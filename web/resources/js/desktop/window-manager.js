@@ -6,6 +6,7 @@ export function windowManager() {
         windows: [],
         nextZIndex: 100,
         activeWindowId: null,
+        startMenuOpen: false,
 
         init() {
             // Open terminal by default
