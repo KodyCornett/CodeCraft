@@ -6,6 +6,62 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, monospace;
+
+    /* OS Color Palette - Dark Hacker Theme */
+    --color-desktop: #0a0a0f;
+    --color-taskbar: #12121a;
+    --color-window-bg: #16161e;
+    --color-window-header: #1a1a24;
+    --color-window-border: #2a2a3a;
+    --color-terminal-bg: #0d0d12;
+    --color-text-primary: #e4e4e7;
+    --color-text-secondary: #a1a1aa;
+    --color-text-muted: #52525b;
+    --color-accent: #22d3ee;
+    --color-accent-dim: #0891b2;
+    --color-success: #4ade80;
+    --color-warning: #fbbf24;
+    --color-danger: #f87171;
+}
+
+/* Global Styles */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-window-border) transparent;
+}
+
+::selection {
+    background-color: var(--color-accent);
+    color: var(--color-desktop);
+}
+
+/* Terminal Cursor Blink */
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.cursor-blink {
+    animation: blink 1s step-end infinite;
+}
+
+/* Window Drag Handle */
+.window-draggable {
+    cursor: grab;
+}
+
+.window-draggable:active {
+    cursor: grabbing;
+}
+
+/* Typing Effect */
+@keyframes typewriter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.type-line {
+    animation: typewriter 0.05s ease-out forwards;
 }
