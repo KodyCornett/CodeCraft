@@ -8,6 +8,7 @@ import { fileExplorer } from './desktop/file-explorer';
 import { nodeManager } from './desktop/node-manager';
 import { browser } from './desktop/browser';
 import { messages } from './desktop/messages';
+import { sentinel } from './desktop/sentinel';
 
 // Register Alpine data components
 Alpine.data('windowManager', windowManager);
@@ -16,6 +17,7 @@ Alpine.data('fileExplorer', fileExplorer);
 Alpine.data('nodeManager', nodeManager);
 Alpine.data('browser', browser);
 Alpine.data('messages', messages);
+Alpine.data('sentinel', sentinel);
 
 // Start Alpine
 Alpine.start();

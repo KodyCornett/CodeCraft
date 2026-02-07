@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\TerminalController;
 use App\Http\Controllers\Api\FilesystemController;
 use App\Http\Controllers\Api\BrowserController;
 use App\Http\Controllers\Api\MessagesController;
+use App\Http\Controllers\Api\SentinelController;
 use Illuminate\Support\Facades\Route;
 
 // Desktop UI
@@ -26,4 +27,11 @@ Route::prefix('api')->group(function () {
     Route::get('/messages/{id}', [MessagesController::class, 'show']);
     Route::post('/messages/{id}/read', [MessagesController::class, 'markRead']);
     Route::post('/messages/send', [MessagesController::class, 'send']);
+
+    // Sentinel (Security Monitor)
+    Route::get('/sentinel/status', [SentinelController::class, 'status']);
+    Route::get('/sentinel/events', [SentinelController::class, 'events']);
+    Route::post('/sentinel/block', [SentinelController::class, 'block']);
+    Route::post('/sentinel/trace', [SentinelController::class, 'trace']);
+    Route::post('/sentinel/counter-hack', [SentinelController::class, 'counterHack']);
 });

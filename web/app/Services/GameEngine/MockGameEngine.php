@@ -7,6 +7,7 @@ namespace App\Services\GameEngine;
 use App\Contracts\GameEngine\CommandResult;
 use App\Contracts\GameEngine\GameEngineInterface;
 use App\Services\Messaging\MessageService;
+use App\Services\Security\SentinelService;
 
 /**
  * Mock implementation of the game engine for UI development.
@@ -17,10 +18,12 @@ use App\Services\Messaging\MessageService;
 class MockGameEngine implements GameEngineInterface
 {
     private MessageService $messageService;
+    private SentinelService $sentinelService;
 
     public function __construct()
     {
         $this->messageService = new MessageService();
+        $this->sentinelService = new SentinelService();
     }
 
     /**
@@ -38,6 +41,8 @@ class MockGameEngine implements GameEngineInterface
         'cat',
         'clear',
         'mail',
+        'sentinel',
+        'status',
     ];
 
     /**
@@ -67,6 +72,7 @@ class MockGameEngine implements GameEngineInterface
             'scan' => $this->handleScan($sessionId, $args),
             'disconnect' => $this->handleDisconnect($sessionId),
             'mail', 'inbox' => $this->handleMail($args),
+            'sentinel', 'status' => $this->handleSentinel(),
             default => CommandResult::unknownCommand($verb),
         };
     }
@@ -99,12 +105,13 @@ AVAILABLE COMMANDS
   cat <file>    Display file contents
   clear         Clear the terminal
   mail          Access your messages
+  sentinel      Security status monitor
   scan <host>   Scan target for open ports
   connect <ip>  Connect to remote system
   disconnect    Close active connection
 
 Type 'mail help' for mail command options.
-Type 'help <command>' for detailed command info.
+Type 'sentinel' or 'status' for security info.
 HELP;
 
         return CommandResult::success($output, delayMs: 150);
@@ -324,5 +331,13 @@ TIPS
 HELP;
 
         return CommandResult::success($output, delayMs: 50);
+    }
+
+    private function handleSentinel(): CommandResult
+    {
+        return CommandResult::success(
+            $this->sentinelService->formatForTerminal(),
+            delayMs: 100
+        );
     }
 }
