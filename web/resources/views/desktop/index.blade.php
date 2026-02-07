@@ -74,6 +74,19 @@
                     </div>
                     <span class="text-xs os-text-dim group-hover:os-text transition-colors text-center leading-tight">Matrix<br>Browser</span>
                 </button>
+
+                {{-- Messages Icon --}}
+                <button
+                    @click.stop="openWindow('messages', 'Messages', { width: 700, height: 550 })"
+                    class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
+                >
+                    <div class="p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
+                        <svg class="w-8 h-8 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs os-text-dim group-hover:os-text transition-colors">Messages</span>
+                </button>
             </div>
 
             {{-- Windows --}}
@@ -126,6 +139,11 @@
                             <template x-if="window.type === 'browser'">
                                 <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'messages'">
+                                <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                 </svg>
                             </template>
                             <span class="text-sm font-medium os-text" x-text="window.title"></span>
@@ -191,6 +209,11 @@
                         {{-- Browser --}}
                         <template x-if="window.type === 'browser'">
                             @include('desktop.windows.browser')
+                        </template>
+
+                        {{-- Messages --}}
+                        <template x-if="window.type === 'messages'">
+                            @include('desktop.windows.messages')
                         </template>
                     </div>
 
@@ -262,6 +285,17 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
                     </svg>
                     <span class="text-sm os-text">Matrix Browser</span>
+                </button>
+
+                {{-- Messages --}}
+                <button
+                    @click="openWindow('messages', 'Messages', { width: 700, height: 550 }); startMenuOpen = false"
+                    class="w-full px-4 py-2 flex items-center gap-3 os-bg-hover transition-colors"
+                >
+                    <svg class="w-5 h-5 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="text-sm os-text">Messages</span>
                 </button>
 
                 <div class="my-2 border-t" style="border-color: #2a2d36;"></div>
@@ -359,6 +393,11 @@
                         <template x-if="window.type === 'browser'">
                             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'messages'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                             </svg>
                         </template>
                         <span class="text-sm truncate" x-text="window.title"></span>

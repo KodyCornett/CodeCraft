@@ -6,6 +6,7 @@ namespace App\Services\GameEngine;
 
 use App\Contracts\GameEngine\CommandResult;
 use App\Contracts\GameEngine\GameEngineInterface;
+use App\Services\Messaging\MessageService;
 
 /**
  * Mock implementation of the game engine for UI development.
@@ -15,6 +16,13 @@ use App\Contracts\GameEngine\GameEngineInterface;
  */
 class MockGameEngine implements GameEngineInterface
 {
+    private MessageService $messageService;
+
+    public function __construct()
+    {
+        $this->messageService = new MessageService();
+    }
+
     /**
      * Simulated trace levels per session (in-memory, resets on request).
      */
@@ -29,6 +37,7 @@ class MockGameEngine implements GameEngineInterface
         'cd',
         'cat',
         'clear',
+        'mail',
     ];
 
     /**
@@ -57,6 +66,7 @@ class MockGameEngine implements GameEngineInterface
             'connect' => $this->handleConnect($sessionId, $args),
             'scan' => $this->handleScan($sessionId, $args),
             'disconnect' => $this->handleDisconnect($sessionId),
+            'mail', 'inbox' => $this->handleMail($args),
             default => CommandResult::unknownCommand($verb),
         };
     }
@@ -80,11 +90,22 @@ class MockGameEngine implements GameEngineInterface
 
     private function handleHelp(string $sessionId): CommandResult
     {
-        $commands = $this->getAvailableCommands($sessionId);
-        $output = "Available commands:\n";
-        foreach ($commands as $cmd) {
-            $output .= "  {$cmd}\n";
-        }
+        $output = <<<HELP
+AVAILABLE COMMANDS
+─────────────────────────────────────────
+  help          Show this help message
+  ls            List directory contents
+  cd <dir>      Change directory
+  cat <file>    Display file contents
+  clear         Clear the terminal
+  mail          Access your messages
+  scan <host>   Scan target for open ports
+  connect <ip>  Connect to remote system
+  disconnect    Close active connection
+
+Type 'mail help' for mail command options.
+Type 'help <command>' for detailed command info.
+HELP;
 
         return CommandResult::success($output, delayMs: 150);
     }
@@ -230,5 +251,78 @@ OUTPUT;
     {
         $current = $this->traceLevels[$sessionId] ?? 0.0;
         $this->traceLevels[$sessionId] = min(1.0, $current + $amount);
+    }
+
+    private function handleMail(array $args): CommandResult
+    {
+        $subcommand = $args[0] ?? 'list';
+
+        return match ($subcommand) {
+            'list', '' => $this->handleMailList(),
+            'read' => $this->handleMailRead($args[1] ?? null),
+            'help' => $this->handleMailHelp(),
+            default => is_numeric($subcommand)
+                ? $this->handleMailRead($subcommand)
+                : CommandResult::error("mail: unknown subcommand '{$subcommand}'. Try 'mail help'."),
+        };
+    }
+
+    private function handleMailList(): CommandResult
+    {
+        $messages = $this->messageService->getMessages();
+        $unreadCount = $this->messageService->getUnreadCount();
+
+        $output = "INBOX ({$unreadCount} unread)\n";
+        $output .= str_repeat('─', 60) . "\n";
+
+        foreach ($messages as $message) {
+            $output .= $this->messageService->formatForTerminal($message) . "\n";
+        }
+
+        $output .= str_repeat('─', 60) . "\n";
+        $output .= "Type 'mail read <id>' to read a message, 'mail help' for more options.";
+
+        return CommandResult::success($output, delayMs: 100);
+    }
+
+    private function handleMailRead(?string $id): CommandResult
+    {
+        if ($id === null) {
+            return CommandResult::error("mail read: missing message ID");
+        }
+
+        $message = $this->messageService->getMessage((int) $id);
+
+        if (!$message) {
+            return CommandResult::error("mail read: message #{$id} not found");
+        }
+
+        $this->messageService->markAsRead((int) $id);
+
+        return CommandResult::success(
+            $this->messageService->formatFullForTerminal($message),
+            delayMs: 150
+        );
+    }
+
+    private function handleMailHelp(): CommandResult
+    {
+        $output = <<<HELP
+MAIL COMMANDS
+─────────────────────────────────────────
+  mail              List all messages
+  mail list         List all messages
+  mail read <id>    Read message by ID
+  mail <id>         Shortcut to read message
+  mail help         Show this help
+
+TIPS
+─────────────────────────────────────────
+  [*] indicates unread messages
+  JOB messages contain contract offers
+  Reply to messages using the Messages app
+HELP;
+
+        return CommandResult::success($output, delayMs: 50);
     }
 }
