@@ -19,13 +19,13 @@
     <div x-data="windowManager()" class="relative h-full flex flex-col">
 
         {{-- Desktop Area (where windows live) --}}
-        <div class="flex-1 relative overflow-hidden" id="desktop-area">
+        <div class="flex-1 relative overflow-hidden" id="desktop-area" @click="startMenuOpen = false">
 
             {{-- Desktop Icons --}}
             <div class="absolute top-4 left-4 flex flex-col gap-4">
                 {{-- Terminal Icon --}}
                 <button
-                    @click="openWindow('terminal', 'Terminal', { width: 750, height: 500 })"
+                    @click.stop="openWindow('terminal', 'Terminal', { width: 750, height: 500 })"
                     class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
                 >
                     <div class="p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
@@ -38,7 +38,7 @@
 
                 {{-- Files Icon --}}
                 <button
-                    @click="openWindow('fileExplorer', 'Files', { width: 650, height: 500 })"
+                    @click.stop="openWindow('fileExplorer', 'Documents', { width: 650, height: 500 })"
                     class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
                 >
                     <div class="p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
@@ -46,7 +46,20 @@
                             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
                         </svg>
                     </div>
-                    <span class="text-xs os-text-dim group-hover:os-text transition-colors">Files</span>
+                    <span class="text-xs os-text-dim group-hover:os-text transition-colors">Documents</span>
+                </button>
+
+                {{-- Node Manager Icon --}}
+                <button
+                    @click.stop="openWindow('nodeManager', 'Node Manager', { width: 900, height: 600 })"
+                    class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
+                >
+                    <div class="p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
+                        <svg class="w-8 h-8 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs os-text-dim group-hover:os-text transition-colors text-center leading-tight">Node<br>Manager</span>
                 </button>
             </div>
 
@@ -61,6 +74,7 @@
                     :class="isActive(window.id) ? 'os-window-active os-window' : 'os-window'"
                     :style="`left: ${window.x}px; top: ${window.y}px; width: ${window.width}px; height: ${window.height}px; z-index: ${window.zIndex}; border-color: ${isActive(window.id) ? '#0891b2' : '#2a2d36'};`"
                     @mousedown="focusWindow(window.id)"
+                    @click.stop
                 >
                     {{-- Window Header --}}
                     <div
@@ -70,6 +84,32 @@
                         @dblclick="toggleMaximize(window.id)"
                     >
                         <div class="flex items-center gap-2">
+                            {{-- Window Icon --}}
+                            <template x-if="window.type === 'terminal'">
+                                <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'fileExplorer'">
+                                <svg class="w-4 h-4 os-accent" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'nodeManager'">
+                                <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'contacts'">
+                                <svg class="w-4 h-4 os-accent" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'myPC'">
+                                <svg class="w-4 h-4 os-accent" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+                                </svg>
+                            </template>
                             <span class="text-sm font-medium os-text" x-text="window.title"></span>
                         </div>
                         <div class="flex items-center gap-1 window-controls">
@@ -110,9 +150,24 @@
                             @include('desktop.windows.terminal')
                         </template>
 
-                        {{-- File Explorer --}}
+                        {{-- File Explorer / Documents --}}
                         <template x-if="window.type === 'fileExplorer'">
                             @include('desktop.windows.file-explorer')
+                        </template>
+
+                        {{-- Node Manager --}}
+                        <template x-if="window.type === 'nodeManager'">
+                            @include('desktop.windows.node-manager')
+                        </template>
+
+                        {{-- Contacts --}}
+                        <template x-if="window.type === 'contacts'">
+                            @include('desktop.windows.contacts')
+                        </template>
+
+                        {{-- My PC --}}
+                        <template x-if="window.type === 'myPC'">
+                            @include('desktop.windows.my-pc')
                         </template>
                     </div>
 
@@ -133,10 +188,98 @@
             </template>
         </div>
 
+        {{-- Start Menu (popup) --}}
+        <div
+            x-show="startMenuOpen"
+            x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-75"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 translate-y-2"
+            @click.stop
+            class="absolute bottom-14 left-2 w-64 rounded-lg border shadow-2xl shadow-black/50 overflow-hidden"
+            style="background-color: #13151a; border-color: #2a2d36; z-index: 9999;"
+        >
+            {{-- Menu Header --}}
+            <div class="px-4 py-3 border-b" style="border-color: #2a2d36; background-color: #1a1c23;">
+                <div class="text-sm font-medium os-text">Programs</div>
+            </div>
+
+            {{-- Menu Items --}}
+            <div class="py-2">
+                {{-- Terminal --}}
+                <button
+                    @click="openWindow('terminal', 'Terminal', { width: 750, height: 500 }); startMenuOpen = false"
+                    class="w-full px-4 py-2 flex items-center gap-3 os-bg-hover transition-colors"
+                >
+                    <svg class="w-5 h-5 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="text-sm os-text">Terminal</span>
+                </button>
+
+                {{-- Node Manager --}}
+                <button
+                    @click="openWindow('nodeManager', 'Node Manager', { width: 900, height: 600 }); startMenuOpen = false"
+                    class="w-full px-4 py-2 flex items-center gap-3 os-bg-hover transition-colors"
+                >
+                    <svg class="w-5 h-5 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                    </svg>
+                    <span class="text-sm os-text">Node Manager</span>
+                </button>
+
+                <div class="my-2 border-t" style="border-color: #2a2d36;"></div>
+
+                {{-- Documents --}}
+                <button
+                    @click="openWindow('fileExplorer', 'Documents', { width: 650, height: 500 }); startMenuOpen = false"
+                    class="w-full px-4 py-2 flex items-center gap-3 os-bg-hover transition-colors"
+                >
+                    <svg class="w-5 h-5 os-accent" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <span class="text-sm os-text">Documents</span>
+                </button>
+
+                {{-- Contacts --}}
+                <button
+                    @click="openWindow('contacts', 'Contacts', { width: 500, height: 450 }); startMenuOpen = false"
+                    class="w-full px-4 py-2 flex items-center gap-3 os-bg-hover transition-colors"
+                >
+                    <svg class="w-5 h-5 os-accent" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                    </svg>
+                    <span class="text-sm os-text">Contacts</span>
+                </button>
+
+                {{-- My PC --}}
+                <button
+                    @click="openWindow('myPC', 'My PC', { width: 600, height: 450 }); startMenuOpen = false"
+                    class="w-full px-4 py-2 flex items-center gap-3 os-bg-hover transition-colors"
+                >
+                    <svg class="w-5 h-5 os-accent" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-sm os-text">My PC</span>
+                </button>
+            </div>
+
+            {{-- Menu Footer --}}
+            <div class="px-4 py-2 border-t flex items-center justify-between" style="border-color: #2a2d36; background-color: #0c0d10;">
+                <span class="text-xs os-text-muted">CodeCraft OS v0.1</span>
+            </div>
+        </div>
+
         {{-- Taskbar (at bottom like Windows/Linux) --}}
         <div class="h-12 os-taskbar border-t flex items-center px-2 gap-1" style="border-color: #2a2d36;">
             {{-- Start/App Menu Button --}}
-            <button class="h-9 w-9 flex items-center justify-center rounded os-bg-hover transition-colors">
+            <button
+                @click.stop="startMenuOpen = !startMenuOpen"
+                class="h-9 w-9 flex items-center justify-center rounded transition-colors"
+                :class="startMenuOpen ? 'os-bg-active' : 'os-bg-hover'"
+            >
                 <svg class="w-5 h-5 os-accent" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z" clip-rule="evenodd"/>
                 </svg>
@@ -162,6 +305,21 @@
                         <template x-if="window.type === 'fileExplorer'">
                             <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'nodeManager'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'contacts'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'myPC'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
                             </svg>
                         </template>
                         <span class="text-sm truncate" x-text="window.title"></span>
