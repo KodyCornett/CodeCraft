@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Contracts\GameEngine\GameEngineInterface;
+use App\Services\GameEngine\KotlinGameEngine;
 use App\Services\GameEngine\MockGameEngine;
 use Illuminate\Support\ServiceProvider;
 
@@ -13,16 +14,24 @@ class GameEngineServiceProvider extends ServiceProvider
     /**
      * Register the game engine binding.
      *
-     * In production/Phase 2+, this will switch to the real Kotlin
-     * engine WebSocket client based on configuration.
+     * Uses mock engine for UI development or real Kotlin engine in production.
      */
     public function register(): void
     {
         $this->app->singleton(GameEngineInterface::class, function ($app) {
-            // TODO: Check config to determine if we should use real engine
-            // return config('game.use_real_engine')
-            //     ? new KotlinGameEngine(config('game.engine_url'))
-            //     : new MockGameEngine();
+            $engineType = config('game.engine', 'mock');
+
+            if ($engineType === 'kotlin') {
+                $kotlinEngine = new KotlinGameEngine();
+
+                // Check if Kotlin engine is available, fall back to mock if not
+                if ($kotlinEngine->isAvailable()) {
+                    return $kotlinEngine;
+                }
+
+                // Log warning and fall back to mock
+                logger()->warning('Kotlin engine not available, falling back to mock engine');
+            }
 
             return new MockGameEngine();
         });
