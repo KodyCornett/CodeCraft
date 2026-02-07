@@ -10,31 +10,37 @@
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, monospace;
 
     /* OS Color Palette - Dark Hacker Theme */
-    --color-desktop: #0a0a0f;
-    --color-taskbar: #12121a;
-    --color-window-bg: #16161e;
-    --color-window-header: #1a1a24;
-    --color-window-border: #2a2a3a;
-    --color-terminal-bg: #0d0d12;
-    --color-text-primary: #e4e4e7;
-    --color-text-secondary: #a1a1aa;
-    --color-text-muted: #52525b;
-    --color-accent: #22d3ee;
-    --color-accent-dim: #0891b2;
-    --color-success: #4ade80;
-    --color-warning: #fbbf24;
-    --color-danger: #f87171;
+    --color-os-desktop: #0a0a0f;
+    --color-os-taskbar: #111318;
+    --color-os-window: #13151a;
+    --color-os-window-header: #1a1c23;
+    --color-os-border: #2a2d36;
+    --color-os-terminal: #0c0d10;
+    --color-os-text: #e4e4e7;
+    --color-os-text-dim: #a1a1aa;
+    --color-os-text-muted: #52525b;
+    --color-os-accent: #22d3ee;
+    --color-os-accent-dim: #0891b2;
+    --color-os-success: #4ade80;
+    --color-os-warning: #fbbf24;
+    --color-os-danger: #f87171;
+}
+
+/* Base HTML/Body - Force dark background */
+html, body {
+    background-color: #0a0a0f;
+    color: #e4e4e7;
 }
 
 /* Global Styles */
 * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-window-border) transparent;
+    scrollbar-color: #2a2d36 transparent;
 }
 
 ::selection {
-    background-color: var(--color-accent);
-    color: var(--color-desktop);
+    background-color: #22d3ee;
+    color: #0a0a0f;
 }
 
 /* Terminal Cursor Blink */
@@ -50,18 +56,73 @@
 /* Window Drag Handle */
 .window-draggable {
     cursor: grab;
+    user-select: none;
 }
 
 .window-draggable:active {
     cursor: grabbing;
 }
 
-/* Typing Effect */
-@keyframes typewriter {
-    from { opacity: 0; }
-    to { opacity: 1; }
+/* OS Component Classes */
+.os-desktop {
+    background-color: #0a0a0f;
 }
 
-.type-line {
-    animation: typewriter 0.05s ease-out forwards;
+.os-taskbar {
+    background-color: #111318;
+    border-color: #2a2d36;
+}
+
+.os-window {
+    background-color: #13151a;
+    border-color: #2a2d36;
+}
+
+.os-window-active {
+    border-color: #0891b2;
+}
+
+.os-window-header {
+    background-color: #1a1c23;
+    border-color: #2a2d36;
+}
+
+.os-terminal {
+    background-color: #0c0d10;
+}
+
+.os-text {
+    color: #e4e4e7;
+}
+
+.os-text-dim {
+    color: #a1a1aa;
+}
+
+.os-text-muted {
+    color: #52525b;
+}
+
+.os-accent {
+    color: #22d3ee;
+}
+
+.os-accent-dim {
+    color: #0891b2;
+}
+
+.os-danger {
+    color: #f87171;
+}
+
+.os-warning {
+    color: #fbbf24;
+}
+
+.os-bg-hover:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.os-bg-active {
+    background-color: rgba(34, 211, 238, 0.15);
 }
