@@ -5,6 +5,12 @@ import com.codecraft.engine.domain.Detection
 import com.codecraft.engine.domain.ToolCatalog
 import com.codecraft.engine.domain.ToolEffectType
 import com.codecraft.engine.domain.ToolType
+import com.codecraft.engine.network.discovery.DiscoveryManager
+import com.codecraft.engine.network.discovery.ScanService
+import com.codecraft.engine.network.gateway.GatewayManager
+import com.codecraft.engine.network.persistence.ConnectionRepository
+import com.codecraft.engine.network.persistence.NodeRepository
+import com.codecraft.engine.network.persistence.PositionRepository
 import com.codecraft.engine.persistence.PlayerRepository
 import com.codecraft.engine.protocol.StateChanges
 import com.codecraft.engine.puzzle.CombatType
@@ -18,7 +24,12 @@ import com.codecraft.engine.session.ToolActivation
  * Registry of all available commands
  */
 class CommandRegistry(
-    private val repository: PlayerRepository? = null
+    private val repository: PlayerRepository? = null,
+    private val nodeRepository: NodeRepository? = null,
+    private val connectionRepository: ConnectionRepository? = null,
+    private val discoveryManager: DiscoveryManager? = null,
+    private val positionRepository: PositionRepository? = null,
+    private val gatewayManager: GatewayManager? = null
 ) {
     private val commands = mutableMapOf<String, Command>()
 
@@ -53,6 +64,17 @@ class CommandRegistry(
         register(ConnectCommand())
         register(DisconnectCommand())
         register(ProbeCommand())
+        // Phase 3 enhanced commands (registered when repos are available)
+        if (nodeRepository != null && discoveryManager != null && positionRepository != null) {
+            register(EnhancedScanCommand(nodeRepository, discoveryManager, ScanService(), positionRepository))
+            register(EnhancedMapCommand(discoveryManager, positionRepository))
+            if (gatewayManager != null) {
+                register(EnhancedConnectCommand(nodeRepository, discoveryManager, positionRepository, gatewayManager))
+            }
+            if (connectionRepository != null) {
+                register(RouteCommand(nodeRepository, connectionRepository, discoveryManager, positionRepository))
+            }
+        }
     }
 
     private fun registerUtilityCommands() {

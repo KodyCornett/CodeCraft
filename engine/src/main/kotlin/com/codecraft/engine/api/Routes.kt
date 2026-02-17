@@ -2,6 +2,13 @@ package com.codecraft.engine.api
 
 import com.codecraft.engine.command.CommandRegistry
 import com.codecraft.engine.domain.Node
+import com.codecraft.engine.network.discovery.DiscoveryManager
+import com.codecraft.engine.network.gateway.GatewayManager
+import com.codecraft.engine.network.persistence.ConnectionRepository
+import com.codecraft.engine.network.persistence.DiscoveryRepository
+import com.codecraft.engine.network.persistence.NodeRepository
+import com.codecraft.engine.network.persistence.PositionRepository
+import com.codecraft.engine.persistence.GameDatabase
 import com.codecraft.engine.protocol.CommandRequest
 import com.codecraft.engine.protocol.NetworkConnectionData
 import com.codecraft.engine.protocol.NetworkNodeData
@@ -22,7 +29,23 @@ import kotlinx.serialization.Serializable
  * Configure REST API routes
  */
 fun Application.configureRoutes(sessionManager: SessionManager) {
-    val commandRegistry = CommandRegistry(sessionManager.getRepository())
+    // Phase 3 network repositories
+    val db = GameDatabase.database
+    val nodeRepository = NodeRepository(db)
+    val connectionRepository = ConnectionRepository(db)
+    val discoveryRepository = DiscoveryRepository(db)
+    val discoveryManager = DiscoveryManager(discoveryRepository, nodeRepository)
+    val positionRepository = PositionRepository(db)
+    val gatewayManager = GatewayManager(nodeRepository, discoveryManager)
+
+    val commandRegistry = CommandRegistry(
+        repository = sessionManager.getRepository(),
+        nodeRepository = nodeRepository,
+        connectionRepository = connectionRepository,
+        discoveryManager = discoveryManager,
+        positionRepository = positionRepository,
+        gatewayManager = gatewayManager
+    )
 
     routing {
         // Health check
@@ -33,6 +56,42 @@ fun Application.configureRoutes(sessionManager: SessionManager) {
                 version = "0.1.0",
                 sessions = sessionManager.sessionCount()
             ))
+        }
+
+        // Dev-only: seed Phase 3 test data for a session
+        post("/dev/seed-network/{sessionId}") {
+            val sessionId = call.parameters["sessionId"]
+                ?: return@post call.respond(HttpStatusCode.BadRequest, "missing sessionId")
+            try {
+                val generator = com.codecraft.engine.network.generation.NetworkTestDataGenerator(
+                    com.codecraft.engine.network.naming.NodeNameGenerator(),
+                    nodeRepository,
+                    connectionRepository
+                )
+                val nodes = generator.generateTestDataset(20)
+                nodes.take(5).forEach { node ->
+                    try {
+                        discoveryManager.discoverNode(sessionId, node)
+                    } catch (e: Exception) {
+                        println("[Seed] Could not discover node ${node.nodeName}: ${e.message}")
+                    }
+                }
+                val firstNodeName = nodes.firstOrNull()?.let { node ->
+                    try {
+                        discoveryManager.updateState(sessionId, node.nodeId, com.codecraft.engine.network.domain.DiscoveryState.CONNECTED)
+                        positionRepository.updatePosition(sessionId, node.nodeId)
+                        node.nodeName
+                    } catch (e: Exception) {
+                        println("[Seed] Could not set position: ${e.message}")
+                        null
+                    }
+                }
+                call.respond(mapOf("seeded" to "${nodes.size}", "startNode" to (firstNodeName ?: "none")))
+            } catch (e: Exception) {
+                println("[Seed] Error: ${e.message}")
+                e.printStackTrace()
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "unknown")))
+            }
         }
 
         // API routes

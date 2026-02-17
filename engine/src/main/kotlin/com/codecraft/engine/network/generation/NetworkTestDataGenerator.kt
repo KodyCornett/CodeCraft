@@ -3,7 +3,9 @@ package com.codecraft.engine.network.generation
 import com.codecraft.engine.network.domain.NetworkNode
 import com.codecraft.engine.network.domain.NodeType
 import com.codecraft.engine.network.naming.NodeNameGenerator
+import com.codecraft.engine.network.persistence.ConnectionRepository
 import com.codecraft.engine.network.persistence.NodeRepository
+import com.codecraft.engine.network.routing.ConnectionGraphBuilder
 import java.util.UUID
 import kotlin.random.Random
 
@@ -12,7 +14,8 @@ import kotlin.random.Random
  */
 class NetworkTestDataGenerator(
     private val nameGenerator: NodeNameGenerator,
-    private val nodeRepository: NodeRepository
+    private val nodeRepository: NodeRepository,
+    private val connectionRepository: ConnectionRepository
 ) {
 
     /**
@@ -66,6 +69,12 @@ class NetworkTestDataGenerator(
 
         // Print sample names
         printSampleNames(nodes)
+
+        // Build and persist connection graph (idempotent)
+        connectionRepository.deleteAllConnections()
+        val connections = ConnectionGraphBuilder().buildConnections(nodes)
+        connectionRepository.saveConnections(connections)
+        println("[TestDataGenerator] ✓ Generated ${connections.size} connections")
 
         return nodes
     }

@@ -2,7 +2,9 @@ package com.codecraft.engine.network.generation
 
 import com.codecraft.engine.database.tables.NetworkDistrictsTable
 import com.codecraft.engine.database.tables.NetworkNodesTable
+import com.codecraft.engine.database.tables.NodeConnectionsTable
 import com.codecraft.engine.network.naming.NodeNameGenerator
+import com.codecraft.engine.network.persistence.ConnectionRepository
 import com.codecraft.engine.network.persistence.NodeRepository
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -25,13 +27,15 @@ class NetworkTestDataGeneratorTest {
         transaction(database) {
             SchemaUtils.create(
                 NetworkDistrictsTable,
-                NetworkNodesTable
+                NetworkNodesTable,
+                NodeConnectionsTable
             )
         }
 
         repository = NodeRepository(database)
+        val connectionRepository = ConnectionRepository(database)
         val nameGenerator = NodeNameGenerator()
-        generator = NetworkTestDataGenerator(nameGenerator, repository)
+        generator = NetworkTestDataGenerator(nameGenerator, repository, connectionRepository)
     }
 
     @Test

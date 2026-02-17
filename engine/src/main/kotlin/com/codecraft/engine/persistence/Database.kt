@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
  */
 object GameDatabase {
     private var initialized = false
+    lateinit var database: Database
 
     fun init() {
         if (initialized) return
@@ -18,7 +19,7 @@ object GameDatabase {
         val jdbcUrl = "jdbc:sqlite:$dbPath"
 
         try {
-            Database.connect(
+            database = Database.connect(
                 url = jdbcUrl,
                 driver = "org.sqlite.JDBC"
             )

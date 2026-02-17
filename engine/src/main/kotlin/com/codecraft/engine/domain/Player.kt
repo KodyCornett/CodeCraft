@@ -33,7 +33,9 @@ data class Player(
         // Puzzles
         "analyze", "decode", "decrypt", "submit", "solve",
         // File operations
-        "open", "download"
+        "open", "download",
+        // Phase 3 network commands
+        "nscan", "nconnect", "nmap", "route"
     ),
 
     // Purchased/owned items
