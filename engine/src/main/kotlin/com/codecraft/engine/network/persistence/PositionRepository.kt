@@ -2,6 +2,7 @@ package com.codecraft.engine.network.persistence
 
 import com.codecraft.engine.database.tables.PlayerNetworkPositionTable
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
 
@@ -19,9 +20,9 @@ class PositionRepository(private val database: Database) {
         previousNodeId: UUID? = null
     ) {
         transaction(database) {
-            val existing = PlayerNetworkPositionTable.select {
-                PlayerNetworkPositionTable.playerId eq playerId
-            }.singleOrNull()
+            val existing = PlayerNetworkPositionTable.selectAll()
+                .where { PlayerNetworkPositionTable.playerId eq playerId }
+                .singleOrNull()
 
             if (existing != null) {
                 // Update existing position
@@ -49,9 +50,8 @@ class PositionRepository(private val database: Database) {
      */
     fun getCurrentPosition(playerId: String): UUID? {
         return transaction(database) {
-            PlayerNetworkPositionTable.select {
-                PlayerNetworkPositionTable.playerId eq playerId
-            }
+            PlayerNetworkPositionTable.selectAll()
+                .where { PlayerNetworkPositionTable.playerId eq playerId }
                 .map { it[PlayerNetworkPositionTable.currentNodeId] }
                 .singleOrNull()
         }
@@ -62,9 +62,8 @@ class PositionRepository(private val database: Database) {
      */
     fun getPreviousPosition(playerId: String): UUID? {
         return transaction(database) {
-            PlayerNetworkPositionTable.select {
-                PlayerNetworkPositionTable.playerId eq playerId
-            }
+            PlayerNetworkPositionTable.selectAll()
+                .where { PlayerNetworkPositionTable.playerId eq playerId }
                 .map { it[PlayerNetworkPositionTable.previousNodeId] }
                 .singleOrNull()
         }
@@ -75,9 +74,8 @@ class PositionRepository(private val database: Database) {
      */
     fun getPositions(playerId: String): Pair<UUID?, UUID?> {
         return transaction(database) {
-            PlayerNetworkPositionTable.select {
-                PlayerNetworkPositionTable.playerId eq playerId
-            }
+            PlayerNetworkPositionTable.selectAll()
+                .where { PlayerNetworkPositionTable.playerId eq playerId }
                 .map {
                     it[PlayerNetworkPositionTable.currentNodeId] to
                             it[PlayerNetworkPositionTable.previousNodeId]
@@ -105,9 +103,9 @@ class PositionRepository(private val database: Database) {
      */
     fun hasPosition(playerId: String): Boolean {
         return transaction(database) {
-            PlayerNetworkPositionTable.select {
-                PlayerNetworkPositionTable.playerId eq playerId
-            }.count() > 0
+            PlayerNetworkPositionTable.selectAll()
+                .where { PlayerNetworkPositionTable.playerId eq playerId }
+                .count() > 0
         }
     }
 
@@ -116,9 +114,8 @@ class PositionRepository(private val database: Database) {
      */
     fun getLastUpdateTime(playerId: String): Long? {
         return transaction(database) {
-            PlayerNetworkPositionTable.select {
-                PlayerNetworkPositionTable.playerId eq playerId
-            }
+            PlayerNetworkPositionTable.selectAll()
+                .where { PlayerNetworkPositionTable.playerId eq playerId }
                 .map { it[PlayerNetworkPositionTable.lastPositionUpdate] }
                 .singleOrNull()
         }

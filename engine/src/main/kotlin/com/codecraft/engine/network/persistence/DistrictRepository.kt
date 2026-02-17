@@ -5,6 +5,7 @@ import com.codecraft.engine.network.domain.District
 import com.codecraft.engine.network.domain.DistrictType
 import com.codecraft.engine.network.domain.NodeDensity
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
 

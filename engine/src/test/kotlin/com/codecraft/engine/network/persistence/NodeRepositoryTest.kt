@@ -21,8 +21,8 @@ class NodeRepositoryTest {
 
     @BeforeEach
     fun setup() {
-        // Initialize in-memory H2 database for testing
-        database = Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+        // Initialize in-memory H2 database for testing (unique name per test)
+        database = Database.connect("jdbc:h2:mem:test_${System.nanoTime()};DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
         transaction(database) {
             SchemaUtils.create(

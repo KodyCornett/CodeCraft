@@ -3,6 +3,7 @@ package com.codecraft.engine.network.persistence
 import com.codecraft.engine.database.tables.PlayerDiscoveredNodesTable
 import com.codecraft.engine.network.domain.DiscoveryState
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
 
@@ -39,20 +40,22 @@ class DiscoveryRepository(private val database: Database) {
         newState: DiscoveryState
     ) {
         transaction(database) {
-            val existing = PlayerDiscoveredNodesTable.select {
-                (PlayerDiscoveredNodesTable.playerId eq playerId) and
-                        (PlayerDiscoveredNodesTable.nodeId eq nodeId)
-            }.singleOrNull()
+            val existing = PlayerDiscoveredNodesTable.selectAll()
+                .where {
+                    (PlayerDiscoveredNodesTable.playerId eq playerId) and
+                            (PlayerDiscoveredNodesTable.nodeId eq nodeId)
+                }.singleOrNull()
 
             if (existing != null) {
                 // Update existing record
+                val currentCount = existing[PlayerDiscoveredNodesTable.accessCount]
                 PlayerDiscoveredNodesTable.update({
                     (PlayerDiscoveredNodesTable.playerId eq playerId) and
                             (PlayerDiscoveredNodesTable.nodeId eq nodeId)
                 }) {
                     it[discoveryState] = newState.name
                     it[lastAccessed] = System.currentTimeMillis()
-                    it[accessCount] = PlayerDiscoveredNodesTable.accessCount + 1
+                    it[accessCount] = currentCount + 1
                 }
             } else {
                 // Insert new record
@@ -66,10 +69,11 @@ class DiscoveryRepository(private val database: Database) {
      */
     fun getDiscoveryState(playerId: String, nodeId: UUID): DiscoveryState? {
         return transaction(database) {
-            PlayerDiscoveredNodesTable.select {
-                (PlayerDiscoveredNodesTable.playerId eq playerId) and
-                        (PlayerDiscoveredNodesTable.nodeId eq nodeId)
-            }
+            PlayerDiscoveredNodesTable.selectAll()
+                .where {
+                    (PlayerDiscoveredNodesTable.playerId eq playerId) and
+                            (PlayerDiscoveredNodesTable.nodeId eq nodeId)
+                }
                 .map { DiscoveryState.valueOf(it[PlayerDiscoveredNodesTable.discoveryState]) }
                 .singleOrNull()
         }
@@ -80,9 +84,8 @@ class DiscoveryRepository(private val database: Database) {
      */
     fun getPlayerDiscoveries(playerId: String): List<Pair<UUID, DiscoveryState>> {
         return transaction(database) {
-            PlayerDiscoveredNodesTable.select {
-                PlayerDiscoveredNodesTable.playerId eq playerId
-            }
+            PlayerDiscoveredNodesTable.selectAll()
+                .where { PlayerDiscoveredNodesTable.playerId eq playerId }
                 .map {
                     it[PlayerDiscoveredNodesTable.nodeId] to
                             DiscoveryState.valueOf(it[PlayerDiscoveredNodesTable.discoveryState])
@@ -95,10 +98,11 @@ class DiscoveryRepository(private val database: Database) {
      */
     fun getNodesByState(playerId: String, state: DiscoveryState): List<UUID> {
         return transaction(database) {
-            PlayerDiscoveredNodesTable.select {
-                (PlayerDiscoveredNodesTable.playerId eq playerId) and
-                        (PlayerDiscoveredNodesTable.discoveryState eq state.name)
-            }
+            PlayerDiscoveredNodesTable.selectAll()
+                .where {
+                    (PlayerDiscoveredNodesTable.playerId eq playerId) and
+                            (PlayerDiscoveredNodesTable.discoveryState eq state.name)
+                }
                 .map { it[PlayerDiscoveredNodesTable.nodeId] }
         }
     }
@@ -108,10 +112,11 @@ class DiscoveryRepository(private val database: Database) {
      */
     fun isDiscovered(playerId: String, nodeId: UUID): Boolean {
         return transaction(database) {
-            PlayerDiscoveredNodesTable.select {
-                (PlayerDiscoveredNodesTable.playerId eq playerId) and
-                        (PlayerDiscoveredNodesTable.nodeId eq nodeId)
-            }.count() > 0
+            PlayerDiscoveredNodesTable.selectAll()
+                .where {
+                    (PlayerDiscoveredNodesTable.playerId eq playerId) and
+                            (PlayerDiscoveredNodesTable.nodeId eq nodeId)
+                }.count() > 0
         }
     }
 
@@ -120,9 +125,9 @@ class DiscoveryRepository(private val database: Database) {
      */
     fun getDiscoveryCount(playerId: String): Long {
         return transaction(database) {
-            PlayerDiscoveredNodesTable.select {
-                PlayerDiscoveredNodesTable.playerId eq playerId
-            }.count()
+            PlayerDiscoveredNodesTable.selectAll()
+                .where { PlayerDiscoveredNodesTable.playerId eq playerId }
+                .count()
         }
     }
 
@@ -131,10 +136,12 @@ class DiscoveryRepository(private val database: Database) {
      */
     fun getDiscoveryCountByState(playerId: String, state: DiscoveryState): Long {
         return transaction(database) {
-            PlayerDiscoveredNodesTable.select {
-                (PlayerDiscoveredNodesTable.playerId eq playerId) and
-                        (PlayerDiscoveredNodesTable.discoveryState eq state.name)
-            }.count()
+            PlayerDiscoveredNodesTable.selectAll()
+                .where {
+                    (PlayerDiscoveredNodesTable.playerId eq playerId) and
+                            (PlayerDiscoveredNodesTable.discoveryState eq state.name)
+                }
+                .count()
         }
     }
 
