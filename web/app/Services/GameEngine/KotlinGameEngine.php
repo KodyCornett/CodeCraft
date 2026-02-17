@@ -24,26 +24,43 @@ class KotlinGameEngine implements GameEngineInterface
     public function executeCommand(string $sessionId, string $command, array $context = []): CommandResult
     {
         try {
-            $response = Http::timeout(10)
-                ->post("{$this->baseUrl}/api/command", [
-                    'sessionId' => $sessionId,
-                    'command' => $command,
-                    'context' => [
-                        'currentPath' => $context['currentPath'] ?? '/home/user',
-                        'connectedTo' => $context['connectedTo'] ?? null,
-                        'variables' => $context['variables'] ?? [],
-                    ],
-                ]);
+            $variables = $context['variables'] ?? [];
+
+            $payload = [
+                'sessionId' => $sessionId,
+                'command' => $command,
+                'context' => [
+                    'currentPath' => $context['currentPath'] ?? '/home/user',
+                    'connectedTo' => $context['connectedTo'] ?? null,
+                    // Force empty array to be JSON object {} instead of array []
+                    'variables' => empty($variables) ? (object) [] : $variables,
+                ],
+            ];
+
+            Log::debug('Sending command to engine', $payload);
+
+            $response = Http::asJson()
+                ->timeout(10)
+                ->post("{$this->baseUrl}/api/command", $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
+                $output = $data['output'] ?? '';
+
+                // Merge gameEvents into stateChanges for downstream processing
+                $stateChanges = $data['stateChanges'] ?? [];
+                if (!empty($data['gameEvents'])) {
+                    $stateChanges['gameEvents'] = $data['gameEvents'];
+                }
 
                 return new CommandResult(
                     success: $data['success'] ?? false,
-                    output: $data['output'] ?? '',
-                    error: $data['error'] ?? null,
+                    output: $output,
+                    lines: $output ? explode("\n", $output) : [],
+                    traceIncrease: (float) ($data['traceIncrease'] ?? 0.0),
                     delayMs: $data['delayMs'] ?? 100,
-                    stateChanges: $data['stateChanges'] ?? [],
+                    stateChanges: $stateChanges,
+                    errorType: $data['error'] ?? null,
                 );
             }
 
@@ -52,15 +69,14 @@ class KotlinGameEngine implements GameEngineInterface
                 'body' => $response->body(),
             ]);
 
-            return CommandResult::error('Engine communication error');
+            return CommandResult::error("Engine returned an error (HTTP {$response->status()}).");
 
         } catch (\Exception $e) {
             Log::error('Game engine connection failed', [
                 'error' => $e->getMessage(),
             ]);
 
-            // Fall back to mock on connection failure
-            return CommandResult::error("Engine offline: {$e->getMessage()}");
+            return CommandResult::error('Connection to engine lost. Is the game server running?');
         }
     }
 
@@ -142,7 +158,8 @@ class KotlinGameEngine implements GameEngineInterface
     public function createSession(): ?string
     {
         try {
-            $response = Http::timeout(5)
+            $response = Http::asJson()
+                ->timeout(5)
                 ->post("{$this->baseUrl}/api/session", [
                     'action' => 'create',
                 ]);
@@ -158,5 +175,219 @@ class KotlinGameEngine implements GameEngineInterface
         }
 
         return null;
+    }
+
+    /**
+     * Get active mission status
+     */
+    public function getActiveMission(string $sessionId): ?array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/mission/{$sessionId}");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['active'] ?? false ? $data : null;
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get active mission', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Complete active mission
+     */
+    public function completeMission(string $sessionId): array
+    {
+        try {
+            $response = Http::asJson()
+                ->timeout(10)
+                ->post("{$this->baseUrl}/api/mission/{$sessionId}/complete");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to complete mission', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return ['success' => false, 'output' => 'Failed to complete mission'];
+    }
+
+    /**
+     * Abandon active mission
+     */
+    public function abandonMission(string $sessionId): array
+    {
+        try {
+            $response = Http::asJson()
+                ->timeout(5)
+                ->post("{$this->baseUrl}/api/mission/{$sessionId}/abandon");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to abandon mission', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return ['success' => false, 'output' => 'Failed to abandon mission'];
+    }
+
+    /**
+     * Accept a mission from the board
+     */
+    public function acceptMission(string $sessionId, string $missionId): array
+    {
+        try {
+            $response = Http::asJson()->timeout(5)
+                ->post("{$this->baseUrl}/api/mission/{$sessionId}/{$missionId}/accept");
+
+            if ($response->successful()) {
+                return array_merge(['success' => true], $response->json());
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to accept mission', ['error' => $e->getMessage()]);
+        }
+
+        return ['success' => false, 'output' => 'Failed to accept mission'];
+    }
+
+    /**
+     * Get available missions
+     */
+    public function getAvailableMissions(string $sessionId): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/missions/available/{$sessionId}");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['missions'] ?? [];
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get available missions', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [];
+    }
+
+    /**
+     * Get network state (nodes and connections) for the session
+     */
+    public function getNetworkState(string $sessionId): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/network-state/{$sessionId}");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get network state from engine', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return ['nodes' => [], 'connections' => [], 'currentNode' => 'local'];
+    }
+
+    /**
+     * Get job offers
+     */
+    public function getJobOffers(string $sessionId): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/jobs/{$sessionId}");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['offers'] ?? [];
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get job offers', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [];
+    }
+
+    /**
+     * Get Sentinel status (exposure, shield, firewall)
+     */
+    public function getSentinelStatus(string $sessionId): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/sentinel/status/{$sessionId}");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get sentinel status', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [];
+    }
+
+    /**
+     * Get Firewall status
+     */
+    public function getFirewallStatus(string $sessionId): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/firewall/status/{$sessionId}");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get firewall status', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [];
+    }
+
+    /**
+     * Get downloads list
+     */
+    public function getDownloads(string $sessionId): array
+    {
+        try {
+            $response = Http::timeout(5)
+                ->get("{$this->baseUrl}/api/downloads/{$sessionId}");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['downloads'] ?? [];
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to get downloads', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [];
     }
 }

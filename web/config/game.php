@@ -7,12 +7,10 @@ return [
     | Game Engine Configuration
     |--------------------------------------------------------------------------
     |
-    | Configure the game engine connection. The engine can run in "mock" mode
-    | for UI development or "kotlin" mode to connect to the real engine.
+    | Configure the game engine connection. The game requires the Kotlin engine
+    | to be running. See CLAUDE.md for setup instructions.
     |
     */
-
-    'engine' => env('GAME_ENGINE', 'mock'), // 'mock' or 'kotlin'
 
     'engine_url' => env('GAME_ENGINE_URL', 'http://localhost:8085'),
 

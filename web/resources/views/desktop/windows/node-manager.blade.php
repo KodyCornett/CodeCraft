@@ -34,6 +34,10 @@
                     <span class="os-text-dim">Discovered</span>
                 </div>
                 <div class="flex items-center gap-2">
+                    <div class="w-8 h-0.5" style="background: repeating-linear-gradient(to right, rgba(251,191,36,0.5) 0, rgba(251,191,36,0.5) 4px, transparent 4px, transparent 8px);"></div>
+                    <span class="os-text-dim">Unbreached Route</span>
+                </div>
+                <div class="flex items-center gap-2">
                     <div class="w-3 h-3 rounded-full" style="background-color: #f87171;"></div>
                     <span class="os-text-dim">Locked</span>
                 </div>
@@ -58,7 +62,12 @@
         {{-- Current Location Indicator --}}
         <div class="absolute top-3 right-3 px-3 py-2 rounded-lg text-xs" style="background-color: rgba(19, 21, 26, 0.9); border: 1px solid #0891b2;">
             <div class="os-text-muted mb-1">Current Position</div>
-            <div class="os-accent font-mono font-medium" x-text="nodes.find(n => n.id === currentNodeId)?.name || 'Unknown'"></div>
+            <div class="os-accent font-mono font-medium"
+                 x-text="(() => {
+                     const node = nodes.find(n => n.id === currentNodeId);
+                     const name = node?.name || 'Local';
+                     return name !== 'undefined' ? name : 'Local';
+                 })()"></div>
         </div>
     </div>
 
@@ -71,12 +80,43 @@
 
         {{-- Node Info --}}
         <div class="flex-1 p-4 overflow-y-auto">
+            {{-- Connection Status --}}
+            <template x-if="currentNodeId && currentNodeId !== 'local'">
+                <div class="mb-4 p-3 rounded border" style="background-color: #0c0d10; border-color: #0891b2;">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-xs os-accent font-medium">CONNECTED</div>
+                        <div class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
+                    </div>
+                    <div class="text-sm os-text font-mono mb-3" x-text="(() => {
+                        const node = nodes.find(n => n.id === currentNodeId);
+                        return node?.name || 'Unknown';
+                    })()"></div>
+                    <button
+                        @click="executeDisconnect()"
+                        :disabled="isDisconnecting"
+                        class="w-full px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 border"
+                        :class="isDisconnecting
+                            ? 'border-gray-700 text-gray-500 cursor-not-allowed'
+                            : 'border-cyan-700 text-cyan-400 hover:bg-cyan-500/10'"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                        <span x-show="!isDisconnecting">Disconnect</span>
+                        <span x-show="isDisconnecting">Disconnecting...</span>
+                    </button>
+                </div>
+            </template>
+
             <template x-if="selectedNode">
                 <div class="space-y-4">
-                    {{-- Node Name --}}
+                    {{-- Node Name: visible after connect, or always for public nodes --}}
                     <div>
                         <div class="text-xs os-text-muted mb-1">Name</div>
-                        <div class="text-sm font-medium os-text" x-text="selectedNode.name"></div>
+                        <div class="text-sm font-medium os-text"
+                             x-text="(['compromised','hacked','owned'].includes(selectedNode.status) || selectedNode.isPublic)
+                                     ? ((selectedNode.name && selectedNode.name !== 'undefined') ? selectedNode.name : 'Unknown')
+                                     : '???'"></div>
                     </div>
 
                     {{-- Status --}}
@@ -85,22 +125,35 @@
                         <div class="text-sm font-medium" :class="getStatusColor(selectedNode.status)" x-text="getStatusLabel(selectedNode.status)"></div>
                     </div>
 
-                    {{-- IP Address --}}
+                    {{-- IP Address: visible after targeted scan, or always for public nodes --}}
                     <div>
                         <div class="text-xs os-text-muted mb-1">IP Address</div>
-                        <div class="text-sm font-mono os-text-dim" x-text="selectedNode.ip"></div>
+                        <div class="text-sm font-mono os-text-dim"
+                             x-text="(['scanned','compromised','hacked','owned'].includes(selectedNode.status) || selectedNode.isPublic)
+                                     ? ((selectedNode.ip && selectedNode.ip !== 'undefined') ? selectedNode.ip : '—')
+                                     : '???'"></div>
                     </div>
 
-                    {{-- Type --}}
-                    <div>
-                        <div class="text-xs os-text-muted mb-1">Type</div>
-                        <div class="text-sm os-text-dim capitalize" x-text="selectedNode.type"></div>
-                    </div>
+                    {{-- Type (gated behind scan) --}}
+                    <template x-if="['scanned','compromised','hacked','owned'].includes(selectedNode.status) || selectedNode.isPublic">
+                        <div>
+                            <div class="text-xs os-text-muted mb-1">Type</div>
+                            <div class="text-sm os-text-dim capitalize" x-text="selectedNode.type || '—'"></div>
+                        </div>
+                    </template>
+
+                    {{-- Security Level (gated behind scan) --}}
+                    <template x-if="['scanned','compromised','hacked','owned'].includes(selectedNode.status)">
+                        <div>
+                            <div class="text-xs os-text-muted mb-1">Security Level</div>
+                            <div class="text-sm font-mono os-text-dim" x-text="selectedNode.securityLevel != null ? selectedNode.securityLevel : '?'"></div>
+                        </div>
+                    </template>
 
                     {{-- Info --}}
                     <div>
                         <div class="text-xs os-text-muted mb-1">Info</div>
-                        <div class="text-sm os-text-dim" x-text="selectedNode.info"></div>
+                        <div class="text-sm os-text-dim" x-text="selectedNode.info || '—'"></div>
                     </div>
 
                     {{-- Connections --}}
@@ -109,33 +162,17 @@
                         <div class="space-y-1">
                             <template x-for="conn in connections.filter(c => c.from === selectedNode.id || c.to === selectedNode.id)" :key="conn.from + conn.to">
                                 <div class="text-xs os-text-dim font-mono px-2 py-1 rounded" style="background-color: #0c0d10;">
-                                    <span x-text="nodes.find(n => n.id === (conn.from === selectedNode.id ? conn.to : conn.from))?.name || 'Unknown'"></span>
+                                    <span x-text="(() => {
+                                        const connId = conn.from === selectedNode.id ? conn.to : conn.from;
+                                        const connNode = nodes.find(n => n.id === connId);
+                                        const name = connNode?.name || 'Unknown';
+                                        return name !== 'undefined' ? name : 'Unknown';
+                                    })()"></span>
                                 </div>
                             </template>
                         </div>
                     </div>
 
-                    {{-- Actions --}}
-                    <div class="pt-2 border-t" style="border-color: #2a2d36;">
-                        <div class="text-xs os-text-muted mb-2">Actions</div>
-                        <div class="space-y-2">
-                            <template x-if="selectedNode.status === 'scanned' || selectedNode.status === 'discovered'">
-                                <button class="w-full px-3 py-1.5 rounded text-xs font-medium os-accent border border-cyan-700 os-bg-hover transition-colors">
-                                    Connect
-                                </button>
-                            </template>
-                            <template x-if="selectedNode.status === 'hacked'">
-                                <button class="w-full px-3 py-1.5 rounded text-xs font-medium text-green-400 border border-green-700 os-bg-hover transition-colors">
-                                    Access Terminal
-                                </button>
-                            </template>
-                            <template x-if="selectedNode.id === currentNodeId">
-                                <button class="w-full px-3 py-1.5 rounded text-xs font-medium os-text-dim border os-bg-hover transition-colors" style="border-color: #2a2d36;">
-                                    Scan Network
-                                </button>
-                            </template>
-                        </div>
-                    </div>
                 </div>
             </template>
 
@@ -158,7 +195,7 @@
             </div>
             <div class="flex justify-between os-text-muted mt-1">
                 <span>Compromised:</span>
-                <span class="text-green-400" x-text="nodes.filter(n => n.status === 'hacked' || n.status === 'owned').length"></span>
+                <span class="text-green-400" x-text="nodes.filter(n => ['hacked','owned','compromised'].includes(n.status)).length"></span>
             </div>
         </div>
     </div>

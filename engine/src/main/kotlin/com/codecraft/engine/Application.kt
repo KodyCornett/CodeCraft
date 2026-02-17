@@ -2,6 +2,7 @@ package com.codecraft.engine
 
 import com.codecraft.engine.api.configureRoutes
 import com.codecraft.engine.api.configureWebSockets
+import com.codecraft.engine.persistence.GameDatabase
 import com.codecraft.engine.session.SessionManager
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -18,6 +19,7 @@ import kotlinx.serialization.json.Json
  * - Game state simulation
  * - Trace/exposure level calculations
  * - WebSocket communication with Laravel frontend
+ * - SQLite persistence
  */
 fun main() {
     val port = System.getenv("ENGINE_PORT")?.toIntOrNull() ?: 8085
@@ -27,6 +29,9 @@ fun main() {
     println("╠════════════════════════════════════════╣")
     println("║  Starting on port $port                  ║")
     println("╚════════════════════════════════════════╝")
+
+    // Initialize database
+    GameDatabase.init()
 
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         configureEngine()
@@ -40,6 +45,8 @@ fun Application.configureEngine() {
             prettyPrint = true
             isLenient = true
             ignoreUnknownKeys = true
+            explicitNulls = true      // Ensure null values are serialized, not omitted
+            encodeDefaults = true      // Include properties with default values (critical for StateChanges)
         })
     }
 

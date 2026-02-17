@@ -8,9 +8,98 @@ export function windowManager() {
         activeWindowId: null,
         startMenuOpen: false,
 
+        // Notification counts
+        unreadMessageCount: 0,
+        messageCountInterval: null,
+
+        // Active mission indicator
+        activeMissionStatus: false,
+        missionStatusInterval: null,
+
         init() {
             // Open terminal by default
             this.openWindow('terminal', 'Terminal', { width: 700, height: 450, x: 50, y: 50 });
+
+            // Start polling for unread message count
+            this.fetchUnreadMessageCount();
+            this.messageCountInterval = setInterval(() => {
+                this.fetchUnreadMessageCount();
+            }, 10000); // Check every 10 seconds
+
+            // Start polling for active mission status
+            this.fetchActiveMissionStatus();
+            this.missionStatusInterval = setInterval(() => {
+                this.fetchActiveMissionStatus();
+            }, 10000); // Check every 10 seconds
+
+            // Listen for secure channel open events
+            window.addEventListener('open-secure-channel', (e) => {
+                this.openSecureChannel(e.detail);
+            });
+
+            // Listen for message refresh events
+            window.addEventListener('messages-updated', () => {
+                this.fetchUnreadMessageCount();
+            });
+
+            // Listen for window open requests (from terminal commands)
+            window.addEventListener('open-window', (e) => {
+                console.log('[WindowManager] Received open-window event:', e.detail.windowId);
+                const windowType = e.detail.windowId;
+                const windowTitle = this.getWindowTitle(windowType);
+
+                // Check if window already exists
+                const existing = this.windows.find(w => w.type === windowType);
+                if (existing) {
+                    console.log('[WindowManager] Window already exists, focusing:', existing.id);
+                    // Focus existing window
+                    this.focusWindow(existing.id);
+                } else {
+                    console.log('[WindowManager] Opening new window:', windowType);
+                    // Open new window
+                    this.openWindow(windowType, windowTitle);
+                }
+            });
+        },
+
+        async fetchActiveMissionStatus() {
+            try {
+                const response = await fetch('/api/mission/active');
+                const data = await response.json();
+                if (data.success) {
+                    this.activeMissionStatus = data.active && !data.mission?.failed && !data.mission?.isComplete;
+                }
+            } catch (e) {
+                // Silently ignore — engine may not be running
+            }
+        },
+
+        async fetchUnreadMessageCount() {
+            try {
+                const response = await fetch('/api/messages/unread-count');
+                const data = await response.json();
+                if (data.success) {
+                    this.unreadMessageCount = data.count;
+                }
+            } catch (e) {
+                console.error('Failed to fetch unread count:', e);
+            }
+        },
+
+        openSecureChannel(detail) {
+            // Open secure channel window with job data
+            const windowId = this.openWindow('secureChannel', 'Secure Channel', {
+                width: 500,
+                height: 450,
+                x: 200 + Math.random() * 100,
+                y: 100 + Math.random() * 50,
+            });
+
+            // Store job data for the window
+            const win = this.getWindow(windowId);
+            if (win) {
+                win.jobId = detail.jobId;
+            }
         },
 
         openWindow(type, title, options = {}) {
@@ -202,6 +291,19 @@ export function windowManager() {
             } else {
                 this.focusWindow(id);
             }
+        },
+
+        getWindowTitle(type) {
+            const titles = {
+                'terminal': 'Terminal',
+                'messages': 'Messages',
+                'nodeManager': 'Node Manager',
+                'sentinel': 'SENTINEL',
+                'firewall': 'Firewall',
+                'secureChannel': 'Secure Channel',
+                'jobsBoard': 'Jobs Board',
+            };
+            return titles[type] || 'Window';
         }
     };
 }

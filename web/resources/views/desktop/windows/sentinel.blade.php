@@ -79,6 +79,22 @@
                 </div>
             </div>
 
+            {{-- Shield Banner --}}
+            <div
+                x-show="status?.shield?.active"
+                class="px-3 py-2 border-b flex items-center justify-between"
+                style="border-color: #2a2d36; background-color: rgba(34, 197, 94, 0.08);"
+            >
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span class="text-xs font-medium text-green-400">SHIELD ACTIVE</span>
+                    <span class="text-xs text-green-400/70">Exposure frozen</span>
+                </div>
+                <span class="text-xs font-mono text-green-400" x-text="getShieldTimeFormatted()"></span>
+            </div>
+
             {{-- Tabs --}}
             <div class="flex border-b" style="border-color: #2a2d36;">
                 <button
@@ -132,6 +148,11 @@
                                     }"
                                     x-text="getTypeLabel(conn.type)"
                                 ></span>
+                                {{-- Counter-hack active indicator --}}
+                                <span
+                                    x-show="counterHackConnectionId === conn.id"
+                                    class="px-1.5 py-0.5 rounded text-xs bg-orange-500/20 text-orange-400"
+                                >HACKING</span>
                             </div>
                             <div class="text-xs os-text-muted" x-text="conn.sourceNode !== 'unknown' ? conn.sourceNode : 'Unknown source'"></div>
                         </div>
@@ -230,6 +251,15 @@
                         </div>
                     </template>
 
+                    {{-- Counter-Hack Puzzle (replaces button when active) --}}
+                    <template x-if="counterHackConnectionId === selectedConnection.id && counterHackChallenge">
+                        <div class="mb-4 p-2 rounded border" style="background-color: #0c0d10; border-color: #f97316;">
+                            <div class="text-xs text-orange-400 mb-2 font-medium">COUNTER-HACK ACTIVE</div>
+                            <div class="text-xs font-mono os-text mb-2" x-text="counterHackChallenge"></div>
+                            <div class="text-xs text-orange-400/70">Type <span class="font-mono">solve &lt;answer&gt;</span> in Terminal</div>
+                        </div>
+                    </template>
+
                     {{-- Actions --}}
                     <div class="space-y-2">
                         <button
@@ -259,21 +289,21 @@
                         <button
                             @click="counterHack(selectedConnection.id)"
                             :disabled="actionInProgress"
-                            x-show="selectedConnection.type === 'intrusion'"
+                            x-show="selectedConnection.type === 'intrusion' && counterHackConnectionId !== selectedConnection.id"
                             class="w-full px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
                             :class="actionInProgress ? 'bg-gray-700 text-gray-500' : 'bg-red-600 hover:bg-red-500 text-white'"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                             </svg>
-                            Counter-Hack (Risky)
+                            Counter-Hack
                         </button>
                     </div>
 
-                    {{-- Risk warning for counter-hack --}}
-                    <div x-show="selectedConnection.type === 'intrusion'" class="mt-3 p-2 rounded text-xs" style="background-color: #0c0d10;">
-                        <span class="text-yellow-400">⚠️ Warning:</span>
-                        <span class="os-text-dim">Counter-hack may fail and increase your exposure.</span>
+                    {{-- Counter-hack instruction --}}
+                    <div x-show="selectedConnection.type === 'intrusion' && counterHackConnectionId !== selectedConnection.id" class="mt-3 p-2 rounded text-xs" style="background-color: #0c0d10;">
+                        <span class="text-yellow-400">Info:</span>
+                        <span class="os-text-dim">Initiates a puzzle challenge. Solve it in the terminal for a temporary shield.</span>
                     </div>
                 </div>
             </template>

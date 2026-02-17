@@ -10,6 +10,11 @@ export function terminal() {
         isProcessing: false,
         currentPath: '/home/user',
 
+        // Connection state
+        connectedTo: null,
+        connectedToName: null,
+        pendingConnection: null,
+
         init() {
             this.addOutput('CodeCraft Terminal v0.1.0', 'system');
             this.addOutput('Type "help" for available commands.', 'system');
@@ -22,8 +27,15 @@ export function terminal() {
         },
 
         get prompt() {
-            const path = this.currentPath.replace('/home/user', '~');
-            return `user@codecraft:${path}$ `;
+            const currentPath = this.currentPath || '/home/user';
+
+            if (this.connectedTo && this.connectedTo !== 'localhost') {
+                const path = currentPath === '/' ? '/' : currentPath;
+                const shortName = this.connectedToName?.replace(/\s+/g, '').substring(0, 12) || this.connectedTo;
+                return `root@${shortName}:${path}# `;
+            }
+            const path = currentPath.replace('/home/user', '~');
+            return `user@localhost:${path}$ `;
         },
 
         async executeCommand() {
@@ -57,15 +69,21 @@ export function terminal() {
                         command,
                         context: {
                             currentPath: this.currentPath,
+                            connectedTo: this.connectedTo,
                         }
                     }),
                 });
 
                 const result = await response.json();
 
-                // Apply state changes
-                if (result.stateChanges?.currentPath) {
-                    this.currentPath = result.stateChanges.currentPath;
+                // Handle state changes
+                if (result.stateChanges) {
+                    console.log('[Terminal] Received stateChanges:', result.stateChanges);
+                    console.log('[Terminal] stateChanges.connectedTo type:', typeof result.stateChanges.connectedTo);
+                    console.log('[Terminal] stateChanges.connectedTo value:', result.stateChanges.connectedTo);
+                    console.log('[Terminal] BEFORE applyStateChanges - connectedTo:', this.connectedTo, 'prompt:', this.prompt);
+                    this.applyStateChanges(result.stateChanges);
+                    console.log('[Terminal] AFTER applyStateChanges - connectedTo:', this.connectedTo, 'prompt:', this.prompt);
                 }
 
                 // Type out the output with delay
@@ -84,6 +102,111 @@ export function terminal() {
                     this.scrollToBottom();
                     this.$refs.input?.focus();
                 });
+            }
+        },
+
+        applyStateChanges(stateChanges) {
+            console.log('[Terminal] applyStateChanges called with:', stateChanges);
+            console.log('[Terminal] Before update - connectedTo:', this.connectedTo, 'currentPath:', this.currentPath);
+
+            // Handle path changes
+            if (stateChanges.currentPath !== undefined) {
+                this.currentPath = stateChanges.currentPath;
+                console.log('[Terminal] Updated currentPath to:', this.currentPath);
+            }
+
+            // Handle connection changes
+            if (stateChanges.connectedTo !== undefined) {
+                const wasConnected = this.connectedTo;
+                this.connectedTo = stateChanges.connectedTo;
+                this.connectedToName = stateChanges.connectedToName || null;
+
+                console.log('[Terminal] After update - connectedTo:', this.connectedTo, 'connectedToName:', this.connectedToName);
+
+                // Reset path when connecting/disconnecting
+                if (stateChanges.connectedTo && !wasConnected) {
+                    // Connecting to new node
+                    this.currentPath = stateChanges.rootPath || stateChanges.currentPath || '/';
+                } else if (!stateChanges.connectedTo && wasConnected) {
+                    // Disconnecting
+                    this.currentPath = '/home/user';
+                }
+
+                // Force Alpine.js to re-evaluate prompt getter
+                this.$nextTick(() => {
+                    // Trigger DOM update by accessing the prompt
+                    const newPrompt = this.prompt;
+                    console.log('[Terminal] Prompt updated to:', newPrompt);
+                });
+
+                // Dispatch event to Node Manager
+                window.dispatchEvent(new CustomEvent('terminal:connection-changed', {
+                    detail: {
+                        connectedTo: this.connectedTo,
+                        connectedToName: this.connectedToName
+                    }
+                }));
+            }
+
+            // Handle pending connection (for puzzles)
+            if (stateChanges.pendingConnection !== undefined) {
+                this.pendingConnection = stateChanges.pendingConnection;
+            }
+
+            // Handle discovered nodes
+            if (stateChanges.discoveredNodes) {
+                window.dispatchEvent(new CustomEvent('terminal:nodes-discovered', {
+                    detail: { nodes: stateChanges.discoveredNodes }
+                }));
+            }
+
+            // Handle trace increase notification
+            if (stateChanges.traceIncrease) {
+                window.dispatchEvent(new CustomEvent('terminal:trace-increased', {
+                    detail: { amount: stateChanges.traceIncrease }
+                }));
+            }
+
+            // Handle Sentinel attack — force disconnect on client
+            if (stateChanges.sentinelAttack) {
+                this.connectedTo = null;
+                this.connectedToName = null;
+                this.currentPath = '/home/user';
+                window.dispatchEvent(new CustomEvent('terminal:connection-changed', {
+                    detail: { connectedTo: null, connectedToName: null }
+                }));
+            }
+
+            // Handle DEFRAG complete — refresh messages
+            if (stateChanges.defragComplete) {
+                window.dispatchEvent(new CustomEvent('messages-updated'));
+            }
+
+            // Handle mission accepted — notify Jobs Board to switch to Active tab
+            if (stateChanges.activeMission !== undefined) {
+                console.log('[Terminal] Mission accepted:', stateChanges.activeMission);
+                window.dispatchEvent(new CustomEvent('terminal:mission-accepted', {
+                    detail: { missionId: stateChanges.activeMission }
+                }));
+            }
+
+            // Handle mission complete — refresh messages
+            if (stateChanges.missionCompleted) {
+                console.log('[Terminal] Mission completed, dispatching messages-updated event');
+                window.dispatchEvent(new CustomEvent('messages-updated'));
+            }
+
+            // Handle window open request (from mail command, etc.)
+            if (stateChanges.openWindow) {
+                console.log('[Terminal] Opening window:', stateChanges.openWindow);
+                window.dispatchEvent(new CustomEvent('open-window', {
+                    detail: { windowId: stateChanges.openWindow }
+                }));
+            }
+
+            // Handle shield activation — notify Sentinel to refresh
+            if (stateChanges.shieldActivated) {
+                window.dispatchEvent(new CustomEvent('terminal:shield-activated'));
             }
         },
 

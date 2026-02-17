@@ -16,12 +16,19 @@ class MessagesController extends Controller
     ) {}
 
     /**
-     * Get all messages.
+     * Get all messages (or trash).
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $messages = $this->messageService->getMessages();
-        $unreadCount = $this->messageService->getUnreadCount();
+        $view = $request->query('view', 'inbox');
+
+        if ($view === 'trash') {
+            $messages = $this->messageService->getDeletedMessages();
+            $unreadCount = 0;
+        } else {
+            $messages = $this->messageService->getMessages();
+            $unreadCount = $this->messageService->getUnreadCount();
+        }
 
         return response()->json([
             'success' => true,
@@ -59,6 +66,30 @@ class MessagesController extends Controller
     public function markRead(int $id): JsonResponse
     {
         $this->messageService->markAsRead($id);
+
+        return response()->json([
+            'success' => true,
+        ]);
+    }
+
+    /**
+     * Delete a message (move to trash).
+     */
+    public function delete(int $id): JsonResponse
+    {
+        $this->messageService->markAsDeleted($id);
+
+        return response()->json([
+            'success' => true,
+        ]);
+    }
+
+    /**
+     * Restore a message from trash.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $this->messageService->restoreMessage($id);
 
         return response()->json([
             'success' => true,
@@ -107,5 +138,73 @@ class MessagesController extends Controller
             'success' => true,
             'count' => $this->messageService->getUnreadCount(),
         ]);
+    }
+
+    /**
+     * Get job details for secure channel.
+     */
+    public function getJob(string $id): JsonResponse
+    {
+        $job = $this->messageService->getJob($id);
+
+        if (!$job) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Job not found or expired.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'job' => $job,
+        ]);
+    }
+
+    /**
+     * Attempt to negotiate job payout.
+     */
+    public function negotiateJob(string $id): JsonResponse
+    {
+        $result = $this->messageService->negotiateJob($id);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Accept a job and get verification puzzle.
+     */
+    public function acceptJob(string $id): JsonResponse
+    {
+        $result = $this->messageService->acceptJob($id);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Verify puzzle answer.
+     */
+    public function verifyPuzzle(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'answer' => 'required|string|max:20',
+        ]);
+
+        $result = $this->messageService->verifyPuzzle($id, $validated['answer']);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Decrypt an encrypted message.
+     */
+    public function decrypt(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'passcode' => 'required|string|max:20',
+        ]);
+
+        $result = $this->messageService->decryptMessage($id, $validated['passcode']);
+
+        return response()->json($result);
     }
 }

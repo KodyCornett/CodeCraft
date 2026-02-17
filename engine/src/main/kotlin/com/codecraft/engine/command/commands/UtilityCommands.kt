@@ -6,93 +6,22 @@ import com.codecraft.engine.session.GameSession
 import com.codecraft.engine.session.ThreatType
 
 /**
- * mail - Access messages
+ * mail - Open Messages window
  */
 class MailCommand : Command {
     override val name = "mail"
-    override val description = "Access your messages"
-    override val usage = "mail [list|read <id>|help]"
+    override val description = "Open messages"
+    override val usage = "mail"
     override val category = CommandCategory.UTILITY
 
-    // Mock messages for now - in production would come from database
-    private val messages = listOf(
-        Message(1, "Ghost", "Welcome to the Network", "Hey, welcome aboard...", false),
-        Message(2, "Ghost", "Job: Data Extraction", "Got a job for you. NovaCorp has some files...", false),
-        Message(3, "System", "Tutorial: Getting Started", "Welcome to your new hacking terminal...", true)
-    )
-
     override fun execute(session: GameSession, args: List<String>): CommandResult {
-        val subcommand = args.firstOrNull() ?: "list"
-
-        return when (subcommand) {
-            "list", "" -> listMessages()
-            "read" -> readMessage(args.getOrNull(1))
-            "help" -> showHelp()
-            else -> {
-                // Check if it's a number (shortcut for read)
-                val id = subcommand.toIntOrNull()
-                if (id != null) readMessage(subcommand) else showHelp()
-            }
-        }
+        return CommandResult(
+            output = "Opening Messages...",
+            success = true,
+            delayMs = 100,
+            stateChanges = com.codecraft.engine.protocol.StateChanges(openWindow = "messages")
+        )
     }
-
-    private fun listMessages(): CommandResult {
-        val output = buildString {
-            appendLine("INBOX (${messages.count { !it.read }} unread)")
-            appendLine("─".repeat(60))
-            messages.forEach { msg ->
-                val status = if (msg.read) " " else "*"
-                appendLine("[$status] #${msg.id} ${msg.from.padEnd(12)} - ${msg.subject}")
-            }
-            appendLine("─".repeat(60))
-            appendLine("Type 'mail read <id>' to read a message")
-        }
-        return CommandResult.success(output, delayMs = 100)
-    }
-
-    private fun readMessage(idStr: String?): CommandResult {
-        if (idStr == null) {
-            return CommandResult.error("mail read: missing message ID")
-        }
-        val id = idStr.toIntOrNull()
-            ?: return CommandResult.error("mail read: invalid message ID")
-
-        val message = messages.find { it.id == id }
-            ?: return CommandResult.error("mail read: message #$id not found")
-
-        val output = buildString {
-            appendLine("━".repeat(55))
-            appendLine("From:    ${message.from}")
-            appendLine("Subject: ${message.subject}")
-            appendLine("━".repeat(55))
-            appendLine()
-            appendLine(message.body)
-            appendLine()
-            appendLine("━".repeat(55))
-        }
-        return CommandResult.success(output, delayMs = 150)
-    }
-
-    private fun showHelp(): CommandResult {
-        val output = """
-            |MAIL COMMANDS
-            |─────────────────────────────────────────
-            |  mail              List all messages
-            |  mail list         List all messages
-            |  mail read <id>    Read message by ID
-            |  mail <id>         Shortcut to read message
-            |  mail help         Show this help
-        """.trimMargin()
-        return CommandResult.success(output, delayMs = 50)
-    }
-
-    private data class Message(
-        val id: Int,
-        val from: String,
-        val subject: String,
-        val body: String,
-        val read: Boolean
-    )
 }
 
 /**

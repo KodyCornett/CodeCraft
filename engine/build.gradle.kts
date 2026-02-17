@@ -16,6 +16,8 @@ repositories {
     mavenCentral()
 }
 
+val exposedVersion = "0.57.0"
+
 dependencies {
     // Ktor server
     implementation("io.ktor:ktor-server-core")
@@ -23,13 +25,22 @@ dependencies {
     implementation("io.ktor:ktor-server-websockets")
     implementation("io.ktor:ktor-server-content-negotiation")
     implementation("io.ktor:ktor-serialization-kotlinx-json")
+    implementation("io.ktor:ktor-server-cors")
 
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.16")
 
+    // Database - Exposed ORM + SQLite
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+
     // Testing
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("com.h2database:h2:2.2.224")
 }
 
 kotlin {

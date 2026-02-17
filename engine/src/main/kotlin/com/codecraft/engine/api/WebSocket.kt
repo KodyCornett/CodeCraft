@@ -12,20 +12,20 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Configure WebSocket support for terminal communication
  */
 fun Application.configureWebSockets(sessionManager: SessionManager) {
     install(WebSockets) {
-        pingPeriod = Duration.ofSeconds(15)
-        timeout = Duration.ofSeconds(30)
+        pingPeriod = 15.seconds
+        timeout = 30.seconds
         maxFrameSize = Long.MAX_VALUE
         masking = false
     }
 
-    val commandRegistry = CommandRegistry()
+    val commandRegistry = CommandRegistry(sessionManager.getRepository())
     val json = Json { ignoreUnknownKeys = true }
 
     routing {

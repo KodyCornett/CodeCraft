@@ -69,25 +69,30 @@
                 {{-- Filters --}}
                 <div class="flex items-center gap-2 px-3 py-2 border-b" style="border-color: #2a2d36;">
                     <button
-                        @click="filter = 'all'"
+                        @click="changeFilter('all')"
                         class="px-2 py-1 text-xs rounded transition-colors"
                         :class="filter === 'all' ? 'os-bg-active os-accent' : 'os-text-dim os-bg-hover'"
                     >All</button>
                     <button
-                        @click="filter = 'unread'"
+                        @click="changeFilter('unread')"
                         class="px-2 py-1 text-xs rounded transition-colors"
                         :class="filter === 'unread' ? 'os-bg-active os-accent' : 'os-text-dim os-bg-hover'"
                     >Unread</button>
                     <button
-                        @click="filter = 'jobs'"
-                        class="px-2 py-1 text-xs rounded transition-colors"
-                        :class="filter === 'jobs' ? 'os-bg-active os-accent' : 'os-text-dim os-bg-hover'"
-                    >Jobs</button>
-                    <button
-                        @click="filter = 'contacts'"
+                        @click="changeFilter('contacts')"
                         class="px-2 py-1 text-xs rounded transition-colors"
                         :class="filter === 'contacts' ? 'os-bg-active os-accent' : 'os-text-dim os-bg-hover'"
                     >Contacts</button>
+                    <button
+                        @click="changeFilter('trash')"
+                        class="px-2 py-1 text-xs rounded transition-colors flex items-center gap-1"
+                        :class="filter === 'trash' ? 'os-bg-active os-accent' : 'os-text-dim os-bg-hover'"
+                    >
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Trash
+                    </button>
                 </div>
 
                 {{-- Message List --}}
@@ -167,13 +172,49 @@
                 </div>
 
                 {{-- Message Body --}}
-                <div class="flex-1 overflow-y-auto p-4">
-                    <div class="message-body os-text text-sm leading-relaxed" x-html="formatBody(selectedMessage.body)"></div>
+                <div class="flex-1 overflow-y-auto p-4" @click="handleBodyClick($event)">
+                    {{-- Encrypted message with passcode input --}}
+                    <template x-if="selectedMessage.encrypted">
+                        <div class="text-center space-y-4 py-8">
+                            <div class="text-6xl">&#x1F512;</div>
+                            <div class="os-accent font-medium">ENCRYPTED MESSAGE</div>
+                            <p class="os-text-dim text-sm">This message is protected. Enter passcode to decrypt.</p>
 
-                    {{-- Job Details Card --}}
-                    <template x-if="selectedMessage.jobData">
+                            <div class="max-w-xs mx-auto space-y-3">
+                                <input
+                                    x-model="passcodeInput"
+                                    @keydown.enter="decryptMessage()"
+                                    type="text"
+                                    class="w-full p-3 bg-black/50 border border-cyan-800 rounded os-text text-center uppercase font-mono tracking-widest"
+                                    placeholder="PASSCODE"
+                                    autocomplete="off"
+                                >
+
+                                <div x-show="decryptError" class="text-red-400 text-sm" x-text="decryptError"></div>
+
+                                <button
+                                    @click="decryptMessage()"
+                                    :disabled="!passcodeInput.trim() || isDecrypting"
+                                    class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-sm transition-colors font-medium disabled:opacity-50"
+                                >
+                                    <span x-show="!isDecrypting">Decrypt</span>
+                                    <span x-show="isDecrypting">Decrypting...</span>
+                                </button>
+                            </div>
+
+                            <p class="text-xs os-text-muted mt-4">Hint: The passcode was revealed when you accepted the job.</p>
+                        </div>
+                    </template>
+
+                    {{-- Normal message body --}}
+                    <template x-if="!selectedMessage.encrypted">
+                        <div class="message-body os-text text-sm leading-relaxed" x-html="formatBody(selectedMessage.body)"></div>
+                    </template>
+
+                    {{-- Job Details Card (for non-encrypted or decrypted messages with job data) --}}
+                    <template x-if="!selectedMessage.encrypted && selectedMessage.jobData">
                         <div class="mt-4 p-4 rounded-lg border" style="background-color: #13151a; border-color: #2a2d36;">
-                            <h3 class="text-sm font-medium os-accent mb-3">Job Details</h3>
+                            <h3 class="text-sm font-medium os-accent mb-3">Mission Details</h3>
                             <div class="grid grid-cols-2 gap-3 text-sm">
                                 <div>
                                     <span class="os-text-muted">Target:</span>
@@ -181,7 +222,7 @@
                                 </div>
                                 <div>
                                     <span class="os-text-muted">Payout:</span>
-                                    <span class="text-green-400 ml-2" x-text="selectedMessage.jobData.payout + ' credits'"></span>
+                                    <span class="text-green-400 ml-2">&sect;<span x-text="selectedMessage.jobData.payout?.toLocaleString()"></span></span>
                                 </div>
                                 <div>
                                     <span class="os-text-muted">Objective:</span>
@@ -194,27 +235,91 @@
                                         :class="{
                                             'bg-green-600/20 text-green-400': selectedMessage.jobData.difficulty === 'easy',
                                             'bg-yellow-600/20 text-yellow-400': selectedMessage.jobData.difficulty === 'medium',
-                                            'bg-red-600/20 text-red-400': selectedMessage.jobData.difficulty === 'hard'
+                                            'bg-red-600/20 text-red-400': selectedMessage.jobData.difficulty === 'hard',
+                                            'bg-purple-600/20 text-purple-400': selectedMessage.jobData.difficulty === 'extreme'
                                         }"
                                         x-text="selectedMessage.jobData.difficulty"
                                     ></span>
+                                </div>
+                            </div>
+
+                            {{-- Quick Start Guide --}}
+                            <div class="mt-4 pt-3 border-t" style="border-color: #2a2d36;">
+                                <h4 class="text-xs font-medium os-accent mb-2">Quick Start</h4>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span class="os-text-muted w-4">1.</span>
+                                        <code class="os-accent font-mono bg-black/30 px-2 py-0.5 rounded">scan <span x-text="selectedMessage.jobData.target"></span></code>
+                                        <span class="os-text-dim">- Find open ports</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="os-text-muted w-4">2.</span>
+                                        <code class="os-accent font-mono bg-black/30 px-2 py-0.5 rounded">connect <span x-text="selectedMessage.jobData.target"></span></code>
+                                        <span class="os-text-dim">- Connect to target</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="os-text-muted w-4">3.</span>
+                                        <code class="os-accent font-mono bg-black/30 px-2 py-0.5 rounded">ls</code>
+                                        <span class="os-text-dim">- Explore files</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="os-text-muted w-4">4.</span>
+                                        <code class="os-accent font-mono bg-black/30 px-2 py-0.5 rounded">download &lt;file&gt;</code>
+                                        <span class="os-text-dim">- Get the objective</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </template>
                 </div>
 
-                {{-- Reply Button --}}
-                <div x-show="selectedMessage.replyable" class="px-4 py-3 border-t" style="border-color: #2a2d36;">
-                    <button
-                        @click="startReply()"
-                        class="px-4 py-2 rounded text-sm os-accent border border-cyan-700 os-bg-hover transition-colors flex items-center gap-2"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                        </svg>
-                        Reply
-                    </button>
+                {{-- Actions: Reply, Delete, Restore --}}
+                <div class="px-4 py-3 border-t flex items-center justify-between" style="border-color: #2a2d36;">
+                    {{-- Reply Button --}}
+                    <div x-show="selectedMessage.replyable">
+                        <button
+                            @click="startReply()"
+                            class="px-4 py-2 rounded text-sm os-accent border border-cyan-700 os-bg-hover transition-colors flex items-center gap-2"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                            </svg>
+                            Reply
+                        </button>
+                    </div>
+
+                    {{-- Delete/Restore Buttons --}}
+                    <div class="flex items-center gap-2">
+                        {{-- Restore (only in trash) --}}
+                        <button
+                            x-show="isInTrash()"
+                            @click="restoreMessage()"
+                            :disabled="isDeleting"
+                            class="px-4 py-2 rounded text-sm transition-colors flex items-center gap-2 border border-green-700 text-green-400 hover:bg-green-900/20"
+                            :class="isDeleting ? 'opacity-50 cursor-not-allowed' : ''"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                            </svg>
+                            <span x-show="!isDeleting">Restore</span>
+                            <span x-show="isDeleting">Restoring...</span>
+                        </button>
+
+                        {{-- Delete (only in inbox) --}}
+                        <button
+                            x-show="!isInTrash()"
+                            @click="deleteMessage()"
+                            :disabled="isDeleting"
+                            class="px-4 py-2 rounded text-sm transition-colors flex items-center gap-2 border border-red-700 text-red-400 hover:bg-red-900/20"
+                            :class="isDeleting ? 'opacity-50 cursor-not-allowed' : ''"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            <span x-show="!isDeleting">Delete</span>
+                            <span x-show="isDeleting">Deleting...</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </template>

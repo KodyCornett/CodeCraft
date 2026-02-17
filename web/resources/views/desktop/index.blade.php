@@ -80,10 +80,16 @@
                     @click.stop="openWindow('messages', 'Messages', { width: 700, height: 550 })"
                     class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
                 >
-                    <div class="p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
+                    <div class="relative p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
                         <svg class="w-8 h-8 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
+                        {{-- Notification badge --}}
+                        <template x-if="unreadMessageCount > 0">
+                            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                                <span x-text="unreadMessageCount > 9 ? '9+' : unreadMessageCount"></span>
+                            </span>
+                        </template>
                     </div>
                     <span class="text-xs os-text-dim group-hover:os-text transition-colors">Messages</span>
                 </button>
@@ -99,6 +105,39 @@
                         </svg>
                     </div>
                     <span class="text-xs os-text-dim group-hover:os-text transition-colors">Sentinel</span>
+                </button>
+
+                {{-- Firewall Icon --}}
+                <button
+                    @click.stop="openWindow('firewall', 'Firewall', { width: 450, height: 500 })"
+                    class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
+                >
+                    <div class="p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
+                        <svg class="w-8 h-8 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs os-text-dim group-hover:os-text transition-colors">Firewall</span>
+                </button>
+
+                {{-- Jobs Board Icon --}}
+                <button
+                    @click.stop="openWindow('jobsBoard', 'Jobs Board', { width: 650, height: 520 })"
+                    class="flex flex-col items-center gap-1 p-2 rounded os-bg-hover transition-colors group w-20"
+                >
+                    <div class="relative p-2 rounded os-window border border-opacity-50 group-hover:border-cyan-700 transition-colors" style="border-color: #2a2d36;">
+                        <svg class="w-8 h-8 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        {{-- Active mission pulse indicator --}}
+                        <template x-if="activeMissionStatus">
+                            <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                            </span>
+                        </template>
+                    </div>
+                    <span class="text-xs os-text-dim group-hover:os-text transition-colors text-center leading-tight">Jobs<br>Board</span>
                 </button>
             </div>
 
@@ -162,6 +201,21 @@
                             <template x-if="window.type === 'sentinel'">
                                 <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'secureChannel'">
+                                <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'firewall'">
+                                <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                            </template>
+                            <template x-if="window.type === 'jobsBoard'">
+                                <svg class="w-4 h-4 os-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                 </svg>
                             </template>
                             <span class="text-sm font-medium os-text" x-text="window.title"></span>
@@ -237,6 +291,21 @@
                         {{-- Sentinel --}}
                         <template x-if="window.type === 'sentinel'">
                             @include('desktop.windows.sentinel')
+                        </template>
+
+                        {{-- Secure Channel --}}
+                        <template x-if="window.type === 'secureChannel'">
+                            @include('desktop.windows.secure-channel')
+                        </template>
+
+                        {{-- Firewall --}}
+                        <template x-if="window.type === 'firewall'">
+                            @include('desktop.windows.firewall')
+                        </template>
+
+                        {{-- Jobs Board --}}
+                        <template x-if="window.type === 'jobsBoard'">
+                            @include('desktop.windows.jobs-board')
                         </template>
                     </div>
 
@@ -430,13 +499,35 @@
                             </svg>
                         </template>
                         <template x-if="window.type === 'messages'">
-                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
+                            <div class="relative flex-shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                                <template x-if="unreadMessageCount > 0">
+                                    <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium">
+                                        <span x-text="unreadMessageCount > 9 ? '!' : unreadMessageCount"></span>
+                                    </span>
+                                </template>
+                            </div>
                         </template>
                         <template x-if="window.type === 'sentinel'">
                             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'secureChannel'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'firewall'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </template>
+                        <template x-if="window.type === 'jobsBoard'">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                             </svg>
                         </template>
                         <span class="text-sm truncate" x-text="window.title"></span>

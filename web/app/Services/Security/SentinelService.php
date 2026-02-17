@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services\Security;
 
+use App\Contracts\GameEngine\GameEngineInterface;
+use Carbon\Carbon;
+
 /**
  * Sentinel Service - Monitors player's security status.
  * Tracks exposure level, incoming connections, and active threats.
  */
 class SentinelService
 {
+    public function __construct(
+        private readonly GameEngineInterface $engine
+    ) {}
     /**
      * Exposure thresholds and their effects.
      */
@@ -26,28 +32,64 @@ class SentinelService
      */
     public function getStatus(): array
     {
-        // Mock data - in real game, comes from database/game state
-        $exposure = $this->getExposure();
+        $sessionId = session()->getId();
+        $sentinelData = $this->engine->getSentinelStatus($sessionId);
+
+        \Log::debug('Sentinel: Raw engine response', [
+            'sessionId' => $sessionId,
+            'dataKeys' => !empty($sentinelData) ? array_keys($sentinelData) : [],
+            'exposure' => $sentinelData['exposure'] ?? 'missing',
+            'threatCount' => $sentinelData['threatCount'] ?? 'missing',
+            'incomingThreatsCount' => isset($sentinelData['incomingThreats']) ? count($sentinelData['incomingThreats']) : 'missing',
+        ]);
+
+        if (empty($sentinelData) || !isset($sentinelData['exposure'])) {
+            // Fallback if engine is unavailable or invalid response
+            \Log::warning('Sentinel: Invalid or empty response from engine', ['data' => $sentinelData]);
+            return [
+                'exposure' => 0,
+                'exposureLevel' => ['key' => 'minimal', 'label' => 'Minimal', 'color' => 'green'],
+                'maxExposure' => 100,
+                'status' => 'OFFLINE',
+                'firewallStrength' => 100,
+                'lastScan' => 'never',
+                'uptime' => '0h 0m',
+                'shield' => ['active' => false, 'secondsRemaining' => 0],
+                'counterHackPending' => false,
+            ];
+        }
+
+        $exposure = (int) round($sentinelData['exposure'] ?? 0);
         $exposureLevel = $this->getExposureLevel($exposure);
+        $shieldActive = $sentinelData['shieldActive'] ?? false;
+        $shieldExpiresAt = $sentinelData['shieldExpiresAt'] ?? null;
+
+        $shield = ['active' => $shieldActive, 'secondsRemaining' => 0];
+        if ($shieldActive && $shieldExpiresAt) {
+            $shield['secondsRemaining'] = max(0, (int) (($shieldExpiresAt - (time() * 1000)) / 1000));
+        }
 
         return [
             'exposure' => $exposure,
             'exposureLevel' => $exposureLevel,
             'maxExposure' => 100,
-            'status' => $this->getSystemStatus(),
-            'firewallStrength' => $this->getFirewallStrength(),
-            'lastScan' => '2 minutes ago',
+            'status' => $this->getSystemStatusFromExposure($exposure),
+            'firewallStrength' => max(0, 100 - $exposure),
+            'lastScan' => 'unknown',
             'uptime' => '3h 24m',
+            'shield' => $shield,
+            'counterHackPending' => false,
         ];
     }
 
     /**
-     * Get current exposure percentage.
+     * Get current exposure percentage (from Kotlin engine).
      */
     public function getExposure(): int
     {
-        // Mock - would be calculated from recent actions
-        return 34;
+        $sessionId = session()->getId();
+        $sentinelData = $this->engine->getSentinelStatus($sessionId);
+        return (int) round($sentinelData['exposure'] ?? 0);
     }
 
     /**
@@ -65,26 +107,19 @@ class SentinelService
     }
 
     /**
-     * Get system status string.
+     * Get system status string based on exposure level.
      */
-    private function getSystemStatus(): string
+    private function getSystemStatusFromExposure(int $exposure): string
     {
-        // Would be based on active threats
-        $threats = $this->getActiveThreats();
-        $activeThreats = count(array_filter($threats, fn($t) => $t['status'] === 'active'));
-
-        if ($activeThreats > 0) {
+        if ($exposure > 80) {
             return 'UNDER ATTACK';
         }
 
-        $incoming = $this->getIncomingConnections();
-        $probes = count(array_filter($incoming, fn($c) => $c['type'] === 'probe' || $c['type'] === 'scan'));
-
-        if ($probes > 2) {
+        if ($exposure > 60) {
             return 'ELEVATED THREAT';
         }
 
-        if ($probes > 0) {
+        if ($exposure > 40) {
             return 'MONITORING';
         }
 
@@ -92,57 +127,22 @@ class SentinelService
     }
 
     /**
-     * Get firewall strength percentage.
-     */
-    private function getFirewallStrength(): int
-    {
-        // Mock - would be based on installed defenses
-        return 75;
-    }
-
-    /**
-     * Get incoming connection attempts.
+     * Get incoming threats from Kotlin engine.
      */
     public function getIncomingConnections(): array
     {
-        // Mock data - would come from game state
-        return [
-            [
-                'id' => 'conn_001',
-                'sourceIp' => '192.168.50.10',
-                'sourceNode' => 'nova-corp-sec',
-                'type' => 'probe',
-                'port' => 22,
-                'timestamp' => now()->subSeconds(45)->toIso8601String(),
-                'timeAgo' => '45s ago',
-                'status' => 'detected',
-                'threatLevel' => 'low',
-            ],
-            [
-                'id' => 'conn_002',
-                'sourceIp' => '10.0.0.15',
-                'sourceNode' => 'unknown',
-                'type' => 'scan',
-                'port' => null,
-                'timestamp' => now()->subMinutes(1)->subSeconds(23)->toIso8601String(),
-                'timeAgo' => '1m ago',
-                'status' => 'detected',
-                'threatLevel' => 'low',
-            ],
-            [
-                'id' => 'conn_003',
-                'sourceIp' => '172.16.0.8',
-                'sourceNode' => 'sec-response-unit',
-                'type' => 'intrusion',
-                'port' => 443,
-                'timestamp' => now()->subSeconds(12)->toIso8601String(),
-                'timeAgo' => '12s ago',
-                'status' => 'active',
-                'threatLevel' => 'critical',
-                'progress' => 35,
-                'timeRemaining' => 45,
-            ],
-        ];
+        $sessionId = session()->getId();
+        $sentinelData = $this->engine->getSentinelStatus($sessionId);
+
+        // Return incoming threats, NOT connection traces
+        $threats = $sentinelData['incomingThreats'] ?? [];
+
+        return array_map(function ($threat) {
+            $threat['timeAgo'] = isset($threat['timestamp'])
+                ? $this->computeTimeAgo($threat['timestamp'])
+                : 'unknown';
+            return $threat;
+        }, $threats);
     }
 
     /**
@@ -150,60 +150,24 @@ class SentinelService
      */
     public function getActiveThreats(): array
     {
-        $connections = $this->getIncomingConnections();
+        $threats = $this->getIncomingConnections();
 
-        return array_values(array_filter($connections, function ($conn) {
-            return $conn['status'] === 'active' || $conn['threatLevel'] === 'critical';
+        return array_values(array_filter($threats, function ($threat) {
+            // Filter threats that are active or critical severity
+            $isActive = ($threat['active'] ?? 'false') === 'true';
+            $isCritical = ($threat['severity'] ?? '') === 'critical';
+            return $isActive || $isCritical;
         }));
     }
 
     /**
-     * Get security event log.
+     * Get security event log from Kotlin engine.
      */
     public function getEventLog(): array
     {
-        return [
-            [
-                'id' => 'evt_001',
-                'type' => 'probe_detected',
-                'message' => 'Port probe detected from 192.168.50.10',
-                'timestamp' => now()->subSeconds(45)->toIso8601String(),
-                'timeAgo' => '45s ago',
-                'severity' => 'warning',
-            ],
-            [
-                'id' => 'evt_002',
-                'type' => 'scan_detected',
-                'message' => 'Network scan detected from 10.0.0.15',
-                'timestamp' => now()->subMinutes(1)->subSeconds(23)->toIso8601String(),
-                'timeAgo' => '1m ago',
-                'severity' => 'warning',
-            ],
-            [
-                'id' => 'evt_003',
-                'type' => 'intrusion_attempt',
-                'message' => 'INTRUSION ATTEMPT from 172.16.0.8 (sec-response-unit)',
-                'timestamp' => now()->subSeconds(12)->toIso8601String(),
-                'timeAgo' => '12s ago',
-                'severity' => 'critical',
-            ],
-            [
-                'id' => 'evt_004',
-                'type' => 'firewall_block',
-                'message' => 'Firewall blocked connection from 45.33.32.156',
-                'timestamp' => now()->subMinutes(5)->toIso8601String(),
-                'timeAgo' => '5m ago',
-                'severity' => 'info',
-            ],
-            [
-                'id' => 'evt_005',
-                'type' => 'exposure_increase',
-                'message' => 'Exposure increased: Failed exploit attempt detected',
-                'timestamp' => now()->subMinutes(8)->toIso8601String(),
-                'timeAgo' => '8m ago',
-                'severity' => 'warning',
-            ],
-        ];
+        // TODO: Implement /api/sentinel/events/{sessionId} call
+        // For now, return empty array
+        return [];
     }
 
     /**
@@ -211,7 +175,6 @@ class SentinelService
      */
     public function blockConnection(string $connectionId): array
     {
-        // Mock - would update game state
         return [
             'success' => true,
             'message' => 'Connection blocked successfully.',
@@ -224,7 +187,6 @@ class SentinelService
      */
     public function traceConnection(string $connectionId): array
     {
-        // Mock - would reveal node info
         return [
             'success' => true,
             'nodeId' => 'node_sec_response_01',
@@ -237,30 +199,15 @@ class SentinelService
     }
 
     /**
-     * Attempt to counter-hack an attacker.
+     * Initiate counter-hack via Kotlin engine.
      */
     public function counterHack(string $connectionId): array
     {
-        // Mock - risky action, could backfire
-        $success = rand(0, 100) > 40; // 60% success rate
-
-        if ($success) {
-            return [
-                'success' => true,
-                'message' => 'Counter-hack successful! Attacker systems disabled.',
-                'exposureChange' => -10,
-                'reward' => [
-                    'credits' => rand(100, 500),
-                    'data' => 'Recovered security protocols',
-                ],
-            ];
-        }
-
+        // TODO: Implement counter-hack via Kotlin engine
+        // For now, return placeholder
         return [
             'success' => false,
-            'message' => 'Counter-hack failed! Your position has been exposed.',
-            'exposureChange' => 15,
-            'consequence' => 'Attacker has strengthened their intrusion.',
+            'message' => 'Counter-hack not yet implemented for Kotlin engine',
         ];
     }
 
@@ -270,7 +217,6 @@ class SentinelService
     public function formatForTerminal(): string
     {
         $status = $this->getStatus();
-        $threats = $this->getActiveThreats();
         $connections = $this->getIncomingConnections();
 
         $exposureBar = $this->renderProgressBar($status['exposure'], 100, 20);
@@ -290,26 +236,39 @@ class SentinelService
             $output .= "║  No incoming connections detected                    ║\n";
         } else {
             foreach (array_slice($connections, 0, 5) as $conn) {
-                $icon = match ($conn['threatLevel']) {
-                    'critical' => '🔴',
-                    'high' => '🟠',
-                    'medium' => '🟡',
-                    default => '⚪',
+                $icon = match ($conn['threatLevel'] ?? 'low') {
+                    'critical' => '!',
+                    'high' => '*',
+                    'medium' => '~',
+                    default => '-',
                 };
                 $type = strtoupper(str_pad($conn['type'], 10));
                 $ip = str_pad($conn['sourceIp'], 15);
                 $time = str_pad($conn['timeAgo'], 8);
-                $output .= sprintf("║  %s %s %s %s ║\n", $icon, $ip, $type, $time);
+                $output .= sprintf("║  [%s] %s %s %s ║\n", $icon, $ip, $type, $time);
             }
         }
 
-        $output .= "╚══════════════════════════════════════════════════════╝\n";
-
-        if (count($threats) > 0) {
-            $output .= "\n⚠️  ACTIVE THREATS DETECTED! Open Sentinel for details.";
-        }
+        $output .= "╚══════════════════════════════════════════════════════╝";
 
         return $output;
+    }
+
+    /**
+     * Compute a human-readable "time ago" string from an ISO timestamp.
+     */
+    private function computeTimeAgo(string $timestamp): string
+    {
+        $seconds = now()->diffInSeconds(Carbon::parse($timestamp));
+
+        if ($seconds < 60) {
+            return $seconds . 's ago';
+        }
+        if ($seconds < 3600) {
+            return floor($seconds / 60) . 'm ago';
+        }
+
+        return floor($seconds / 3600) . 'h ago';
     }
 
     /**

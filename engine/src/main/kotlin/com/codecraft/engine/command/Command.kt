@@ -76,7 +76,8 @@ data class CommandResult(
             error = if (!success) output else null,
             delayMs = delayMs,
             stateChanges = stateChanges,
-            gameEvents = events
+            gameEvents = events,
+            traceIncrease = exposureChange
         )
     }
 }

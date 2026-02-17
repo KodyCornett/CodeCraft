@@ -45,7 +45,8 @@ class HelpCommand(private val registry: CommandRegistry) : Command {
                 }
             }
 
-            appendLine("\n─".repeat(50))
+            appendLine()
+            appendLine("─".repeat(50))
             appendLine("Type 'help <command>' for detailed information.")
         }
 

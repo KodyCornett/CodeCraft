@@ -14,6 +14,8 @@ export function sentinel() {
         actionInProgress: false,
         lastUpdate: null,
         refreshInterval: null,
+        counterHackChallenge: null,
+        counterHackConnectionId: null,
 
         init() {
             this.loadStatus();
@@ -39,6 +41,12 @@ export function sentinel() {
                     this.connections = data.connections;
                     this.threats = data.threats;
                     this.lastUpdate = new Date();
+
+                    // Clear puzzle UI when shield becomes active or puzzle is no longer pending
+                    if (this.status.shield?.active || !this.status.counterHackPending) {
+                        this.counterHackChallenge = null;
+                        this.counterHackConnectionId = null;
+                    }
                 }
             } catch (e) {
                 console.error('Failed to load sentinel status:', e);
@@ -132,16 +140,10 @@ export function sentinel() {
                 });
 
                 const data = await response.json();
-                if (data.success) {
-                    // Remove threat and update exposure
-                    this.connections = this.connections.filter(c => c.id !== connectionId);
-                    this.threats = this.threats.filter(t => t.id !== connectionId);
-                    this.selectedConnection = null;
-                    // Reload status to get updated exposure
-                    await this.loadStatus();
-                } else {
-                    // Failed - exposure increased
-                    await this.loadStatus();
+                if (data.success && data.puzzleActive) {
+                    // Show puzzle challenge inline
+                    this.counterHackChallenge = data.prompt;
+                    this.counterHackConnectionId = connectionId;
                 }
             } catch (e) {
                 console.error('Failed to counter-hack:', e);
@@ -152,6 +154,14 @@ export function sentinel() {
 
         selectConnection(connection) {
             this.selectedConnection = connection;
+        },
+
+        getShieldTimeFormatted() {
+            if (!this.status?.shield?.active) return '';
+            const secs = this.status.shield.secondsRemaining;
+            const mins = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${mins}:${String(s).padStart(2, '0')}`;
         },
 
         getExposureColor() {
@@ -215,6 +225,14 @@ export function sentinel() {
                 'exposure_increase': '📈',
                 'connection_blocked': '🚫',
                 'counter_hack': '⚔️',
+                'counter_hack_success': '⚔️',
+                'counter_hack_failed': '⚔️',
+                'connection_attempt': '🔗',
+                'auth_failure': '🔒',
+                'breach_detected': '🚨',
+                'file_access': '📂',
+                'data_exfiltration': '💾',
+                'connection_closed': '🔌',
             }[type] || '📋';
         },
 
