@@ -4,8 +4,11 @@ import com.codecraft.engine.command.CommandRegistry
 import com.codecraft.engine.domain.Node
 import com.codecraft.engine.network.discovery.DiscoveryManager
 import com.codecraft.engine.network.gateway.GatewayManager
+import com.codecraft.engine.network.generation.PlayerSpawnService
+import com.codecraft.engine.network.generation.WorldBootstrap
 import com.codecraft.engine.network.persistence.ConnectionRepository
 import com.codecraft.engine.network.persistence.DiscoveryRepository
+import com.codecraft.engine.network.persistence.DistrictRepository
 import com.codecraft.engine.network.persistence.NodeRepository
 import com.codecraft.engine.network.persistence.PositionRepository
 import com.codecraft.engine.persistence.GameDatabase
@@ -31,12 +34,17 @@ import kotlinx.serialization.Serializable
 fun Application.configureRoutes(sessionManager: SessionManager) {
     // Phase 3 network repositories
     val db = GameDatabase.database
+    val districtRepository = DistrictRepository(db)
     val nodeRepository = NodeRepository(db)
     val connectionRepository = ConnectionRepository(db)
     val discoveryRepository = DiscoveryRepository(db)
     val discoveryManager = DiscoveryManager(discoveryRepository, nodeRepository)
     val positionRepository = PositionRepository(db)
     val gatewayManager = GatewayManager(nodeRepository, discoveryManager)
+
+    // Phase 3.5: bootstrap the city on first startup and spawn service
+    WorldBootstrap(districtRepository, nodeRepository, connectionRepository).bootstrapIfEmpty()
+    val playerSpawnService = PlayerSpawnService(nodeRepository, discoveryManager, positionRepository)
 
     val commandRegistry = CommandRegistry(
         repository = sessionManager.getRepository(),
@@ -101,6 +109,7 @@ fun Application.configureRoutes(sessionManager: SessionManager) {
                 val request = call.receive<CommandRequest>()
 
                 val session = sessionManager.getOrCreateSession(request.sessionId)
+                playerSpawnService.spawnPlayer(session.sessionId)
 
                 // Update session context
                 session.currentPath = request.context.currentPath
@@ -125,6 +134,7 @@ fun Application.configureRoutes(sessionManager: SessionManager) {
                 when (request.action) {
                     "create" -> {
                         val session = sessionManager.createSession()
+                        playerSpawnService.spawnPlayer(session.sessionId)
                         call.respond(SessionResponse(
                             success = true,
                             sessionId = session.sessionId,
