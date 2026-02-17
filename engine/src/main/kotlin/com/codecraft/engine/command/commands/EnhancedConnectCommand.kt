@@ -6,6 +6,7 @@ import com.codecraft.engine.command.CommandResult
 import com.codecraft.engine.network.discovery.DiscoveryManager
 import com.codecraft.engine.network.domain.DiscoveryState
 import com.codecraft.engine.network.domain.NetworkNode
+import com.codecraft.engine.network.gateway.GatewayManager
 import com.codecraft.engine.network.persistence.NodeRepository
 import com.codecraft.engine.network.persistence.PositionRepository
 import com.codecraft.engine.session.GameSession
@@ -13,12 +14,13 @@ import java.util.UUID
 
 /**
  * Enhanced connect command for the new network system
- * Handles connection, position tracking, and discovery state updates
+ * Handles connection, position tracking, discovery state updates, and gateway activation
  */
 class EnhancedConnectCommand(
     private val nodeRepository: NodeRepository,
     private val discoveryManager: DiscoveryManager,
-    private val positionRepository: PositionRepository
+    private val positionRepository: PositionRepository,
+    private val gatewayManager: GatewayManager
 ) : Command {
 
     override val name = "nconnect"
@@ -103,10 +105,17 @@ class EnhancedConnectCommand(
             newState = DiscoveryState.CONNECTED
         )
 
+        // Activate gateway if public node
+        val gatewayResult = gatewayManager.activateGateway(
+            playerId = session.player.id,
+            gatewayNode = targetNode
+        )
+
         // Build connection message
         val output = buildConnectionOutput(
             targetNode = targetNode,
-            previousNode = currentNode
+            previousNode = currentNode,
+            gatewayResult = gatewayResult
         )
 
         // Small exposure increase for moving through the network
@@ -143,7 +152,8 @@ class EnhancedConnectCommand(
      */
     private fun buildConnectionOutput(
         targetNode: NetworkNode,
-        previousNode: NetworkNode?
+        previousNode: NetworkNode?,
+        gatewayResult: GatewayManager.GatewayActivationResult
     ): String {
         val lines = mutableListOf<String>()
 
@@ -178,7 +188,29 @@ class EnhancedConnectCommand(
 
         lines.add("")
         lines.add("You are now connected to this node's network.")
-        lines.add("Use 'nscan' to discover nearby nodes from this position.")
+
+        // Show gateway activation results
+        if (gatewayResult.isGateway && gatewayResult.autoRevealedCount > 0) {
+            lines.add("")
+            lines.add("─────────────────────────────────────────────────────")
+            lines.add("GATEWAY ACTIVATED")
+            lines.add("─────────────────────────────────────────────────────")
+            lines.add("This public access point has revealed ${gatewayResult.autoRevealedCount} nearby network(s):")
+            lines.add("")
+
+            gatewayResult.autoRevealedNodes.take(5).forEach { node ->
+                lines.add("  [+] ${node.nodeName} (${node.ipAddress})")
+            }
+
+            if (gatewayResult.autoRevealedCount > 5) {
+                lines.add("  ... and ${gatewayResult.autoRevealedCount - 5} more")
+            }
+
+            lines.add("")
+            lines.add("Use 'nmap' to view all discovered nodes.")
+        } else {
+            lines.add("Use 'nscan' to discover nearby nodes from this position.")
+        }
 
         return lines.joinToString("\n")
     }

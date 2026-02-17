@@ -5,6 +5,7 @@ import com.codecraft.engine.network.discovery.DiscoveryManager
 import com.codecraft.engine.network.domain.DiscoveryState
 import com.codecraft.engine.network.domain.NetworkNode
 import com.codecraft.engine.network.domain.NodeType
+import com.codecraft.engine.network.gateway.GatewayManager
 import com.codecraft.engine.network.persistence.DiscoveryRepository
 import com.codecraft.engine.network.persistence.NodeRepository
 import com.codecraft.engine.network.persistence.PositionRepository
@@ -57,7 +58,8 @@ class EnhancedConnectCommandTest {
         val discoveryRepository = DiscoveryRepository(database)
         discoveryManager = DiscoveryManager(discoveryRepository, nodeRepository)
         positionRepository = PositionRepository(database)
-        connectCommand = EnhancedConnectCommand(nodeRepository, discoveryManager, positionRepository)
+        val gatewayManager = GatewayManager(nodeRepository, discoveryManager)
+        connectCommand = EnhancedConnectCommand(nodeRepository, discoveryManager, positionRepository, gatewayManager)
 
         // Create test session
         session = GameSession(sessionId = testPlayerId)
