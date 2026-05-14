@@ -27,6 +27,11 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json")
     implementation("io.ktor:ktor-server-cors")
 
+    // Ktor client (for LaravelApiClient)
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
+    implementation("io.ktor:ktor-client-content-negotiation")
+
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.16")
 
