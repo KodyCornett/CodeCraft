@@ -34,6 +34,7 @@ class Player extends Model
         'pocket_creds',
         'wallet_creds',
         'cache',
+        'cyberdoc_cooldowns',
         'tech_points',
     ];
 
@@ -52,6 +53,7 @@ class Player extends Model
         'pocket_creds'             => 'integer',
         'wallet_creds'             => 'integer',
         'cache'                    => 'integer',
+        'cyberdoc_cooldowns'       => 'array',
         'tech_points'              => 'decimal:2',
     ];
 

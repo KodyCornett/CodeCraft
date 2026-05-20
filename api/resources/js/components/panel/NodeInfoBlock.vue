@@ -60,10 +60,10 @@
             <div v-else class="ni-resources">
                 <div class="ni-res-label">NODE RESOURCES</div>
 
-                <!-- Cache-full lock banner -->
+                <!-- Cache-full ping exposure warning -->
                 <div v-if="cacheFull" class="ni-cache-full">
-                    <span class="ni-cache-icon">▓</span>
-                    CACHE FULL — VISIT CYBERDOC
+                    <span class="ni-cache-icon">◈</span>
+                    CACHE FULL — PING EXPOSURE MAXIMUM
                 </div>
 
                 <div class="ni-res-row">

@@ -30,7 +30,8 @@ class CyberDocController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
-        $result = $this->cyberDocService->bankCreds($player);
+        $cyberdocCanvasId = $request->input('cyberdoc_canvas_id');
+        $result = $this->cyberDocService->bankCreds($player, $cyberdocCanvasId);
         $fresh  = $player->fresh();
 
         $rig      = $this->rigService->getRigForPlayer($fresh);
@@ -51,6 +52,41 @@ class CyberDocController extends Controller
                 'is_limping'        => $fresh->is_limping,
             ],
             'max_cache' => $maxCache,
+        ]);
+    }
+
+    /**
+     * POST /api/cyberdoc/flush
+     *
+     * Flush the player's cache without resetting bounty or banking creds.
+     * Costs 30 pocket creds × current cache amount.
+     * Subject to a 10-minute cooldown per CyberDoc node.
+     *
+     * Body: { cyberdoc_canvas_id: string }
+     */
+    public function flush(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'cyberdoc_canvas_id' => 'required|string',
+        ]);
+
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        try {
+            $result = $this->cyberDocService->flushCache($player, $data['cyberdoc_canvas_id']);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message'       => 'Cache flushed.',
+            'cache_flushed' => $result['cache_flushed'],
+            'cost'          => $result['cost'],
+            'pocket_creds'  => $result['pocket_creds'],
+            'cache'         => 0,
         ]);
     }
 

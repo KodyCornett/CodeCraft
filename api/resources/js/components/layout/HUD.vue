@@ -258,7 +258,7 @@ const flashClass = computed(() =>
     animation: crit-pulse 0.8s ease-in-out infinite;
 }
 
-/* ── Cache states ─────────────────────────────────────────────────────────── */
+/* ── Cache states — colour reflects ping exposure risk, not a lock ────────── */
 .val-cache-ok   { color: rgba(0, 255, 255, 0.6); }
 .val-cache-mid  { color: #FFB300; }
 .val-cache-high {
@@ -266,6 +266,7 @@ const flashClass = computed(() =>
     animation: cache-warn 1.5s ease-in-out infinite;
 }
 .val-cache-full {
+    /* Full cache = maximum ping exposure radius */
     color: #FF3333;
     animation: crit-pulse 0.6s ease-in-out infinite;
 }

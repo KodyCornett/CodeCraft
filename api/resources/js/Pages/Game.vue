@@ -386,14 +386,18 @@ function checkBountyEscalation(nodeIce = null) {
 // the star AND the higher the node's ICE, the tighter the ping circle gets.
 //
 //   effective_ice  = node.ice × (1 + bountyLevel)
-//   raw_range      = BASE_RANGE + player.os − effective_ice
+//   raw_range      = BASE_RANGE + player.os − effective_ice − cachePenalty
 //   ping_range     = clamp(raw_range, 0, MAX_RANGE_PER_STAR[bountyLevel])
+//
+// cachePenalty: full cache subtracts 3 from raw_range (widens the ring),
+// scaling linearly from 0 at empty to −3 at full. Hot data = hot signal.
 //
 // At ★5, even a low-ICE node (1 × 6 = 6) leaves very little OS headroom.
 // A high-ICE node (6 × 6 = 36) is instant pinpoint regardless of OS.
 // Commands like Signal Noise / Ghost Protocol are the only real escape at ★4–5.
 //
 const PING_BASE_RANGE      = 8;
+const PING_CACHE_PENALTY   = 3;   // max OS penalty at full cache
 const PING_TTL_MS          = 30_000;
 // Max radius (in abstract "node hops") per bounty star level
 const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 1];   // index = bountyLevel (0–5)
@@ -401,10 +405,13 @@ const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 1];   // index = bountyLevel (0–5
 const PING_PX_PER_HOP      = 38;
 const PING_MIN_RADIUS_PX   = 18;   // tight ring for a range-0 exact ping
 
-function calcPingRange(nodeIce, playerOs, bountyLevel) {
-    const lvl         = Math.min(bountyLevel, 5);
+function calcPingRange(nodeIce, playerOs, bountyLevel, cache = 0, maxCache = 5) {
+    const lvl          = Math.min(bountyLevel, 5);
     const effectiveIce = nodeIce * (1 + lvl);
-    const raw          = PING_BASE_RANGE + playerOs - effectiveIce;
+    // Cache penalty scales from 0 (empty) to PING_CACHE_PENALTY (full)
+    const cachePct     = maxCache > 0 ? Math.min(cache / maxCache, 1) : 0;
+    const cachePenalty = Math.round(cachePct * PING_CACHE_PENALTY);
+    const raw          = PING_BASE_RANGE + playerOs - effectiveIce - cachePenalty;
     const cap          = PING_MAX_RANGE[lvl] ?? 1;
     return Math.max(0, Math.min(cap, raw));
 }
@@ -432,7 +439,7 @@ function firePing(reason = 'movement', nodeIce = null, type = 'real') {
         ?? 3;
 
     const os    = rig.value?.os ?? 2;
-    const range = calcPingRange(ice, os, player.value.bountyLevel);
+    const range = calcPingRange(ice, os, player.value.bountyLevel, player.value.cache ?? 0, player.value.maxCache ?? 5);
 
     const ping = {
         pingId:       Math.random().toString(36).slice(2),
@@ -485,6 +492,8 @@ function fireFalsePing(targetNode) {
         targetNode.ice ?? 3,
         rig.value?.os ?? 2,
         player.value.bountyLevel,
+        player.value.cache    ?? 0,
+        player.value.maxCache ?? 5,
     );
 
     const ping = {
@@ -579,8 +588,8 @@ function handlePlayerMoved(event) {
 
 // ── Cache + resource availability ─────────────────────────────────────────────
 //
-// Cache fills by 1 per successful hack. Full = all hack buttons locked until
-// the player visits a CyberDoc (Street Doc) to flush it.
+// Cache fills by 1 per successful hack. Full cache does NOT lock hacking —
+// instead it maximises the player's ping exposure radius.
 // maxCache = CPU + RAM effective (seeded from API via hydrateFromAuth).
 //
 const cacheIsFull = computed(() =>
@@ -602,7 +611,6 @@ function secsUntilReplenish(lastHackedAt) {
 }
 
 // Drives NodeInfoBlock [HACK] button enabled states. Merges:
-//   • cache lock (full cache disables everything)
 //   • node resource depletion flags from the DB (server-authoritative)
 //   • client-side replenish countdown so the button re-enables without polling
 //   • display values for the panel (what the player could earn)
@@ -614,8 +622,8 @@ const nodeResources = computed(() => {
     const node = selectedNode.value?.canvasId
         ? (getByCanvasId(selectedNode.value.canvasId) ?? selectedNode.value)
         : null;
-    // Cache full OR SS = 0 (critical failure) both lock all hacking
-    const full = cacheIsFull.value || (player.value.currentSS ?? 1) <= 0;
+    // SS = 0 (critical failure) locks all hacking. Cache no longer blocks.
+    const full = (player.value.currentSS ?? 1) <= 0;
 
     const credSecsLeft     = secsUntilReplenish(node?.credLastHackedAt);
     const movementSecsLeft = secsUntilReplenish(node?.movementLastHackedAt);
@@ -729,10 +737,6 @@ const activeHack = ref(null);
 
 function onHackSelected(resource) {
     if (!selectedNode.value) return;
-    if (cacheIsFull.value) {
-        console.warn('[HACK] Blocked — cache full. Visit CyberDoc to flush.');
-        return;
-    }
     const ice  = effectiveNodeIce(selectedNode.value);
     // Pass a shallow copy with the live effective ICE baked in
     activeHack.value = {
@@ -899,11 +903,15 @@ function onHackAbort() {
 // Returns the API response or null on failure.
 //
 async function bankCreds() {
-    const pid = playerId.value;
+    const pid       = playerId.value;
+    const canvasId  = currentNodeId.value;
     if (!pid) return null;
 
     try {
-        const res = await axios.post('/api/cyberdoc/bank', { player_id: pid });
+        const res = await axios.post('/api/cyberdoc/bank', {
+            player_id:           pid,
+            cyberdoc_canvas_id:  canvasId ?? undefined,
+        });
         const result = res.data;
 
         // Move pocket into wallet
@@ -945,6 +953,32 @@ async function bankCreds() {
     } catch (e) {
         console.error('[CYBERDOC] Bank failed:', e?.response?.data?.message ?? e.message);
         return null;
+    }
+}
+
+// Flushes cache only — bounty kept, costs 30 pocket creds × current cache.
+// Subject to a 10-minute cooldown per CyberDoc node.
+//
+async function flushCache() {
+    const pid      = playerId.value;
+    const canvasId = currentNodeId.value;
+    if (!pid || !canvasId) return null;
+
+    try {
+        const res    = await axios.post('/api/cyberdoc/flush', {
+            cyberdoc_canvas_id: canvasId,
+        });
+        const result = res.data;
+
+        player.value.cache        = 0;
+        player.value.pocketCreds  = result.pocket_creds ?? player.value.pocketCreds;
+
+        console.log(`[CYBERDOC] Cache flushed. Cost: ${result.cost} ₡`);
+        return result;
+    } catch (e) {
+        const msg = e?.response?.data?.message ?? e.message;
+        console.error('[CYBERDOC] Flush failed:', msg);
+        return { error: msg };
     }
 }
 
@@ -1274,7 +1308,7 @@ function applyPvpResult(result, opponentHandle) {
 }
 
 // ── Provide game state to SPLICE browser pages ────────────────────────────────
-provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, useConsumable });
+provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, flushCache, currentNodeId, useConsumable });
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {

@@ -26,8 +26,10 @@ use RuntimeException;
 class CyberDocService
 {
     /** Minimum level any stat may be reduced to (mirrors RigService::MIN_LEVEL). */
-    private const MIN_LEVEL   = 1;
-    private const VALID_STATS = ['os', 'ram', 'cpu', 'storage', 'firewall'];
+    private const MIN_LEVEL             = 1;
+    private const VALID_STATS           = ['os', 'ram', 'cpu', 'storage', 'firewall'];
+    private const CACHE_FLUSH_COST_PER  = 30;   // pocket creds per cache point
+    private const CYBERDOC_COOLDOWN_SEC = 600;  // 10 minutes
 
     public function __construct(
         private readonly RigService    $rigService,
@@ -48,11 +50,11 @@ class CyberDocService
      *
      * Returns ['pocket_banked' => int].
      */
-    public function bankCreds(Player $player): array
+    public function bankCreds(Player $player, ?string $cyberdocCanvasId = null): array
     {
         $pocketBanked = 0;
 
-        DB::transaction(function () use ($player, &$pocketBanked) {
+        DB::transaction(function () use ($player, $cyberdocCanvasId, &$pocketBanked) {
             // Run extraction whenever there is any run state to reset — not just
             // when pocket_creds > 0. A player with 0 pocket but nonzero hacks or
             // bounty still needs their counters cleared and bounty reset.
@@ -67,6 +69,12 @@ class CyberDocService
 
             // Clear the hack cache so the next run starts unblocked.
             $player->cache = 0;
+
+            // Record cooldown for this CyberDoc if a canvas ID was provided.
+            if ($cyberdocCanvasId !== null) {
+                $this->recordCooldown($player, $cyberdocCanvasId);
+            }
+
             $player->save();
 
             // Reset current_uplink to chassis base so the next run starts with a full pool.
@@ -78,6 +86,90 @@ class CyberDocService
         });
 
         return ['pocket_banked' => $pocketBanked];
+    }
+
+    // -------------------------------------------------------------------------
+    // Cache Flush — clear cache only, keep bounty, costs pocket creds
+    // -------------------------------------------------------------------------
+
+    /**
+     * Flush the player's cache without resetting bounty or banking creds.
+     *
+     * Cost: 30 pocket creds × current cache amount.
+     * Cooldown: 10 minutes per CyberDoc node (tracked by canvas_id).
+     *
+     * Returns ['cache_flushed' => int, 'cost' => int, 'pocket_creds' => int].
+     *
+     * @throws RuntimeException         When the CyberDoc is on cooldown or pocket creds insufficient.
+     */
+    public function flushCache(Player $player, string $cyberdocCanvasId): array
+    {
+        $this->assertCooldown($player, $cyberdocCanvasId);
+
+        $currentCache = (int) ($player->cache ?? 0);
+        $cost         = $currentCache * self::CACHE_FLUSH_COST_PER;
+
+        if ($cost > 0 && ($player->pocket_creds ?? 0) < $cost) {
+            throw new RuntimeException(
+                "Insufficient pocket creds. Need {$cost}, have " . ($player->pocket_creds ?? 0) . '.'
+            );
+        }
+
+        DB::transaction(function () use ($player, $cyberdocCanvasId, $cost) {
+            if ($cost > 0) {
+                $player->pocket_creds = max(0, (int) ($player->pocket_creds ?? 0) - $cost);
+            }
+            $player->cache = 0;
+            $this->recordCooldown($player, $cyberdocCanvasId);
+            $player->save();
+        });
+
+        return [
+            'cache_flushed' => $currentCache,
+            'cost'          => $cost,
+            'pocket_creds'  => (int) ($player->fresh()->pocket_creds ?? 0),
+        ];
+    }
+
+    /**
+     * Return the seconds remaining on a CyberDoc cooldown, or 0 if clear.
+     */
+    public function cooldownRemaining(Player $player, string $cyberdocCanvasId): int
+    {
+        $cooldowns = $player->cyberdoc_cooldowns ?? [];
+        if (!isset($cooldowns[$cyberdocCanvasId])) {
+            return 0;
+        }
+
+        $elapsed = time() - (int) $cooldowns[$cyberdocCanvasId];
+        return max(0, self::CYBERDOC_COOLDOWN_SEC - $elapsed);
+    }
+
+    /**
+     * Record a visit cooldown for the given CyberDoc canvas ID.
+     * Call this inside a DB transaction that already has the player locked.
+     */
+    private function recordCooldown(Player $player, string $cyberdocCanvasId): void
+    {
+        $cooldowns                      = $player->cyberdoc_cooldowns ?? [];
+        $cooldowns[$cyberdocCanvasId]   = time();
+        $player->cyberdoc_cooldowns     = $cooldowns;
+    }
+
+    /**
+     * Throw if the given CyberDoc is still on cooldown for this player.
+     *
+     * @throws RuntimeException
+     */
+    private function assertCooldown(Player $player, string $cyberdocCanvasId): void
+    {
+        $remaining = $this->cooldownRemaining($player, $cyberdocCanvasId);
+        if ($remaining > 0) {
+            $mins = (int) ceil($remaining / 60);
+            throw new RuntimeException(
+                "This CyberDoc is on cooldown. Available again in {$mins} minute(s)."
+            );
+        }
     }
 
     // -------------------------------------------------------------------------

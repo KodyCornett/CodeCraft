@@ -35,10 +35,37 @@
             >
                 <span v-if="banking">BANKING…</span>
                 <span v-else-if="playerPocketCreds === 0">NOTHING TO BANK</span>
-                <span v-else>[ BANK ◈{{ playerPocketCreds.toLocaleString() }} ]</span>
+                <span v-else>[ EXTRACT ◈{{ playerPocketCreds.toLocaleString() }} ]</span>
             </button>
             <Transition name="bank-confirm">
                 <span v-if="bankConfirm" class="bank-confirm">✓ {{ bankConfirm.toLocaleString() }} ₡ SECURED</span>
+            </Transition>
+        </div>
+
+        <!-- ── Cache flush strip ──────────────────────────────────────────────── -->
+        <div class="flush-strip" :class="{ 'flush-strip--hot': playerCache > 0 }">
+            <div class="flush-strip-left">
+                <span class="flush-label">CACHE</span>
+                <span class="flush-cache" :class="playerCache >= playerMaxCache ? 'cache--full' : 'cache--ok'">
+                    {{ playerCache }}/{{ playerMaxCache }}
+                </span>
+                <span v-if="playerCache >= playerMaxCache" class="flush-warn">PING EXPOSED</span>
+                <span v-else-if="flushCooldownSecs > 0" class="flush-cooldown">
+                    COOLDOWN {{ Math.ceil(flushCooldownSecs / 60) }}m
+                </span>
+            </div>
+            <button
+                class="flush-btn"
+                :disabled="playerCache === 0 || flushing || flushCooldownSecs > 0"
+                @click="onFlushCache"
+            >
+                <span v-if="flushing">FLUSHING…</span>
+                <span v-else-if="flushCooldownSecs > 0">ON COOLDOWN</span>
+                <span v-else-if="playerCache === 0">CACHE CLEAR</span>
+                <span v-else>[ FLUSH CACHE — {{ flushCost }} ₡ ]</span>
+            </button>
+            <Transition name="bank-confirm">
+                <span v-if="flushConfirm" class="flush-confirm">✓ CACHE FLUSHED</span>
             </Transition>
         </div>
 
@@ -413,16 +440,37 @@ import { useUpgradeCosts } from '@/composables/useUpgradeCosts.js';
 defineProps({ url: { type: String, default: '' } });
 
 // ── Real player state from Game.vue ──────────────────────────────────────────
-const gameState    = inject('gameState', null);
-const player       = gameState?.player      ?? ref({ creds: 0, techPoints: 0 });
-const rig          = gameState?.rig         ?? ref({ ram: 2, tier: 1, chassis: 'BlackHat v1.0' });
-const allCommands  = gameState?.commands    ?? ref([]);
-const inventory    = gameState?.inventory   ?? ref({ hardware: [], consumables: [] });
-const useConsumable = gameState?.useConsumable ?? null;
+const gameState     = inject('gameState', null);
+const player        = gameState?.player         ?? ref({ creds: 0, techPoints: 0 });
+const rig           = gameState?.rig            ?? ref({ ram: 2, tier: 1, chassis: 'BlackHat v1.0' });
+const allCommands   = gameState?.commands       ?? ref([]);
+const inventory     = gameState?.inventory      ?? ref({ hardware: [], consumables: [] });
+const useConsumable = gameState?.useConsumable  ?? null;
+const currentNodeId = gameState?.currentNodeId  ?? ref(null);
 
 const playerCreds       = computed(() => player.value?.creds       ?? 0);
 const playerPocketCreds = computed(() => player.value?.pocketCreds ?? 0);
 const playerTechPoints  = computed(() => player.value?.techPoints  ?? 0);
+const playerCache       = computed(() => player.value?.cache       ?? 0);
+const playerMaxCache    = computed(() => player.value?.maxCache     ?? 5);
+
+// Flush cost = 30 creds × current cache
+const FLUSH_COST_PER = 30;
+const flushCost = computed(() => playerCache.value * FLUSH_COST_PER);
+
+// Cooldown — counts down from 600s after a flush or extract at this node.
+// Stored locally; resets if the page reloads (acceptable — server enforces it).
+const flushCooldownSecs = ref(0);
+let   _cooldownInterval = null;
+
+function startCooldown() {
+    flushCooldownSecs.value = 600;
+    clearInterval(_cooldownInterval);
+    _cooldownInterval = setInterval(() => {
+        flushCooldownSecs.value = Math.max(0, flushCooldownSecs.value - 1);
+        if (flushCooldownSecs.value === 0) clearInterval(_cooldownInterval);
+    }, 1000);
+}
 
 // ── Banking ───────────────────────────────────────────────────────────────────
 const banking     = ref(false);
@@ -439,7 +487,29 @@ async function onBankCreds() {
     banking.value = false;
     if (result !== null) {
         bankConfirm.value = banked;
+        startCooldown();
         setTimeout(() => { bankConfirm.value = null; }, 3000);
+    }
+}
+
+// ── Cache flush ───────────────────────────────────────────────────────────────
+const flushing     = ref(false);
+const flushConfirm = ref(false);
+
+async function onFlushCache() {
+    if (flushing.value || playerCache.value === 0 || flushCooldownSecs.value > 0) return;
+    flushing.value = true;
+    flushConfirm.value = false;
+
+    const result = await gameState?.flushCache?.();
+
+    flushing.value = false;
+    if (result && !result.error) {
+        flushConfirm.value = true;
+        startCooldown();
+        setTimeout(() => { flushConfirm.value = false; }, 3000);
+    } else if (result?.error) {
+        console.warn('[CYBERDOC] Flush error:', result.error);
     }
 }
 
@@ -968,6 +1038,77 @@ function onResetCooldowns() {
 }
 .bank-confirm-enter-active, .bank-confirm-leave-active { transition: opacity 0.3s; }
 .bank-confirm-enter-from, .bank-confirm-leave-to       { opacity: 0; }
+
+/* ── Cache flush strip ────────────────────────────────────────────────────── */
+.flush-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(0, 200, 255, 0.1);
+    background: transparent;
+    transition: background 0.2s, border-color 0.2s;
+}
+.flush-strip--hot {
+    background: rgba(0, 200, 255, 0.03);
+    border-bottom-color: rgba(0, 200, 255, 0.15);
+}
+.flush-strip-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+.flush-label {
+    font-size: 8px;
+    color: rgba(0, 200, 255, 0.5);
+    letter-spacing: 0.12em;
+    flex-shrink: 0;
+}
+.flush-cache {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+}
+.cache--ok   { color: rgba(0, 200, 255, 0.7); }
+.cache--full { color: #FF3333; animation: risk-pulse 1s ease-in-out infinite; }
+.flush-warn {
+    font-size: 8px;
+    color: #FF3333;
+    letter-spacing: 0.1em;
+}
+.flush-cooldown {
+    font-size: 8px;
+    color: rgba(255, 179, 0, 0.7);
+    letter-spacing: 0.1em;
+}
+.flush-btn {
+    background: transparent;
+    border: 1px solid rgba(0, 200, 255, 0.25);
+    color: rgba(0, 200, 255, 0.7);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 5px 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.flush-btn:hover:not(:disabled) {
+    background: rgba(0, 200, 255, 0.07);
+    border-color: rgba(0, 200, 255, 0.6);
+    color: #00C8FF;
+}
+.flush-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+.flush-confirm {
+    font-size: 8px;
+    color: #00C8FF;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+}
 
 /* ── Category bar ─────────────────────────────────────────────────────────── */
 .store-category-bar {
