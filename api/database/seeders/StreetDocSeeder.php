@@ -2,73 +2,49 @@
 
 namespace Database\Seeders;
 
-use App\Models\District;
 use App\Models\Node;
 use App\Models\StreetDoc;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds one Street Doc per district using an existing node in that district.
+ * Seeds one Street Doc (repair/upgrade shop) per district.
  *
- * Street Doc names are styled as underground/back-alley repair shops to fit
- * the game's Spokane cyberpunk aesthetic.
+ * Each Street Doc is anchored to the district's CyberDoc hub node
+ * (type = 'cyberdoc') — the yellow hexagonal nodes on the canvas.
+ * One per district means the player always has a clear, named home base.
+ *
+ * Hub canvas_ids:
+ *   NS-hub  → North Spokane
+ *   BA-hub  → Browne's Addition
+ *   DT-hub  → Downtown
+ *   UD-hub  → University District
+ *   SV-hub  → Spokane Valley
  */
 class StreetDocSeeder extends Seeder
 {
-    /**
-     * Maps district name → [Street Doc name, preferred node business_name].
-     * Falls back to the first node in the district if the preferred node doesn't exist.
-     */
     private const DOCS = [
-        'Downtown' => [
-            'name'        => 'Monroe St. Underground',
-            'prefer_node' => 'Steam Plant Square',
-        ],
-        'South Hill' => [
-            'name'        => 'South Hill Salvage & Repair',
-            'prefer_node' => 'Manito Park',
-        ],
-        'University District' => [
-            'name'        => 'Campus Black Market',
-            'prefer_node' => 'Washington State University Spokane',
-        ],
-        "Browne's Addition" => [
-            'name'        => "Browne's Backroom Clinic",
-            'prefer_node' => 'Dempseys Brass Rail',
-        ],
-        'North Spokane' => [
-            'name'        => 'North Side Hardware Hub',
-            'prefer_node' => 'Spokane County Library North',
-        ],
-        'Spokane Valley' => [
-            'name'        => 'Valley Depot Repairs',
-            'prefer_node' => 'Spokane Valley Mall',
-        ],
+        'NS-hub' => ['name' => 'North Side Hardware Hub',     'district' => 'North Spokane'],
+        'BA-hub' => ['name' => "Browne's Backroom Clinic",    'district' => "Browne's Addition"],
+        'DT-hub' => ['name' => 'Monroe St. Underground',      'district' => 'Downtown'],
+        'UD-hub' => ['name' => 'Campus Black Market',         'district' => 'University District'],
+        'SV-hub' => ['name' => 'Valley Depot Repairs',        'district' => 'Spokane Valley'],
     ];
 
     public function run(): void
     {
-        foreach (self::DOCS as $districtName => $config) {
-            $district = District::where('name', $districtName)->first();
-            if ($district === null) {
-                continue;  // district not seeded yet — skip
-            }
-
-            // Try preferred node first, fall back to any node in the district
-            $node = Node::where('district_id', $district->id)
-                ->where('business_name', $config['prefer_node'])
-                ->first()
-                ?? Node::where('district_id', $district->id)->first();
+        foreach (self::DOCS as $canvasId => $config) {
+            $node = Node::where('canvas_id', $canvasId)->first();
 
             if ($node === null) {
-                continue;  // no nodes in this district yet — skip
+                $this->command?->warn("StreetDocSeeder: node '{$canvasId}' not found — skipped.");
+                continue;
             }
 
-            StreetDoc::firstOrCreate(
+            StreetDoc::updateOrCreate(
                 ['node_id' => $node->id],
                 [
-                    'district_id' => $district->id,
-                    'name'        => $config['name'],
+                    'district' => $config['district'],
+                    'name'     => $config['name'],
                 ],
             );
         }

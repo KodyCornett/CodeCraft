@@ -6,64 +6,91 @@ use App\Models\Player;
 use Illuminate\Support\Collection;
 
 /**
- * All bounty, Open Season, and leaderboard logic.
+ * All bounty, Open Season, leaderboard, and PvP loot logic.
  *
- * Thresholds
- * ----------
- * BOUNTY_BOARD_THRESHOLD  — nodes hacked in one run to appear on the bounty board
- * OPEN_SEASON_NODE_THRESHOLD — nodes hacked in one run to trigger Open Season
- * OPEN_SEASON_PVP_THRESHOLD  — PvP wins while already on the board to trigger Open Season
+ * Bounty ladder (nodes_hacked_this_run → client level)
+ * ─────────────────────────────────────────────────────
+ *   < 10 hacks  → off the board (Level 0)
+ *  10–14 hacks  → Level 1  ×1.25
+ *  15–19 hacks  → Level 2  ×1.50
+ *  20–24 hacks  → Level 3  ×1.75
+ *  25–29 hacks  → Level 4  ×2.00  → Open Season (node route)
+ *   30+  hacks  → Level 5  ×2.25
  *
- * Steal percentages
- * -----------------
- *   Off bounty board:          10 %
- *   On bounty board (lv 15–24): 25 % → 59 %  (scales linearly)
- *   On bounty board (lv 25+):   60 % → 75 %  (tighter band, still scales)
- *   Open Season:               87.5 %
+ * Steal percentages (winner's cut of loser's pocket on PvP combat)
+ * ──────────────────────────────────────────────────────────────────
+ *  Level 0 (off board) :  20 % to winner, loser keeps 80 %
+ *  Level 1             :  30 %  loser keeps 70 %
+ *  Level 2             :  40 %  loser keeps 60 %
+ *  Level 3             :  50 %  loser keeps 50 %
+ *  Level 4             :  60 %  loser keeps 40 %
+ *  Level 5 / Open Season:  75 %  loser keeps 25 %
  *
- * Bounty multiplier
- * -----------------
- * Starts at 1.00. Each PvP win while on the bounty board adds 0.15, capped at 5.00.
- * Banked at Street Doc (extract). Determines the payout bonus the winner receives.
+ * On a SURVIVABLE loss the loser keeps (100 - steal_pct)% of their pocket.
+ * On ELIMINATION (SS hits 0) the loser's pocket is fully zeroed — the winner
+ * still takes steal_pct% and ICE seizes the remainder.
+ *
+ * The same steal formula applies when a player DECLINES a challenge — they
+ * take the same financial hit as losing without even having to fight.
+ *
+ * PvP win multiplier bonus
+ * ─────────────────────────
+ * Each PvP win while on the board (≥ Level 1) adds +0.15 to bounty_multiplier,
+ * capped at 5.00. Surviving hunters makes you worth even more to the next one.
  */
 class BountyService
 {
-    // --- Thresholds ---
-    public const BOUNTY_BOARD_THRESHOLD    = 15;
-    public const OPEN_SEASON_NODE_THRESHOLD = 25;
-    public const OPEN_SEASON_PVP_THRESHOLD  = 5;
+    // ── Thresholds (hack counts per CLAUDE.md) ───────────────────────────────
+    public const BOUNTY_BOARD_THRESHOLD    = 10;  // hacks to appear on bounty board (Star 1)
+    public const OPEN_SEASON_THRESHOLD     = 25;  // hacks to trigger Open Season via nodes (Star 4)
+    public const OPEN_SEASON_PVP_THRESHOLD = 5;   // PvP wins while on board → Open Season
 
-    // --- Multiplier ---
+    // ── Star tier thresholds (hack count → 0–5 star level) ──────────────────
+    private const STAR_TIERS = [
+        30 => 5,   // ★★★★★
+        25 => 4,   // ★★★★  — Open Season at this point
+        20 => 3,   // ★★★
+        15 => 2,   // ★★
+        10 => 1,   // ★
+    ];
+
+    // ── Multiplier ────────────────────────────────────────────────────────────
     public const MULTIPLIER_PER_PVP_WIN = 0.15;
     public const MULTIPLIER_CAP         = 5.00;
 
-    // -------------------------------------------------------------------------
+    // ── Steal tiers (aligned to CLAUDE.md star thresholds) ───────────────────
+    private const STEAL_TIERS = [
+        30 => 75.0,   // Level 5 / Open Season
+        25 => 60.0,   // Level 4  (Open Season triggers here, steal goes to 75 via is_open_season check)
+        20 => 50.0,   // Level 3
+        15 => 40.0,   // Level 2
+        10 => 30.0,   // Level 1
+         0 => 20.0,   // off board
+    ];
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Node hack tracking
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Record that a player successfully hacked a node.
-     * Increments run counters and checks bounty/open-season thresholds.
-     *
-     * Returns a BountyEvent describing any threshold that was just crossed.
+     * Record a successful node hack.
+     * Increments run counters and fires bounty/open-season threshold events.
      */
     public function recordNodeHack(Player $player): BountyEvent
     {
-        $wasOnBoard     = $player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD;
-        $wasOpenSeason  = $player->is_open_season;
+        $wasOnBoard    = $player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD;
+        $wasOpenSeason = $player->is_open_season;
 
         $player->nodes_hacked_this_run++;
-        $player->bounty_level = $player->nodes_hacked_this_run;
+        // bounty_level stores the 0–5 star tier; nodes_hacked_this_run is the raw counter
+        $player->bounty_level = $this->hackCountToStarLevel($player->nodes_hacked_this_run);
 
         $event = BountyEvent::none();
 
-        // Open season — node threshold
-        if (!$wasOpenSeason && $player->nodes_hacked_this_run >= self::OPEN_SEASON_NODE_THRESHOLD) {
+        if (!$wasOpenSeason && $player->nodes_hacked_this_run >= self::OPEN_SEASON_THRESHOLD) {
             $player->is_open_season = true;
             $event = BountyEvent::openSeasonTriggered($player->bounty_level);
-        }
-        // Bounty board entry
-        elseif (!$wasOnBoard && $player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD) {
+        } elseif (!$wasOnBoard && $player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD) {
             $event = BountyEvent::bountyMarked($player->bounty_level);
         }
 
@@ -71,14 +98,26 @@ class BountyService
         return $event;
     }
 
-    // -------------------------------------------------------------------------
+    /**
+     * Convert a raw hack count to a 0–5 star level.
+     */
+    public function hackCountToStarLevel(int $hacks): int
+    {
+        foreach (self::STAR_TIERS as $threshold => $stars) {
+            if ($hacks >= $threshold) {
+                return $stars;
+            }
+        }
+        return 0;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // PvP win tracking
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Record a PvP win for the given player.
-     * Increments the run win counter, adds a multiplier bonus, and checks
-     * whether the player should enter Open Season.
+     * Adds a multiplier bonus and checks for Open Season via PvP route.
      */
     public function recordPvpWin(Player $player): BountyEvent
     {
@@ -86,32 +125,29 @@ class BountyService
 
         $player->pvp_wins_this_run++;
 
-        // Multiplier bonus if on the bounty board
-        if ($player->bounty_level >= self::BOUNTY_BOARD_THRESHOLD) {
+        if ($player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD) {
             $player->bounty_multiplier = min(
                 self::MULTIPLIER_CAP,
                 (float) $player->bounty_multiplier + self::MULTIPLIER_PER_PVP_WIN,
             );
         }
 
-        // Open Season — PvP wins threshold (while already on bounty board)
         $event = BountyEvent::none();
+
         if (
             !$wasOpenSeason
-            && $player->bounty_level >= self::BOUNTY_BOARD_THRESHOLD
-            && $player->pvp_wins_this_run >= self::OPEN_SEASON_PVP_THRESHOLD
+            && $player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD
+            && $player->pvp_wins_this_run     >= self::OPEN_SEASON_PVP_THRESHOLD
         ) {
             $player->is_open_season = true;
             $event = BountyEvent::openSeasonTriggered($player->bounty_level);
         }
 
-        // Update Open Season win streak
         if ($player->is_open_season) {
             $player->open_season_current_wins++;
             if ($player->open_season_current_wins > $player->open_season_best_wins) {
                 $player->open_season_best_wins = $player->open_season_current_wins;
-                // Also update the legacy open_season_wins column (all-time record)
-                $player->open_season_wins = $player->open_season_best_wins;
+                $player->open_season_wins      = $player->open_season_best_wins;
             }
         }
 
@@ -119,53 +155,106 @@ class BountyService
         return $event;
     }
 
-    // -------------------------------------------------------------------------
-    // Steal percentage
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    // PvP loot resolution
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Returns the percentage of carried creds the winner steals from this loser.
-     * Scales with the loser's bounty level. More dangerous to lose at higher bounty.
+     * Resolve PvP loot: transfer a cut of the loser's pocket to the winner.
+     *
+     * Survivable loss  ($isElimination = false):
+     *   Winner takes steal_pct% of loser's pocket.
+     *   Loser keeps the remaining (100 - steal_pct)%.
+     *   ICE seizes nothing.
+     *
+     * Elimination      ($isElimination = true, SS hit 0):
+     *   Winner takes steal_pct% of loser's pocket.
+     *   ICE seizes the rest. Loser's pocket is fully zeroed.
+     *
+     * Returns:
+     *   pocket_before   — what the loser was carrying
+     *   steal_pct       — percentage the winner takes
+     *   stolen          — creds transferred to winner's pocket
+     *   seized_by_ice   — creds destroyed (0 on survivable loss)
+     */
+    public function resolvePvpLoot(Player $winner, Player $loser, bool $isElimination = false): array
+    {
+        $pocket   = (int) ($loser->pocket_creds ?? 0);
+        $stealPct = $this->calculateStealPercentage($loser);
+        $stolen   = (int) floor($pocket * $stealPct / 100);
+
+        $winner->pocket_creds = (int) ($winner->pocket_creds ?? 0) + $stolen;
+        $winner->save();
+
+        if ($isElimination) {
+            // ICE seizes whatever the winner didn't take
+            $seized              = $pocket - $stolen;
+            $loser->pocket_creds = 0;
+        } else {
+            // Loser keeps the remainder — ICE gets nothing
+            $seized              = 0;
+            $loser->pocket_creds = $pocket - $stolen;
+        }
+        // loser is saved by resetAfterPvpLoss() — do not save here
+
+        return [
+            'pocket_before' => $pocket,
+            'steal_pct'     => $stealPct,
+            'stolen'        => $stolen,
+            'seized_by_ice' => $seized,
+        ];
+    }
+
+    /**
+     * Reset the loser's run state after a survivable PvP loss.
+     * Pocket is already updated by resolvePvpLoot(); we only set the limp flag here.
+     * Full resets happen in criticalFailure() (SS = 0) or extractToCyberDoc().
+     */
+    public function resetAfterPvpLoss(Player $loser): void
+    {
+        $loser->is_limping = true;
+        $loser->save();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Steal percentage
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Percentage of the loser's pocket the winner receives.
+     * Scales with the loser's hack count (nodes_hacked_this_run).
      */
     public function calculateStealPercentage(Player $loser): float
     {
         if ($loser->is_open_season) {
-            return 87.5;
+            return self::STEAL_TIERS[30];
         }
 
-        $level = (int) $loser->bounty_level;
+        $hacks = (int) ($loser->nodes_hacked_this_run ?? 0);
 
-        if ($level < self::BOUNTY_BOARD_THRESHOLD) {
-            // Off the board — flat 10 %
-            return 10.0;
+        foreach (self::STEAL_TIERS as $threshold => $pct) {
+            if ($hacks >= $threshold) {
+                return $pct;
+            }
         }
 
-        if ($level < self::OPEN_SEASON_NODE_THRESHOLD) {
-            // Board tier: 15–24 → 25 % to 59 %
-            $progress = ($level - self::BOUNTY_BOARD_THRESHOLD)
-                      / (self::OPEN_SEASON_NODE_THRESHOLD - self::BOUNTY_BOARD_THRESHOLD);
-            return round(25.0 + $progress * 35.0, 1);
-        }
-
-        // High tier (25+): 60 % → 75 %, capped at 75 before Open Season kicks in
-        $progress = min(1.0, ($level - self::OPEN_SEASON_NODE_THRESHOLD) / 25.0);
-        return round(60.0 + $progress * 15.0, 1);
+        return 20.0;
     }
 
-    // -------------------------------------------------------------------------
-    // Extract (banking a run at Street Doc)
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    // Extract (banking at CyberDoc)
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * The player reaches a Street Doc and banks their run.
-     * Resets all per-run counters. The bounty_multiplier bonus is paid out
-     * (caller handles cred transfer — we just reset state here).
+     * Player banks their run at the CyberDoc.
+     * Returns the pocket_creds amount so the caller can credit the player's
+     * safe wallet (handled outside this service — we only reset run state here).
      */
-    public function extractToStreetDoc(Player $player): void
+    public function extractToCyberDoc(Player $player): int
     {
-        // Snapshot district before wipe so it can be shown on leaderboard until next run
-        // (district was already updated on district-crossing — we leave it as-is)
+        $pocket = (int) ($player->pocket_creds ?? 0);
 
+        $player->pocket_creds             = 0;
         $player->nodes_hacked_this_run    = 0;
         $player->pvp_wins_this_run        = 0;
         $player->bounty_level             = 0;
@@ -175,30 +264,28 @@ class BountyService
         $player->bounty_district_snapshot = null;
 
         $player->save();
+
+        return $pocket; // caller adds this to safe wallet
     }
 
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
     // Leaderboards
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Active bounty targets: players currently on the bounty board, sorted by
-     * bounty_level descending.
-     *
-     * Returns players with bounty_level ≥ BOUNTY_BOARD_THRESHOLD.
-     */
     public function getBountyLeaderboard(): Collection
     {
-        return Player::where('bounty_level', '>=', self::BOUNTY_BOARD_THRESHOLD)
+        // Filter by nodes_hacked_this_run so the board threshold is based on the
+        // raw hack count (BOUNTY_BOARD_THRESHOLD = 10), not the 0–5 star value.
+        return Player::where('nodes_hacked_this_run', '>=', self::BOUNTY_BOARD_THRESHOLD)
             ->orderByDesc('bounty_level')
             ->orderByDesc('pvp_wins_this_run')
-            ->get(['id', 'handle', 'bounty_level', 'bounty_district_snapshot',
-                   'nodes_hacked_this_run', 'pvp_wins_this_run', 'bounty_multiplier', 'is_open_season']);
+            ->get([
+                'id', 'handle', 'bounty_level', 'bounty_district_snapshot',
+                'nodes_hacked_this_run', 'pvp_wins_this_run',
+                'bounty_multiplier', 'is_open_season', 'pocket_creds',
+            ]);
     }
 
-    /**
-     * All-time Open Season hall of fame: sorted by open_season_best_wins descending.
-     */
     public function getOpenSeasonHallOfFame(): Collection
     {
         return Player::where('open_season_best_wins', '>', 0)

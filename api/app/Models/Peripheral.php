@@ -17,11 +17,13 @@ class Peripheral extends Model
         'boost_amount',
         'rarity',
         'port_cost',
+        'price_creds',
     ];
 
     protected $casts = [
         'boost_amount' => 'integer',
         'port_cost'    => 'integer',
+        'price_creds'  => 'integer',
     ];
 
     public function playerPeripherals(): HasMany

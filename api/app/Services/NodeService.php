@@ -9,10 +9,10 @@ use InvalidArgumentException;
 class NodeService
 {
     /** Minutes a depleted cred resource takes to replenish. */
-    private const CRED_REPLENISH_MINUTES = 60;
+    private const CRED_REPLENISH_MINUTES = 10;
 
     /** Minutes a depleted movement resource takes to replenish. */
-    private const MOVEMENT_REPLENISH_MINUTES = 30;
+    private const MOVEMENT_REPLENISH_MINUTES = 10;
 
     /**
      * Minutes at which the cred time-multiplier reaches its maximum.

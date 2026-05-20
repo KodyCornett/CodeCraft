@@ -20,6 +20,7 @@ class PlayerRig extends Model
         'storage_level',
         'os_level',
         'current_ss',
+        'current_uplink',
         'is_limping',
     ];
 
@@ -30,6 +31,7 @@ class PlayerRig extends Model
         'storage_level'  => 'integer',
         'os_level'       => 'integer',
         'current_ss'     => 'integer',
+        'current_uplink' => 'integer',
         'is_limping'     => 'boolean',
     ];
 

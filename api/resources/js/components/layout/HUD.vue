@@ -1,479 +1,454 @@
 <template>
-    <div class="hud-wrapper" :class="{ 'hud-minimized': minimized }">
+    <div class="hud-bar">
 
-        <!-- ── Minimized tab ──────────────────────────────────────── -->
-        <NeonBorder v-if="minimized" color="#00FFFF" :opacity="0.25">
-            <button class="hud-tab" @click="minimized = false">[CC]</button>
-        </NeonBorder>
+        <!-- Handle -->
+        <div class="hud-item">
+            <span class="hud-key">CC</span>
+            <span class="hud-sep">:</span>
+            <span class="hud-val" :class="{ 'val-open-season': player.isOpenSeason }">
+                {{ player.handle }}
+            </span>
+        </div>
 
-        <!-- ── Expanded panel ────────────────────────────────────── -->
-        <template v-else>
-        <button class="hud-toggle" @click="minimized = true" title="Minimize">[−]</button>
-        <NeonBorder color="#00FFFF" :opacity="0.35">
-            <div class="hud-panel">
+        <div class="hud-divider" />
 
-                <!-- Handle -->
-                <div class="hud-row">
-                    <span class="hud-key">[HANDLE</span>
-                    <span class="hud-sep">:</span>
-                    <span
-                        class="hud-val"
-                        :class="{ 'open-season-handle': player.isOpenSeason }"
-                        :style="{ color: player.isOpenSeason ? '#FF3333' : '#00FFFF' }"
-                    >{{ player.handle }}</span>
-                    <span class="hud-close">]</span>
-                </div>
+        <!-- District -->
+        <div class="hud-item">
+            <span class="hud-key">DIST</span>
+            <span class="hud-sep">:</span>
+            <span class="hud-val hud-val--dim">{{ player.district ?? 'UNKNOWN' }}</span>
+        </div>
 
-                <!-- SS bar -->
-                <div class="hud-row">
-                    <span class="hud-key">[SS&nbsp;&nbsp;&nbsp;&nbsp;</span>
-                    <span class="hud-sep">:</span>
-                    <span class="hud-val">
-                        <SSBar :current="player.currentSS" :max="player.maxSS" :is-limping="player.isLimping" />
-                    </span>
-                    <Transition name="flash">
-                        <span v-if="ssFlash" class="stat-delta" :class="ssFlash.positive ? 'delta-pos' : 'delta-neg'">
-                            {{ formatDelta(ssFlash.value) }}
-                        </span>
-                    </Transition>
-                    <span class="hud-close">]</span>
-                </div>
+        <div class="hud-divider" />
 
-                <!-- Limp mode warning -->
-                <div v-if="player.isLimping" class="hud-row limp-warning">
-                    <span>[! LIMP MODE ACTIVE !]</span>
-                </div>
+        <!-- Uplink -->
+        <div class="hud-item">
+            <span class="hud-key">UPLINK</span>
+            <span class="hud-sep">:</span>
+            <span class="hud-val" :class="uplinkClass">
+                {{ player.uplink ?? 0 }}/{{ player.maxUplink ?? 3 }}
+            </span>
+        </div>
 
-                <!-- Creds -->
-                <div class="hud-row">
-                    <span class="hud-key">[CREDS&nbsp;</span>
-                    <span class="hud-sep">:</span>
-                    <span class="hud-val">{{ formattedCreds }}</span>
-                    <Transition name="flash">
-                        <span v-if="credsFlash" class="stat-delta" :class="credsFlash.positive ? 'delta-pos' : 'delta-neg'">
-                            {{ formatDelta(credsFlash.value) }}
-                        </span>
-                    </Transition>
-                    <span class="hud-close">]</span>
-                </div>
+        <div class="hud-divider" />
 
-                <!-- CPU cycles -->
-                <div class="hud-row">
-                    <span class="hud-key">[CPU&nbsp;&nbsp;&nbsp;</span>
-                    <span class="hud-sep">:</span>
-                    <span class="hud-val">{{ player.cpuCycles }}/{{ player.maxCpu }} cycles</span>
-                    <Transition name="flash">
-                        <span v-if="cpuFlash" class="stat-delta" :class="cpuFlash.positive ? 'delta-pos' : 'delta-neg'">
-                            {{ formatDelta(cpuFlash.value) }}
-                        </span>
-                    </Transition>
-                    <span class="hud-close">]</span>
-                </div>
+        <!-- Cache -->
+        <div class="hud-item">
+            <span class="hud-key">CACHE</span>
+            <span class="hud-sep">:</span>
+            <span class="hud-val" :class="cacheClass">
+                {{ player.cache ?? 0 }}/{{ player.maxCache ?? 5 }}
+            </span>
+        </div>
 
-                <!-- District -->
-                <div class="hud-row">
-                    <span class="hud-key">[DIST&nbsp;&nbsp;</span>
-                    <span class="hud-sep">:</span>
-                    <span class="hud-val district-val">{{ player.district ?? 'UNKNOWN' }}</span>
-                    <span class="hud-close">]</span>
-                </div>
+        <div class="hud-divider" />
 
-                <!-- Bounty -->
-                <div class="hud-row">
-                    <span class="hud-key">[BOUNTY</span>
-                    <span class="hud-sep">:</span>
-                    <span
-                        class="hud-val"
-                        :class="{ 'bounty-active': player.bountyLevel > 0 }"
-                        :style="{ color: player.bountyLevel > 0 ? '#FFB300' : '#444444' }"
-                    >{{ player.bountyLevel > 0 ? `LVL ${player.bountyLevel}` : 'NONE' }}</span>
-                    <span class="hud-close">]</span>
-                </div>
+        <!-- Tech Points -->
+        <div class="hud-item">
+            <span class="hud-key">TP</span>
+            <span class="hud-sep">:</span>
+            <span class="hud-val hud-val--tp">{{ fmtTp(player.techPoints) }}</span>
+        </div>
 
-                <!-- Open Season badge -->
-                <div v-if="player.isOpenSeason" class="hud-row open-season-badge">
-                    <span>[⚡ OPEN SEASON ACTIVE ]</span>
-                </div>
+        <div class="hud-divider" />
 
-                <!-- ── Node Interface Section ──────────────────────────────── -->
-                <template v-if="currentNode">
-                    <div class="hud-divider" />
+        <!-- Bounty — ticker + stars + multiplier -->
+        <div class="hud-item hud-item--bounty">
+            <span class="hud-key">BOUNTY</span>
+            <span class="hud-sep">:</span>
 
-                    <!-- Section header -->
-                    <div class="hud-row hud-section-head" :class="{ 'node-street-doc': isStreetDoc }">
-                        [CURRENT NODE]
-                    </div>
+            <!-- Hack counter — resets each tier -->
+            <span class="hud-val hud-ticker" :class="tickerClass">
+                {{ bountyTicker.current }}/{{ bountyTicker.max }}
+            </span>
 
-                    <!-- Node name — truncates on overflow -->
-                    <div class="hud-node-name" :class="{ 'node-street-doc': isStreetDoc }">
-                        {{ (currentNode.label ?? currentNode.id)?.toUpperCase() }}
-                    </div>
-
-                    <!-- Street Doc mode -->
-                    <template v-if="isStreetDoc">
-                        <div class="hud-row hud-node-sub node-street-doc">STREET DOC // SECURE CHANNEL</div>
-                        <div class="hud-divider" />
-                        <div v-for="svc in STREET_DOC_SERVICES" :key="svc" class="hud-node-row node-street-doc">
-                            <span class="hud-nkey">{{ svc.key }}</span>
-                            <span class="hud-sep">:</span>
-                            <span class="hud-nval hud-available">▶ AVAILABLE</span>
-                        </div>
-                    </template>
-
-                    <!-- Standard node mode -->
-                    <template v-else>
-                        <div class="hud-row hud-node-sub">
-                            TIER: {{ currentNode.tier ?? '?' }}&nbsp;&nbsp;//&nbsp;&nbsp;{{ (currentNode.district ?? '?')?.toUpperCase() }}
-                        </div>
-                        <div class="hud-divider" />
-
-                        <!-- Creds -->
-                        <div class="hud-node-row">
-                            <span class="hud-nkey">[CREDS&nbsp;&nbsp;&nbsp;</span>
-                            <span class="hud-sep">:</span>
-                            <template v-if="!currentNode.credDepleted && !isScorched">
-                                <span class="hud-nval">{{ credValueDisplay }} ₡&nbsp;</span>
-                                <span class="hud-available">▶ AVAILABLE</span>
-                            </template>
-                            <span v-else class="hud-nval hud-depleted">DEPLETED</span>
-                            <span class="hud-close">]</span>
-                        </div>
-
-                        <!-- Movement -->
-                        <div class="hud-node-row">
-                            <span class="hud-nkey">[MOVEMENT</span>
-                            <span class="hud-sep">:</span>
-                            <template v-if="!currentNode.movementDepleted && !isScorched">
-                                <span class="hud-nval">+{{ currentNode.movementPts }} PTS&nbsp;</span>
-                                <span class="hud-available">▶ AVAILABLE</span>
-                            </template>
-                            <span v-else class="hud-nval hud-depleted">DEPLETED</span>
-                            <span class="hud-close">]</span>
-                        </div>
-
-                        <!-- State -->
-                        <div class="hud-node-row">
-                            <span class="hud-nkey">[STATE&nbsp;&nbsp;&nbsp;</span>
-                            <span class="hud-sep">:</span>
-                            <span class="hud-nval" :class="`hud-state--${currentNode.state}`">{{ nodeStateLabel }}</span>
-                            <span class="hud-close">]</span>
-                        </div>
-
-                        <!-- Links -->
-                        <div class="hud-node-row">
-                            <span class="hud-nkey">[LINKS&nbsp;&nbsp;&nbsp;</span>
-                            <span class="hud-sep">:</span>
-                            <span class="hud-nval">{{ currentNode.adjacentCount }} ADJACENT NODES</span>
-                            <span class="hud-close">]</span>
-                        </div>
-                    </template>
-
-                    <div class="hud-divider" />
-                </template>
-
+            <!-- 5 star slots -->
+            <div class="hud-stars">
+                <span
+                    v-for="i in 5"
+                    :key="i"
+                    class="hud-star"
+                    :class="{
+                        'star--lit':  i <= player.bountyLevel,
+                        'star--os':   i <= player.bountyLevel && player.isOpenSeason,
+                        'star--next': i === player.bountyLevel + 1,
+                    }"
+                >★</span>
             </div>
-        </NeonBorder>
-        </template><!-- end expanded -->
+
+            <!-- Loot multiplier bonus — always visible, starts at +0% -->
+            <span class="hud-multiplier" :class="{
+                'hud-multiplier--active': player.bountyLevel > 0 && !player.isOpenSeason,
+                'hud-multiplier--os':     player.isOpenSeason,
+            }">
+                +{{ multiplierBonus }}%
+            </span>
+        </div>
+
+        <!-- Open Season badge — only when active -->
+        <template v-if="player.isOpenSeason">
+            <div class="hud-divider" />
+            <div class="hud-item hud-item--os">
+                <span>⚡ OPEN SEASON</span>
+            </div>
+        </template>
 
     </div>
+
+    <!-- Move-block flash toast — mounts below the HUD bar when set -->
+    <Transition name="hud-flash-fade">
+        <div v-if="flash" class="hud-flash" :class="flashClass">
+            <span class="hud-flash-icon">⛔</span>
+            {{ flash }}
+        </div>
+    </Transition>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
-import NeonBorder from '@/components/shared/NeonBorder.vue';
-import SSBar      from '@/components/shared/SSBar.vue';
-
-const minimized = ref(false);
-
-const STREET_DOC_SERVICES = [
-    { key: '[REPAIR SS  ' },
-    { key: '[UPGRADE RIG' },
-    { key: '[SET LOADOUT' },
-    { key: '[INSTALL HW ' },
-];
+import { computed } from 'vue';
 
 const props = defineProps({
     player: {
         type: Object,
         default: () => ({
-            handle: 'UNKNOWN', currentSS: 100, maxSS: 100, creds: 0,
-            cpuCycles: 0, maxCpu: 3, district: null, bountyLevel: 0,
-            isOpenSeason: false, isLimping: false,
+            handle: 'UNKNOWN', uplink: 3, maxUplink: 3,
+            cache: 0, maxCache: 5,
+            district: null, bountyLevel: 0, isOpenSeason: false,
+            currentSS: 0, maxSS: 0, techPoints: 0,
         }),
     },
-    currentNode: {
-        type: Object,
-        default: null,
-        // { id, label, tier, district, state, credDepleted, movementDepleted,
-        //   credValueBase, credLastHackedAt, adjacentCount, movementPts, isStreetDoc }
+    rig:          { type: Object, default: null },
+    currentNode:  { type: Object, default: null },
+    bountyTicker: {
+        type:    Object,
+        default: () => ({ current: 0, max: 10 }),
     },
+    /** Move-block flash message. Empty string = hidden. */
+    flash: { type: String, default: '' },
 });
 
-// ── Player stat formatting ─────────────────────────────────────────────────────
-const formattedCreds = computed(() => (props.player.creds ?? 0).toLocaleString('en-US'));
-
-// ── Node section derived state ─────────────────────────────────────────────────
-const isStreetDoc = computed(() => props.currentNode?.state === 'street_doc');
-const isScorched  = computed(() => props.currentNode?.state === 'scorched');
-
-const credValueDisplay = computed(() => {
-    if (!props.currentNode) return 0;
-    const base     = props.currentNode.credValueBase ?? 100;
-    const hackedAt = props.currentNode.credLastHackedAt;
-    if (!hackedAt) return base;
-    const mins = (Date.now() - new Date(hackedAt).getTime()) / 60_000;
-    return base + Math.floor(mins / 2.5) * 25;
-});
-
-const nodeStateLabel = computed(() => {
-    const map = { active: 'ACTIVE', hacked: 'COMPROMISED', scorched: 'SCORCHED', street_doc: 'STREET DOC' };
-    return map[props.currentNode?.state] ?? props.currentNode?.state?.toUpperCase() ?? '';
-});
-
-// ── Stat delta flashes ─────────────────────────────────────────────────────────
-const ssFlash    = ref(null);
-const credsFlash = ref(null);
-const cpuFlash   = ref(null);
-
-const ssTH    = { t: null };
-const credsTH = { t: null };
-const cpuTH   = { t: null };
-
-function showFlash(flashRef, th, delta) {
-    if (delta === 0) return;
-    clearTimeout(th.t);
-    flashRef.value = { value: delta, positive: delta > 0 };
-    th.t = setTimeout(() => { flashRef.value = null; }, 1600);
+/**
+ * Format tech points for display.
+ * Shows up to 2 decimal places but strips trailing zeros so:
+ *   1.00 → "1"   |   1.50 → "1.5"   |   1.25 → "1.25"
+ */
+function fmtTp(val) {
+    const n = parseFloat(val ?? 0);
+    return isNaN(n) ? '0' : parseFloat(n.toFixed(2)).toString();
 }
 
-watch(() => props.player.currentSS,  (n, o) => { if (o !== undefined) showFlash(ssFlash,    ssTH,    n - o); });
-watch(() => props.player.creds,      (n, o) => { if (o !== undefined) showFlash(credsFlash, credsTH, n - o); });
-watch(() => props.player.cpuCycles,  (n, o) => { if (o !== undefined) showFlash(cpuFlash,   cpuTH,   n - o); });
+const uplinkClass = computed(() => {
+    const pct = (props.player.uplink ?? 0) / (props.player.maxUplink ?? 3);
+    if (pct <= 0.25) return 'val-uplink-crit';
+    if (pct <= 0.5)  return 'val-uplink-low';
+    return 'val-uplink-ok';
+});
 
-function formatDelta(delta) {
-    return (delta > 0 ? '+' : '') + delta.toLocaleString('en-US');
-}
+const cacheClass = computed(() => {
+    const pct = (props.player.cache ?? 0) / (props.player.maxCache ?? 5);
+    if (pct >= 1)    return 'val-cache-full';
+    if (pct >= 0.75) return 'val-cache-high';
+    if (pct >= 0.5)  return 'val-cache-mid';
+    return 'val-cache-ok';
+});
+
+const ssClass = computed(() => {
+    const max = props.player.maxSS ?? 0;
+    if (!max) return 'val-ss-ok';
+    const pct = (props.player.currentSS ?? 0) / max;
+    if (pct <= 0)    return 'val-ss-dead';
+    if (pct <= 0.25) return 'val-ss-crit';
+    if (pct <= 0.5)  return 'val-ss-low';
+    return 'val-ss-ok';
+});
+
+// Ticker pulses amber when close to next threshold
+const tickerClass = computed(() => {
+    const pct = props.bountyTicker.current / props.bountyTicker.max;
+    if (props.player.bountyLevel > 0) {
+        if (pct >= 0.8) return 'ticker--warn';
+        return 'ticker--active';
+    }
+    if (pct >= 0.8) return 'ticker--warn';
+    return 'ticker--idle';
+});
+
+// "+25%" style display — (multiplier - 1) * 100, rounded
+const multiplierBonus = computed(() =>
+    Math.round(((props.player.bountyMultiplier ?? 1.0) - 1.0) * 100)
+);
+
+// Flash toast colour — red for system failure, amber for uplink
+const flashClass = computed(() =>
+    props.flash.includes('SYSTEM FAILURE') ? 'hud-flash--critical' : 'hud-flash--warn'
+);
 </script>
 
 <style scoped>
-.hud-wrapper {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 20;
-    width: 272px;
-}
-
-.hud-minimized {
-    width: auto;
-}
-
-/* ── Minimized tab ───────────────────────────────────────────────────────────── */
-.hud-tab {
-    display: block;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: rgba(0, 255, 255, 0.45);
-    padding: 6px 10px;
-    line-height: 1;
-    letter-spacing: 0.1em;
-    white-space: nowrap;
-    transition: color 0.15s, text-shadow 0.15s;
-}
-
-.hud-tab:hover {
-    color: #00FFFF;
-    text-shadow: 0 0 8px rgba(0, 255, 255, 0.55);
-}
-
-/* ── Expand / collapse toggle ────────────────────────────────────────────────── */
-.hud-toggle {
+.hud-bar {
     position: absolute;
     top: 0;
+    left: 0;
     right: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: rgba(0, 255, 255, 0.35);
-    padding: 5px 7px;
-    line-height: 1;
-    z-index: 1;
-    transition: color 0.15s, text-shadow 0.15s;
-}
-
-.hud-toggle:hover {
-    color: #00FFFF;
-    text-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
-}
-
-.hud-panel {
-    background: rgba(5, 5, 5, 0.84);
-    padding: 10px 12px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    backdrop-filter: blur(2px);
-}
-
-/* ── Base row ────────────────────────────────────────────────────────────────── */
-.hud-row {
+    z-index: 20;
+    height: 32px;
     display: flex;
     align-items: center;
+    background: rgba(4, 4, 10, 0.82);
+    border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+    backdrop-filter: blur(4px);
+    padding: 0 14px;
+    gap: 0;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #00FFFF;
-    white-space: nowrap;
-    line-height: 1.6;
-    overflow: hidden;
 }
 
-.hud-key   { color: rgba(0, 255, 255, 0.5); letter-spacing: 0.04em; flex-shrink: 0; }
-.hud-sep   { color: rgba(0, 255, 255, 0.35); margin: 0 4px; flex-shrink: 0; }
-.hud-val   { color: #00FFFF; letter-spacing: 0.03em; flex: 1; min-width: 0; overflow: hidden; }
-.hud-close { color: rgba(0, 255, 255, 0.5); margin-left: 2px; flex-shrink: 0; }
+/* ── Items ────────────────────────────────────────────────────────────────── */
+.hud-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    white-space: nowrap;
+}
 
-.district-val { color: rgba(0, 255, 255, 0.7); font-size: 10px; letter-spacing: 0.08em; }
+.hud-key {
+    font-size: 9px;
+    color: rgba(0, 255, 255, 0.35);
+    letter-spacing: 0.1em;
+}
 
-/* ── Divider ─────────────────────────────────────────────────────────────────── */
+.hud-sep {
+    font-size: 9px;
+    color: rgba(0, 255, 255, 0.2);
+}
+
+.hud-val {
+    font-size: 10px;
+    color: #00FFFF;
+    letter-spacing: 0.06em;
+}
+
+.hud-val--dim { color: rgba(0, 255, 255, 0.55); }
+
+/* ── Divider ──────────────────────────────────────────────────────────────── */
 .hud-divider {
-    height: 1px;
+    width: 1px;
+    height: 14px;
     background: rgba(0, 255, 255, 0.12);
-    margin: 4px 0 2px;
     flex-shrink: 0;
 }
 
-/* ── Node section ────────────────────────────────────────────────────────────── */
-.hud-section-head {
-    font-size: 9px;
-    color: rgba(0, 255, 255, 0.45);
-    letter-spacing: 0.1em;
+/* ── SS states ───────────────────────────────────────────────────────────── */
+.val-ss-ok   { color: #00FF88; }
+.val-ss-low  { color: #FFB300; }
+.val-ss-crit {
+    color: #FF3333;
+    animation: crit-pulse 0.8s ease-in-out infinite;
+}
+.val-ss-dead { color: rgba(255,51,51,.3); }
+
+/* ── Tech Points ─────────────────────────────────────────────────────────── */
+.hud-val--tp { color: rgba(125,249,255,.75); }
+
+/* ── Uplink states ────────────────────────────────────────────────────────── */
+.val-uplink-ok   { color: #00FF88; }
+.val-uplink-low  { color: #FFB300; }
+.val-uplink-crit {
+    color: #FF3333;
+    animation: crit-pulse 0.8s ease-in-out infinite;
 }
 
-.hud-node-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #00FFFF;
-    letter-spacing: 0.05em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding: 1px 0;
-    line-height: 1.5;
+/* ── Cache states ─────────────────────────────────────────────────────────── */
+.val-cache-ok   { color: rgba(0, 255, 255, 0.6); }
+.val-cache-mid  { color: #FFB300; }
+.val-cache-high {
+    color: #FF6B00;
+    animation: cache-warn 1.5s ease-in-out infinite;
+}
+.val-cache-full {
+    color: #FF3333;
+    animation: crit-pulse 0.6s ease-in-out infinite;
 }
 
-.hud-node-sub {
-    font-size: 9px;
-    color: rgba(0, 255, 255, 0.4);
-    letter-spacing: 0.06em;
-    margin-bottom: 1px;
+@keyframes cache-warn {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
 }
 
-.hud-node-row {
+/* ── Bounty section ───────────────────────────────────────────────────────── */
+.hud-item--bounty { gap: 6px; }
+
+/* Hack counter */
+.hud-ticker     { font-size: 10px; letter-spacing: 0.06em; }
+.ticker--idle   { color: rgba(0, 255, 255, 0.45); }
+.ticker--active { color: #FFB300; }
+.ticker--warn   {
+    color: #FF6B00;
+    animation: ticker-warn 0.9s ease-in-out infinite;
+}
+
+@keyframes ticker-warn {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+
+/* Stars */
+.hud-stars {
     display: flex;
     align-items: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: #00FFFF;
-    white-space: nowrap;
-    line-height: 1.65;
-    overflow: hidden;
+    gap: 3px;
 }
 
-.hud-nkey  { color: rgba(0, 255, 255, 0.45); flex-shrink: 0; letter-spacing: 0.04em; }
-.hud-nval  { flex: 1; min-width: 0; overflow: hidden; color: rgba(0, 255, 255, 0.85); }
-
-.hud-available { color: #00FF88; font-size: 9px; letter-spacing: 0.03em; }
-.hud-depleted  { color: rgba(100, 100, 100, 0.65) !important; letter-spacing: 0.04em; }
-
-/* State colors */
-.hud-state--active   { color: #00FFFF; }
-.hud-state--hacked   { color: rgba(255, 0, 204, 0.7); }
-.hud-state--scorched { color: rgba(180, 30, 30, 0.85); }
-
-/* Street Doc amber treatment */
-.node-street-doc,
-.hud-node-name.node-street-doc,
-.hud-node-row.node-street-doc .hud-nkey,
-.hud-node-row.node-street-doc .hud-nval {
-    color: #FFB300 !important;
+.hud-star {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.15);
+    transition: color 0.3s ease, text-shadow 0.3s ease;
+    line-height: 1;
 }
-.hud-node-row.node-street-doc .hud-sep   { color: rgba(255, 179, 0, 0.35) !important; }
-.hud-node-row.node-street-doc .hud-close { color: rgba(255, 179, 0, 0.5)  !important; }
-.hud-section-head.node-street-doc        { color: rgba(255, 179, 0, 0.5)  !important; }
 
-/* ── Limp warning ────────────────────────────────────────────────────────────── */
-.limp-warning {
+.hud-star.star--lit {
+    color: #FFB300;
+    text-shadow: 0 0 8px rgba(255, 179, 0, 0.9), 0 0 2px rgba(255, 179, 0, 1);
+    animation: star-glow 2.5s ease-in-out infinite;
+}
+
+.hud-star.star--os {
+    color: #FF4444;
+    text-shadow: 0 0 10px rgba(255, 68, 68, 1.0), 0 0 3px rgba(255, 68, 68, 1);
+    animation: star-os 1.2s ease-in-out infinite;
+}
+
+/* Next unlit star — visible enough to track progress toward */
+.hud-star.star--next {
+    color: rgba(255, 179, 0, 0.3);
+    animation: star-next 2.5s ease-in-out infinite;
+}
+
+@keyframes star-glow {
+    0%, 100% { text-shadow: 0 0 6px rgba(255, 179, 0, 0.7), 0 0 2px rgba(255, 179, 0, 1); }
+    50%       { text-shadow: 0 0 14px rgba(255, 179, 0, 1.0), 0 0 4px rgba(255, 179, 0, 1); }
+}
+
+@keyframes star-os {
+    0%, 100% { text-shadow: 0 0 8px rgba(255, 68, 68, 0.8);  color: #FF4444; }
+    50%       { text-shadow: 0 0 18px rgba(255, 68, 68, 1.0); color: #FF6666; }
+}
+
+@keyframes star-next {
+    0%, 100% { opacity: 0.3; }
+    50%       { opacity: 0.7; }
+}
+
+/* Multiplier bonus badge */
+.hud-multiplier {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    padding: 1px 5px;
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    background: transparent;
+    color: rgba(0, 255, 255, 0.3);
+}
+
+.hud-multiplier--active {
+    color: #FFB300;
+    border-color: rgba(255, 179, 0, 0.45);
+    background: rgba(255, 179, 0, 0.06);
+    animation: multi-glow 2.5s ease-in-out infinite;
+}
+
+.hud-multiplier--os {
+    color: #FF4444;
+    border-color: rgba(255, 68, 68, 0.55);
+    background: rgba(255, 68, 68, 0.08);
+    animation: multi-os 1.2s ease-in-out infinite;
+}
+
+@keyframes multi-glow {
+    0%, 100% { box-shadow: 0 0 4px rgba(255, 179, 0, 0.15); }
+    50%       { box-shadow: 0 0 8px rgba(255, 179, 0, 0.35); }
+}
+
+@keyframes multi-os {
+    0%, 100% { box-shadow: 0 0 6px rgba(255, 68, 68, 0.2); }
+    50%       { box-shadow: 0 0 12px rgba(255, 68, 68, 0.5); }
+}
+
+/* ── Bounty text (legacy, unused — kept for reference) ────────────────────── */
+.val-bounty {
+    color: #FFB300;
+    animation: bounty-glow 2s ease-in-out infinite;
+}
+
+/* ── Open Season ──────────────────────────────────────────────────────────── */
+.hud-item--os {
     color: #FF3333;
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    animation: limp-warn-pulse 1s ease-in-out infinite;
-    justify-content: center;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    animation: crit-pulse 1.2s ease-in-out infinite;
 }
 
-@keyframes limp-warn-pulse {
+.val-open-season {
+    color: #FF3333;
+    text-shadow: 0 0 8px rgba(255, 51, 51, 0.6);
+    animation: os-glitch 4s steps(1) infinite;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes crit-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.4; }
 }
 
-/* ── Bounty ──────────────────────────────────────────────────────────────────── */
-.bounty-active { animation: bounty-pulse 2s ease-in-out infinite; }
-
-@keyframes bounty-pulse {
-    0%, 100% { text-shadow: 0 0 4px #FFB300; opacity: 1; }
-    50%       { text-shadow: 0 0 12px #FFB300, 0 0 20px rgba(255,179,0,0.4); opacity: 0.85; }
+@keyframes bounty-glow {
+    0%, 100% { text-shadow: 0 0 4px rgba(255, 179, 0, 0.4); }
+    50%       { text-shadow: 0 0 10px rgba(255, 179, 0, 0.8); }
 }
 
-/* ── Open Season ─────────────────────────────────────────────────────────────── */
 @keyframes os-glitch {
-    0%   { transform: translateX(0);    clip-path: none; }
-    3%   { transform: translateX(-2px); clip-path: inset(15% 0 70% 0); }
-    5%   { transform: translateX(2px);  clip-path: inset(55% 0 20% 0); }
-    7%   { transform: translateX(0);    clip-path: none; }
-    100% { transform: translateX(0); }
+    0%   { transform: translateX(0);    }
+    3%   { transform: translateX(-2px); }
+    5%   { transform: translateX(2px);  }
+    7%   { transform: translateX(0);    }
+    100% { transform: translateX(0);    }
 }
 
-.open-season-handle {
-    text-shadow: 0 0 8px #FF3333;
-    animation: os-glitch 4s steps(1) infinite;
-}
-
-.open-season-badge {
-    color: #FF3333;
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    justify-content: center;
-    margin-top: 2px;
-    animation: bounty-pulse 1.5s ease-in-out infinite;
-}
-
-/* ── Stat delta flash ────────────────────────────────────────────────────────── */
-.stat-delta {
+/* ── Move-block flash toast ───────────────────────────────────────────────── */
+.hud-flash {
+    position: absolute;
+    top: 36px;   /* sits just below the 32px HUD bar */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 21;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 18px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    font-weight: bold;
-    letter-spacing: 0.04em;
-    margin-left: 6px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
     white-space: nowrap;
-    flex-shrink: 0;
-    animation: delta-rise 1.6s ease forwards;
+    border: 1px solid;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
 }
 
-.delta-pos { color: #00FF88; }
-.delta-neg { color: #FF3333; }
-
-@keyframes delta-rise {
-    0%   { opacity: 1;   transform: translateY(0);    }
-    30%  { opacity: 1;   transform: translateY(-4px); }
-    70%  { opacity: 0.8; transform: translateY(-8px); }
-    100% { opacity: 0;   transform: translateY(-12px); }
+.hud-flash--critical {
+    color: #FF3333;
+    border-color: rgba(255, 51, 51, 0.5);
+    background: rgba(255, 51, 51, 0.08);
+    animation: crit-pulse 0.8s ease-in-out infinite;
 }
 
-.flash-enter-active { animation: delta-rise 1.6s ease forwards; }
-.flash-leave-active { transition: opacity 0.1s; }
-.flash-leave-to     { opacity: 0; }
+.hud-flash--warn {
+    color: #FFB300;
+    border-color: rgba(255, 179, 0, 0.45);
+    background: rgba(255, 179, 0, 0.06);
+}
+
+.hud-flash-icon { font-size: 11px; }
+
+.hud-flash-fade-enter-active { transition: opacity 0.15s ease; }
+.hud-flash-fade-leave-active { transition: opacity 0.4s ease; }
+.hud-flash-fade-enter-from,
+.hud-flash-fade-leave-to    { opacity: 0; }
 </style>

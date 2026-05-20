@@ -15,6 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
+
+        // Sanctum stateful middleware — lets session cookies authenticate
+        // API routes from the same-origin SPA (no Bearer token needed for the frontend).
+        $middleware->api(prepend: [
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

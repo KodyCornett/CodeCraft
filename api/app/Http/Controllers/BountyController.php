@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Player;
 use App\Services\BountyService;
+use App\Services\CyberDocService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BountyController extends Controller
 {
-    public function __construct(private readonly BountyService $bountyService) {}
+    public function __construct(
+        private readonly BountyService   $bountyService,
+        private readonly CyberDocService $cyberDocService,
+    ) {}
 
     /**
      * GET /api/leaderboard/bounty
@@ -30,6 +34,7 @@ class BountyController extends Controller
                 'pvp_wins_this_run'       => $p->pvp_wins_this_run,
                 'bounty_multiplier'       => $p->bounty_multiplier,
                 'is_open_season'          => $p->is_open_season,
+                'pocket_creds'            => (int) ($p->pocket_creds ?? 0),
             ]),
         ]);
     }
@@ -55,9 +60,12 @@ class BountyController extends Controller
     /**
      * POST /api/player/{player_id}/extract
      *
-     * Player banks their run at a Street Doc.
-     * Resets all bounty counters and pays out the multiplier bonus (stub — cred
-     * transfer is handled in Prompt 11 StreetDocService::visitStreetDoc).
+     * Player banks their run at the CyberDoc.
+     * Transfers pocket_creds to safe wallet, resets all bounty/run counters,
+     * and restores uplink for the next run.
+     *
+     * Called by the Kotlin engine when the player physically reaches a CyberDoc.
+     * Mirrors what POST /api/cyberdoc/bank does for the SPA.
      */
     public function extract(Request $request, string $playerId): JsonResponse
     {
@@ -67,22 +75,35 @@ class BountyController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
-        $multiplierAtExtract = (float) $player->bounty_multiplier;
-        $bountyLevelAtExtract = (int) $player->bounty_level;
+        // Ownership check — the session user must own this player.
+        // When the Kotlin engine is active it authenticates via Bearer token
+        // with its own user account; revisit this check at that point.
+        $sessionPlayer = Player::where('user_id', $request->user()->id)->value('id');
+        if ($sessionPlayer !== $player->id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
 
-        $this->bountyService->extractToStreetDoc($player);
+        $multiplierAtExtract  = (float) $player->bounty_multiplier;
+        $bountyLevelAtExtract = (int)   $player->bounty_level;
+
+        // bankCreds(): pocket → wallet, reset run state, restore uplink
+        $result = $this->cyberDocService->bankCreds($player);
+        $fresh  = $player->fresh();
 
         return response()->json([
             'message'               => 'Run extracted successfully.',
+            'pocket_banked'         => $result['pocket_banked'],
             'multiplier_at_extract' => $multiplierAtExtract,
             'bounty_level_banked'   => $bountyLevelAtExtract,
             'player' => [
-                'player_id'            => $player->id,
-                'bounty_level'         => $player->bounty_level,
-                'nodes_hacked_this_run' => $player->nodes_hacked_this_run,
-                'pvp_wins_this_run'    => $player->pvp_wins_this_run,
-                'bounty_multiplier'    => $player->bounty_multiplier,
-                'is_open_season'       => $player->is_open_season,
+                'player_id'             => $fresh->id,
+                'wallet_creds'          => (int)   ($fresh->wallet_creds  ?? 0),
+                'pocket_creds'          => (int)   ($fresh->pocket_creds  ?? 0),
+                'bounty_level'          => $fresh->bounty_level,
+                'nodes_hacked_this_run' => $fresh->nodes_hacked_this_run,
+                'pvp_wins_this_run'     => $fresh->pvp_wins_this_run,
+                'bounty_multiplier'     => $fresh->bounty_multiplier,
+                'is_open_season'        => $fresh->is_open_season,
             ],
         ]);
     }

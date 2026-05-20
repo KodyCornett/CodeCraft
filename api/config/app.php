@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Kotlin Engine Account
+    |--------------------------------------------------------------------------
+    |
+    | The email address of the dedicated engine service account. Only this
+    | account is permitted to obtain a Bearer token via POST /api/auth/token.
+    | Set ENGINE_EMAIL in your .env file. Leave blank to disable the check
+    | (useful in local dev when the engine is not configured).
+    |
+    */
+
+    'engine_email' => env('ENGINE_EMAIL', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

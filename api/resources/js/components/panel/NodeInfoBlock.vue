@@ -1,0 +1,396 @@
+<template>
+    <PanelBlock icon="◈" title="NODE INFO" :start-open="true">
+
+        <!-- Idle state -->
+        <div v-if="!node" class="ni-idle">
+            <span class="ni-idle-icon">◈</span>
+            <span class="ni-idle-text">NO NODE SELECTED</span>
+            <span class="ni-idle-sub">Click any node to inspect</span>
+        </div>
+
+        <!-- Node content -->
+        <div v-else class="ni-content">
+
+            <!-- Network name + SPLICE address -->
+            <div class="ni-header">
+                <span class="ni-ping">◈</span>
+                <div class="ni-header-text">
+                    <div class="ni-name">{{ identity.networkName }}</div>
+                    <div class="ni-address">
+                        <span class="ni-addr-label">SPLICE</span>
+                        <span class="ni-addr-sep">//</span>
+                        <span class="ni-addr-val">{{ identity.spliceAddress }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ni-divider" />
+
+            <!-- Data rows -->
+            <div class="ni-rows">
+                <div class="ni-row">
+                    <span class="ni-key">TYPE</span>
+                    <span class="ni-val" :class="typeColorClass">{{ typeLabel }}</span>
+                </div>
+                <div class="ni-row">
+                    <span class="ni-key">SECTOR</span>
+                    <span class="ni-val ni-val--dim">{{ sectorLabel }}</span>
+                </div>
+                <div class="ni-row">
+                    <span class="ni-key">STATUS</span>
+                    <span class="ni-val" :class="statusColorClass">{{ statusLabel }}</span>
+                </div>
+                <div class="ni-row">
+                    <span class="ni-key">ICE</span>
+                    <span class="ni-val" :class="iceColorClass">{{ node.ice ?? '?' }}</span>
+                </div>
+            </div>
+
+            <div class="ni-divider" />
+
+            <!-- CyberDoc -->
+            <div v-if="node.type === 'cyberdoc'" class="ni-store">
+                <div class="ni-store-desc">Licensed hardware &amp; software vendor.</div>
+                <button class="ni-store-btn" @click="$emit('open-store')">
+                    <span>⬡</span> OPEN STOREFRONT
+                </button>
+            </div>
+
+            <!-- Resources -->
+            <div v-else class="ni-resources">
+                <div class="ni-res-label">NODE RESOURCES</div>
+
+                <!-- Cache-full lock banner -->
+                <div v-if="cacheFull" class="ni-cache-full">
+                    <span class="ni-cache-icon">▓</span>
+                    CACHE FULL — VISIT CYBERDOC
+                </div>
+
+                <div class="ni-res-row">
+                    <span class="ni-res-key">CREDS</span>
+                    <span v-if="resources.creds.replenishesIn > 0" class="ni-res-val ni-res--depleted">
+                        DEPLETED — {{ formatTimer(resources.creds.replenishesIn) }}
+                    </span>
+                    <span v-else class="ni-res-val ni-res--creds">◈ {{ resources.creds.value }}</span>
+                    <button class="ni-hack-btn" :disabled="!resources.creds.available" @click="$emit('hack', 'creds')">[HACK]</button>
+                </div>
+                <div class="ni-res-row">
+                    <span class="ni-res-key">TECH</span>
+                    <span v-if="resources.tech.replenishesIn > 0" class="ni-res-val ni-res--depleted">
+                        DEPLETED — {{ formatTimer(resources.tech.replenishesIn) }}
+                    </span>
+                    <span v-else class="ni-res-val ni-res--tech">◈ {{ resources.tech.value }} PTS</span>
+                    <button class="ni-hack-btn" :disabled="!resources.tech.available" @click="$emit('hack', 'tech')">[HACK]</button>
+                </div>
+                <div class="ni-res-row">
+                    <span class="ni-res-key">UPLINK</span>
+                    <span v-if="resources.uplink.replenishesIn > 0" class="ni-res-val ni-res--depleted">
+                        DEPLETED — {{ formatTimer(resources.uplink.replenishesIn) }}
+                    </span>
+                    <span v-else class="ni-res-val ni-res--uplink">◈ {{ resources.uplink.value }} LNK</span>
+                    <button class="ni-hack-btn ni-hack-btn--uplink" :disabled="!resources.uplink.available" @click="$emit('hack', 'uplink')">[HACK]</button>
+                </div>
+            </div>
+
+            <!-- Data fragments — recent hackers' traces, ticking down to zero -->
+            <div v-if="traces.length > 0" class="ni-traces">
+                <div class="ni-divider" />
+                <div class="ni-res-label ni-traces-label">DATA FRAGMENTS</div>
+                <div
+                    v-for="t in traces"
+                    :key="t.id"
+                    class="ni-trace-row"
+                    :class="{ 'ni-trace-row--stale': t.seconds_remaining < 60 }"
+                >
+                    <span class="ni-trace-icon">▒</span>
+                    <span class="ni-trace-handle">{{ t.handle }}</span>
+                    <span class="ni-trace-timer">{{ formatTimer(t.seconds_remaining) }}</span>
+                </div>
+            </div>
+
+            <!-- Players on this node — only shown when player is standing here -->
+            <div v-if="isOnNode && nodePlayers.length > 0" class="ni-players">
+                <div class="ni-divider" />
+                <div class="ni-res-label ni-players-label">PLAYERS ON NODE</div>
+                <div
+                    v-for="p in nodePlayers"
+                    :key="p.id"
+                    class="ni-player-row"
+                    :class="{ 'ni-player-row--os': p.is_open_season }"
+                >
+                    <div class="ni-player-info">
+                        <span class="ni-player-handle" :class="p.is_open_season ? 'ni-player--os' : ''">
+                            {{ p.handle }}
+                        </span>
+                        <span class="ni-player-meta">
+                            <span class="ni-player-stars">{{ '★'.repeat(p.bounty_level) }}{{ '☆'.repeat(5 - p.bounty_level) }}</span>
+                            <span class="ni-player-pocket" v-if="p.pocket_creds > 0">◈{{ p.pocket_creds.toLocaleString() }}</span>
+                        </span>
+                    </div>
+                    <button
+                        v-if="!p.in_combat"
+                        class="ni-hack-btn ni-hack-btn--pvp"
+                        @click="$emit('hack-player', p)"
+                    >[HACK]</button>
+                    <span v-else class="ni-in-combat">IN COMBAT</span>
+                </div>
+            </div>
+
+            <div class="ni-divider" />
+
+            <!-- Footer -->
+            <div class="ni-footer">
+                <span v-if="isOnNode" class="ni-connected">◉ CONNECTED</span>
+                <span v-else class="ni-remote">○ REMOTE NODE</span>
+            </div>
+
+        </div>
+    </PanelBlock>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import PanelBlock from './PanelBlock.vue';
+import { getNodeIdentity } from '@/composables/useNodeIdentity.js';
+
+const props = defineProps({
+    node:        { type: Object,  default: null },
+    isOnNode:    { type: Boolean, default: false },
+    cacheFull:   { type: Boolean, default: false },
+    nodePlayers: { type: Array,   default: () => [] },
+    // Active hack traces left on this node — see useNodeTraces composable
+    traces:      { type: Array,   default: () => [] },
+    resources: {
+        type:    Object,
+        default: () => ({
+            creds:  { available: true, value: 750 },
+            tech:   { available: true, value: 4   },
+            uplink: { available: true, value: 2   },
+        }),
+    },
+});
+
+defineEmits(['hack', 'open-store', 'hack-player']);
+
+// Render seconds_remaining as M:SS
+function formatTimer(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+const identity      = computed(() => props.node ? getNodeIdentity(props.node) : null);
+const typeLabel     = computed(() => props.node?.type === 'cyberdoc' ? 'CYBER DOC' : 'ACTION NODE');
+const typeColorClass= computed(() => props.node?.type === 'cyberdoc' ? 'ni-val--cyberdoc' : 'ni-val--action');
+const sectorLabel   = computed(() => props.node?.district?.toUpperCase() ?? 'TRANSIT RELAY');
+const statusLabel   = computed(() => props.isOnNode ? 'ACTIVE SESSION' : 'STANDBY');
+const statusColorClass = computed(() => props.isOnNode ? 'ni-val--connected' : 'ni-val--dim');
+const iceColorClass = computed(() => {
+    const ice = props.node?.ice ?? 0;
+    if (ice >= 7) return 'ni-val--ice-high';
+    if (ice >= 4) return 'ni-val--ice-mid';
+    return 'ni-val--ice-low';
+});
+</script>
+
+<style scoped>
+.ni-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 28px 16px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+}
+.ni-idle-icon { font-size: 18px; color: rgba(0,255,255,0.35); animation: idle-pulse 4s ease-in-out infinite; }
+.ni-idle-text { font-size: 8px; color: rgba(0,255,255,0.7); letter-spacing: 0.16em; text-shadow: 0 0 8px rgba(0,255,255,0.4); }
+.ni-idle-sub  { font-size: 7px; color: rgba(0,255,255,0.45); letter-spacing: 0.06em; }
+
+@keyframes idle-pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+.ni-content { font-family: 'JetBrains Mono', monospace; }
+
+.ni-header { display:flex; align-items:flex-start; gap:10px; padding:12px 14px 10px; }
+.ni-ping   { color:#00FF88; font-size:9px; flex-shrink:0; margin-top:2px; animation:ping 2s ease-in-out infinite; }
+@keyframes ping { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.ni-header-text { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.ni-name        { font-size:10px; color:#00FFFF; letter-spacing:0.07em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 0 10px rgba(0,255,255,.8), 0 0 20px rgba(0,255,255,.3); }
+.ni-address     { display:flex; align-items:center; gap:4px; }
+.ni-addr-label  { font-size:7px; color:rgba(0,255,255,.7); letter-spacing:.1em; }
+.ni-addr-sep    { font-size:7px; color:rgba(0,255,255,.45); }
+.ni-addr-val    { font-size:8px; color:#00FFC8; letter-spacing:.1em; text-shadow:0 0 8px rgba(0,255,200,.6); }
+
+.ni-divider { height:1px; background:rgba(0,255,255,.06); }
+
+.ni-rows { padding:6px 0; }
+.ni-row  { display:flex; align-items:center; padding:3px 14px; }
+.ni-key  { font-size:7px; color:rgba(0,255,255,.65); letter-spacing:.08em; width:52px; flex-shrink:0; }
+.ni-val  { font-size:8px; letter-spacing:.06em; }
+
+.ni-val--action    { color:#FF69B4; text-shadow:0 0 8px rgba(255,105,180,.6); }
+.ni-val--cyberdoc  { color:#FFB300; text-shadow:0 0 8px rgba(255,179,0,.6); }
+.ni-val--connected { color:#00FF88; text-shadow:0 0 8px rgba(0,255,136,.6); }
+.ni-val--dim       { color:rgba(0,255,255,.8); }
+.ni-val--ice-low   { color:#00FF88; text-shadow:0 0 8px rgba(0,255,136,.6); }
+.ni-val--ice-mid   { color:#FFB300; text-shadow:0 0 8px rgba(255,179,0,.6); }
+.ni-val--ice-high  { color:#FF3333; text-shadow:0 0 8px rgba(255,51,51,.7); }
+
+.ni-resources { padding:8px 14px 10px; display:flex; flex-direction:column; gap:2px; }
+.ni-res-label { font-size:7px; color:rgba(0,255,255,.7); letter-spacing:.14em; margin-bottom:4px; text-shadow:0 0 6px rgba(0,255,255,.4); }
+.ni-res-row   { display:flex; align-items:center; padding:2px 0; }
+.ni-res-key   { font-size:7px; color:rgba(0,255,255,.65); letter-spacing:.08em; width:52px; flex-shrink:0; }
+.ni-res-val   { font-size:8px; flex:1; }
+.ni-res--creds  { color:#00FF88; text-shadow:0 0 8px rgba(0,255,136,.7); }
+.ni-res--tech   { color:#7DF9FF; text-shadow:0 0 8px rgba(125,249,255,.7); }
+.ni-res--uplink { color:#00FFFF; text-shadow:0 0 8px rgba(0,255,255,.7); }
+
+.ni-cache-full {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding: 5px 8px;
+    background: rgba(255, 51, 51, 0.08);
+    border: 1px solid rgba(255, 51, 51, 0.3);
+    font-size: 7px;
+    color: #FF3333;
+    letter-spacing: 0.12em;
+    animation: cache-lock-pulse 1.2s ease-in-out infinite;
+}
+.ni-cache-icon {
+    font-size: 8px;
+    opacity: 0.7;
+}
+@keyframes cache-lock-pulse {
+    0%, 100% { border-color: rgba(255, 51, 51, 0.3); }
+    50%       { border-color: rgba(255, 51, 51, 0.7); }
+}
+
+.ni-hack-btn {
+    background:transparent; border:1px solid rgba(0,255,136,.3); color:rgba(0,255,136,.65);
+    font-family:'JetBrains Mono',monospace; font-size:7px; letter-spacing:.1em; padding:2px 6px; cursor:pointer;
+    flex-shrink:0; transition:all .12s;
+}
+.ni-hack-btn:hover:not(:disabled) { color:#00FF88; border-color:rgba(0,255,136,.75); background:rgba(0,255,136,.07); }
+.ni-hack-btn--uplink { border-color:rgba(125,249,255,.3); color:rgba(125,249,255,.65); }
+.ni-hack-btn--uplink:hover:not(:disabled) { color:#7DF9FF; border-color:rgba(125,249,255,.75); background:rgba(125,249,255,.07); }
+.ni-hack-btn:disabled { border-color:rgba(255,51,51,.18); color:rgba(255,51,51,.28); cursor:not-allowed; }
+
+.ni-store { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.ni-store-desc { font-size:7px; color:rgba(255,179,0,.4); letter-spacing:.06em; line-height:1.7; }
+.ni-store-btn  { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:9px 0;
+    background:rgba(255,179,0,.04); border:1px solid rgba(255,179,0,.35); color:#FFB300;
+    font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; cursor:pointer; transition:all .15s; }
+.ni-store-btn:hover { background:rgba(255,179,0,.09); border-color:rgba(255,179,0,.7); }
+
+.ni-footer    { padding:7px 14px 10px; }
+.ni-connected { font-size:7px; color:#00FF88; letter-spacing:.1em; text-shadow:0 0 8px rgba(0,255,136,.7); }
+.ni-remote    { font-size:7px; color:rgba(0,255,255,.7); letter-spacing:.1em; }
+
+/* ── Players on node ──────────────────────────────────────────────────────── */
+.ni-players       { padding: 6px 14px 8px; }
+.ni-players-label { margin-bottom: 6px; }
+
+.ni-player-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 105, 180, 0.08);
+    gap: 8px;
+}
+.ni-player-row--os {
+    border-bottom-color: rgba(255, 51, 51, 0.15);
+}
+.ni-player-row:last-child { border-bottom: none; }
+
+.ni-player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.ni-player-handle {
+    font-size: 9px;
+    color: #FF69B4;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ni-player--os { color: #FF3333; }
+
+.ni-player-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ni-player-stars  { font-size: 7px; color: rgba(255, 179, 0, 0.85); letter-spacing: 1px; }
+.ni-player-pocket { font-size: 7px; color: #FFB300; letter-spacing: 0.06em; text-shadow: 0 0 6px rgba(255,179,0,.6); }
+
+.ni-hack-btn--pvp {
+    border-color: rgba(255, 105, 180, 0.35);
+    color: rgba(255, 105, 180, 0.7);
+    flex-shrink: 0;
+}
+.ni-hack-btn--pvp:hover {
+    color: #FF69B4;
+    border-color: rgba(255, 105, 180, 0.8);
+    background: rgba(255, 105, 180, 0.07);
+}
+.ni-in-combat {
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    color: rgba(255, 179, 0, 0.6);
+    border: 1px solid rgba(255, 179, 0, 0.25);
+    padding: 2px 6px;
+    flex-shrink: 0;
+}
+
+/* ── Data fragments / hack traces ────────────────────────────────────────── */
+.ni-traces        { padding: 6px 14px 8px; }
+.ni-traces-label  { margin-bottom: 6px; color: rgba(125, 249, 255, 0.85); text-shadow: 0 0 6px rgba(125,249,255,.5); }
+
+.ni-trace-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 8px;
+    letter-spacing: 0.06em;
+}
+
+.ni-trace-icon {
+    color: rgba(125, 249, 255, 0.85);
+    font-size: 9px;
+    animation: trace-flicker 2.4s steps(1) infinite;
+}
+@keyframes trace-flicker {
+    0%, 92%, 100% { opacity: 1;   }
+    94%           { opacity: 0.3; }
+    96%           { opacity: 1;   }
+    98%           { opacity: 0.5; }
+}
+
+.ni-trace-handle {
+    flex: 1;
+    color: #7DF9FF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 0 8px rgba(125,249,255,.65);
+}
+
+.ni-trace-timer {
+    color: rgba(125, 249, 255, 0.85);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Older fragments shift toward red — they're about to fade */
+.ni-trace-row--stale .ni-trace-handle { color: rgba(255, 105, 180, 0.9); }
+.ni-trace-row--stale .ni-trace-timer  { color: rgba(255, 51,  51, 0.9); }
+.ni-trace-row--stale .ni-trace-icon   { color: rgba(255, 51,  51, 0.75); }
+</style>

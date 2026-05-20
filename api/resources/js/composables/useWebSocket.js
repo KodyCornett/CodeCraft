@@ -1,12 +1,35 @@
 import { ref, readonly } from 'vue';
 
-const ENGINE_PORT = import.meta.env.VITE_ENGINE_PORT ?? 8085;
-const WS_URL      = `ws://localhost:${ENGINE_PORT}/ws/game`;
+const ENGINE_PORT    = import.meta.env.VITE_ENGINE_PORT    ?? 8085;
+const ENGINE_ENABLED = import.meta.env.VITE_ENGINE_ENABLED === 'true';
+const WS_URL         = `ws://localhost:${ENGINE_PORT}/ws/game`;
 
-const RECONNECT_DELAY_MS  = 3000;
-const MAX_RECONNECT_DELAY = 30000;
+const RECONNECT_DELAY_MS  = 5000;
+const MAX_RECONNECT_DELAY = 60000;
+
+// ── Stub returned when the engine flag is off ──────────────────────────────
+// All the same API surface — connect/send/onMessage/disconnect — but silent.
+function createStub() {
+    const handlers = new Map();
+    return {
+        connected: readonly(ref(false)),
+        lastError:  readonly(ref(null)),
+        send:       () => {},
+        onMessage:  (action, handler) => {
+            if (!handlers.has(action)) handlers.set(action, new Set());
+            handlers.get(action).add(handler);
+            return () => handlers.get(action)?.delete(handler);
+        },
+        disconnect: () => {},
+    };
+}
 
 export function useWebSocket() {
+    // Engine not enabled — return a silent stub so Game.vue wires up normally
+    // but no WS connection is attempted. Set VITE_ENGINE_ENABLED=true in .env
+    // when the real-time engine server is running.
+    if (!ENGINE_ENABLED) return createStub();
+
     const connected       = ref(false);
     const lastError       = ref(null);
 
@@ -14,7 +37,7 @@ export function useWebSocket() {
     let reconnectTimer   = null;
     let reconnectDelay   = RECONNECT_DELAY_MS;
     let destroyed        = false;
-    const handlers       = new Map(); // action → Set<handler>
+    const handlers       = new Map();
 
     function connect() {
         if (destroyed) return;
@@ -43,18 +66,22 @@ export function useWebSocket() {
             const set = handlers.get(action);
             if (set) set.forEach(fn => fn(msg));
 
-            // Also fire wildcard handlers
             const all = handlers.get('*');
             if (all) all.forEach(fn => fn(msg));
         };
 
-        ws.onerror = (e) => {
+        ws.onerror = () => {
             lastError.value = 'WebSocket error';
         };
 
         ws.onclose = () => {
             connected.value = false;
-            if (!destroyed) scheduleReconnect();
+            if (!destroyed) {
+                if (reconnectDelay <= RECONNECT_DELAY_MS) {
+                    console.info('[useWebSocket] Engine not reachable — set VITE_ENGINE_ENABLED=true when ready');
+                }
+                scheduleReconnect();
+            }
         };
     }
 

@@ -1,11 +1,44 @@
 <template>
-    <div class="hex-map-wrapper">
+    <div
+        class="hex-map-wrapper"
+        :class="{ 'is-panning': isPanning }"
+        @mousedown="onPanStart"
+    >
         <svg
             ref="svgEl"
             class="hex-map-svg"
             viewBox="0 0 1200 800"
             preserveAspectRatio="xMidYMid meet"
         >
+            <defs>
+                <!-- Bloom filter for the player ring -->
+                <filter id="player-glow" x="-150%" y="-150%" width="400%" height="400%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+                    <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                <!-- Bloom filter for reachable-node rings -->
+                <filter id="reachable-glow" x="-100%" y="-100%" width="300%" height="300%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+                    <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                <!-- ICE ping glow -->
+                <filter id="ping-glow" x="-150%" y="-150%" width="400%" height="400%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+                    <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            <!-- Pan group — all content shifts with drag offset -->
+            <g :transform="panTransform">
+
             <!-- Grid lines — one line per deduplicated hex edge -->
             <g class="hex-grid-layer">
                 <line
@@ -24,50 +57,62 @@
                     :key="`${d.name}-hex-${i}`"
                     :points="hex.points"
                     class="cluster-hex-outline"
+                    :style="{ stroke: d.color }"
                 />
-                <circle
-                    v-for="(node, i) in d.allNodes"
-                    :key="`${d.name}-node-${i}`"
-                    :cx="node.x" :cy="node.y"
-                    r="4"
-                    class="cluster-shared-node"
-                />
-                <circle
-                    :cx="d.hub.x" :cy="d.hub.y"
-                    r="6"
-                    class="district-yellow-hub"
-                />
+                <!-- Action nodes — individually clickable; cyberdoc hub is skipped here -->
+                <template v-for="(node, i) in d.allNodes" :key="`${d.name}-node-${i}`">
+                    <g
+                        v-if="node.type === 'action'"
+                        class="node-clickable"
+                        @click="onNodeClick(node.id)"
+                    >
+                        <circle v-if="reachableNames.has(node.id)" :cx="node.x" :cy="node.y" r="12" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
+                        <circle :cx="node.x" :cy="node.y" r="4" class="cluster-shared-node" />
+                    </g>
+                </template>
+                <!-- CyberDoc hub — vertex-positioned yellow node, traversable like action nodes -->
+                <g class="node-clickable" @click="onNodeClick(d.hub.id)">
+                    <circle v-if="reachableNames.has(d.hub.id)" :cx="d.hub.x" :cy="d.hub.y" r="12" class="reachable-ring" :class="{ 'reachable-ring--locked': ssCritical }" />
+                    <circle :cx="d.hub.x" :cy="d.hub.y" r="6" class="district-yellow-hub" />
+                </g>
                 <text :x="d.labelX" :y="d.labelY" class="district-name">{{ d.name.toUpperCase() }}</text>
             </g>
 
             <!-- Neighborhoods — single hex cells -->
             <g v-for="(nb, i) in NEIGHBORHOODS" :key="`nb-${i}`" class="neighborhood">
-                <polygon :points="nb.points" class="cluster-hex-outline" />
-                <circle
+                <polygon :points="nb.points" class="cluster-hex-outline" :style="{ stroke: nb.color }" />
+                <!-- Action nodes — individually clickable -->
+                <g
                     v-for="(node, j) in nb.nodes"
                     :key="`nb-${i}-n${j}`"
-                    :cx="node.x" :cy="node.y"
-                    r="4"
-                    class="cluster-shared-node"
-                />
+                    class="node-clickable"
+                    @click="onNodeClick(node.id)"
+                >
+                    <circle v-if="reachableNames.has(node.id)" :cx="node.x" :cy="node.y" r="12" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
+                    <circle :cx="node.x" :cy="node.y" r="4" class="cluster-shared-node" />
+                </g>
             </g>
 
             <!-- NetLinks — connections between districts and neighborhoods -->
             <g v-for="(link, li) in NET_LINKS" :key="`link-${li}`" class="net-link">
-                <polyline
-                    v-for="(seg, si) in link.segments"
-                    :key="`link-${li}-seg-${si}`"
-                    :points="seg.map(p => `${p.x},${p.y}`).join(' ')"
+                <line
+                    v-for="(edge, ei) in link.edges"
+                    :key="`link-${li}-edge-${ei}`"
+                    :x1="edge.x1" :y1="edge.y1"
+                    :x2="edge.x2" :y2="edge.y2"
                     class="route-edge"
+                    :style="{ stroke: edge.color }"
                 />
-                <circle
+                <!-- Action nodes — individually clickable -->
+                <g
                     v-for="(pt, i) in link.points"
                     :key="`link-${li}-pt-${i}`"
-                    :cx="pt.x"
-                    :cy="pt.y"
-                    r="4"
-                    :class="pt.isJunction ? 'junction-node' : 'route-node'"
-                />
+                    class="node-clickable"
+                    @click="onNodeClick(pt.id)"
+                >
+                    <circle v-if="reachableNames.has(pt.id)" :cx="pt.x" :cy="pt.y" r="12" class="reachable-ring" />
+                    <circle :cx="pt.x" :cy="pt.y" r="4" class="route-node" />
+                </g>
             </g>
 
             <!-- Cell coordinate labels (column letter + row number) -->
@@ -80,19 +125,123 @@
                     class="hex-cell-label"
                 >{{ cell.label }}</text>
             </g>
+
+            <!-- ICE Ping rings — visible when bounty player is being tracked -->
+            <!-- ring radius = ping.radiusPx, driven by node ICE × bounty level vs player OS -->
+            <g class="ping-layer">
+                <g
+                    v-for="ping in props.pings"
+                    :key="ping.pingId"
+                    class="ping-group"
+                >
+                    <!-- Accuracy ring — size reflects how tight the lock is -->
+                    <circle
+                        :cx="ping.x"
+                        :cy="ping.y"
+                        :r="ping.radiusPx ?? 20"
+                        class="ping-ring"
+                        :class="[
+                            ping.type === 'false'  ? 'ping-ring--false'  :
+                            ping.isOpenSeason      ? 'ping-ring--os'     :
+                                                     'ping-ring--bounty',
+                        ]"
+                    />
+                    <!-- Inner dot — exact centre of the lock -->
+                    <circle
+                        :cx="ping.x"
+                        :cy="ping.y"
+                        r="4"
+                        class="ping-dot"
+                        :class="[
+                            ping.type === 'false'  ? 'ping-dot--false'  :
+                            ping.isOpenSeason      ? 'ping-dot--os'     :
+                                                     'ping-dot--bounty',
+                        ]"
+                        filter="url(#ping-glow)"
+                    />
+                    <!-- Range label — shows node-hop radius so player can gauge accuracy -->
+                    <text
+                        v-if="ping.range > 0"
+                        :x="ping.x"
+                        :y="ping.y - (ping.radiusPx ?? 20) - 6"
+                        class="ping-label"
+                        :class="ping.isOpenSeason ? 'ping-label--os' : ''"
+                    >±{{ ping.range }}</text>
+                </g>
+            </g>
+
+            <!-- Player marker — pulsing ring above everything else -->
+            <g v-if="playerToken" class="player-marker">
+                <circle
+                    :cx="playerToken.x"
+                    :cy="playerToken.y"
+                    r="16"
+                    class="player-ring"
+                />
+            </g>
+
+            </g><!-- end pan group -->
         </svg>
     </div>
 </template>
 
 <script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+
+// Template ref — bound to the <svg> element so getNodeScreenPos can convert
+// SVG coordinates to stage-relative screen pixels.
+const svgEl = ref(null);
+
+// ─── Pan state ────────────────────────────────────────────────────────────────
+const panOffset  = ref({ x: 0, y: 0 });
+const isPanning  = ref(false);
+let   hasDragged = false;
+let   dragOrigin = { mx: 0, my: 0, px: 0, py: 0 };
+
+const panTransform = computed(() =>
+    `translate(${panOffset.value.x}, ${panOffset.value.y})`
+);
+
+function onPanStart(e) {
+    // Middle-mouse or left-button only
+    if (e.button !== 0 && e.button !== 1) return;
+    isPanning.value = true;
+    hasDragged      = false;
+    dragOrigin      = {
+        mx: e.clientX, my: e.clientY,
+        px: panOffset.value.x, py: panOffset.value.y,
+    };
+    e.preventDefault();
+}
+
+function onPanMove(e) {
+    if (!isPanning.value || !svgEl.value) return;
+    const dx = e.clientX - dragOrigin.mx;
+    const dy = e.clientY - dragOrigin.my;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged = true;
+    // Convert screen-pixel delta → SVG-unit delta using the SVG's screen CTM.
+    const ctm = svgEl.value.getScreenCTM();
+    if (!ctm) return;
+    panOffset.value = {
+        x: dragOrigin.px + dx / ctm.a,
+        y: dragOrigin.py + dy / ctm.d,
+    };
+}
+
+function onPanEnd() {
+    isPanning.value = false;
+}
+
 // ─── Props (kept for Game.vue compatibility — not rendered yet) ───────────────
-defineProps({
+const props = defineProps({
     nodes:         { type: Array,  default: () => [] },
     links:         { type: Array,  default: () => [] },
     pings:         { type: Array,  default: () => [] },
     currentNodeId: { type: String, default: null     },
+    playerUplink:  { type: Number, default: 3        },
+    playerSs:      { type: Number, default: 100      },
 });
-defineEmits(['node-clicked', 'street-doc-selected']);
+const emit = defineEmits(['node-clicked', 'player-moved', 'move-blocked']);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HEX LATTICE
@@ -210,11 +359,33 @@ function hexVertexPx(q, r, vi) {
     };
 }
 
+// ─── Node registry ────────────────────────────────────────────────────────────
+const ALL_NODES      = new Map(); // id → node
+const COORD_NODE_MAP = new Map(); // "a,b" → node (first-write-wins)
+const NODE_ADJACENCY = new Map(); // id → Set<id>  (built progressively)
+const AREA_COLOR_MAP = new Map(); // area name → color string (authoritative)
+
+function createNode(id, x, y, type, district, areaColor = null) {
+    const node = { id, x, y, type, district, areaColor };
+    ALL_NODES.set(id, node);
+    return node;
+}
+
+function addNodeEdge(a, b) {
+    if (a === b) return;
+    if (!NODE_ADJACENCY.has(a)) NODE_ADJACENCY.set(a, new Set());
+    if (!NODE_ADJACENCY.has(b)) NODE_ADJACENCY.set(b, new Set());
+    NODE_ADJACENCY.get(a).add(b);
+    NODE_ADJACENCY.get(b).add(a);
+}
+
 // ─── Map element factories ────────────────────────────────────────────────────
 
-function createDistrict(centerCell, neighborCells, name) {
-    const cells = [centerCell, ...neighborCells];
-    const hub   = hexCenterPx(centerCell.q, centerCell.r);
+function createDistrict(centerCell, neighborCells, name, abbr) {
+    const color  = '#00FF41'; // neon green — all district lines and edges
+    AREA_COLOR_MAP.set(name, color);
+    const cells  = [centerCell, ...neighborCells];
+    const midPx  = hexCenterPx(centerCell.q, centerCell.r); // geometric center for reference only
 
     const hexPolygons = cells.map(({ q, r }) => ({
         points: V_OFFSETS.map((_, vi) => {
@@ -223,32 +394,98 @@ function createDistrict(centerCell, neighborCells, name) {
         }).join(' '),
     }));
 
-    const vCount = new Map();
+    // Collect all cluster vertex positions
+    const vMap = new Map();
     for (const { q, r } of cells) {
         for (let vi = 0; vi < 6; vi++) {
             const [da, db] = V_OFFSETS[vi];
-            const key = `${2 * q + r + da},${3 * r + db}`;
-            if (!vCount.has(key)) vCount.set(key, { ...hexVertexPx(q, r, vi), n: 0 });
-            vCount.get(key).n++;
+            const a = 2 * q + r + da;
+            const b = 3 * r + db;
+            const key = `${a},${b}`;
+            if (!vMap.has(key)) vMap.set(key, { a, b, ...hexVertexPx(q, r, vi) });
         }
     }
-    const allNodes = [...vCount.values()].map(({ x, y }) => ({ x, y }));
 
-    // Place label below the cluster when the center is near the top of the viewport
-    const labelY = hub.y < 150
-        ? hub.y + HEX_SIZE * 2.5 + 20
-        : hub.y - HEX_SIZE * 2.5 - 12;
+    // Place the cyberdoc hub at the cluster vertex nearest to the hex midpoint.
+    // Register it in COORD_NODE_MAP *before* allNodes is built so the allNodes
+    // pass returns it for that vertex key instead of creating a duplicate action node.
+    let hubEntry = null, hubDist = Infinity;
+    for (const entry of vMap.values()) {
+        const d = Math.hypot(entry.x - midPx.x, entry.y - midPx.y);
+        if (d < hubDist) { hubDist = d; hubEntry = entry; }
+    }
+    const hub = createNode(`${abbr}-hub`, hubEntry.x, hubEntry.y, 'cyberdoc', name, color);
+    COORD_NODE_MAP.set(`${hubEntry.a},${hubEntry.b}`, hub);
 
-    return { name, hexPolygons, allNodes, hub, labelX: hub.x, labelY };
+    // Build allNodes — hub's key is already occupied, so it comes back as the
+    // cyberdoc node; all other vertices become action nodes.
+    let vIdx = 1;
+    const allNodes = [...vMap.values()].map(({ a, b, x, y }) => {
+        const key = `${a},${b}`;
+        if (!COORD_NODE_MAP.has(key)) {
+            const node = createNode(`${abbr}-v${vIdx}`, x, y, 'action', name, color);
+            COORD_NODE_MAP.set(key, node);
+            vIdx++;
+            return node;
+        }
+        return COORD_NODE_MAP.get(key);
+    });
+
+    // Internal vertex adjacency — the hub participates as a regular vertex node.
+    for (const { q, r } of cells) {
+        for (let vi = 0; vi < 6; vi++) {
+            const [da1, db1] = V_OFFSETS[vi];
+            const [da2, db2] = V_OFFSETS[(vi + 1) % 6];
+            const n1 = COORD_NODE_MAP.get(`${2*q + r + da1},${3*r + db1}`);
+            const n2 = COORD_NODE_MAP.get(`${2*q + r + da2},${3*r + db2}`);
+            if (n1 && n2) addNodeEdge(n1.id, n2.id);
+        }
+    }
+
+    // Use the true geometric midpoint for label placement so it stays centered
+    // regardless of which vertex the hub landed on.
+    const labelY = midPx.y < 150
+        ? midPx.y + HEX_SIZE * 2.5 + 20
+        : midPx.y - HEX_SIZE * 2.5 - 12;
+
+    return { name, color, hexPolygons, allNodes, hub, labelX: midPx.x, labelY };
 }
 
-function createNeighborhood({ q, r }) {
+function createNeighborhood({ q, r, name }) {
+    const color = '#0099FF'; // neon blue — all neighborhood lines and edges
+    AREA_COLOR_MAP.set(name, color);
+    const nodes = V_OFFSETS.map((_, vi) => {
+        const [da, db] = V_OFFSETS[vi];
+        const a = 2 * q + r + da;
+        const b = 3 * r + db;
+        const key = `${a},${b}`;
+        const px = hexVertexPx(q, r, vi);
+        if (!COORD_NODE_MAP.has(key)) {
+            const node = createNode(`${name}-v${vi}`, px.x, px.y, 'action', name, color);
+            COORD_NODE_MAP.set(key, node);
+            return node;
+        }
+        return COORD_NODE_MAP.get(key);
+    });
+    // Ring adjacency: each vertex connects to its two hex-ring neighbors
+    for (let vi = 0; vi < 6; vi++) {
+        addNodeEdge(nodes[vi].id, nodes[(vi + 1) % 6].id);
+    }
+
+    // If every vertex was already claimed by the same district (e.g. F4 ⊂ Downtown),
+    // use that district's color for the polygon outline so it matches the district.
+    const d0 = nodes[0]?.district;
+    const outlineColor = (d0 && d0 !== name && nodes.every(n => n.district === d0) && AREA_COLOR_MAP.has(d0))
+        ? AREA_COLOR_MAP.get(d0)
+        : color;
+
     return {
+        color: outlineColor,
         points: V_OFFSETS.map((_, vi) => {
             const p = hexVertexPx(q, r, vi);
             return `${p.x},${p.y}`;
         }).join(' '),
-        nodes: V_OFFSETS.map((_, vi) => hexVertexPx(q, r, vi)),
+        nodes,
     };
 }
 
@@ -258,61 +495,65 @@ const DISTRICTS = [
         { q: -3, r: -4 },
         [{ q: -2, r: -4 }, { q: -3, r: -3 }, { q: -4, r: -3 },
          { q: -4, r: -4 }, { q: -3, r: -5 }, { q: -2, r: -5 }],
-        'North Spokane',
+        'North Spokane', 'NS',
     ),
     createDistrict(
         { q: -6, r:  3 },
         [{ q: -5, r:  3 }, { q: -6, r:  4 }, { q: -7, r:  4 },
          { q: -7, r:  3 }, { q: -6, r:  2 }, { q: -5, r:  2 }],
-        "Browne's Addition",
+        "Browne's Addition", 'BA',
     ),
     createDistrict(
         { q: -1, r: -1 },
         [{ q: -1, r: -2 }, { q:  0, r: -2 }, { q:  0, r: -1 },
          { q: -1, r:  0 }, { q: -2, r:  0 }, { q: -2, r: -1 }],
-        'Downtown',
+        'Downtown', 'DT',
     ),
     createDistrict(
         { q:  1, r:  3 },
         [{ q:  2, r:  3 }, { q:  0, r:  3 }, { q:  1, r:  4 },
          { q:  0, r:  4 }, { q:  1, r:  2 }, { q:  2, r:  2 }],
-        'University District',
+        'University District', 'UD',
     ),
     createDistrict(
         { q:  6, r: -3 },
         [{ q:  7, r: -3 }, { q:  5, r: -3 }, { q:  6, r: -2 },
          { q:  5, r: -2 }, { q:  6, r: -4 }, { q:  7, r: -4 }],
-        'Spokane Valley',
+        'Spokane Valley', 'SV',
     ),
 ];
 
 // ─── Neighborhoods ────────────────────────────────────────────────────────────
 const NEIGHBORHOODS = [
-    { q:  0, r: -4 }, // F2
-    { q:  2, r: -5 }, // G1
-    { q:  3, r: -3 }, // I3
-    { q:  5, r: -5 }, // J1
-    { q:  5, r:  1 }, // M7
-    { q:  2, r: -1 }, // I5
-    { q:  4, r:  4 }, // N10
-    { q:  4, r:  5 }, // N11
-    { q: -3, r:  5 }, // G11
-    { q: -6, r:  0 }, // B6
-    { q: -3, r:  3 }, // F9
-    { q:  0, r:  1 }, // H7
-].map(createNeighborhood);
+    { q:  0, r: -4, name: 'F2'  },
+    { q:  2, r: -5, name: 'G1'  },
+    { q:  3, r: -3, name: 'I3'  },
+    { q:  5, r: -5, name: 'J1'  },
+    { q:  5, r:  1, name: 'M7'  },
+    { q:  2, r: -1, name: 'I5'  },
+    { q:  4, r:  4, name: 'N10' },
+    { q:  4, r:  5, name: 'N11' },
+    { q: -3, r:  5, name: 'G11' },
+    { q: -6, r:  0, name: 'B6'  },
+    { q: -3, r:  3, name: 'F9'  },
+    { q:  0, r:  1, name: 'H7'  },
+    { q: -1, r: -2, name: 'F4'  },
+].map((spec) => ({ ...createNeighborhood(spec), name: spec.name, center: hexCenterPx(spec.q, spec.r) }));
 
 // ─── Junction factory ─────────────────────────────────────────────────────────
 // cell — vertex position in hex lattice space { a, b }
 // Returns a named split point that any NetLink path can reference. When two
 // NetLinks share the same junction object, the node renders once at that vertex.
-function createJunction({ a, b }) {
-    return {
-        a, b,
-        isJunction: true,
-        x: GRID_CX + HEX_SIZE * (SQ3 / 2) * a,
-        y: GRID_CY + HEX_SIZE * 0.5 * b,
-    };
+function createJunction(id, { a, b }) {
+    const x   = GRID_CX + HEX_SIZE * (SQ3 / 2) * a;
+    const y   = GRID_CY + HEX_SIZE * 0.5 * b;
+    const key = `${a},${b}`;
+    if (!COORD_NODE_MAP.has(key)) {
+        const node = createNode(id, x, y, 'action', null);
+        COORD_NODE_MAP.set(key, node);
+        return { ...node, a, b };
+    }
+    return { ...COORD_NODE_MAP.get(key), a, b };
 }
 
 // ─── NetLink factory ──────────────────────────────────────────────────────────
@@ -327,8 +568,20 @@ function createJunction({ a, b }) {
 // of polylines to draw and points is the deduped vertex set for circles.
 function createNetLink(startNode, endNode, path) {
     function resolve(v) {
-        if (v.isJunction) return v;
-        return { x: GRID_CX + HEX_SIZE * (SQ3 / 2) * v.a, y: GRID_CY + HEX_SIZE * 0.5 * v.b, isJunction: false };
+        if (v.id !== undefined) return v;
+        const key = `${v.a},${v.b}`;
+        if (COORD_NODE_MAP.has(key)) {
+            const node = COORD_NODE_MAP.get(key);
+            // Waypoints in a NetLink are never district-owned — strip district so
+            // the per-segment color check never mistakes a shared vertex for an
+            // internal district edge.
+            return node.district !== null ? { ...node, district: null } : node;
+        }
+        const x = GRID_CX + HEX_SIZE * (SQ3 / 2) * v.a;
+        const y = GRID_CY + HEX_SIZE * 0.5 * v.b;
+        const node = createNode(`wp_${v.a}_${v.b}`, x, y, 'action', null);
+        COORD_NODE_MAP.set(key, node);
+        return node;
     }
 
     function walk(entries, seed) {
@@ -359,7 +612,25 @@ function createNetLink(startNode, endNode, path) {
         }
     }
 
-    return { startNode, endNode, segments, points };
+    const color = '#00FFFF'; // cyan — default NetLink line color
+
+    // Pre-compute per-edge colors. If both endpoints belong to the same named
+    // area (district or neighborhood), use that area's color; otherwise cyan.
+    // Waypoint nodes have district=null and can never match any area.
+    const edges = [];
+    for (const seg of segments) {
+        for (let i = 0; i < seg.length - 1; i++) {
+            const a = seg[i], b = seg[i + 1];
+            const edgeColor = (a.district !== null
+                && a.district === b.district
+                && AREA_COLOR_MAP.has(a.district))
+                ? AREA_COLOR_MAP.get(a.district)
+                : color;
+            edges.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, color: edgeColor });
+        }
+    }
+
+    return { startNode, endNode, segments, points, edges, color };
 }
 
 // ─── Junctions ────────────────────────────────────────────────────────────────
@@ -367,32 +638,32 @@ const JUNCTIONS = {
     // Apex of gap hex (q=−1, r=−4) — midpoint on the north corridor between
     // the North Spokane cluster and F2. Any future link routing through this
     // area can branch from here.
-    northCorridor: createJunction({ a: -6, b: -14 }),
+    northCorridor: createJunction('northCorridor', { a: -6, b: -14 }),
 
     // Top vertex of I5 (q=2, r=−1) vi=5 — sits directly between I3 and the
     // I5/G5 row. Used as the split point for the I3 → G5/I5 branch.
-    i5Top: createJunction({ a: 3, b: -5 }),
+    i5Top: createJunction('i5Top', { a: 3, b: -5 }),
 
     // Bottom vertex of J5 (q=3, r=−1) vi=2 — shared by J5/J6/K6.
     // Lies on the I5→L4 path; the J5→K8 link branches downward from here.
-    j5Bottom: createJunction({ a: 5, b: -1 }),
+    j5Bottom: createJunction('j5Bottom', { a: 5, b: -1 }),
 
     // Lower-right vertex of L8 (q=3, r=2) vi=2 = K9 vi=0 upper-right.
     // Lies on the K9→M7 path; the L8→N10 link branches downward from here.
-    l8Corner: createJunction({ a: 8, b: 8 }),
+    l8Corner: createJunction('l8Corner', { a: 8, b: 8 }),
 
     // Right vertex of B4 (q=−5, r=−2) vi=1 = C4 vi=3.
     // Lies on the B3→B6 path; the B4→E5 link branches eastward from here.
-    b4Right: createJunction({ a: -11, b: -5 }),
+    b4Right: createJunction('b4Right', { a: -11, b: -5 }),
 
     // Upper-left vertex of F9 (q=−3, r=3) vi=4 = E9 vi=0.
     // Split destination from the F6→D9 link; also the entry point for any future
     // link that passes through F9.
-    f9: createJunction({ a: -4, b: 8 }),
+    f9: createJunction('f9', { a: -4, b: 8 }),
 
     // Lower-left vertex of I2 (q=3, r=−4) vi=3 = H3 vi=5.
     // Entry point for connections routing southwest out of I2.
-    i2: createJunction({ a: 1, b: -11 }),
+    i2: createJunction('i2', { a: 1, b: -11 }),
 };
 
 // ─── NetLinks ─────────────────────────────────────────────────────────────────
@@ -714,12 +985,156 @@ const NET_LINKS = [
         { a: -1, b:  -7 },
     ]),
 
+    // J1 → L2
+    createNetLink('J1', 'L2', [
+        { a:  5, b: -13 },
+        { a:  6, b: -14 },
+        { a:  7, b: -13 },
+        { a:  8, b: -14 },
+        { a:  9, b: -13 },
+    ]),
+
 ];
 
-// ─── Expose stubs (Game.vue calls these after movement) ──────────────────────
+// ─── Player token ─────────────────────────────────────────────────────────────
+
+// NetLink segment adjacency — consecutive pairs only so each move is exactly
+// one step. Nodes that are 2+ hops apart along a segment are not adjacent.
+for (const link of NET_LINKS) {
+    for (const seg of link.segments) {
+        for (let i = 0; i < seg.length - 1; i++) {
+            if (seg[i].id === undefined || seg[i + 1].id === undefined) {
+                console.warn('[HexMap] segment node missing id', seg[i], seg[i + 1]);
+                continue;
+            }
+            addNodeEdge(seg[i].id, seg[i + 1].id);
+        }
+    }
+}
+
+// Debug: verify all nodes and their connections are wired correctly
+console.log('[HexMap] ALL_NODES (%d entries):', ALL_NODES.size,
+    Object.fromEntries([...ALL_NODES.entries()].map(([id, n]) => [id, { x: Math.round(n.x), y: Math.round(n.y), type: n.type }]))
+);
+console.log('[HexMap] NODE_ADJACENCY (%d nodes):', NODE_ADJACENCY.size,
+    Object.fromEntries([...NODE_ADJACENCY.entries()].map(([id, s]) => [id, [...s]]))
+);
+
+// Return the action node inside the Downtown district that is closest to the
+// district hub and has at least 2 connections. CyberDoc hub nodes are excluded.
+function findStartNode() {
+    const dtDistrict = DISTRICTS.find(d => d.name === 'Downtown');
+    const dtHub      = dtDistrict.hub;
+    let best = null, bestDist = Infinity;
+    for (const node of dtDistrict.allNodes) {
+        if (node.type !== 'action') continue;
+        const nbrs = NODE_ADJACENCY.get(node.id);
+        if (!nbrs || nbrs.size < 2) continue;
+        const d = Math.hypot(node.x - dtHub.x, node.y - dtHub.y);
+        if (d < bestDist) { bestDist = d; best = node; }
+    }
+    return best;
+}
+
+// Player token factory — accepts an ALL_NODES entry { id, x, y, type, district }.
+// Moving the player replaces the token: playerToken.value = createPlayerToken(node).
+function createPlayerToken(node) {
+    return { id: node.id, x: node.x, y: node.y };
+}
+
+const startNode      = findStartNode();
+const playerToken    = ref(createPlayerToken(startNode));
+const reachableNames  = computed(() => NODE_ADJACENCY.get(playerToken.value.id) ?? new Set());
+const uplinkDepleted  = computed(() => props.playerUplink <= 0);
+const ssCritical      = computed(() => props.playerSs <= 0);
+
+// ─── Node click — move if adjacent, always emit for NodeWindow ───────────────
+function onNodeClick(nodeId) {
+    if (hasDragged) return;   // suppress click if this was a pan gesture
+    const node = ALL_NODES.get(nodeId);
+    if (!node) return;
+
+    // Move the player if the target is one step away and uplink allows it
+    const adj = NODE_ADJACENCY.get(playerToken.value.id);
+    if (adj && adj.has(nodeId)) {
+        if (ssCritical.value) {
+            // SS at 0 — rig must be repaired before leaving the CyberDoc
+            emit('move-blocked', { reason: 'SS_CRITICAL' });
+            return;
+        }
+        if (props.playerUplink <= 0) {
+            // No uplink — emit a blocked notice but don't move
+            emit('move-blocked', { reason: 'NO_UPLINK' });
+            return;
+        }
+        playerToken.value = createPlayerToken(node);
+        emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
+    }
+
+    // Always open the NodeWindow so the player can see node info
+    const pos = getNodeScreenPos(nodeId);
+    emit('node-clicked', {
+        node:    { ...node },
+        screenX: pos?.x ?? 200,
+        screenY: pos?.y ?? 200,
+    });
+}
+
+// ─── Helpers exposed to Game.vue ─────────────────────────────────────────────
+
+/** Move the player token to toId, then fire callback. */
+function animatePlayerTo(fromId, toId, callback) {
+    const node = ALL_NODES.get(toId);
+    if (node) playerToken.value = createPlayerToken(node);
+    callback?.();
+}
+
+/**
+ * Teleport the player token directly to a node by canvas ID.
+ * Called by Game.vue after DB spawn-node selection resolves.
+ * Does NOT emit player-moved — that event is for voluntary moves only.
+ */
+function setPlayerNode(canvasId) {
+    const node = ALL_NODES.get(canvasId);
+    if (node) playerToken.value = createPlayerToken(node);
+}
+
+/** Convert a canvas node's SVG coords to stage-relative screen pixels. */
+function getNodeScreenPos(nodeId) {
+    const node = ALL_NODES.get(nodeId);
+    if (!node || !svgEl.value) return null;
+    try {
+        const pt  = svgEl.value.createSVGPoint();
+        pt.x      = node.x;
+        pt.y      = node.y;
+        const ctm = svgEl.value.getScreenCTM();
+        if (!ctm) return null;
+        const screen     = pt.matrixTransform(ctm);
+        const parentRect = svgEl.value.parentElement?.getBoundingClientRect();
+        return {
+            x: screen.x - (parentRect?.left ?? 0),
+            y: screen.y - (parentRect?.top  ?? 0),
+        };
+    } catch {
+        return null;
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('mousemove', onPanMove);
+    window.addEventListener('mouseup',   onPanEnd);
+});
+onUnmounted(() => {
+    window.removeEventListener('mousemove', onPanMove);
+    window.removeEventListener('mouseup',   onPanEnd);
+});
+
 defineExpose({
-    animatePlayerTo:  () => {},
-    getNodeScreenPos: () => null,
+    animatePlayerTo,
+    setPlayerNode,
+    getNodeScreenPos,
+    nodeAdjacency: NODE_ADJACENCY,   // plain Map — stable after init
+    startNodeId:   startNode?.id ?? null,
 });
 </script>
 
@@ -728,6 +1143,12 @@ defineExpose({
     position: absolute;
     inset: 0;
     background: #05050A;
+    cursor: grab;
+    user-select: none;
+}
+
+.hex-map-wrapper.is-panning {
+    cursor: grabbing;
 }
 
 .hex-map-svg {
@@ -754,7 +1175,6 @@ defineExpose({
 
 .cluster-hex-outline {
     fill: none;
-    stroke: #00FFFF;
     stroke-width: 1.5;
     stroke-opacity: 0.7;
     stroke-linejoin: round;
@@ -787,7 +1207,6 @@ defineExpose({
 
 .route-edge {
     fill: none;
-    stroke: #00FFFF;
     stroke-width: 2;
     stroke-opacity: 0.9;
     stroke-linejoin: round;
@@ -807,5 +1226,131 @@ defineExpose({
 @keyframes hub-pulse {
     0%, 100% { transform: scale(1); }
     50%       { transform: scale(1.25); }
+}
+
+/* ── Reachable node highlight ───────────────────────────────────────────────── */
+
+.reachable-ring {
+    fill: none;
+    stroke: #00FFFF;
+    stroke-width: 1.5;
+    stroke-opacity: 0.75;
+    filter: url(#reachable-glow);
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: reachable-breathe 2s ease-in-out infinite;
+    pointer-events: none;
+}
+.reachable-ring--locked {
+    stroke: #FF3333;
+    stroke-opacity: 0.5;
+    stroke-dasharray: 4 3;
+    animation: reachable-locked 1.5s ease-in-out infinite;
+}
+
+@keyframes reachable-breathe {
+    0%, 100% { stroke-opacity: 0.75; }
+    50%       { stroke-opacity: 0.2;  }
+}
+@keyframes reachable-locked {
+    0%, 100% { stroke-opacity: 0.5; }
+    50%       { stroke-opacity: 0.15; }
+}
+
+/* ── Player marker ──────────────────────────────────────────────────────────── */
+
+.node-clickable {
+    cursor: pointer;
+}
+
+.district-yellow-hub {
+    cursor: pointer;
+}
+
+.player-ring {
+    fill: none;
+    stroke: #FF69B4;
+    stroke-width: 2.5;
+    stroke-opacity: 0.9;
+    filter: url(#player-glow);
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: player-pulse 3.5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes player-pulse {
+    0%, 100% {
+        transform: scale(1);
+        stroke-opacity: 0.9;
+        stroke-width: 2.5;
+    }
+    50% {
+        transform: scale(1.5);
+        stroke-opacity: 0.15;
+        stroke-width: 1.5;
+    }
+}
+
+/* ── ICE Ping rings ──────────────────────────────────────────────────────────── */
+
+.ping-ring {
+    fill: none;
+    stroke-width: 1.5;
+    transform-box: fill-box;
+    transform-origin: center;
+    pointer-events: none;
+}
+/* Real ping — bounty not yet open season */
+.ping-ring--bounty {
+    stroke: #FFB300;
+    stroke-opacity: 0.55;
+    stroke-dasharray: 6 4;
+    animation: ping-pulse 2.4s ease-in-out infinite;
+}
+/* Open season — bright red, faster pulse */
+.ping-ring--os {
+    stroke: #FF3333;
+    stroke-opacity: 0.7;
+    stroke-dasharray: none;
+    animation: ping-pulse 1.4s ease-in-out infinite;
+}
+/* False ping (Signal Noise) — teal, slightly faded so attentive players might notice */
+.ping-ring--false {
+    stroke: #00FFFF;
+    stroke-opacity: 0.45;
+    stroke-dasharray: 4 6;
+    animation: ping-pulse 2.8s ease-in-out infinite;
+}
+
+.ping-dot {
+    pointer-events: none;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ping-dot-pulse 1.4s ease-in-out infinite;
+}
+.ping-dot--bounty { fill: #FFB300; }
+.ping-dot--os     { fill: #FF3333; }
+.ping-dot--false  { fill: #00FFFF; opacity: 0.5; }
+
+/* Range label — ±N shown above the ring */
+.ping-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: rgba(255, 179, 0, 0.6);
+    text-anchor: middle;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+}
+.ping-label--os { fill: rgba(255, 51, 51, 0.7); }
+
+@keyframes ping-pulse {
+    0%, 100% { stroke-opacity: 0.6; }
+    50%       { stroke-opacity: 0.15; }
+}
+
+@keyframes ping-dot-pulse {
+    0%, 100% { opacity: 1;   transform: scale(1);   }
+    50%       { opacity: 0.3; transform: scale(0.6); }
 }
 </style>

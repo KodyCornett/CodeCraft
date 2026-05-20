@@ -23,7 +23,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(PeripheralSeeder::class);
+        $this->call(ConsumableSeeder::class);
+        $this->call(PlayerSeeder::class);     // must run after User factory above
         $this->call(NodeSeeder::class);
+        $this->call(SpawnNodeSeeder::class);  // must run after NodeSeeder
         $this->call(CommandSeeder::class);
         $this->call(StreetDocSeeder::class);
     }

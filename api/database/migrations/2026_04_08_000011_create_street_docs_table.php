@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('street_docs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('node_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('district_id')->constrained()->cascadeOnDelete();
+            // district stored as a name string — matches Node.district column
+            $table->string('district', 64)->nullable();
             $table->string('name');
             $table->timestamps();
         });
