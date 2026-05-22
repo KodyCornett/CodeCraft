@@ -36,6 +36,7 @@ class Player extends Model
         'cache',
         'cyberdoc_cooldowns',
         'tech_points',
+        'last_seen_at',
     ];
 
     protected $casts = [

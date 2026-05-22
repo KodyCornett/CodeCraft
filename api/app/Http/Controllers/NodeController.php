@@ -78,9 +78,15 @@ class NodeController extends Controller
             $currentPlayerId = $me?->id;
         }
 
+        // Exclude players whose heartbeat has expired (closed tab / crashed).
+        // 2-minute window gives the client two missed heartbeat cycles before
+        // a player is considered gone. NULL last_seen_at = legacy row, exclude.
+        $staleThreshold = Carbon::now()->subMinutes(2);
+
         $players = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
             ->where('current_node_id', $node->id)
             ->when($currentPlayerId, fn ($q) => $q->where('id', '!=', $currentPlayerId))
+            ->where('last_seen_at', '>', $staleThreshold)
             ->get(['id', 'handle', 'bounty_level', 'is_open_season', 'pocket_creds', 'bounty_multiplier']);
 
         // Flag players who are already in an active combat so the client can

@@ -8,6 +8,7 @@ use App\Models\Player;
 use App\Services\RigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class PlayerController extends Controller
@@ -256,6 +257,7 @@ class PlayerController extends Controller
 
         $player->current_node_id  = $node->id;
         $player->current_district = $data['district'] ?? $player->current_district;
+        $player->last_seen_at     = Carbon::now();
 
         // Decrement every move-counted command effect by 1, prune expired ones.
         // Ghost Protocol, Dark Mode, Firewall Patch, Blackout, etc. all use this.
@@ -289,6 +291,30 @@ class PlayerController extends Controller
             'active_effects'   => $player->active_effects ?? (object) [],
             'remaining_uplink' => $remainingUplink,
         ]);
+    }
+
+    /**
+     * POST /api/player/heartbeat
+     *
+     * Lightweight presence ping sent by the client every 45 seconds.
+     * Also fires via sendBeacon on beforeunload so tab/browser closes
+     * are handled immediately rather than waiting for the timeout window.
+     *
+     * NodeController::players() filters out players whose last_seen_at
+     * is older than 2 minutes, removing ghosts from the world automatically.
+     */
+    public function heartbeat(Request $request): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+
+        if ($player === null) {
+            return response()->json(['ok' => false], 404);
+        }
+
+        $player->last_seen_at = Carbon::now();
+        $player->save();
+
+        return response()->json(['ok' => true]);
     }
 
     /**

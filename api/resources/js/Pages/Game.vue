@@ -195,7 +195,7 @@
         </div>
 
         <!-- NavBar sits below map-stage, inside GameScreen -->
-        <NavBar :active-browser-url="activeBrowserUrl" @launch="onLaunch" />
+        <NavBar :active-browser-url="activeBrowserUrl" @launch="onLaunch" @tutorial="onTutorial" />
     </GameScreen>
 </template>
 
@@ -231,6 +231,8 @@ import { useNodePresence }   from '@/composables/useNodePresence.js';
 import { useNodeTraces }     from '@/composables/useNodeTraces.js';
 import { useCombat }         from '@/composables/useCombat.js';
 import { useGameState }      from '@/composables/useGameState.js';
+import { useHeartbeat }     from '@/composables/useHeartbeat.js';
+import { useAudio }        from '@/composables/useAudio.js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const { playerId, player: authPlayer, rig: authRig, login } = useAuth();
@@ -252,6 +254,12 @@ const { entries: bounties, startPolling: startBountyPolling, stopPolling: stopBo
 
 // ── Position persistence — updates current_node_id on every move ─────────────
 const { updatePosition } = usePosition(playerId);
+
+// ── Heartbeat — keeps last_seen_at fresh; sendBeacon cleans up on tab close ───
+const { startHeartbeat, stopHeartbeat } = useHeartbeat();
+
+// ── Audio — shuffled background music, starts on first user interaction ───────
+const { startAudio, stopAudio } = useAudio();
 
 // ── Combat — challenge handshake + result submission ─────────────────────────
 const {
@@ -661,6 +669,13 @@ const { traces: nodeTraces, refreshNow: refreshTraces } = useNodeTraces(selected
 
 // ── Browser state ─────────────────────────────────────────────────────────────
 const { activeBrowserUrl, onLaunch, onOpenStore, onCloseBrowser } = useBrowserState();
+
+// ── Tutorial — triggered from GameMenu via NavBar ─────────────────────────────
+// Placeholder: opens SPLICE to the manual for now. Replace with the Street Doc
+// terminal quest trigger once GHOST_PROTOCOL_0 is built.
+function onTutorial() {
+    onLaunch('splice://sys.local/manual');
+}
 
 // ── WebSocket — live server events ────────────────────────────────────────────
 const ws = useWebSocket();
@@ -1282,6 +1297,15 @@ onMounted(async () => {
         // Fetch commands and inventory in parallel
         await Promise.all([fetchCommands(), fetchInventory()]);
 
+        // Start presence heartbeat — stamps last_seen_at every 45s and fires
+        // sendBeacon on beforeunload so ghost players are removed immediately
+        // when the tab closes rather than waiting for the stale window to expire.
+        startHeartbeat();
+
+        // Queue background music — plays automatically on first user click
+        // (browser autoplay policy requires a user gesture before audio starts).
+        startAudio();
+
         console.log(`[BOOT] Auth OK — playing as ${player.value.handle} (${playerId.value})`);
     }
 
@@ -1324,6 +1348,8 @@ onUnmounted(() => {
     ws.disconnect();
     stopBountyPolling();
     stopPendingPoll();
+    stopHeartbeat();
+    stopAudio();
     clearInterval(_nowTick);
 });
 </script>

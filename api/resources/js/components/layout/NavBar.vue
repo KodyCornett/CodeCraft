@@ -32,18 +32,24 @@
         <!-- Clock -->
         <div class="tb-clock">{{ time }}</div>
 
+        <div class="tb-sep" />
+
+        <!-- System menu — logout, audio, tutorial -->
+        <GameMenu @tutorial="$emit('tutorial')" />
+
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { SPLICE } from '@/components/browser/SpliceRouter.js';
+import { SPLICE }   from '@/components/browser/SpliceRouter.js';
+import GameMenu from '@/components/layout/GameMenu.vue';
 
 const props = defineProps({
     activeBrowserUrl: { type: String, default: null },
 });
 
-const emit = defineEmits(['launch']);
+const emit = defineEmits(['launch', 'tutorial']);
 
 const APPS = [
     { url: SPLICE.STATS,     icon: '◈', label: 'STATUS' },
@@ -84,6 +90,7 @@ onUnmounted(() => clearInterval(timer));
     flex-shrink: 0;
     gap: 1px;
     padding: 0 4px;
+    position: relative;   /* anchor for GameMenu's absolute panel */
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
