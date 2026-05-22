@@ -50,6 +50,7 @@ class NodeController extends Controller
                 'movement_resource_depleted' => $node->movement_resource_depleted,
                 'movement_last_hacked_at'    => $node->movement_last_hacked_at,
                 'is_spawn'                   => $node->is_spawn,
+                'is_safe_zone'               => $node->is_safe_zone,
                 // Adjacent node IDs as UUIDs (for DB ops) and canvas_ids (for map matching)
                 'adjacent_node_ids'          => $node->adjacentNodes->pluck('id'),
                 'adjacent_canvas_ids'        => $node->adjacentNodes->pluck('canvas_id'),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CombatChallenge;
+use App\Models\Node;
 use App\Models\Player;
 use App\Services\BountyService;
 use App\Services\RigService;
@@ -71,6 +72,12 @@ class CombatChallengeController extends Controller
 
         if ($target->id === $me->id) {
             return response()->json(['message' => 'Cannot challenge yourself.'], 422);
+        }
+
+        // Block challenge if the node is a safe zone
+        $node = Node::where('canvas_id', $data['node_canvas_id'])->first();
+        if ($node?->is_safe_zone) {
+            return response()->json(['message' => 'PvP is not permitted in safe zones.'], 422);
         }
 
         // Block challenge if target is already in an active combat

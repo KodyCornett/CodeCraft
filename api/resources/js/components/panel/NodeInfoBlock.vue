@@ -121,11 +121,15 @@
                             <span class="ni-player-pocket" v-if="p.pocket_creds > 0">◈{{ p.pocket_creds.toLocaleString() }}</span>
                         </span>
                     </div>
-                    <button
-                        v-if="!p.in_combat"
-                        class="ni-hack-btn ni-hack-btn--pvp"
-                        @click="$emit('hack-player', p)"
-                    >[HACK]</button>
+                    <template v-if="node?.is_safe_zone">
+                        <span class="ni-safe-zone">SAFE ZONE</span>
+                    </template>
+                    <template v-else-if="!p.in_combat">
+                        <button
+                            class="ni-hack-btn ni-hack-btn--pvp"
+                            @click="$emit('hack-player', p)"
+                        >[HACK]</button>
+                    </template>
                     <span v-else class="ni-in-combat">IN COMBAT</span>
                 </div>
             </div>
@@ -318,6 +322,14 @@ const iceColorClass = computed(() => {
     letter-spacing: 0.12em;
     color: rgba(255, 179, 0, 0.6);
     border: 1px solid rgba(255, 179, 0, 0.25);
+    padding: 2px 6px;
+    flex-shrink: 0;
+}
+.ni-safe-zone {
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    color: rgba(0, 255, 136, 0.6);
+    border: 1px solid rgba(0, 255, 136, 0.25);
     padding: 2px 6px;
     flex-shrink: 0;
 }
