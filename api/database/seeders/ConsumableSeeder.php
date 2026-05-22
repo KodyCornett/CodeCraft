@@ -50,7 +50,7 @@ class ConsumableSeeder extends Seeder
                 'boost_amount'   => 25,
                 'duration_moves' => null,
                 'rarity'         => 'common',
-                'price_creds'    => 1200,
+                'price_creds'    => 150,
                 'description'    => 'Restores 25 points of System Stability. Field-grade kit.',
             ],
             [
@@ -60,7 +60,7 @@ class ConsumableSeeder extends Seeder
                 'boost_amount'   => 50,
                 'duration_moves' => null,
                 'rarity'         => 'uncommon',
-                'price_creds'    => 2000,
+                'price_creds'    => 300,
                 'description'    => 'Restores 50 points of System Stability. Clinic-grade treatment.',
             ],
             [
@@ -70,7 +70,7 @@ class ConsumableSeeder extends Seeder
                 'boost_amount'   => 100,
                 'duration_moves' => null,
                 'rarity'         => 'rare',
-                'price_creds'    => 4500,
+                'price_creds'    => 600,
                 'description'    => 'Restores full System Stability. Expensive but complete.',
             ],
         ];
