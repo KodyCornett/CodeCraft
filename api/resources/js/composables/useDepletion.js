@@ -91,8 +91,6 @@ export function useDepletion(playerId) {
                 bountyEvent:          res.data.bounty_event ?? null,
                 // current_uplink is only set on movement (uplink) hacks; null otherwise
                 currentUplink:        res.data.player?.current_uplink ?? null,
-                // server-authoritative cache count (persists across reloads)
-                cache:                res.data.player?.cache          ?? null,
             };
         } catch (e) {
             error.value = e?.response?.data?.message ?? e.message ?? 'Deplete failed';

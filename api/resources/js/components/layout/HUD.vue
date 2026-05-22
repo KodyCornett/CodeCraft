@@ -32,17 +32,6 @@
 
         <div class="hud-divider" />
 
-        <!-- Cache -->
-        <div class="hud-item">
-            <span class="hud-key">CACHE</span>
-            <span class="hud-sep">:</span>
-            <span class="hud-val" :class="cacheClass">
-                {{ player.cache ?? 0 }}/{{ player.maxCache ?? 5 }}
-            </span>
-        </div>
-
-        <div class="hud-divider" />
-
         <!-- Tech Points -->
         <div class="hud-item">
             <span class="hud-key">TP</span>
@@ -112,7 +101,6 @@ const props = defineProps({
         type: Object,
         default: () => ({
             handle: 'UNKNOWN', uplink: 3, maxUplink: 3,
-            cache: 0, maxCache: 5,
             district: null, bountyLevel: 0, isOpenSeason: false,
             currentSS: 0, maxSS: 0, techPoints: 0,
         }),
@@ -142,14 +130,6 @@ const uplinkClass = computed(() => {
     if (pct <= 0.25) return 'val-uplink-crit';
     if (pct <= 0.5)  return 'val-uplink-low';
     return 'val-uplink-ok';
-});
-
-const cacheClass = computed(() => {
-    const pct = (props.player.cache ?? 0) / (props.player.maxCache ?? 5);
-    if (pct >= 1)    return 'val-cache-full';
-    if (pct >= 0.75) return 'val-cache-high';
-    if (pct >= 0.5)  return 'val-cache-mid';
-    return 'val-cache-ok';
 });
 
 const ssClass = computed(() => {
@@ -258,23 +238,6 @@ const flashClass = computed(() =>
     animation: crit-pulse 0.8s ease-in-out infinite;
 }
 
-/* ── Cache states — colour reflects ping exposure risk, not a lock ────────── */
-.val-cache-ok   { color: rgba(0, 255, 255, 0.6); }
-.val-cache-mid  { color: #FFB300; }
-.val-cache-high {
-    color: #FF6B00;
-    animation: cache-warn 1.5s ease-in-out infinite;
-}
-.val-cache-full {
-    /* Full cache = maximum ping exposure radius */
-    color: #FF3333;
-    animation: crit-pulse 0.6s ease-in-out infinite;
-}
-
-@keyframes cache-warn {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.5; }
-}
 
 /* ── Bounty section ───────────────────────────────────────────────────────── */
 .hud-item--bounty { gap: 6px; }

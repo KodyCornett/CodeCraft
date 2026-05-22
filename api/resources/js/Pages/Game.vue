@@ -176,7 +176,6 @@
                 :node="selectedNode"
                 :is-on-node="selectedNode?.canvasId === currentNodeId"
                 :resources="nodeResources"
-                :cache-full="cacheIsFull"
                 :commands="commands"
                 :current-s-s="player.currentSS"
                 :max-s-s="player.maxSS"
@@ -246,7 +245,7 @@ const {
 const { loading: mapLoading, fetchAll, getSpawnNode, updateNodeState, updateNodeResources, getByCanvasId, getNodesNear } = useMapData();
 
 // ── Deplete — fires after every successful hack ───────────────────────────────
-const { deplete, error: depleteError } = useDepletion(playerId);
+const { deplete } = useDepletion(playerId);
 
 // ── Bounty board — live leaderboard (players with ★1+ appear here) ───────────
 const { entries: bounties, startPolling: startBountyPolling, stopPolling: stopBountyPolling } = useBountyBoard(playerId);
@@ -386,18 +385,14 @@ function checkBountyEscalation(nodeIce = null) {
 // the star AND the higher the node's ICE, the tighter the ping circle gets.
 //
 //   effective_ice  = node.ice × (1 + bountyLevel)
-//   raw_range      = BASE_RANGE + player.os − effective_ice − cachePenalty
+//   raw_range      = BASE_RANGE + player.os − effective_ice
 //   ping_range     = clamp(raw_range, 0, MAX_RANGE_PER_STAR[bountyLevel])
-//
-// cachePenalty: full cache subtracts 3 from raw_range (widens the ring),
-// scaling linearly from 0 at empty to −3 at full. Hot data = hot signal.
 //
 // At ★5, even a low-ICE node (1 × 6 = 6) leaves very little OS headroom.
 // A high-ICE node (6 × 6 = 36) is instant pinpoint regardless of OS.
 // Commands like Signal Noise / Ghost Protocol are the only real escape at ★4–5.
 //
 const PING_BASE_RANGE      = 8;
-const PING_CACHE_PENALTY   = 3;   // max OS penalty at full cache
 const PING_TTL_MS          = 30_000;
 // Max radius (in abstract "node hops") per bounty star level
 const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 1];   // index = bountyLevel (0–5)
@@ -405,13 +400,10 @@ const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 1];   // index = bountyLevel (0–5
 const PING_PX_PER_HOP      = 38;
 const PING_MIN_RADIUS_PX   = 18;   // tight ring for a range-0 exact ping
 
-function calcPingRange(nodeIce, playerOs, bountyLevel, cache = 0, maxCache = 5) {
+function calcPingRange(nodeIce, playerOs, bountyLevel) {
     const lvl          = Math.min(bountyLevel, 5);
     const effectiveIce = nodeIce * (1 + lvl);
-    // Cache penalty scales from 0 (empty) to PING_CACHE_PENALTY (full)
-    const cachePct     = maxCache > 0 ? Math.min(cache / maxCache, 1) : 0;
-    const cachePenalty = Math.round(cachePct * PING_CACHE_PENALTY);
-    const raw          = PING_BASE_RANGE + playerOs - effectiveIce - cachePenalty;
+    const raw          = PING_BASE_RANGE + playerOs - effectiveIce;
     const cap          = PING_MAX_RANGE[lvl] ?? 1;
     return Math.max(0, Math.min(cap, raw));
 }
@@ -439,7 +431,7 @@ function firePing(reason = 'movement', nodeIce = null, type = 'real') {
         ?? 3;
 
     const os    = rig.value?.os ?? 2;
-    const range = calcPingRange(ice, os, player.value.bountyLevel, player.value.cache ?? 0, player.value.maxCache ?? 5);
+    const range = calcPingRange(ice, os, player.value.bountyLevel);
 
     const ping = {
         pingId:       Math.random().toString(36).slice(2),
@@ -492,8 +484,6 @@ function fireFalsePing(targetNode) {
         targetNode.ice ?? 3,
         rig.value?.os ?? 2,
         player.value.bountyLevel,
-        player.value.cache    ?? 0,
-        player.value.maxCache ?? 5,
     );
 
     const ping = {
@@ -586,18 +576,8 @@ function handlePlayerMoved(event) {
     }
 }
 
-// ── Cache + resource availability ─────────────────────────────────────────────
+// ── Resource availability ──────────────────────────────────────────────────────
 //
-// Cache fills by 1 per successful hack. Full cache locks all creds/tech hacking
-// until the player visits a Street Doc (matches server-side enforcement in
-// NodeController::deplete). Uplink hacks are exempt — server skips the cache
-// check for 'movement' resources. Full cache also maximises ping exposure radius.
-// maxCache = CPU + RAM effective (seeded from API via hydrateFromAuth).
-//
-const cacheIsFull = computed(() =>
-    (player.value.cache ?? 0) >= (player.value.maxCache ?? 5)
-);
-
 // Ticks every second so the replenish countdowns in NodeInfoBlock run smoothly.
 const _now = ref(Date.now());
 let   _nowTick = null;
@@ -626,12 +606,6 @@ const nodeResources = computed(() => {
         : null;
     // SS = 0 (critical failure) locks all hacking.
     const ssEmpty    = (player.value.currentSS ?? 1) <= 0;
-    // Full cache locks creds + tech hacking (uplink is exempt, matching server).
-    // Exception: when the player has no uplink at all they are stranded — allow
-    // hack attempts so onHackFailed's 1-escape-move mechanic can still fire.
-    const cacheAtCap   = (player.value.cache ?? 0) >= (player.value.maxCache ?? 5);
-    const isStranded   = (player.value.uplink ?? 0) === 0;
-    const cacheLocked  = cacheAtCap && !isStranded;
 
     const credSecsLeft     = secsUntilReplenish(node?.credLastHackedAt);
     const movementSecsLeft = secsUntilReplenish(node?.movementLastHackedAt);
@@ -644,19 +618,18 @@ const nodeResources = computed(() => {
 
     return {
         creds: {
-            available:    !!node && !ssEmpty && !cacheLocked && credReady,
+            available:    !!node && !ssEmpty && credReady,
             value:        node?.credValueBase ?? 750,
             replenishesIn: credReady ? 0 : credSecsLeft,
         },
         tech: {
             // Tech hacks draw from the same cred pool — share the depletion flag
-            available:    !!node && !ssEmpty && !cacheLocked && credReady,
+            available:    !!node && !ssEmpty && credReady,
             value:        Math.max(1, Math.floor((node?.credValueBase ?? 100) / 100)),
             replenishesIn: credReady ? 0 : credSecsLeft,
         },
         uplink: {
-            // Uplink is exempt from cache lock — server skips cache check for 'movement'
-            available:    !!node && !ssEmpty && movementReady,
+                available:    !!node && !ssEmpty && movementReady,
             value:        player.value.maxUplink ?? 3,
             replenishesIn: movementReady ? 0 : movementSecsLeft,
         },
@@ -785,16 +758,9 @@ async function onHackComplete({ resource, amount }) {
         firePing('hack', nodeIce);
     }
 
-    // Fill cache by 1 for every successful hack
-    player.value.cache = Math.min(
-        (player.value.cache ?? 0) + 1,
-        player.value.maxCache ?? 5
-    );
-
     applyHackReward(resource, amount);
     console.log(
         `[HACK] ${resource.toUpperCase()} +${amount}` +
-        ` | cache ${player.value.cache}/${player.value.maxCache}` +
         ` | bounty LVL ${player.value.bountyLevel}` +
         ` | hacks #${hackCount.value}`
     );
@@ -802,20 +768,6 @@ async function onHackComplete({ resource, amount }) {
     // Tell the backend — credits pocket_creds, records hack for bounty tracking
     if (nodeId) {
         const patch = await deplete(nodeId, resource, resource !== 'uplink' ? amount : 0);
-
-        if (!patch) {
-            // Server rejected the deplete — most likely cache is full (422).
-            // Roll back the optimistic cache increment we applied above.
-            player.value.cache = Math.max(0, (player.value.cache ?? 1) - 1);
-            console.warn('[HACK] Deplete rejected by server:', depleteError.value);
-
-            // If the player is now stranded (0 uplink), grant 1 escape move so
-            // they can reach a Street Doc — same safety net as onHackFailed.
-            if ((player.value.uplink ?? 0) === 0) {
-                player.value.uplink = 1;
-                console.warn('[HACK] Cache-full reject while stranded — granting 1 escape move.');
-            }
-        }
 
         if (patch) {
             updateNodeResources(nodeId, patch);
@@ -827,10 +779,6 @@ async function onHackComplete({ resource, amount }) {
             if (patch.currentUplink != null) {
                 player.value.uplink = patch.currentUplink;
             }
-            if (patch.cache != null) {
-                player.value.cache = patch.cache;
-            }
-
             // Surface bounty escalation from the server (if any)
             if (patch.bountyEvent?.type === 'bounty_marked') {
                 console.log(`[BOUNTY] Server confirmed: on the board at hack ${patch.player?.nodes_hacked_this_run}`);
@@ -851,8 +799,7 @@ async function onHackFailed({ resource, amount }) {
     const failedNode = activeHack.value?.node ?? selectedNode.value;
     activeHack.value = null;
 
-    // Failed breach: no rewards. Cache is server-authoritative (incremented by
-    // deplete() on success only) — do not update it here on a failed hack.
+    // Failed breach: no rewards.
 
     // If the player is stranded (uplink = 0), grant exactly 1 escape move.
     // They must use it to reach a node they can actually breach for full recovery.
@@ -865,10 +812,7 @@ async function onHackFailed({ resource, amount }) {
     // resolves node ICE and effective Firewall (including peripherals) itself.
     const nodeCanvasId = failedNode?.canvasId ?? failedNode?.id ?? null;
 
-    console.log(
-        `[HACK] Breach failed on ${nodeCanvasId}` +
-        (amount > 0 ? ` | partial yield: ${amount}` : '')
-    );
+    console.log(`[HACK] Breach failed on ${nodeCanvasId}`);
 
     // Sync SS with the server and handle critical failure if SS hits 0
     if (playerId.value && nodeCanvasId) {
@@ -923,7 +867,7 @@ function onHackAbort() {
 
 // ── CyberDoc banking — called from CyberDocStore via gameState injection ──────
 //
-// Banks all pocket_creds into the safe wallet, flushes cache, resets bounty.
+// Banks all pocket_creds into the safe wallet, resets bounty.
 // Returns the API response or null on failure.
 //
 async function bankCreds() {
@@ -946,12 +890,6 @@ async function bankCreds() {
         }
         player.value.pocketCreds = 0;
 
-        // Flush cache
-        player.value.cache = 0;
-        if (result.max_cache != null) {
-            player.value.maxCache = result.max_cache;
-        }
-
         // Restore uplink to full
         player.value.uplink = player.value.maxUplink;
 
@@ -972,37 +910,11 @@ async function bankCreds() {
         commands.value.forEach(cmd => { cmd.cooldown = false; cmd.movesLeft = 0; });
         activeEffects.value = {};
 
-        console.log('[CYBERDOC] Cache flushed. Bounty reset. Commands refreshed.');
+        console.log('[CYBERDOC] Bounty reset. Commands refreshed.');
         return result;
     } catch (e) {
         console.error('[CYBERDOC] Bank failed:', e?.response?.data?.message ?? e.message);
         return null;
-    }
-}
-
-// Flushes cache only — bounty kept, costs 30 pocket creds × current cache.
-// Subject to a 10-minute cooldown per CyberDoc node.
-//
-async function flushCache() {
-    const pid      = playerId.value;
-    const canvasId = currentNodeId.value;
-    if (!pid || !canvasId) return null;
-
-    try {
-        const res    = await axios.post('/api/cyberdoc/flush', {
-            cyberdoc_canvas_id: canvasId,
-        });
-        const result = res.data;
-
-        player.value.cache        = 0;
-        player.value.pocketCreds  = result.pocket_creds ?? player.value.pocketCreds;
-
-        console.log(`[CYBERDOC] Cache flushed. Cost: ${result.cost} ₡`);
-        return result;
-    } catch (e) {
-        const msg = e?.response?.data?.message ?? e.message;
-        console.error('[CYBERDOC] Flush failed:', msg);
-        return { error: msg };
     }
 }
 
@@ -1332,7 +1244,7 @@ function applyPvpResult(result, opponentHandle) {
 }
 
 // ── Provide game state to SPLICE browser pages ────────────────────────────────
-provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, flushCache, currentNodeId, useConsumable });
+provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, currentNodeId, useConsumable });
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {

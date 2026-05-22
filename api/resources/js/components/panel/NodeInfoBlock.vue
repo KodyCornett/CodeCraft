@@ -60,12 +60,6 @@
             <div v-else class="ni-resources">
                 <div class="ni-res-label">NODE RESOURCES</div>
 
-                <!-- Cache-full ping exposure warning -->
-                <div v-if="cacheFull" class="ni-cache-full">
-                    <span class="ni-cache-icon">◈</span>
-                    CACHE FULL — PING EXPOSURE MAXIMUM
-                </div>
-
                 <div class="ni-res-row">
                     <span class="ni-res-key">CREDS</span>
                     <span v-if="resources.creds.replenishesIn > 0" class="ni-res-val ni-res--depleted">
@@ -156,7 +150,6 @@ import { getNodeIdentity } from '@/composables/useNodeIdentity.js';
 const props = defineProps({
     node:        { type: Object,  default: null },
     isOnNode:    { type: Boolean, default: false },
-    cacheFull:   { type: Boolean, default: false },
     nodePlayers: { type: Array,   default: () => [] },
     // Active hack traces left on this node — see useNodeTraces composable
     traces:      { type: Array,   default: () => [] },
@@ -247,27 +240,6 @@ const iceColorClass = computed(() => {
 .ni-res--tech   { color:#7DF9FF; text-shadow:0 0 8px rgba(125,249,255,.7); }
 .ni-res--uplink { color:#00FFFF; text-shadow:0 0 8px rgba(0,255,255,.7); }
 
-.ni-cache-full {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
-    padding: 5px 8px;
-    background: rgba(255, 51, 51, 0.08);
-    border: 1px solid rgba(255, 51, 51, 0.3);
-    font-size: 7px;
-    color: #FF3333;
-    letter-spacing: 0.12em;
-    animation: cache-lock-pulse 1.2s ease-in-out infinite;
-}
-.ni-cache-icon {
-    font-size: 8px;
-    opacity: 0.7;
-}
-@keyframes cache-lock-pulse {
-    0%, 100% { border-color: rgba(255, 51, 51, 0.3); }
-    50%       { border-color: rgba(255, 51, 51, 0.7); }
-}
 
 .ni-hack-btn {
     background:transparent; border:1px solid rgba(0,255,136,.3); color:rgba(0,255,136,.65);

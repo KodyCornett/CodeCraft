@@ -55,7 +55,6 @@ class PlayerController extends Controller
                 // Economy
                 'wallet_creds'          => (int)  ($player->wallet_creds  ?? 0),
                 'pocket_creds'          => (int)  ($player->pocket_creds  ?? 0),
-                'cache'                 => (int)  ($player->cache         ?? 0),
                 'tech_points'           => (float) ($player->tech_points   ?? 0),
                 // Active command effects (move-countdown, restored on reload)
                 'active_effects'        => $player->active_effects ?? (object) [],

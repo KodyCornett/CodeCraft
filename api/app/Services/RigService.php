@@ -298,7 +298,6 @@ class RigService
 
         if ($player) {
             $player->pocket_creds          = 0;
-            $player->cache                 = 0;
             $player->bounty_level          = 0;
             $player->bounty_multiplier     = 1.0;
             $player->is_open_season        = false;

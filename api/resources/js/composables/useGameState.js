@@ -28,10 +28,6 @@ export function useGameState() {
         uplink:              0,
         maxUplink:           0,
 
-        // Cache — fills per hack, locked when full until Street Doc flush.
-        cache:               0,
-        maxCache:            0,
-
         // Tech
         techPoints:          0,
 
@@ -118,7 +114,6 @@ export function useGameState() {
             player.value.currentNodeCanvasId = authPlayer.current_node_canvas_id  ?? null;
             player.value.creds               = authPlayer.wallet_creds            ?? 0;
             player.value.pocketCreds         = authPlayer.pocket_creds            ?? 0;
-            player.value.cache               = authPlayer.cache                   ?? 0;
             player.value.techPoints          = authPlayer.tech_points             ?? 0;
             player.value.bountyLevel         = authPlayer.bounty_level            ?? 0;
             player.value.bountyMultiplier    = authPlayer.bounty_multiplier       ?? 1.0;
@@ -149,10 +144,6 @@ export function useGameState() {
             rig.value.uplink       = maxUplink;
             player.value.uplink    = curUplink;     // remaining this run
             player.value.maxUplink = maxUplink;     // chassis maximum
-
-            // Cache = cpu + ram effective
-            const maxCache         = rig.value.cpu + rig.value.ram;
-            player.value.maxCache  = maxCache;
 
             // SS
             player.value.currentSS = authRig.current_ss ?? 0;

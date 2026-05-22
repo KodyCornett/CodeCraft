@@ -544,8 +544,8 @@ const gainDisplay = computed(() => {
 // ─── Reward formula ───────────────────────────────────────────────────────────
 //
 // Rewards are intentionally lean — skill favoured over gear grinding.
-// Payout scales with ICE (harder node = more value) and score ratio
-// (partial credit for incomplete sequences: 3/4 threshold = 75% payout).
+// Full payout on success; zero on failure.
+// Payout scales with ICE (harder node = more value).
 // Tech Points scale with ICE level — 1 TP at ICE 3, +1 per ICE tier above that.
 // All action nodes reward tech; harder nodes are more efficient to farm.
 //
@@ -598,9 +598,6 @@ const outcomeSuccessMsg = computed(() => {
 });
 
 const outcomeFailMsg = computed(() => {
-    if (rewardAmount.value > 0) {
-        return `THRESHOLD NOT MET — PARTIAL YIELD: ${rewardAmount.value} ${props.resource.toUpperCase()} SALVAGED`;
-    }
     return 'THRESHOLD NOT MET — ICE HELD — NO YIELD';
 });
 
@@ -635,8 +632,7 @@ function onDismiss() {
     if (status.value === 'success') {
         emit('complete', { resource: props.resource, amount: rewardAmount.value });
     } else {
-        // Failed breach still yields partial reward for sequences completed
-        emit('failed', { resource: props.resource, amount: rewardAmount.value });
+        emit('failed', { resource: props.resource, amount: 0 });
     }
 }
 

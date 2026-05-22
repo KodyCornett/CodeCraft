@@ -19,7 +19,7 @@ class CyberDocController extends Controller
      * POST /api/cyberdoc/bank
      *
      * Banks all pocket_creds into the player's safe wallet.
-     * Resets bounty run counters and clears the cache.
+     * Resets bounty run counters.
      *
      * Body: { player_id }
      */
@@ -34,12 +34,6 @@ class CyberDocController extends Controller
         $result = $this->cyberDocService->bankCreds($player, $cyberdocCanvasId);
         $fresh  = $player->fresh();
 
-        $rig      = $this->rigService->getRigForPlayer($fresh);
-        $stats    = $rig ? $this->rigService->effectiveStats($rig, $fresh) : null;
-        $maxCache = $stats
-            ? ($stats['cpu']['effective'] + $stats['ram']['effective'])
-            : null;
-
         return response()->json([
             'message'       => 'Creds banked.',
             'pocket_banked' => $result['pocket_banked'],
@@ -51,42 +45,6 @@ class CyberDocController extends Controller
                 'pocket_creds'      => $fresh->pocket_creds,
                 'is_limping'        => $fresh->is_limping,
             ],
-            'max_cache' => $maxCache,
-        ]);
-    }
-
-    /**
-     * POST /api/cyberdoc/flush
-     *
-     * Flush the player's cache without resetting bounty or banking creds.
-     * Costs 30 pocket creds × current cache amount.
-     * Subject to a 10-minute cooldown per CyberDoc node.
-     *
-     * Body: { cyberdoc_canvas_id: string }
-     */
-    public function flush(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'cyberdoc_canvas_id' => 'required|string',
-        ]);
-
-        $player = Player::where('user_id', $request->user()->id)->first();
-        if ($player === null) {
-            return response()->json(['message' => 'Player not found.'], 404);
-        }
-
-        try {
-            $result = $this->cyberDocService->flushCache($player, $data['cyberdoc_canvas_id']);
-        } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        return response()->json([
-            'message'       => 'Cache flushed.',
-            'cache_flushed' => $result['cache_flushed'],
-            'cost'          => $result['cost'],
-            'pocket_creds'  => $result['pocket_creds'],
-            'cache'         => 0,
         ]);
     }
 

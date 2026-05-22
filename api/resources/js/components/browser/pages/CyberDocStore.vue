@@ -42,33 +42,6 @@
             </Transition>
         </div>
 
-        <!-- ── Cache flush strip ──────────────────────────────────────────────── -->
-        <div class="flush-strip" :class="{ 'flush-strip--hot': playerCache > 0 }">
-            <div class="flush-strip-left">
-                <span class="flush-label">CACHE</span>
-                <span class="flush-cache" :class="playerCache >= playerMaxCache ? 'cache--full' : 'cache--ok'">
-                    {{ playerCache }}/{{ playerMaxCache }}
-                </span>
-                <span v-if="playerCache >= playerMaxCache" class="flush-warn">PING EXPOSED</span>
-                <span v-else-if="flushCooldownSecs > 0" class="flush-cooldown">
-                    COOLDOWN {{ Math.ceil(flushCooldownSecs / 60) }}m
-                </span>
-            </div>
-            <button
-                class="flush-btn"
-                :disabled="playerCache === 0 || flushing || flushCooldownSecs > 0"
-                @click="onFlushCache"
-            >
-                <span v-if="flushing">FLUSHING…</span>
-                <span v-else-if="flushCooldownSecs > 0">ON COOLDOWN</span>
-                <span v-else-if="playerCache === 0">CACHE CLEAR</span>
-                <span v-else>[ FLUSH CACHE — {{ flushCost }} ₡ ]</span>
-            </button>
-            <Transition name="bank-confirm">
-                <span v-if="flushConfirm" class="flush-confirm">✓ CACHE FLUSHED</span>
-            </Transition>
-        </div>
-
         <div class="store-category-bar">
             <button
                 v-for="cat in categories"
@@ -451,27 +424,6 @@ const currentNodeId = gameState?.currentNodeId  ?? ref(null);
 const playerCreds       = computed(() => player.value?.creds       ?? 0);
 const playerPocketCreds = computed(() => player.value?.pocketCreds ?? 0);
 const playerTechPoints  = computed(() => player.value?.techPoints  ?? 0);
-const playerCache       = computed(() => player.value?.cache       ?? 0);
-const playerMaxCache    = computed(() => player.value?.maxCache     ?? 5);
-
-// Flush cost = 30 creds × current cache
-const FLUSH_COST_PER = 30;
-const flushCost = computed(() => playerCache.value * FLUSH_COST_PER);
-
-// Cooldown — counts down from 600s after a flush or extract at this node.
-// Stored locally; resets if the page reloads (acceptable — server enforces it).
-const flushCooldownSecs = ref(0);
-let   _cooldownInterval = null;
-
-function startCooldown() {
-    flushCooldownSecs.value = 600;
-    clearInterval(_cooldownInterval);
-    _cooldownInterval = setInterval(() => {
-        flushCooldownSecs.value = Math.max(0, flushCooldownSecs.value - 1);
-        if (flushCooldownSecs.value === 0) clearInterval(_cooldownInterval);
-    }, 1000);
-}
-
 // ── Banking ───────────────────────────────────────────────────────────────────
 const banking     = ref(false);
 const bankConfirm = ref(null);
@@ -487,29 +439,7 @@ async function onBankCreds() {
     banking.value = false;
     if (result !== null) {
         bankConfirm.value = banked;
-        startCooldown();
         setTimeout(() => { bankConfirm.value = null; }, 3000);
-    }
-}
-
-// ── Cache flush ───────────────────────────────────────────────────────────────
-const flushing     = ref(false);
-const flushConfirm = ref(false);
-
-async function onFlushCache() {
-    if (flushing.value || playerCache.value === 0 || flushCooldownSecs.value > 0) return;
-    flushing.value = true;
-    flushConfirm.value = false;
-
-    const result = await gameState?.flushCache?.();
-
-    flushing.value = false;
-    if (result && !result.error) {
-        flushConfirm.value = true;
-        startCooldown();
-        setTimeout(() => { flushConfirm.value = false; }, 3000);
-    } else if (result?.error) {
-        console.warn('[CYBERDOC] Flush error:', result.error);
     }
 }
 
@@ -557,7 +487,7 @@ const rigVersionLabel = computed(() => {
 // Counters: Ghost outruns Breaker → Breaker overwhelms Vault → Vault tanks Ghost.
 //
 //  Ghost   — High Uplink (7) + High OS:  mobile, hard to locate, long runs
-//  Breaker — High CPU + High RAM:        fast node cracking, massive cache pool (10)
+//  Breaker — High CPU + High RAM:        fast node cracking, cracks high-ICE districts early
 //  Vault   — High Firewall + High Storage: PvP durability, huge command loadout
 const NULLTEK_CHASSIS = [
     {
@@ -581,8 +511,7 @@ const NULLTEK_CHASSIS = [
         brand:    'NullTek',
         build:    'breaker',
         tier:     2,
-        tagline:  'Max cache. Max cracks. Outpace every node on the grid.',
-        // CPU 5 + RAM 5 = 10 cache at base (double BlackHat). Cracks high-ICE districts early.
+        tagline:  'Max CPU. Max RAM. Outpace every node on the grid.',
         base: { cpu: 5, ram: 5, os: 2, storage: 3, firewall: 1, uplink: 5 },
         caps: { cpu: 9, ram: 8, os: 5, storage: 6, firewall: 4, uplink: 5, pointCap: 18 },
         portSlots: 2,
@@ -660,7 +589,6 @@ async function onPurchaseChassis(chassis) {
         player.value.techPoints = r.tech_points;
         player.value.uplink     = r.uplink;
         player.value.maxUplink  = r.uplink;
-        player.value.maxCache   = r.stats.cpu + r.stats.ram;
         player.value.currentSS  = r.current_ss;
         player.value.maxSS      = r.max_ss;
 
@@ -878,10 +806,6 @@ async function onUpgradeStat(stat, cost) {
         player.value.creds      = res.data.wallet_creds ?? player.value.creds;
         player.value.techPoints = res.data.tech_points  ?? player.value.techPoints;
 
-        // Recompute cache when CPU or RAM changes
-        if (stat === 'cpu' || stat === 'ram') {
-            player.value.maxCache = rig.value.cpu + rig.value.ram;
-        }
     } catch (e) {
         console.error('[STATS] Upgrade failed:', e?.response?.data?.message ?? e.message);
     }
@@ -1038,77 +962,6 @@ function onResetCooldowns() {
 }
 .bank-confirm-enter-active, .bank-confirm-leave-active { transition: opacity 0.3s; }
 .bank-confirm-enter-from, .bank-confirm-leave-to       { opacity: 0; }
-
-/* ── Cache flush strip ────────────────────────────────────────────────────── */
-.flush-strip {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
-    border-bottom: 1px solid rgba(0, 200, 255, 0.1);
-    background: transparent;
-    transition: background 0.2s, border-color 0.2s;
-}
-.flush-strip--hot {
-    background: rgba(0, 200, 255, 0.03);
-    border-bottom-color: rgba(0, 200, 255, 0.15);
-}
-.flush-strip-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-}
-.flush-label {
-    font-size: 8px;
-    color: rgba(0, 200, 255, 0.5);
-    letter-spacing: 0.12em;
-    flex-shrink: 0;
-}
-.flush-cache {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    flex-shrink: 0;
-}
-.cache--ok   { color: rgba(0, 200, 255, 0.7); }
-.cache--full { color: #FF3333; animation: risk-pulse 1s ease-in-out infinite; }
-.flush-warn {
-    font-size: 8px;
-    color: #FF3333;
-    letter-spacing: 0.1em;
-}
-.flush-cooldown {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.7);
-    letter-spacing: 0.1em;
-}
-.flush-btn {
-    background: transparent;
-    border: 1px solid rgba(0, 200, 255, 0.25);
-    color: rgba(0, 200, 255, 0.7);
-    font-family: inherit;
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    padding: 5px 12px;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.flush-btn:hover:not(:disabled) {
-    background: rgba(0, 200, 255, 0.07);
-    border-color: rgba(0, 200, 255, 0.6);
-    color: #00C8FF;
-}
-.flush-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-.flush-confirm {
-    font-size: 8px;
-    color: #00C8FF;
-    letter-spacing: 0.1em;
-    flex-shrink: 0;
-}
 
 /* ── Category bar ─────────────────────────────────────────────────────────── */
 .store-category-bar {

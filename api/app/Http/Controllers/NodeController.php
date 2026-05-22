@@ -210,23 +210,6 @@ class NodeController extends Controller
 
         $player = Player::where('user_id', $request->user()->id)->first();
 
-        // Pre-flight: enforce server-side cache limit.
-        // Cache fills by 1 per hack and locks all hacking when full (cache >= cpu + ram).
-        // This must be checked server-side so a bypassing client cannot ignore the cap.
-        // Movement (uplink) hacks are exempt — they restore the uplink pool, not the cache.
-        if ($player !== null && $data['resource'] !== 'movement') {
-            $rig = $player->rig()->with('chassis')->first();
-            if ($rig !== null) {
-                $stats    = $this->rigService->effectiveStats($rig, $player);
-                $maxCache = $stats['cpu']['effective'] + $stats['ram']['effective'];
-                if ((int) ($player->cache ?? 0) >= $maxCache) {
-                    return response()->json([
-                        'message' => 'Cache full — visit a Street Doc to bank your run before hacking again.',
-                    ], 422);
-                }
-            }
-        }
-
         // All mutations run in a transaction with a pessimistic lock on the
         // node row, preventing double-deplete from a rapid double-tap or retry.
         [
@@ -288,10 +271,6 @@ class NodeController extends Controller
                     }
                 }
 
-                // Every successful hack fills cache by 1 (reset to 0 at CyberDoc bank)
-                $player->cache = (int) ($player->cache ?? 0) + 1;
-                $player->save();
-
                 $pocketAfter = (int)   ($player->pocket_creds ?? 0);
                 $techAfter   = (float) ($player->tech_points  ?? 0);
 
@@ -325,7 +304,6 @@ class NodeController extends Controller
             'player' => $player ? [
                 'pocket_creds'          => $pocketAfter,
                 'tech_points'           => $techAfter,
-                'cache'                 => (int) ($player->cache ?? 0),
                 'current_uplink'        => $currentUplink,
                 'nodes_hacked_this_run' => $player->nodes_hacked_this_run,
                 'bounty_level'          => $player->bounty_level,

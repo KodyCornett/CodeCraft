@@ -21,7 +21,6 @@
                 :node="node"
                 :is-on-node="isOnNode"
                 :resources="resources"
-                :cache-full="cacheFull"
                 :node-players="nodePlayers"
                 :traces="traces"
                 @hack="$emit('hack', $event)"
@@ -59,7 +58,6 @@ defineProps({
     node:        { type: Object,  default: null },
     isOnNode:    { type: Boolean, default: false },
     resources:   { type: Object,  default: null },
-    cacheFull:   { type: Boolean, default: false },
     nodePlayers: { type: Array,   default: () => [] },
     traces:      { type: Array,   default: () => [] },
 

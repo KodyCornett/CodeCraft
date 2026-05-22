@@ -18,11 +18,11 @@
                     </div>
                     <div class="g-table-row">
                         <span class="stat-name stat--cpu">CPU</span>
-                        <span>Node ICE gate — cannot attempt nodes with ICE more than 4 above your CPU. PvP damage multiplier. GridBreach sequence length. Command level cap — the highest command level you can equip equals your effective CPU. Contributes to Cache pool.</span>
+                        <span>Node ICE gate — cannot attempt nodes with ICE more than 4 above your CPU. PvP damage multiplier. GridBreach sequence length. Command level cap — the highest command level you can equip equals your effective CPU.</span>
                     </div>
                     <div class="g-table-row">
                         <span class="stat-name stat--ram">RAM</span>
-                        <span>Active loadout slots — effective RAM = max commands running simultaneously. GridBreach game length — base 30s + (RAM × 5s). Contributes to Cache pool.</span>
+                        <span>Active loadout slots — effective RAM = max commands running simultaneously. GridBreach game length — base 30s + (RAM × 5s).</span>
                     </div>
                     <div class="g-table-row">
                         <span class="stat-name stat--os">OS</span>
@@ -43,20 +43,6 @@
                 </div>
             </section>
 
-            <!-- ── Cache ─────────────────────────────────────────────────────── -->
-            <section class="g-section">
-                <div class="g-section-title">CACHE POOL</div>
-                <div class="g-formula">
-                    Cache Pool = Effective CPU + Effective RAM
-                </div>
-                <div class="g-prose">
-                    Every hack costs 1 Cache. Full cache locks all hacking until you clean your system. Visit a <span class="g-highlight">CyberDoc</span> for a full wipe, or use a <span class="g-highlight">Defrag Injection</span> consumable for a partial clear in the field.
-                </div>
-                <div class="g-example">
-                    BlackHat v1.0 — CPU 3 + RAM 2 = Cache pool of 5
-                </div>
-            </section>
-
             <!-- ── Effective Stat ─────────────────────────────────────────────── -->
             <section class="g-section">
                 <div class="g-section-title">EFFECTIVE STAT FORMULA</div>
@@ -72,7 +58,7 @@
             <section class="g-section">
                 <div class="g-section-title">ICE vs CPU — HACK DIFFICULTY</div>
                 <div class="g-prose">
-                    Each node has an ICE rating. Your CPU is compared against it to determine difficulty. Every hack costs 1 Cache — tough nodes burn more Cache and widen your exposure window.
+                    Each node has an ICE rating. Your CPU is compared against it to determine difficulty.
                 </div>
                 <div class="g-table">
                     <div class="g-table-row g-table-head">

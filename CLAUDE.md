@@ -147,16 +147,9 @@ When RAM degrades below active command count, `RigService::enforceRamCap()` deac
 ```
 PvE damage  = max(1, nodeICE − playerFirewall)
 PvP damage  = max(15, 20 + (winnerCPU × 5) − (loserFirewall × 5))
-Repair cost = floor((missingSS / maxSS) × missingSS × 25)
+Repair cost = floor((missingSS / maxSS) × 600)
+             → 150 ₡ per 25% SS lost (e.g. 25% = 150₡, 50% = 300₡, 100% = 600₡)
 ```
-
-### Cache
-
-```
-max_cache = effective_cpu + effective_ram
-```
-
-Each successful hack fills cache by 1. Full cache locks all hacking until Street Doc visit.
 
 ### Uplink
 

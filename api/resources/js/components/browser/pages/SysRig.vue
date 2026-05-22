@@ -50,22 +50,6 @@
                     <span class="live-status" :class="uplinkClass">{{ uplinkStatus }}</span>
                 </div>
 
-                <!-- Cache -->
-                <div class="live-row">
-                    <span class="live-key">CACHE</span>
-                    <div class="live-segs">
-                        <span
-                            v-for="i in (player.maxCache ?? 5)"
-                            :key="i"
-                            class="live-seg"
-                            :class="i <= (player.cache ?? 0) ? cacheSegClass : 'seg--off'"
-                        />
-                    </div>
-                    <span class="live-val" :class="cacheClass">
-                        {{ player.cache ?? 0 }}<span class="live-unit">/{{ player.maxCache ?? 5 }}</span>
-                    </span>
-                    <span class="live-status" :class="cacheClass">{{ cacheStatus }}</span>
-                </div>
             </section>
 
             <div class="rig-divider" />
@@ -211,7 +195,7 @@ defineProps({ url: { type: String, default: '' } });
 
 const gameState = inject('gameState', null);
 const rig    = gameState?.rig    ?? ref({ os:0, ram:0, cpu:0, storage:0, firewall:0, uplink:3, peripherals:[], portSlots:0, chassis:'UNKNOWN', tier:1, caps:{}, investedPoints:{} });
-const player = gameState?.player ?? ref({ uplink:3, maxUplink:3, cache:0, maxCache:5 });
+const player = gameState?.player ?? ref({ uplink:3, maxUplink:3 });
 
 // ── Tier label ────────────────────────────────────────────────────────────────
 const TIER_LABELS = ['', 'I', 'II', 'III', 'IV', 'V'];
@@ -244,27 +228,6 @@ const uplinkStatus = computed(() => {
     if (u <= 0) return 'DEPLETED';
     if (u <= 1) return 'CRITICAL';
     return 'NOMINAL';
-});
-
-const cacheClass = computed(() => {
-    const pct = (player.value.cache ?? 0) / (player.value.maxCache ?? 5);
-    if (pct >= 1)    return 'live--crit';
-    if (pct >= 0.75) return 'live--high';
-    if (pct >= 0.4)  return 'live--mid';
-    return 'live--ok';
-});
-const cacheSegClass = computed(() => {
-    const pct = (player.value.cache ?? 0) / (player.value.maxCache ?? 5);
-    if (pct >= 1)    return 'seg--cache-full';
-    if (pct >= 0.75) return 'seg--cache-high';
-    return 'seg--cache';
-});
-const cacheStatus = computed(() => {
-    const pct = (player.value.cache ?? 0) / (player.value.maxCache ?? 5);
-    if (pct >= 1)    return 'FULL — VISIT CYBERDOC';
-    if (pct >= 0.75) return 'NEAR CAPACITY';
-    if (pct > 0)     return 'IN USE';
-    return 'CLEAR';
 });
 
 // ── Core stats ────────────────────────────────────────────────────────────────
@@ -472,9 +435,6 @@ function toggleStat(key) {
 
 /* Live segment colours */
 .seg--uplink  { background: #00FF88; box-shadow: 0 0 4px rgba(0,255,136,0.5); }
-.seg--cache   { background: #FFB300; box-shadow: 0 0 4px rgba(255,179,0,0.4); }
-.seg--cache-high { background: #FF6B00; box-shadow: 0 0 4px rgba(255,107,0,0.5); }
-.seg--cache-full { background: #FF3333; box-shadow: 0 0 5px rgba(255,51,51,0.6); animation: seg-crit 0.5s steps(1) infinite; }
 .seg--off     { background: rgba(0,255,255,0.07); }
 
 @keyframes seg-crit { 0%,49%{opacity:1} 50%,100%{opacity:0.3} }

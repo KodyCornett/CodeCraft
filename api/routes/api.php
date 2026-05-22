@@ -93,7 +93,6 @@ Route::middleware('auth:sanctum')->group(function () {
 // ---------------------------------------------------------------------------
 
     Route::post('/cyberdoc/bank',            [CyberDocController::class, 'bank']);
-    Route::post('/cyberdoc/flush',           [CyberDocController::class, 'flush']);
     Route::post('/cyberdoc/repair',          [CyberDocController::class, 'repair']);
     Route::post('/cyberdoc/install',         [CyberDocController::class, 'install']);
     Route::post('/cyberdoc/loadout',         [CyberDocController::class, 'loadout']);

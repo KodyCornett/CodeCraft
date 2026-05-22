@@ -20,15 +20,14 @@ use RuntimeException;
  *  - Hardware encrypts must be installed here to take effect.
  *  - Stat reallocation moves 1 level from one stat to another for a cred fee.
  *    It does NOT trigger the ring tax (it's a direct swap, not an upgrade).
- *  - bankCreds banks all pocket_creds into the wallet, resets bounty counters,
- *    and clears the cache. This is the extract operation.
+ *  - bankCreds banks all pocket_creds into the wallet, resets bounty counters.
+ *    This is the extract operation.
  */
 class CyberDocService
 {
     /** Minimum level any stat may be reduced to (mirrors RigService::MIN_LEVEL). */
     private const MIN_LEVEL             = 1;
     private const VALID_STATS           = ['os', 'ram', 'cpu', 'storage', 'firewall'];
-    private const CACHE_FLUSH_COST_PER  = 30;   // pocket creds per cache point
     private const CYBERDOC_COOLDOWN_SEC = 600;  // 10 minutes
 
     public function __construct(
@@ -44,7 +43,7 @@ class CyberDocService
      * Bank all pocket_creds into the player's safe wallet.
      * Resets bounty run counters and clears the run state.
      *
-     * All mutations (pocket zero, wallet credit, cache clear, uplink restore)
+     * All mutations (pocket zero, wallet credit, uplink restore)
      * run inside a single DB transaction so a mid-operation failure cannot
      * permanently destroy the player's pocket without crediting the wallet.
      *
@@ -67,9 +66,6 @@ class CyberDocService
                 }
             }
 
-            // Clear the hack cache so the next run starts unblocked.
-            $player->cache = 0;
-
             // Record cooldown for this CyberDoc if a canvas ID was provided.
             if ($cyberdocCanvasId !== null) {
                 $this->recordCooldown($player, $cyberdocCanvasId);
@@ -86,49 +82,6 @@ class CyberDocService
         });
 
         return ['pocket_banked' => $pocketBanked];
-    }
-
-    // -------------------------------------------------------------------------
-    // Cache Flush — clear cache only, keep bounty, costs pocket creds
-    // -------------------------------------------------------------------------
-
-    /**
-     * Flush the player's cache without resetting bounty or banking creds.
-     *
-     * Cost: 30 pocket creds × current cache amount.
-     * Cooldown: 10 minutes per CyberDoc node (tracked by canvas_id).
-     *
-     * Returns ['cache_flushed' => int, 'cost' => int, 'pocket_creds' => int].
-     *
-     * @throws RuntimeException         When the CyberDoc is on cooldown or pocket creds insufficient.
-     */
-    public function flushCache(Player $player, string $cyberdocCanvasId): array
-    {
-        $this->assertCooldown($player, $cyberdocCanvasId);
-
-        $currentCache = (int) ($player->cache ?? 0);
-        $cost         = $currentCache * self::CACHE_FLUSH_COST_PER;
-
-        if ($cost > 0 && ($player->pocket_creds ?? 0) < $cost) {
-            throw new RuntimeException(
-                "Insufficient pocket creds. Need {$cost}, have " . ($player->pocket_creds ?? 0) . '.'
-            );
-        }
-
-        DB::transaction(function () use ($player, $cyberdocCanvasId, $cost) {
-            if ($cost > 0) {
-                $player->pocket_creds = max(0, (int) ($player->pocket_creds ?? 0) - $cost);
-            }
-            $player->cache = 0;
-            $this->recordCooldown($player, $cyberdocCanvasId);
-            $player->save();
-        });
-
-        return [
-            'cache_flushed' => $currentCache,
-            'cost'          => $cost,
-            'pocket_creds'  => (int) ($player->fresh()->pocket_creds ?? 0),
-        ];
     }
 
     /**
@@ -214,8 +167,14 @@ class CyberDocService
     /**
      * Calculate the cred cost to repair the player's SS.
      *
-     * Nonlinear formula — deeper damage = more expensive per SS point:
-     *   cost = floor((missing / max) × missing × 25)
+     * Linear formula — 150 ₡ per 25% of max SS lost:
+     *   cost = floor((missing / max) × 600)
+     *
+     * Examples (max_ss = 100):
+     *   25 missing (25%) → 150 ₡
+     *   50 missing (50%) → 300 ₡
+     *   75 missing (75%) → 450 ₡
+     *  100 missing (100%) → 600 ₡
      *
      * @throws RuntimeException When the player has no rig.
      */
@@ -231,7 +190,7 @@ class CyberDocService
 
         if ($missingSs === 0 || $maxSs === 0) return 0;
 
-        return (int) floor(($missingSs / $maxSs) * $missingSs * 25);
+        return (int) floor(($missingSs / $maxSs) * 600);
     }
 
     // -------------------------------------------------------------------------
