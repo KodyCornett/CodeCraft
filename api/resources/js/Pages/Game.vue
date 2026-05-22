@@ -246,7 +246,7 @@ const {
 const { loading: mapLoading, fetchAll, getSpawnNode, updateNodeState, updateNodeResources, getByCanvasId, getNodesNear } = useMapData();
 
 // ── Deplete — fires after every successful hack ───────────────────────────────
-const { deplete } = useDepletion(playerId);
+const { deplete, error: depleteError } = useDepletion(playerId);
 
 // ── Bounty board — live leaderboard (players with ★1+ appear here) ───────────
 const { entries: bounties, startPolling: startBountyPolling, stopPolling: stopBountyPolling } = useBountyBoard(playerId);
@@ -588,8 +588,10 @@ function handlePlayerMoved(event) {
 
 // ── Cache + resource availability ─────────────────────────────────────────────
 //
-// Cache fills by 1 per successful hack. Full cache does NOT lock hacking —
-// instead it maximises the player's ping exposure radius.
+// Cache fills by 1 per successful hack. Full cache locks all creds/tech hacking
+// until the player visits a Street Doc (matches server-side enforcement in
+// NodeController::deplete). Uplink hacks are exempt — server skips the cache
+// check for 'movement' resources. Full cache also maximises ping exposure radius.
 // maxCache = CPU + RAM effective (seeded from API via hydrateFromAuth).
 //
 const cacheIsFull = computed(() =>
@@ -622,8 +624,14 @@ const nodeResources = computed(() => {
     const node = selectedNode.value?.canvasId
         ? (getByCanvasId(selectedNode.value.canvasId) ?? selectedNode.value)
         : null;
-    // SS = 0 (critical failure) locks all hacking. Cache no longer blocks.
-    const full = (player.value.currentSS ?? 1) <= 0;
+    // SS = 0 (critical failure) locks all hacking.
+    const ssEmpty    = (player.value.currentSS ?? 1) <= 0;
+    // Full cache locks creds + tech hacking (uplink is exempt, matching server).
+    // Exception: when the player has no uplink at all they are stranded — allow
+    // hack attempts so onHackFailed's 1-escape-move mechanic can still fire.
+    const cacheAtCap   = (player.value.cache ?? 0) >= (player.value.maxCache ?? 5);
+    const isStranded   = (player.value.uplink ?? 0) === 0;
+    const cacheLocked  = cacheAtCap && !isStranded;
 
     const credSecsLeft     = secsUntilReplenish(node?.credLastHackedAt);
     const movementSecsLeft = secsUntilReplenish(node?.movementLastHackedAt);
@@ -636,18 +644,19 @@ const nodeResources = computed(() => {
 
     return {
         creds: {
-            available:    !!node && !full && credReady,
+            available:    !!node && !ssEmpty && !cacheLocked && credReady,
             value:        node?.credValueBase ?? 750,
             replenishesIn: credReady ? 0 : credSecsLeft,
         },
         tech: {
             // Tech hacks draw from the same cred pool — share the depletion flag
-            available:    !!node && !full && credReady,
+            available:    !!node && !ssEmpty && !cacheLocked && credReady,
             value:        Math.max(1, Math.floor((node?.credValueBase ?? 100) / 100)),
             replenishesIn: credReady ? 0 : credSecsLeft,
         },
         uplink: {
-            available:    !!node && !full && movementReady,
+            // Uplink is exempt from cache lock — server skips cache check for 'movement'
+            available:    !!node && !ssEmpty && movementReady,
             value:        player.value.maxUplink ?? 3,
             replenishesIn: movementReady ? 0 : movementSecsLeft,
         },
@@ -793,6 +802,21 @@ async function onHackComplete({ resource, amount }) {
     // Tell the backend — credits pocket_creds, records hack for bounty tracking
     if (nodeId) {
         const patch = await deplete(nodeId, resource, resource !== 'uplink' ? amount : 0);
+
+        if (!patch) {
+            // Server rejected the deplete — most likely cache is full (422).
+            // Roll back the optimistic cache increment we applied above.
+            player.value.cache = Math.max(0, (player.value.cache ?? 1) - 1);
+            console.warn('[HACK] Deplete rejected by server:', depleteError.value);
+
+            // If the player is now stranded (0 uplink), grant 1 escape move so
+            // they can reach a Street Doc — same safety net as onHackFailed.
+            if ((player.value.uplink ?? 0) === 0) {
+                player.value.uplink = 1;
+                console.warn('[HACK] Cache-full reject while stranded — granting 1 escape move.');
+            }
+        }
+
         if (patch) {
             updateNodeResources(nodeId, patch);
 
