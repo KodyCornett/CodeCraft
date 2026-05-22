@@ -1,5 +1,15 @@
 # CodeCraft — Developer Reference
 
+## Server Paths
+
+| Location | Path |
+|---|---|
+| **EC2 project root** | `/var/www/codecraft` |
+| **Laravel API** | `/var/www/codecraft/api` |
+| **Run migrations** | `cd /var/www/codecraft/api && php artisan migrate` |
+
+---
+
 ## What This Game Is
 
 CodeCraft is a real-time multiplayer cyberpunk hacking game. Players move across a hex node map, hack nodes to earn creds and tech points, manage a bounty system that makes them increasingly visible to ICE and other players, and engage in PvP Grid-Breach combat. The game runs in a browser (Inertia + Vue 3) backed by a Laravel 11 API.
