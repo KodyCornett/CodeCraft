@@ -139,6 +139,7 @@
             <!-- Footer -->
             <div class="ni-footer">
                 <span v-if="isOnNode" class="ni-connected">◉ CONNECTED</span>
+                <button v-else-if="isAdjacent" class="ni-jackin-btn" @click="$emit('move')">[ JACK IN ]</button>
                 <span v-else class="ni-remote">○ REMOTE NODE</span>
             </div>
 
@@ -154,6 +155,7 @@ import { getNodeIdentity } from '@/composables/useNodeIdentity.js';
 const props = defineProps({
     node:        { type: Object,  default: null },
     isOnNode:    { type: Boolean, default: false },
+    isAdjacent:  { type: Boolean, default: false },
     nodePlayers: { type: Array,   default: () => [] },
     // Active hack traces left on this node — see useNodeTraces composable
     traces:      { type: Array,   default: () => [] },
@@ -167,7 +169,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['hack', 'open-store', 'hack-player']);
+defineEmits(['hack', 'open-store', 'hack-player', 'move']);
 
 // Render seconds_remaining as M:SS
 function formatTimer(seconds) {
@@ -265,6 +267,24 @@ const iceColorClass = computed(() => {
 .ni-footer    { padding:7px 14px 10px; }
 .ni-connected { font-size:7px; color:#00FF88; letter-spacing:.1em; text-shadow:0 0 8px rgba(0,255,136,.7); }
 .ni-remote    { font-size:7px; color:rgba(0,255,255,.7); letter-spacing:.1em; }
+.ni-jackin-btn {
+    background: transparent;
+    border: 1px solid rgba(0,255,136,.45);
+    color: #00FF88;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: .12em;
+    padding: 4px 14px;
+    cursor: pointer;
+    width: 100%;
+    transition: all .12s;
+    text-shadow: 0 0 8px rgba(0,255,136,.5);
+}
+.ni-jackin-btn:hover {
+    background: rgba(0,255,136,.08);
+    border-color: rgba(0,255,136,.8);
+    box-shadow: 0 0 10px rgba(0,255,136,.15);
+}
 
 /* ── Players on node ──────────────────────────────────────────────────────── */
 .ni-players       { padding: 6px 14px 8px; }

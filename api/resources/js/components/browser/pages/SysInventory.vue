@@ -23,6 +23,29 @@
                         <span class="inv-qty">×{{ item.quantity }}</span>
                     </div>
                     <div class="inv-desc">{{ item.detail }}</div>
+                    <div class="inv-row-actions">
+                        <!-- Hardware is installed at CyberDoc, not used from inventory -->
+                        <span v-if="item.category === 'hardware'" class="inv-install-note">
+                            INSTALL AT CYBERDOC
+                        </span>
+                        <template v-else>
+                            <Transition name="feedback-fade">
+                                <span
+                                    v-if="feedback[item.id]"
+                                    class="inv-feedback"
+                                    :class="`inv-feedback--${feedback[item.id].type}`"
+                                >{{ feedback[item.id].msg }}</span>
+                            </Transition>
+                            <button
+                                class="inv-use-btn"
+                                :class="`inv-use-btn--${item.category}`"
+                                :disabled="using[item.id]"
+                                @click="onUse(item)"
+                            >
+                                {{ using[item.id] ? '...' : '[ USE ]' }}
+                            </button>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
@@ -34,34 +57,43 @@ import { inject, ref, computed } from 'vue';
 
 defineProps({ url: { type: String, default: '' } });
 
-const gameState = inject('gameState', null);
-const inventory = gameState?.inventory ?? ref({ hardware: [], consumables: [] });
+const gameState       = inject('gameState', null);
+const inventory       = gameState?.inventory ?? ref({ hardware: [], consumables: [] });
+const useConsumableFn = gameState?.useConsumable ?? null;
+
+// per-item loading flag
+const using    = ref({});
+// per-item flash feedback: { type: 'ok'|'err', msg: string }
+const feedback = ref({});
 
 /**
  * Flatten both inventory buckets into a single list with a uniform display shape:
- *   id        — unique key for v-for
- *   category  — 'hardware' | 'software' | 'repair'
- *   name      — display name
- *   detail    — stat boost / duration summary line
- *   quantity  — stack count (hardware always 1 per encrypt)
+ *   id           — unique key for v-for (encrypt_id or consumable_id)
+ *   consumableId — original consumable_id (null for hardware)
+ *   category     — 'hardware' | 'software' | 'repair'
+ *   name         — display name
+ *   detail       — stat boost / duration summary line
+ *   quantity     — stack count (hardware always 1 per encrypt)
  */
 const allItems = computed(() => {
     const hardware = (inventory.value.hardware ?? []).map(h => ({
-        id:       h.encrypt_id,
-        category: 'hardware',
-        name:     h.name,
-        detail:   `${(h.stat ?? '').toUpperCase()} +${h.boost}  ·  ${h.port_cost} PORT${h.port_cost !== 1 ? 'S' : ''}  ·  ${(h.rarity ?? '').toUpperCase()}`,
-        quantity: 1,
+        id:           h.encrypt_id,
+        consumableId: null,
+        category:     'hardware',
+        name:         h.name,
+        detail:       `${(h.stat ?? '').toUpperCase()} +${h.boost}  ·  ${h.port_cost} PORT${h.port_cost !== 1 ? 'S' : ''}  ·  ${(h.rarity ?? '').toUpperCase()}`,
+        quantity:     1,
     }));
 
     const consumables = (inventory.value.consumables ?? []).map(c => {
         const durationNote = c.duration_moves ? `  ·  ${c.duration_moves} MOVES` : '  ·  INSTANT';
         return {
-            id:       c.consumable_id,
-            category: c.category,      // 'software' | 'repair'
-            name:     c.name,
-            detail:   `${(c.stat ?? '').toUpperCase()} +${c.boost}${durationNote}  ·  ${(c.rarity ?? '').toUpperCase()}`,
-            quantity: c.quantity,
+            id:           c.consumable_id,
+            consumableId: c.consumable_id,
+            category:     c.category,      // 'software' | 'repair'
+            name:         c.name,
+            detail:       `${(c.stat ?? '').toUpperCase()} +${c.boost}${durationNote}  ·  ${(c.rarity ?? '').toUpperCase()}`,
+            quantity:     c.quantity,
         };
     });
 
@@ -73,6 +105,36 @@ function categoryLabel(cat) {
     if (cat === 'software') return 'SOFTWARE';
     if (cat === 'repair')   return 'REPAIR';
     return (cat ?? 'ITEM').toUpperCase();
+}
+
+async function onUse(item) {
+    if (!item.consumableId || !useConsumableFn) return;
+    if (using.value[item.id]) return;
+
+    using.value[item.id] = true;
+    clearFeedback(item.id);
+
+    const result = await useConsumableFn(item.consumableId);
+
+    using.value[item.id] = false;
+
+    if (result) {
+        const msg = result.type === 'repair'
+            ? `+${result.ss_restored} SS RESTORED`
+            : `ACTIVE — ${result.moves_remaining} MOVES`;
+        showFeedback(item.id, 'ok', msg);
+    } else {
+        showFeedback(item.id, 'err', 'USE FAILED');
+    }
+}
+
+function showFeedback(id, type, msg) {
+    feedback.value[id] = { type, msg };
+    setTimeout(() => clearFeedback(id), 2500);
+}
+
+function clearFeedback(id) {
+    delete feedback.value[id];
 }
 </script>
 
@@ -188,4 +250,65 @@ function categoryLabel(cat) {
     letter-spacing: 0.03em;
     line-height: 1.5;
 }
+
+.inv-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.inv-install-note {
+    font-size: 7px;
+    color: rgba(255,179,0,0.4);
+    letter-spacing: 0.1em;
+}
+
+.inv-use-btn {
+    background: transparent;
+    border: 1px solid rgba(0,255,136,0.3);
+    color: rgba(0,255,136,0.7);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: all 0.12s;
+    flex-shrink: 0;
+}
+.inv-use-btn:hover:not(:disabled) {
+    background: rgba(0,255,136,0.07);
+    border-color: rgba(0,255,136,0.7);
+    color: #00FF88;
+}
+.inv-use-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.inv-use-btn--repair {
+    border-color: rgba(0,255,136,0.35);
+    color: rgba(0,255,136,0.75);
+}
+.inv-use-btn--software {
+    border-color: rgba(125,249,255,0.3);
+    color: rgba(125,249,255,0.7);
+}
+.inv-use-btn--software:hover:not(:disabled) {
+    background: rgba(125,249,255,0.07);
+    border-color: rgba(125,249,255,0.7);
+    color: #7DF9FF;
+}
+
+.inv-feedback {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+}
+.inv-feedback--ok  { color: #00FF88; text-shadow: 0 0 8px rgba(0,255,136,0.5); }
+.inv-feedback--err { color: #FF3333; }
+
+.feedback-fade-enter-active { transition: opacity 0.15s; }
+.feedback-fade-leave-active { transition: opacity 0.4s ease; }
+.feedback-fade-enter-from,
+.feedback-fade-leave-to     { opacity: 0; }
 </style>

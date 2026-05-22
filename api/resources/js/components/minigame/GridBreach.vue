@@ -227,27 +227,22 @@ const difficulty = computed(() => {
     const ram = props.playerRam;
     const os  = props.playerOs;
 
-    // Sequence length and threshold — ICE-driven only
-    let seqLen, threshold;
-    if      (ice <= 4)  { seqLen = 3; threshold = 2; }
-    else if (ice <= 6)  { seqLen = 4; threshold = 3; }
-    else if (ice <= 8)  { seqLen = 5; threshold = 4; }
-    else                { seqLen = 6; threshold = 5; }
+    // Sequence length = ICE level directly (ICE 3 → 3 hexakeys, ICE 9 → 9 hexakeys).
+    // Threshold = 1: one sequence completion wins the node.
+    // Difficulty comes from sequence length + timer pressure, not repeated sequences.
+    const seqLen = ice;
 
     // Base game timer: RAM drives total length; OS adjusts per-move input window
     const baseTimer = 30 + (ram * 5) + Math.round(os * 0.3);
 
     // CPU vs ICE asymmetric modifier: bonus small, penalty compounds
-    const diff      = cpu - ice;
-    const timerMod  = diff >= 0 ? diff * 3 : -(diff * diff) * 2;
-
-    // Threshold only shifts by 1 at extreme gaps (4+ above or below)
-    const threshMod = diff >= 4 ? -1 : diff <= -4 ? 1 : 0;
+    const diff     = cpu - ice;
+    const timerMod = diff >= 0 ? diff * 3 : -(diff * diff) * 2;
 
     return {
         seqLen,
         timer:     Math.max(8, baseTimer + timerMod),
-        threshold: Math.max(1, threshold + threshMod),
+        threshold: 1,
     };
 });
 

@@ -1048,36 +1048,46 @@ const reachableNames  = computed(() => NODE_ADJACENCY.get(playerToken.value.id) 
 const uplinkDepleted  = computed(() => props.playerUplink <= 0);
 const ssCritical      = computed(() => props.playerSs <= 0);
 
-// ─── Node click — move if adjacent, always emit for NodeWindow ───────────────
+// ─── Node click — inspect only, never auto-move ──────────────────────────────
 function onNodeClick(nodeId) {
     if (hasDragged) return;   // suppress click if this was a pan gesture
     const node = ALL_NODES.get(nodeId);
     if (!node) return;
 
-    // Move the player if the target is one step away and uplink allows it
-    const adj = NODE_ADJACENCY.get(playerToken.value.id);
-    if (adj && adj.has(nodeId)) {
-        if (ssCritical.value) {
-            // SS at 0 — rig must be repaired before leaving the CyberDoc
-            emit('move-blocked', { reason: 'SS_CRITICAL' });
-            return;
-        }
-        if (props.playerUplink <= 0) {
-            // No uplink — emit a blocked notice but don't move
-            emit('move-blocked', { reason: 'NO_UPLINK' });
-            return;
-        }
-        playerToken.value = createPlayerToken(node);
-        emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
-    }
+    // Determine adjacency so NodeInfoBlock can show the JACK IN button
+    const adj        = NODE_ADJACENCY.get(playerToken.value.id);
+    const isAdjacent = !!(adj && adj.has(nodeId));
 
-    // Always open the NodeWindow so the player can see node info
+    // Always open the NodeWindow so the player can inspect node info
     const pos = getNodeScreenPos(nodeId);
     emit('node-clicked', {
-        node:    { ...node },
-        screenX: pos?.x ?? 200,
-        screenY: pos?.y ?? 200,
+        node:       { ...node },
+        screenX:    pos?.x ?? 200,
+        screenY:    pos?.y ?? 200,
+        isAdjacent,
     });
+}
+
+// ─── Commit move — called by Game.vue when player confirms via JACK IN ────────
+function commitMove(nodeId) {
+    const node = ALL_NODES.get(nodeId);
+    if (!node) return;
+
+    if (ssCritical.value) {
+        emit('move-blocked', { reason: 'SS_CRITICAL' });
+        return;
+    }
+    if (props.playerUplink <= 0) {
+        emit('move-blocked', { reason: 'NO_UPLINK' });
+        return;
+    }
+
+    // Only allow moving to an adjacent node
+    const adj = NODE_ADJACENCY.get(playerToken.value.id);
+    if (!adj || !adj.has(nodeId)) return;
+
+    playerToken.value = createPlayerToken(node);
+    emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
 }
 
 // ─── Helpers exposed to Game.vue ─────────────────────────────────────────────
@@ -1132,6 +1142,7 @@ onUnmounted(() => {
 defineExpose({
     animatePlayerTo,
     setPlayerNode,
+    commitMove,
     getNodeScreenPos,
     nodeAdjacency: NODE_ADJACENCY,   // plain Map — stable after init
     startNodeId:   startNode?.id ?? null,

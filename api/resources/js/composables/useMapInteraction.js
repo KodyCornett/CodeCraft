@@ -28,12 +28,13 @@ import { ref } from 'vue';
 
 export function useMapInteraction(player, getByCanvasId = null) {
 
-    const mapCanvasRef    = ref(null);
-    const currentNodeId   = ref(null);   // canvas ID of player's current node
-    const currentNode     = ref(null);
-    const selectedNode    = ref(null);   // merged canvas+DB node object
-    const pings           = ref([]);
-    const booted          = ref(false);
+    const mapCanvasRef          = ref(null);
+    const currentNodeId         = ref(null);   // canvas ID of player's current node
+    const currentNode           = ref(null);
+    const selectedNode          = ref(null);   // merged canvas+DB node object
+    const selectedNodeIsAdjacent = ref(false); // true when selectedNode is one step from player
+    const pings                 = ref([]);
+    const booted                = ref(false);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -76,8 +77,9 @@ export function useMapInteraction(player, getByCanvasId = null) {
         }
     }
 
-    function onNodeClicked({ node }) {
-        selectedNode.value = enrichNode(node);
+    function onNodeClicked({ node, isAdjacent = false }) {
+        selectedNode.value          = enrichNode(node);
+        selectedNodeIsAdjacent.value = isAdjacent;
     }
 
     return {
@@ -85,6 +87,7 @@ export function useMapInteraction(player, getByCanvasId = null) {
         currentNodeId,
         currentNode,
         selectedNode,
+        selectedNodeIsAdjacent,
         pings,
         booted,
         onPlayerMoved,

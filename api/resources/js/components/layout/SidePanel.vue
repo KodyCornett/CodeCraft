@@ -20,12 +20,14 @@
             <NodeInfoBlock
                 :node="node"
                 :is-on-node="isOnNode"
+                :is-adjacent="isAdjacent"
                 :resources="resources"
                 :node-players="nodePlayers"
                 :traces="traces"
                 @hack="$emit('hack', $event)"
                 @open-store="$emit('open-store')"
                 @hack-player="$emit('hack-player', $event)"
+                @move="$emit('move')"
             />
 
             <LoadoutBlock
@@ -57,6 +59,7 @@ defineProps({
     // Node Info
     node:        { type: Object,  default: null },
     isOnNode:    { type: Boolean, default: false },
+    isAdjacent:  { type: Boolean, default: false },
     resources:   { type: Object,  default: null },
     nodePlayers: { type: Array,   default: () => [] },
     traces:      { type: Array,   default: () => [] },
@@ -74,7 +77,7 @@ defineProps({
     playerOpenSeason: { type: Boolean, default: false },
 });
 
-defineEmits(['hack', 'open-store', 'use-command', 'hack-player']);
+defineEmits(['hack', 'open-store', 'use-command', 'hack-player', 'move']);
 </script>
 
 <style scoped>

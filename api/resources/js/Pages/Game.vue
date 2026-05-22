@@ -175,6 +175,7 @@
             <SidePanel
                 :node="selectedNode"
                 :is-on-node="selectedNode?.canvasId === currentNodeId"
+                :is-adjacent="selectedNodeIsAdjacent"
                 :resources="nodeResources"
                 :commands="commands"
                 :current-s-s="player.currentSS"
@@ -190,6 +191,7 @@
                 @open-store="onOpenStore"
                 @use-command="onUseCommand"
                 @hack-player="onHackPlayer"
+                @move="onMoveToSelected"
             />
 
         </div>
@@ -584,6 +586,12 @@ function handlePlayerMoved(event) {
     }
 }
 
+// ── JACK IN — confirmed move from NodeInfoBlock JACK IN button ────────────────
+function onMoveToSelected() {
+    if (!selectedNode.value?.canvasId) return;
+    mapCanvasRef.value?.commitMove(selectedNode.value.canvasId);
+}
+
 // ── Resource availability ──────────────────────────────────────────────────────
 //
 // Ticks every second so the replenish countdowns in NodeInfoBlock run smoothly.
@@ -649,7 +657,7 @@ const nodeResources = computed(() => {
 // (ice rating, resource depletion, UUID) into a single enriched node object.
 const {
     mapCanvasRef, currentNodeId, currentNode,
-    selectedNode, pings, booted,
+    selectedNode, selectedNodeIsAdjacent, pings, booted,
     onPlayerMoved, onNodeClicked,
 } = useMapInteraction(player, getByCanvasId);
 
@@ -734,6 +742,9 @@ const activeHack = ref(null);
 
 function onHackSelected(resource) {
     if (!selectedNode.value) return;
+    // Player must be standing on the node to hack it. With inspect-before-move,
+    // the panel shows hack buttons for any inspected node, so we guard here.
+    if (selectedNode.value.canvasId !== currentNodeId.value) return;
     const ice  = effectiveNodeIce(selectedNode.value);
     // Pass a shallow copy with the live effective ICE baked in
     activeHack.value = {
@@ -1258,8 +1269,21 @@ function applyPvpResult(result, opponentHandle) {
     console.log(`[PVP] ${won ? 'WON' : 'LOST'} vs ${opponentHandle} | scores: ${result.winner_score}–${result.loser_score}`);
 }
 
+// ── Consumable use — wraps gameState useConsumable to sync activeEffects ──────
+// Software consumables return active_effects from the server. Game.vue owns the
+// activeEffects ref so the movement handler can decrement them correctly. This
+// wrapper ensures they're merged in immediately when a consumable is used from
+// the SPLICE browser rather than waiting for the next auth hydration.
+async function onUseConsumable(consumableId) {
+    const result = await useConsumable(consumableId);
+    if (result?.type === 'software' && result.active_effects) {
+        Object.assign(activeEffects.value, result.active_effects);
+    }
+    return result;
+}
+
 // ── Provide game state to SPLICE browser pages ────────────────────────────────
-provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, currentNodeId, useConsumable });
+provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, currentNodeId, useConsumable: onUseConsumable });
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
