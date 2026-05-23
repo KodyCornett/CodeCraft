@@ -84,23 +84,29 @@
                     </span>
                 </div>
 
-                <!-- System Stability — visible here since failed hacks damage SS -->
-                <div class="lb-ss-row">
-                    <span class="lb-ss-key">SS</span>
-                    <div class="lb-ss-bar">
-                        <div
-                            class="lb-ss-fill"
-                            :class="ssBarClass"
-                            :style="{ width: ssPct + '%' }"
-                        />
-                    </div>
-                    <span class="lb-ss-val" :class="ssValClass">
-                        {{ ssPct }}%
-                    </span>
-                    <span v-if="isLimping" class="lb-limp-badge">LIMP</span>
-                </div>
             </div>
 
+        </div>
+
+        <!-- System Stability — always-visible rig health -->
+        <div class="lb-ss-section" :class="ssSectionClass">
+            <div class="lb-ss-header">
+                <span class="lb-ss-label">SYS.STABILITY</span>
+                <span class="lb-ss-readout" :class="ssValClass">
+                    {{ currentSS }}<span class="lb-ss-denom"> / {{ maxSS }}</span>
+                </span>
+            </div>
+            <div class="lb-ss-track">
+                <div class="lb-ss-fill" :class="ssBarClass" :style="{ width: ssPct + '%' }" />
+                <div class="lb-ss-tick" style="left: 20%" />
+                <div class="lb-ss-tick" style="left: 40%" />
+                <div class="lb-ss-tick" style="left: 60%" />
+                <div class="lb-ss-tick" style="left: 80%" />
+            </div>
+            <div class="lb-ss-footer-row">
+                <span class="lb-ss-pct" :class="ssValClass">{{ ssPct }}%</span>
+                <span v-if="isLimping" class="lb-limp-badge">LIMP MODE</span>
+            </div>
         </div>
     </PanelBlock>
 </template>
@@ -141,6 +147,11 @@ const ssBarClass = computed(() => {
 const ssValClass = computed(() => {
     if (props.isLimping)   return 'ss-val--limp';
     if (ssPct.value <= 25) return 'ss-val--crit';
+    return '';
+});
+const ssSectionClass = computed(() => {
+    if (props.isLimping || ssPct.value <= 25) return 'lb-ss--crit';
+    if (ssPct.value <= 50) return 'lb-ss--warn';
     return '';
 });
 
@@ -321,49 +332,89 @@ function selectCmd(cmd) {
     gap: 6px;
 }
 
-/* ── SS bar ───────────────────────────────────────────────────────────────── */
-.lb-ss-row {
+/* ── Prominent SS Section ─────────────────────────────────────────────────── */
+.lb-ss-section {
+    padding: 10px 14px 12px;
+    border-top: 1px solid rgba(0,255,255,.08);
+    background: rgba(0,255,255,.012);
+    font-family: 'JetBrains Mono', monospace;
+    transition: background .3s, border-color .3s;
+}
+.lb-ss--warn {
+    background: rgba(255,179,0,.025);
+    border-top-color: rgba(255,179,0,.15);
+}
+.lb-ss--crit {
+    background: rgba(255,51,51,.04);
+    border-top-color: rgba(255,51,51,.25);
+}
+.lb-ss-header {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
 }
-.lb-ss-key {
-    font-size: 6px;
-    color: rgba(0,255,255,.25);
-    letter-spacing: .1em;
-    width: 14px;
-    flex-shrink: 0;
+.lb-ss-label {
+    font-size: 7px;
+    color: rgba(0,255,255,.5);
+    letter-spacing: .18em;
+    text-shadow: 0 0 8px rgba(0,255,255,.25);
 }
-.lb-ss-bar {
-    flex: 1;
-    height: 4px;
+.lb-ss-readout {
+    font-size: 12px;
+    color: rgba(0,255,255,.8);
+    letter-spacing: .04em;
+    text-shadow: 0 0 10px rgba(0,255,255,.4);
+}
+.lb-ss-denom {
+    font-size: 8px;
+    color: rgba(0,255,255,.3);
+}
+.lb-ss-track {
+    position: relative;
+    height: 8px;
     background: rgba(0,255,255,.07);
     border-radius: 2px;
     overflow: hidden;
+    margin-bottom: 6px;
 }
 .lb-ss-fill {
-    height: 100%;
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
     border-radius: 2px;
     transition: width .4s ease, background .3s;
 }
-.ss-fill--ok   { background: #00FF88; }
-.ss-fill--low  { background: #FFB300; }
+.lb-ss-tick {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(0,0,12,.65);
+    z-index: 2;
+    pointer-events: none;
+}
+.ss-fill--ok   { background: #00FF88; box-shadow: 0 0 6px rgba(0,255,136,.5); }
+.ss-fill--low  { background: #FFB300; box-shadow: 0 0 6px rgba(255,179,0,.4); }
 .ss-fill--crit { background: #FF3333; animation: ss-crit-pulse .8s ease-in-out infinite; }
 .ss-fill--limp { background: #FF3333; animation: ss-crit-pulse .8s ease-in-out infinite; }
 .ss-fill--dead { background: rgba(255,51,51,.2); }
 @keyframes ss-crit-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-.lb-ss-val { font-size: 7px; color: rgba(0,255,255,.45); letter-spacing: .04em; }
-.ss-val--crit { color: #FF3333; }
-.ss-val--limp { color: #FF3333; }
+.lb-ss-footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 14px;
+}
+.lb-ss-pct { font-size: 8px; color: rgba(0,255,255,.4); letter-spacing: .06em; }
+.ss-val--crit { color: #FF3333; text-shadow: 0 0 8px rgba(255,51,51,.5); }
+.ss-val--limp { color: #FF3333; text-shadow: 0 0 8px rgba(255,51,51,.5); }
 
 .lb-limp-badge {
     font-size: 6px;
     color: #FF3333;
     border: 1px solid rgba(255,51,51,.4);
-    padding: 1px 4px;
-    letter-spacing: .1em;
+    padding: 1px 5px;
+    letter-spacing: .12em;
     animation: ss-crit-pulse .8s ease-in-out infinite;
 }
 .lb-stat { display: flex; align-items: center; gap: 4px; }

@@ -254,7 +254,7 @@ const coreStats = computed(() => {
         const effective = e[key] ?? 0;
         // base = effective − invested gives the chassis-only contribution so that
         // pip segments can correctly distinguish base vs. invested vs. peripheral.
-        const base      = effective - invested;
+        const base      = Math.max(0, effective - invested);
         const cap       = r.caps?.[key] ?? 10;
         return {
             key,

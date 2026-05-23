@@ -71,11 +71,11 @@
                         </p>
                         <div class="sec-rule">
                             <span class="rule-key stat--ss">SS BAR</span>
-                            <span class="rule-val">System Stability — your rig's health. Failed hacks and PvP losses chip it down. At 0: <strong class="hl-red">Critical System Failure</strong> — pocket creds wiped, bounty cleared, teleported to your last Street Doc. Watch it constantly.</span>
+                            <span class="rule-val">System Stability — your rig's health. Failed hacks and PvP losses chip it down. At 0: <strong class="hl-red">Critical System Failure</strong> — pocket creds wiped, bounty cleared, teleported to your last CyberDoc. Watch it constantly.</span>
                         </div>
                         <div class="sec-rule">
                             <span class="rule-key stat--creds">◈ CREDS</span>
-                            <span class="rule-val">Two pools. <strong class="hl-green">Wallet</strong> is safe — banked at a Street Doc. <strong class="hl-amber">Pocket</strong> is at risk — anything unbanked is lost on a PvP kill. Bank early, bank often.</span>
+                            <span class="rule-val">Two pools. <strong class="hl-green">Wallet</strong> is safe — banked at a CyberDoc. <strong class="hl-amber">Pocket</strong> is at risk — anything unbanked is lost on a PvP kill. Bank early, bank often.</span>
                         </div>
                         <div class="sec-rule">
                             <span class="rule-key stat--uplink">UPLINK</span>
@@ -87,7 +87,7 @@
                         </div>
                         <div class="sec-callout sec-callout--amber">
                             <span class="callout-label">TIP</span>
-                            SS degradation also weakens stats. Every 20% SS lost strips 1 point from CPU, RAM, Firewall, and OS. A limping rig fails breaches a healthy rig handles cleanly. Visit a Street Doc before you bottom out.
+                            SS degradation also weakens stats. Every 20% SS lost strips 1 point from CPU, RAM, Firewall, and OS. A limping rig fails breaches a healthy rig handles cleanly. Visit a CyberDoc before you bottom out.
                         </div>
                     </section>
 
@@ -158,7 +158,7 @@
                         </p>
                         <div class="sec-rule">
                             <span class="rule-key stat--creds">CREDS</span>
-                            <span class="rule-val">Currency paid to your pocket. Bank at a Street Doc to make it safe.</span>
+                            <span class="rule-val">Currency paid to your pocket. Bank at a CyberDoc to make it safe.</span>
                         </div>
                         <div class="sec-rule">
                             <span class="rule-key stat--tech">TECH POINTS</span>
@@ -254,15 +254,15 @@
                         </div>
                         <div class="sec-callout sec-callout--amber">
                             <span class="callout-label">STRATEGY</span>
-                            High bounty means high payouts — but also makes you the most valuable PvP target on the grid. Visit a Street Doc before ★4. Banking resets your bounty to zero. Time it right to capture the multiplier bonus without going Open Season.
+                            High bounty means high payouts — but also makes you the most valuable PvP target on the grid. Visit a CyberDoc before ★4. Banking resets your bounty to zero. Time it right to capture the multiplier bonus without going Open Season.
                         </div>
                     </section>
 
-                    <!-- ── STREET DOC ────────────────────────────────────────── -->
+                    <!-- ── CYBERDOC ──────────────────────────────────────────── -->
                     <section v-if="activeSection === 'streetdoc'">
-                        <h2 class="sec-title">STREET DOC — YOUR SAFE HARBOUR</h2>
+                        <h2 class="sec-title">CYBERDOC — YOUR SAFE HARBOUR</h2>
                         <p class="sec-body">
-                            Street Doc nodes are safe zones. No PvP can be initiated here.
+                            CyberDoc nodes are safe zones. No PvP can be initiated here.
                             Bank your creds, reset your bounty, repair your rig.
                         </p>
                         <div class="sec-rule">
@@ -279,7 +279,7 @@
                         </div>
                         <div class="sec-callout">
                             <span class="callout-label">CRITICAL</span>
-                            SS at 0 triggers Critical System Failure. Pocket creds wiped, bounty cleared, teleported to your last Street Doc. SS stays at 0 until you pay for repairs. You cannot hack until fixed.
+                            SS at 0 triggers Critical System Failure. Pocket creds wiped, bounty cleared, teleported to your last CyberDoc. SS stays at 0 until you pay for repairs. You cannot hack until fixed.
                         </div>
                     </section>
 
@@ -377,7 +377,7 @@ const sections = [
     { id: 'hacking',    label: 'HACKING'     },
     { id: 'gridbreach', label: 'GRID-BREACH' },
     { id: 'bounty',     label: 'BOUNTY'      },
-    { id: 'streetdoc',  label: 'STREET DOC'  },
+    { id: 'streetdoc',  label: 'CYBERDOC'    },
     { id: 'splice',     label: 'SPLICE'      },
 ];
 
@@ -387,7 +387,7 @@ const objectives = [
     { id: 3, label: 'Plan and execute your first Jack In',                   ref: 'MOVEMENT'  },
     { id: 4, label: 'Hack your first resource cache',                        ref: 'HACKING'   },
     { id: 5, label: 'Read the Grid-Breach guide before tackling ICE 5+',    ref: 'GRID-BREACH'},
-    { id: 6, label: 'Bank your creds at a Street Doc',                       ref: 'STREET DOC'},
+    { id: 6, label: 'Bank your creds at a CyberDoc',                         ref: 'CYBERDOC'  },
     { id: 7, label: 'Identify your bounty level before it reaches ★3',      ref: 'BOUNTY'    },
     { id: 8, label: 'Open SPLICE and locate splice://sys.local/rig',         ref: 'SPLICE'    },
 ];

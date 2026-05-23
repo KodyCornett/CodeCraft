@@ -202,6 +202,14 @@ function randId() {
     return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 // ─── ICE floor — equal to BlackHat v1.0 CPU, the starting rig ────────────────
 // No node can be easier than a fresh player expects on day one.
 // Nodes escalate ABOVE this floor as they get hacked more (handled in Game.vue).
@@ -246,17 +254,39 @@ const difficulty = computed(() => {
     };
 });
 
+// ─── Row modifiers — randomised once per match in buildRowModifiers() ─────────
+// Map<rowIndex, 'locked'|'glitch'>. Populated at mount before buildGrid().
+const rowModifiers = ref(new Map());
+
+function buildRowModifiers() {
+    const ice  = iceLevel.value;
+    const mods = new Map();
+
+    if (ice < 5) {
+        rowModifiers.value = mods;
+        return;
+    }
+
+    // ICE 5-6 → 1 locked + 1 glitch
+    // ICE 7   → 2 locked + 1 glitch
+    // ICE 8+  → 2 locked + 2 glitch
+    const lockedCount = ice >= 7 ? 2 : 1;
+    const glitchCount = ice >= 8 ? 2 : 1;
+
+    const rows = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    let pick = 0;
+    for (let i = 0; i < lockedCount; i++) mods.set(rows[pick++], 'locked');
+    for (let i = 0; i < glitchCount; i++) mods.set(rows[pick++], 'glitch');
+
+    rowModifiers.value = mods;
+}
+
 // ─── Row meta (direction + modifier) ─────────────────────────────────────────
 const rowMeta = computed(() => {
-    return Array.from({ length: 10 }, (_, i) => {
-        const ice = iceLevel.value;
-        let modifier = null;
-        if (ice >= 5 && i === 3) modifier = 'locked';
-        if (ice >= 5 && i === 7) modifier = 'glitch';
-        if (ice >= 7 && i === 1) modifier = 'locked';
-        if (ice >= 8 && i === 5) modifier = 'glitch';
-        return { direction: i % 2 === 0 ? 'forward' : 'backward', modifier };
-    });
+    return Array.from({ length: 10 }, (_, i) => ({
+        direction: i % 2 === 0 ? 'forward' : 'backward',
+        modifier:  rowModifiers.value.get(i) ?? null,
+    }));
 });
 
 function rowDir(rIdx)      { return rowMeta.value[rIdx].direction === 'forward' ? '[>>>]' : '[<<<]'; }
@@ -643,6 +673,7 @@ let scrambleInterval;
 
 onMounted(() => {
     timeLeft.value = difficulty.value.timer;
+    buildRowModifiers();
     buildSequence();
     buildGrid();
     nextTick(() => coordInputRef.value?.focus());
