@@ -679,10 +679,9 @@ const { traces: nodeTraces, refreshNow: refreshTraces } = useNodeTraces(selected
 const { activeBrowserUrl, onLaunch, onOpenStore, onCloseBrowser } = useBrowserState();
 
 // ── Tutorial — triggered from GameMenu via NavBar ─────────────────────────────
-// Placeholder: opens SPLICE to the manual for now. Replace with the Street Doc
-// terminal quest trigger once GHOST_PROTOCOL_0 is built.
+// Opens GHOST_PROTOCOL_0 — the new-runner orientation mission in the SPLICE browser.
 function onTutorial() {
-    onLaunch('splice://sys.local/manual');
+    onLaunch('splice://sys.local/tutorial');
 }
 
 // ── WebSocket — live server events ────────────────────────────────────────────

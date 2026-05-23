@@ -64,7 +64,7 @@
 
                 <div class="cc-identity">
                     <div class="cc-tier">T{{ rig.tier }}</div>
-                    <span class="cc-name">{{ (rig.chassis ?? '').toUpperCase() }}</span>
+                    <span class="cc-name">{{ chassisBaseName }}</span>
                     <span class="cc-ver">v{{ rigVersionLabel }}</span>
                 </div>
 
@@ -92,13 +92,13 @@
                         <span class="cc-prog-label">UPGRADE PROGRESS</span>
                         <div class="cc-prog-bar">
                             <span
-                                v-for="n in (rig.caps?.pointCap ?? 9)"
+                                v-for="n in (rig.pointsCap ?? 9)"
                                 :key="n"
                                 class="cc-prog-pip"
                                 :class="{ 'cc-prog-pip--lit': n <= totalInvestedAll }"
                             />
                         </div>
-                        <span class="cc-prog-count">{{ totalInvestedAll }}/{{ rig.caps?.pointCap ?? 9 }} PTS</span>
+                        <span class="cc-prog-count">{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }} PTS</span>
                         <span class="cc-prog-sub" v-if="chassisMaxed">— CHASSIS MAXED</span>
                     </div>
                     <div class="cc-ports">
@@ -119,7 +119,7 @@
                 <span class="lock-icon">🔒</span>
                 <span class="lock-text">
                     NullTek Series 2 unlocks when your BlackHat reaches v1.9 —
-                    <strong>{{ totalInvestedAll }}/{{ rig.caps?.pointCap ?? 9 }} upgrade points invested.</strong>
+                    <strong>{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }} upgrade points invested.</strong>
                     Visit the STATS tab to keep investing.
                 </span>
             </div>
@@ -220,7 +220,7 @@
                 <span class="sg-label">GLOBAL PROGRESSION:</span>
                 <div class="sg-pips">
                     <span
-                        v-for="n in (rig.caps?.pointCap ?? 9)"
+                        v-for="n in (rig.pointsCap ?? 9)"
                         :key="n"
                         class="sg-pip"
                         :class="{ 'sg-pip--lit': n <= totalInvestedAll }"
@@ -268,7 +268,7 @@
                             </span>
                         </template>
                         <template v-else-if="s.osGated">
-                            <span class="su-os-gate">[ OS {{ effectiveStat('os', rig) }} CAP — RAISE OS FIRST ]</span>
+                            <span class="su-os-gate">{{ s.gateMsg }}</span>
                         </template>
                         <span v-else class="su-maxed">[ CAPPED ]</span>
                     </div>
@@ -283,6 +283,9 @@
 
                 </div>
             </div>
+
+            <!-- Upgrade error -->
+            <div v-if="upgradeError" class="stat-upgrade-error">{{ upgradeError }}</div>
 
             <!-- Chassis maxed notice -->
             <div v-if="chassisMaxed" class="stat-maxed-notice">
@@ -425,8 +428,9 @@ const playerCreds       = computed(() => player.value?.creds       ?? 0);
 const playerPocketCreds = computed(() => player.value?.pocketCreds ?? 0);
 const playerTechPoints  = computed(() => player.value?.techPoints  ?? 0);
 // ── Banking ───────────────────────────────────────────────────────────────────
-const banking     = ref(false);
-const bankConfirm = ref(null);
+const banking      = ref(false);
+const bankConfirm  = ref(null);
+const upgradeError = ref(null);
 
 async function onBankCreds() {
     if (banking.value || playerPocketCreds.value === 0) return;
@@ -472,7 +476,7 @@ const totalInvestedAll = computed(() =>
 );
 
 const chassisMaxed = computed(() =>
-    totalInvestedAll.value >= (rig.value?.caps?.pointCap ?? 9)
+    totalInvestedAll.value >= (rig.value?.pointsCap ?? 9)
 );
 
 const rigVersionLabel = computed(() => {
@@ -480,6 +484,13 @@ const rigVersionLabel = computed(() => {
     const pts  = totalInvestedAll.value;
     return `${tier}.${pts}`;
 });
+
+// Strip the static version suffix (e.g. " v1.0") from the chassis name so only
+// the dynamic rigVersionLabel is shown as the version indicator.
+// "BlackHat v1.0" → "BLACKHAT", "NullTek GX-7 Ghost" → "NULLTEK GX-7 GHOST"
+const chassisBaseName = computed(() =>
+    (rig.value?.chassis ?? '').replace(/\s+v\d+\.\d+$/, '').toUpperCase()
+);
 
 // ── NullTek Series 2 chassis templates ───────────────────────────────────────
 // Three distinct build paths — Ghost / Breaker / Vault — unlocked when BlackHat is maxed.
@@ -541,7 +552,7 @@ function canAffordChassis(chassis) {
 
 function chassisBtnTitle(chassis) {
     if (rig.value?.tier > 1)   return 'Already on NullTek Series 2';
-    if (!chassisMaxed.value)    return `Max your BlackHat first (${totalInvestedAll.value}/${rig.value?.caps?.pointCap ?? 9} pts)`;
+    if (!chassisMaxed.value)    return `Max your BlackHat first (${totalInvestedAll.value}/${rig.value?.pointsCap ?? 9} pts)`;
     if (playerCreds.value < chassis.price.creds)      return `Not enough Creds — need ${chassis.price.creds} ₡`;
     if (playerTechPoints.value < chassis.price.tp)    return `Not enough Tech Points — need ${chassis.price.tp} TP`;
     return `Purchase NullTek ${chassis.model} ${chassis.name}`;
@@ -735,8 +746,8 @@ async function onBuyCommand(cmd) {
 const STAT_META = [
     { key: 'cpu',      label: 'CPU',      desc: 'Reduces ICE advantage — widens your hack window and timer.' },
     { key: 'ram',      label: 'RAM',      desc: 'Unlocks higher command tiers and increases command slot capacity.' },
-    { key: 'os',       label: 'OS',       desc: 'Reduces how accurately ICE pings reveal your location.' },
-    { key: 'storage',  label: 'STORAGE',  desc: 'Increases inventory and command loadout slots.' },
+    { key: 'os',       label: 'OS',       desc: 'Reduces ping accuracy. Raises the OS+Storage ceiling for CPU, RAM, and FW.' },
+    { key: 'storage',  label: 'STORAGE',  desc: 'Increases inventory and loadout slots. Freely investable — each point extends the ceiling for CPU, RAM, and FW.' },
     { key: 'firewall', label: 'FIREWALL', desc: 'Reduces bounty ping frequency and improves breach defence.' },
 ];
 
@@ -749,20 +760,32 @@ const upgradeableStats = computed(() => {
     // OS itself is exempt — it must be raised first to unlock other stats.
     const currentOS = effectiveStat('os', r);
 
+    const currentStorage = effectiveStat('storage', r);
+
     return STAT_META.map(({ key, label, desc }) => {
         const investedIn  = inv[key] ?? 0;
-        const base        = r?.[key] ?? 0;
+        const base        = (r?.[key] ?? 0) - investedIn;
         const effective   = effectiveStat(key, r);
         const cap         = r?.caps?.[key] ?? effective;
 
-        // OS gate: non-OS stats cannot be invested past the current OS level
-        const osGated = key !== 'os' && effective >= currentOS;
+        // OS gate rules:
+        //  • OS      — never gated (it IS the ceiling stat)
+        //  • Storage — never gated (freely investable; extends the ceiling for others)
+        //  • CPU / RAM / FW — cannot exceed effective OS + effective Storage combined
+        let osGated = false;
+        let gateMsg = '';
+        if (key !== 'os' && key !== 'storage') {
+            const ceiling = currentOS + currentStorage;
+            osGated = effective >= ceiling;
+            gateMsg = `[ OS+STR ${ceiling} CAP — RAISE OS OR STORAGE ]`;
+        }
+
         const canUp   = canUpgrade(key, r) && !chassisMaxed.value && !osGated;
         const cost    = canUp
             ? upgradeCost(key, investedIn, tot, tier)
             : { creds: 0, tp: 0 };
 
-        return { key, label, desc, base, effective, cap, investedIn, canUp, cost, osGated };
+        return { key, label, desc, base, effective, cap, investedIn, canUp, cost, osGated, gateMsg };
     });
 });
 
@@ -786,28 +809,44 @@ function statBtnTitle(s) {
 
 async function onUpgradeStat(stat, cost) {
     if (!canAffordStat(cost) || chassisMaxed.value) return;
+    upgradeError.value = null;
     try {
         const res = await axios.post('/api/rig/upgrade', {
             player_id: player.value.id,
             stat,
         });
 
-        // Bump invested points locally so cost formula stays in sync
-        rig.value.investedPoints[stat] = (rig.value.investedPoints[stat] ?? 0) + 1;
-
-        // Sync effective stats and balances from response
+        // Sync all effective stats + invested levels from server response
         const s = res.data.stats ?? {};
-        if (s.cpu)      rig.value.cpu      = s.cpu.effective      ?? rig.value.cpu;
-        if (s.ram)      rig.value.ram      = s.ram.effective      ?? rig.value.ram;
-        if (s.os)       rig.value.os       = s.os.effective       ?? rig.value.os;
-        if (s.storage)  rig.value.storage  = s.storage.effective  ?? rig.value.storage;
-        if (s.firewall) rig.value.firewall = s.firewall.effective  ?? rig.value.firewall;
+        if (s.cpu) {
+            rig.value.cpu                    = s.cpu.effective      ?? rig.value.cpu;
+            rig.value.investedPoints.cpu     = s.cpu.level          ?? rig.value.investedPoints.cpu;
+        }
+        if (s.ram) {
+            rig.value.ram                    = s.ram.effective      ?? rig.value.ram;
+            rig.value.investedPoints.ram     = s.ram.level          ?? rig.value.investedPoints.ram;
+        }
+        if (s.os) {
+            rig.value.os                     = s.os.effective       ?? rig.value.os;
+            rig.value.investedPoints.os      = s.os.level           ?? rig.value.investedPoints.os;
+        }
+        if (s.storage) {
+            rig.value.storage                = s.storage.effective  ?? rig.value.storage;
+            rig.value.investedPoints.storage = s.storage.level      ?? rig.value.investedPoints.storage;
+        }
+        if (s.firewall) {
+            rig.value.firewall               = s.firewall.effective ?? rig.value.firewall;
+            rig.value.investedPoints.firewall = s.firewall.level    ?? rig.value.investedPoints.firewall;
+        }
 
-        player.value.creds      = res.data.wallet_creds ?? player.value.creds;
-        player.value.techPoints = res.data.tech_points  ?? player.value.techPoints;
+        rig.value.pointsSpent   = res.data.points?.spent  ?? rig.value.pointsSpent;
+        rig.value.pointsCap     = res.data.points?.cap    ?? rig.value.pointsCap;
+        player.value.creds      = res.data.wallet_creds   ?? player.value.creds;
+        player.value.techPoints = res.data.tech_points    ?? player.value.techPoints;
 
     } catch (e) {
-        console.error('[STATS] Upgrade failed:', e?.response?.data?.message ?? e.message);
+        upgradeError.value = e?.response?.data?.message ?? 'Upgrade failed — check your wallet balance.';
+        console.error('[STATS] Upgrade failed:', upgradeError.value);
     }
 }
 
@@ -1625,6 +1664,15 @@ function onResetCooldowns() {
 .su-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 
 /* Chassis maxed notice */
+.stat-upgrade-error {
+    padding: 8px 16px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: #ff4455;
+    border: 1px solid rgba(255, 68, 85, 0.3);
+    background: rgba(255, 68, 85, 0.05);
+}
+
 .stat-maxed-notice {
     display: flex;
     align-items: flex-start;

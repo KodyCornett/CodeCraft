@@ -20,6 +20,8 @@ import SysCommands       from './pages/SysCommands.vue';
 import SysCommandCatalog from './pages/SysCommandCatalog.vue';
 import SysStatGuide      from './pages/SysStatGuide.vue';
 import SysInventory      from './pages/SysInventory.vue';
+import GridBreachGuide   from './pages/GridBreachGuide.vue';
+import GhostProtocol0   from './pages/GhostProtocol0.vue';
 import NotFound      from './pages/NotFound.vue';
 
 // ── Route table ───────────────────────────────────────────────────────────────
@@ -36,6 +38,8 @@ const ROUTES = [
     { url: 'splice://sys.local/rig',       title: 'Rig Info',     component: SysRig       },
     { url: 'splice://sys.local/commands/catalog', title: 'Command Catalog', component: SysCommandCatalog },
     { url: 'splice://sys.local/guide/stats',      title: 'Stat Reference',  component: SysStatGuide      },
+    { url: 'splice://sys.local/guide/gridbreach', title: 'Grid-Breach Manual', component: GridBreachGuide },
+    { url: 'splice://sys.local/tutorial',         title: 'GHOST_PROTOCOL_0',   component: GhostProtocol0  },
     { url: 'splice://sys.local/commands',         title: 'Commands',        component: SysCommands       },
     { url: 'splice://sys.local/inventory', title: 'Inventory',    component: SysInventory },
 ];
@@ -64,5 +68,7 @@ export const SPLICE = {
     COMMANDS:         'splice://sys.local/commands',
     COMMAND_CATALOG:  'splice://sys.local/commands/catalog',
     STAT_GUIDE:       'splice://sys.local/guide/stats',
+    GRID_BREACH_GUIDE: 'splice://sys.local/guide/gridbreach',
+    TUTORIAL:          'splice://sys.local/tutorial',
     INVENTORY: 'splice://sys.local/inventory',
 };

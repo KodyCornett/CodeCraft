@@ -28,8 +28,10 @@ function toCanvasNode(apiNode) {
         district:  apiNode.district,    // string district name or null for waypoints
         tier:      apiNode.tier,
         ice:       apiNode.ice ?? 3,    // ICE rating — floor 3 (BlackHat v1.0 CPU)
-        isSpawn: apiNode.is_spawn ?? false,
-        state:   deriveState(apiNode),
+        isSpawn:   apiNode.is_spawn   ?? false,
+        isSafeZone: apiNode.is_safe_zone ?? false,
+        npcHandle: apiNode.npc_handle ?? null,  // set on CyberDoc hubs — quest-giver handle
+        state:     deriveState(apiNode),
         // Resource state for game logic
         credDepleted:       apiNode.cred_resource_depleted,
         movementDepleted:   apiNode.movement_resource_depleted,

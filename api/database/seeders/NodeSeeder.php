@@ -21,7 +21,7 @@ class NodeSeeder extends Seeder
     {
         // ── Nodes ─────────────────────────────────────────────────────────── //
         $nodes = [
-            ['canvas_id' => 'NS-hub', 'x' => 225.88, 'y' => 88, 'type' => 'cyberdoc', 'district' => 'North Spokane', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0],
+            ['canvas_id' => 'NS-hub', 'x' => 225.88, 'y' => 88, 'type' => 'cyberdoc', 'district' => 'North Spokane', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0, 'npc_handle' => 'PATCH'],
             ['canvas_id' => 'NS-v1', 'x' => 225.88, 'y' => 136, 'type' => 'action', 'district' => 'North Spokane', 'ice' => 6, 'tier' => 2, 'cred_value_base' => 104],
             ['canvas_id' => 'NS-v2', 'x' => 184.31, 'y' => 160, 'type' => 'action', 'district' => 'North Spokane', 'ice' => 6, 'tier' => 2, 'cred_value_base' => 127],
             ['canvas_id' => 'NS-v3', 'x' => 142.74, 'y' => 136, 'type' => 'action', 'district' => 'North Spokane', 'ice' => 6, 'tier' => 2, 'cred_value_base' => 135],
@@ -45,7 +45,7 @@ class NodeSeeder extends Seeder
             ['canvas_id' => 'NS-v21', 'x' => 142.74, 'y' => -8, 'type' => 'action', 'district' => 'North Spokane', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 123],
             ['canvas_id' => 'NS-v22', 'x' => 267.45, 'y' => 16, 'type' => 'action', 'district' => 'North Spokane', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 98],
             ['canvas_id' => 'NS-v23', 'x' => 225.88, 'y' => -8, 'type' => 'action', 'district' => 'North Spokane', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 106],
-            ['canvas_id' => 'BA-hub', 'x' => 267.45, 'y' => 592, 'type' => 'cyberdoc', 'district' => 'Browne\'s Addition', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0],
+            ['canvas_id' => 'BA-hub', 'x' => 267.45, 'y' => 592, 'type' => 'cyberdoc', 'district' => 'Browne\'s Addition', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0, 'npc_handle' => 'KNUCKLE'],
             ['canvas_id' => 'BA-v1', 'x' => 267.45, 'y' => 640, 'type' => 'action', 'district' => 'Browne\'s Addition', 'ice' => 4, 'tier' => 1, 'cred_value_base' => 76],
             ['canvas_id' => 'BA-v2', 'x' => 225.88, 'y' => 664, 'type' => 'action', 'district' => 'Browne\'s Addition', 'ice' => 4, 'tier' => 1, 'cred_value_base' => 61],
             ['canvas_id' => 'BA-v3', 'x' => 184.31, 'y' => 640, 'type' => 'action', 'district' => 'Browne\'s Addition', 'ice' => 4, 'tier' => 1, 'cred_value_base' => 66],
@@ -69,7 +69,7 @@ class NodeSeeder extends Seeder
             ['canvas_id' => 'BA-v21', 'x' => 184.31, 'y' => 496, 'type' => 'action', 'district' => 'Browne\'s Addition', 'ice' => 3, 'tier' => 1, 'cred_value_base' => 62],
             ['canvas_id' => 'BA-v22', 'x' => 309.02, 'y' => 520, 'type' => 'action', 'district' => 'Browne\'s Addition', 'ice' => 3, 'tier' => 1, 'cred_value_base' => 76],
             ['canvas_id' => 'BA-v23', 'x' => 267.45, 'y' => 496, 'type' => 'action', 'district' => 'Browne\'s Addition', 'ice' => 3, 'tier' => 1, 'cred_value_base' => 81],
-            ['canvas_id' => 'DT-hub', 'x' => 516.86, 'y' => 304, 'type' => 'cyberdoc', 'district' => 'Downtown', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0],
+            ['canvas_id' => 'DT-hub', 'x' => 516.86, 'y' => 304, 'type' => 'cyberdoc', 'district' => 'Downtown', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0, 'npc_handle' => 'VEIL'],
             ['canvas_id' => 'DT-v1', 'x' => 516.86, 'y' => 352, 'type' => 'action', 'district' => 'Downtown', 'ice' => 5, 'tier' => 3, 'cred_value_base' => 189],
             ['canvas_id' => 'DT-v2', 'x' => 475.29, 'y' => 376, 'type' => 'action', 'district' => 'Downtown', 'ice' => 5, 'tier' => 3, 'cred_value_base' => 222],
             ['canvas_id' => 'DT-v3', 'x' => 433.72, 'y' => 352, 'type' => 'action', 'district' => 'Downtown', 'ice' => 5, 'tier' => 3, 'cred_value_base' => 200],
@@ -93,7 +93,7 @@ class NodeSeeder extends Seeder
             ['canvas_id' => 'DT-v21', 'x' => 392.15, 'y' => 376, 'type' => 'action', 'district' => 'Downtown', 'ice' => 6, 'tier' => 3, 'cred_value_base' => 186],
             ['canvas_id' => 'DT-v22', 'x' => 350.58, 'y' => 352, 'type' => 'action', 'district' => 'Downtown', 'ice' => 6, 'tier' => 3, 'cred_value_base' => 226],
             ['canvas_id' => 'DT-v23', 'x' => 350.58, 'y' => 304, 'type' => 'action', 'district' => 'Downtown', 'ice' => 6, 'tier' => 3, 'cred_value_base' => 213],
-            ['canvas_id' => 'UD-hub', 'x' => 849.42, 'y' => 592, 'type' => 'cyberdoc', 'district' => 'University District', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0],
+            ['canvas_id' => 'UD-hub', 'x' => 849.42, 'y' => 592, 'type' => 'cyberdoc', 'district' => 'University District', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0, 'npc_handle' => 'AXIOM'],
             ['canvas_id' => 'UD-v1', 'x' => 849.42, 'y' => 640, 'type' => 'action', 'district' => 'University District', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 108],
             ['canvas_id' => 'UD-v2', 'x' => 807.85, 'y' => 664, 'type' => 'action', 'district' => 'University District', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 137],
             ['canvas_id' => 'UD-v3', 'x' => 766.28, 'y' => 640, 'type' => 'action', 'district' => 'University District', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 102],
@@ -117,7 +117,7 @@ class NodeSeeder extends Seeder
             ['canvas_id' => 'UD-v21', 'x' => 766.28, 'y' => 496, 'type' => 'action', 'district' => 'University District', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 142],
             ['canvas_id' => 'UD-v22', 'x' => 890.98, 'y' => 520, 'type' => 'action', 'district' => 'University District', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 135],
             ['canvas_id' => 'UD-v23', 'x' => 849.42, 'y' => 496, 'type' => 'action', 'district' => 'University District', 'ice' => 4, 'tier' => 2, 'cred_value_base' => 100],
-            ['canvas_id' => 'SV-hub', 'x' => 1015.69, 'y' => 160, 'type' => 'cyberdoc', 'district' => 'Spokane Valley', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0],
+            ['canvas_id' => 'SV-hub', 'x' => 1015.69, 'y' => 160, 'type' => 'cyberdoc', 'district' => 'Spokane Valley', 'ice' => 0, 'tier' => 4, 'cred_value_base' => 0, 'npc_handle' => 'FLOAT'],
             ['canvas_id' => 'SV-v1', 'x' => 1015.69, 'y' => 208, 'type' => 'action', 'district' => 'Spokane Valley', 'ice' => 5, 'tier' => 2, 'cred_value_base' => 113],
             ['canvas_id' => 'SV-v2', 'x' => 974.12, 'y' => 232, 'type' => 'action', 'district' => 'Spokane Valley', 'ice' => 5, 'tier' => 2, 'cred_value_base' => 106],
             ['canvas_id' => 'SV-v3', 'x' => 932.55, 'y' => 208, 'type' => 'action', 'district' => 'Spokane Valley', 'ice' => 5, 'tier' => 2, 'cred_value_base' => 119],
@@ -266,6 +266,7 @@ class NodeSeeder extends Seeder
                     'ice'             => $data['ice'],
                     'tier'            => $data['tier'],
                     'cred_value_base' => $data['cred_value_base'],
+                    'npc_handle'      => $data['npc_handle'] ?? null,
                 ]);
             } else {
                 $uuid = (string) Str::uuid();
@@ -280,6 +281,7 @@ class NodeSeeder extends Seeder
                     'ice'             => $data['ice'],
                     'tier'            => $data['tier'],
                     'cred_value_base' => $data['cred_value_base'],
+                    'npc_handle'      => $data['npc_handle'] ?? null,
                     'cred_resource_depleted'     => false,
                     'movement_resource_depleted' => false,
                     'cred_last_hacked_at'        => null,

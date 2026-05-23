@@ -147,7 +147,9 @@ class RigServiceTest extends TestCase
 
     public function test_upgrade_throws_when_stat_equals_chassis_cap(): void
     {
-        [$rig] = $this->makeRig(['cpu_level' => 10], ['total_point_cap' => 10]);
+        // cap_cpu = 5, base_cpu (factory) = 2 → effective CPU = 2 + 3 = 5 = cap → blocked.
+        // base_os_level stays at factory default (10) so the OS gate never fires first.
+        [$rig] = $this->makeRig(['cpu_level' => 3], ['cap_cpu' => 5, 'total_point_cap' => 10]);
 
         $this->expectException(\OverflowException::class);
         $this->service->upgradeStat($rig, 'cpu');

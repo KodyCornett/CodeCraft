@@ -50,6 +50,14 @@
 
             <!-- CyberDoc -->
             <div v-if="node.type === 'cyberdoc'" class="ni-store">
+                <!-- NPC identity — shown when the hub has a quest-giver handle -->
+                <div v-if="node.npcHandle" class="ni-npc">
+                    <span class="ni-npc-icon">◈</span>
+                    <div class="ni-npc-body">
+                        <span class="ni-npc-handle">{{ node.npcHandle }}</span>
+                        <span class="ni-npc-role">STREET DOC // QUEST GIVER</span>
+                    </div>
+                </div>
                 <div class="ni-store-desc">Licensed hardware &amp; software vendor.</div>
                 <button class="ni-store-btn" @click="$emit('open-store')">
                     <span>⬡</span> OPEN STOREFRONT
@@ -263,6 +271,37 @@ const iceColorClass = computed(() => {
     background:rgba(255,179,0,.04); border:1px solid rgba(255,179,0,.35); color:#FFB300;
     font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; cursor:pointer; transition:all .15s; }
 .ni-store-btn:hover { background:rgba(255,179,0,.09); border-color:rgba(255,179,0,.7); }
+
+/* ── NPC identity block ───────────────────────────────────────────────────── */
+.ni-npc {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0 4px;
+    border-bottom: 1px solid rgba(255, 179, 0, 0.1);
+    margin-bottom: 2px;
+}
+.ni-npc-icon {
+    font-size: 14px;
+    color: #FFB300;
+    flex-shrink: 0;
+    animation: npc-pulse 3s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(255, 179, 0, 0.5);
+}
+@keyframes npc-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+.ni-npc-body   { display: flex; flex-direction: column; gap: 2px; }
+.ni-npc-handle {
+    font-size: 13px;
+    color: #FFB300;
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 12px rgba(255, 179, 0, 0.45);
+}
+.ni-npc-role {
+    font-size: 7px;
+    color: rgba(255, 179, 0, 0.35);
+    letter-spacing: 0.12em;
+}
 
 .ni-footer    { padding:7px 14px 10px; }
 .ni-connected { font-size:7px; color:#00FF88; letter-spacing:.1em; text-shadow:0 0 8px rgba(0,255,136,.7); }

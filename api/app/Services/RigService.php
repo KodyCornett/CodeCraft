@@ -73,11 +73,38 @@ class RigService
         $capKey   = "cap_{$stat}";
         $taxEvent = null;
 
-        // Enforce per-stat chassis cap (e.g. cap_cpu = 5 for BlackHat v1.0)
-        if ($rig->$column >= $chassis->$capKey) {
+        // Enforce per-stat chassis cap.
+        // cap_* stores the maximum EFFECTIVE value (base + max investable points).
+        // We must compare the current effective value (base + invested) against the cap,
+        // not the raw invested level — otherwise the cap is applied 3–5× too loosely.
+        $baseKey   = ($stat === 'os') ? 'base_os_level' : "base_{$stat}";
+        $baseValue = (int) ($chassis->$baseKey ?? 0);
+        if (($baseValue + $rig->$column) >= $chassis->$capKey) {
             throw new \OverflowException(
                 "'{$stat}' is already at the chassis cap ({$chassis->$capKey})."
             );
+        }
+
+        // OS gate — determines how high CPU / RAM / FW can be pushed.
+        //  • OS      : always investable — it IS the ceiling stat.
+        //  • Storage : always investable — it extends the ceiling for other stats.
+        //              Only the chassis hard cap (cap_storage) limits it.
+        //  • CPU / RAM / FW : cannot exceed effective OS + effective Storage combined.
+        //
+        // effectiveStats() is called without a player so peripheral boosts are excluded —
+        // the gate is based on invested stat values only, not transient hardware bonuses.
+        if ($stat !== 'os' && $stat !== 'storage') {
+            $currentStats     = $this->effectiveStats($rig);
+            $effectiveOS      = $currentStats['os']['effective']      ?? 0;
+            $effectiveStorage = $currentStats['storage']['effective'] ?? 0;
+            $effectiveStat    = $currentStats[$stat]['effective']     ?? 0;
+            $ceiling          = $effectiveOS + $effectiveStorage;
+
+            if ($effectiveStat >= $ceiling) {
+                throw new \RuntimeException(
+                    "Cannot invest in '{$stat}': effective value ({$effectiveStat}) already meets or exceeds OS + Storage ceiling ({$ceiling}). Raise OS or Storage first."
+                );
+            }
         }
 
         if ($this->totalPointsSpent($rig) >= $chassis->total_point_cap) {

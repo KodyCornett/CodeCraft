@@ -47,6 +47,12 @@
                     <span class="tile-desc">Movement, hacking, resources and combat reference guide</span>
                     <span class="tile-url">sys.local/manual</span>
                 </button>
+                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.GRID_BREACH_GUIDE)">
+                    <span class="tile-icon tile-icon--breach">◉</span>
+                    <span class="tile-title">GRID-BREACH MANUAL</span>
+                    <span class="tile-desc">How to run breaches — grid, sequences, row modifiers, stats &amp; PvP</span>
+                    <span class="tile-url">sys.local/guide/gridbreach</span>
+                </button>
             </div>
         </div>
 
@@ -158,9 +164,10 @@ onUnmounted(() => clearInterval(timer));
     box-shadow: 0 0 16px rgba(0, 255, 255, 0.07);
 }
 
-.tile-icon        { font-size: 16px; color: #00FF88; }
-.tile-icon--cmd   { color: #FFB300; }
-.tile-icon--stat  { color: #7DF9FF; }
+.tile-icon         { font-size: 16px; color: #00FF88; }
+.tile-icon--cmd    { color: #FFB300; }
+.tile-icon--stat   { color: #7DF9FF; }
+.tile-icon--breach { color: #FF3333; }
 .tile-title { font-size: 11px; color: #00FFFF; letter-spacing: 0.1em; }
 .tile-desc  { font-size: 8px;  color: rgba(255, 255, 255, 0.35); letter-spacing: 0.04em; line-height: 1.6; }
 .tile-url   { font-size: 8px;  color: rgba(0, 255, 255, 0.25); letter-spacing: 0.08em; margin-top: 4px; }
