@@ -13,10 +13,11 @@
                 <HexMapCanvas
                     ref="mapCanvasRef"
                     :pings="pings"
+                    :crash-mines="crashMines"
                     :current-node-id="currentNodeId"
                     :player-uplink="player.uplink"
                     :player-ss="player.currentSS"
-                    @node-clicked="onNodeClicked"
+                    @node-clicked="handleNodeClicked"
                     @player-moved="handlePlayerMoved"
                     @move-blocked="onMoveBlocked"
                 />
@@ -41,6 +42,15 @@
 
                 <!-- Map loading indicator -->
                 <div v-if="mapLoading" class="map-loading">// LOADING NETWORK DATA...</div>
+
+                <!-- Crash mine targeting mode — persists until player picks a node or cancels -->
+                <Transition name="targeting-fade">
+                    <div v-if="crashTargetMode" class="crash-targeting-banner">
+                        <span class="ct-icon">⚠</span>
+                        <span class="ct-text">CRASH MINE — SELECT AN ADJACENT NODE TO PLANT</span>
+                        <button class="ct-cancel" @click="cancelCrashTarget">[ CANCEL ]</button>
+                    </div>
+                </Transition>
 
                 <!-- In-game SPLICE browser -->
                 <Transition name="browser-fade">
@@ -197,7 +207,35 @@
         </div>
 
         <!-- NavBar sits below map-stage, inside GameScreen -->
-        <NavBar :active-browser-url="activeBrowserUrl" @launch="onLaunch" @tutorial="onTutorial" />
+        <NavBar
+            :active-browser-url="activeBrowserUrl"
+            :has-tutorial-badge="tutorial.hasBadge.value"
+            @launch="onLaunch"
+            @tutorial="onTutorial"
+        />
+
+        <!-- First-login welcome modal — shown once after boot for new players -->
+        <Transition name="welcome-fade">
+            <div v-if="showWelcomeModal" class="welcome-overlay">
+                <div class="welcome-modal">
+                    <div class="welcome-tag">// INCOMING TRANSMISSION</div>
+                    <div class="welcome-title">WELCOME, RUNNER</div>
+                    <div class="welcome-body">
+                        Your rig is online. Your uplink is live.<br>
+                        Complete orientation before running anything hot.<br>
+                        <span class="welcome-note">Rewards go directly to your wallet — safe from PvP.</span>
+                    </div>
+                    <div class="welcome-actions">
+                        <button class="welcome-btn welcome-btn--primary" @click="onWelcomeStart">
+                            [ BEGIN ORIENTATION ]
+                        </button>
+                        <button class="welcome-btn welcome-btn--ghost" @click="onWelcomeSkip">
+                            skip
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
     </GameScreen>
 </template>
 
@@ -235,6 +273,8 @@ import { useCombat }         from '@/composables/useCombat.js';
 import { useGameState }      from '@/composables/useGameState.js';
 import { useHeartbeat }     from '@/composables/useHeartbeat.js';
 import { useAudio }        from '@/composables/useAudio.js';
+import { useTutorial }    from '@/composables/useTutorial.js';
+import { SPLICE }         from '@/components/browser/SpliceRouter.js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const { playerId, player: authPlayer, rig: authRig, login } = useAuth();
@@ -340,8 +380,14 @@ const bountyAlert = ref(null);
 let   _alertTimer = null;
 
 // Move-block HUD flash — auto-dismissed after 3 s
-const hudFlash    = ref('');
-let   _flashTimer = null;
+const hudFlash        = ref('');
+let   _flashTimer     = null;
+
+// ── Crash mine state ──────────────────────────────────────────────────────────
+// crashTargetMode: set to { cmd, match } while the player is picking a target node.
+// crashMines:      client-only list of placed mines visible only to this player.
+const crashTargetMode = ref(null);
+const crashMines      = ref([]);
 
 function showBountyAlert(message) {
     if (_alertTimer) clearTimeout(_alertTimer);
@@ -560,6 +606,13 @@ function handlePlayerMoved(event) {
         }
     }
 
+    // Tick down crash mine TTLs — remove any that have expired
+    if (crashMines.value.length > 0) {
+        crashMines.value = crashMines.value
+            .map(m => ({ ...m, movesLeft: m.movesLeft - 1 }))
+            .filter(m => m.movesLeft > 0);
+    }
+
     // Tick down false ping counter (Signal Noise / Decoy planted via fireFalsePing)
     if (_falsePingIds.length > 0 && _falsePingMovesLeft > 0) {
         _falsePingMovesLeft--;
@@ -590,6 +643,35 @@ function handlePlayerMoved(event) {
 function onMoveToSelected() {
     if (!selectedNode.value?.canvasId) return;
     mapCanvasRef.value?.commitMove(selectedNode.value.canvasId);
+}
+
+// ── Node click — intercepts crash targeting mode before normal selection ───────
+function handleNodeClicked(event) {
+    if (crashTargetMode.value) {
+        if (!event.isAdjacent) {
+            clearTimeout(_flashTimer);
+            hudFlash.value = 'OUT OF RANGE — select an adjacent node to plant the mine';
+            _flashTimer = setTimeout(() => { hudFlash.value = ''; }, 3_000);
+            return;
+        }
+        const { cmd, match } = crashTargetMode.value;
+        const node           = event.node;
+        const ttl            = cmd.duration?.moves ?? 5;
+        crashMines.value.push({ canvasId: node.id, x: node.x, y: node.y, movesLeft: ttl });
+        match.cooldown  = true;
+        match.movesLeft = ttl;
+        crashTargetMode.value = null;
+        console.log(`[CRASH] Mine planted at ${node.id} — ${ttl} moves TTL`);
+        return;
+    }
+    onNodeClicked(event);
+}
+
+function cancelCrashTarget() {
+    if (!crashTargetMode.value) return;
+    // Revert the premature cooldown set before the switch — command stays ready.
+    crashTargetMode.value.match.cooldown = false;
+    crashTargetMode.value = null;
 }
 
 // ── Resource availability ──────────────────────────────────────────────────────
@@ -676,12 +758,69 @@ const selectedCanvasId = computed(() => selectedNode.value?.canvasId ?? null);
 const { traces: nodeTraces, refreshNow: refreshTraces } = useNodeTraces(selectedCanvasId, playerId);
 
 // ── Browser state ─────────────────────────────────────────────────────────────
-const { activeBrowserUrl, onLaunch, onOpenStore, onCloseBrowser } = useBrowserState();
+const { activeBrowserUrl, onLaunch, onCloseBrowser } = useBrowserState();
 
-// ── Tutorial — triggered from GameMenu via NavBar ─────────────────────────────
-// Opens GHOST_PROTOCOL_0 — the new-runner orientation mission in the SPLICE browser.
+// Maps each CyberDoc hub node ID to its named SPLICE page.
+// When the player opens the store from a hub, they land on that doc's branded page.
+const CYBERDOC_URLS = {
+    'NS-hub': SPLICE.CYBER_DOC_PATCH,
+    'BA-hub': SPLICE.CYBER_DOC_KNUCKLE,
+    'DT-hub': SPLICE.CYBER_DOC_VEIL,
+    'UD-hub': SPLICE.CYBER_DOC_AXIOM,
+    'SV-hub': SPLICE.CYBER_DOC_FLOAT,
+};
+
+function onOpenStore() {
+    const url = CYBERDOC_URLS[currentNodeId.value] ?? SPLICE.CYBER_DOC;
+    onLaunch(url);
+}
+
+// ── Tutorial ──────────────────────────────────────────────────────────────────
+const tutorial = useTutorial();
+
+// Provide tutorial state to all SPLICE page components via inject('tutorial').
+// GhostProtocol0 reads it to render quest status.
+// GridBreachGuide calls markStepDone('read_manual') on mount.
+provide('tutorial', tutorial);
+
+// Clear TERMINAL badge when the player opens the tutorial page
+watch(activeBrowserUrl, (url) => {
+    if (url?.startsWith(SPLICE.TERMINAL)) tutorial.clearBadge();
+});
+
+// Quest trigger: node inspected (any node click)
+watch(() => selectedNode.value, (node) => {
+    if (node) tutorial.markStepDone('inspect');
+});
+
+// Quest trigger: player actually moved (both old and new nodeId must be non-null
+// so the initial position load doesn't count as a move).
+// Also fires visit_cyberdoc if the destination is a CyberDoc hub node.
+watch(currentNodeId, (newVal, oldVal) => {
+    if (newVal && oldVal) {
+        tutorial.markStepDone('move');
+        const node = getByCanvasId(newVal);
+        if (node?.type === 'cyberdoc') tutorial.markStepDone('visit_cyberdoc');
+    }
+});
+
+// onTutorial — kept for GameMenu backward compat; opens TERMINAL page
 function onTutorial() {
-    onLaunch('splice://sys.local/tutorial');
+    onLaunch(SPLICE.TERMINAL);
+}
+
+// First-login modal
+const showWelcomeModal = computed(() =>
+    booted.value && !tutorial.tutorialSeen.value && !tutorial.tutorialSkipped.value
+);
+
+function onWelcomeStart() {
+    tutorial.markSeen();
+    onLaunch(SPLICE.TERMINAL);
+}
+
+function onWelcomeSkip() {
+    tutorial.skip();
 }
 
 // ── WebSocket — live server events ────────────────────────────────────────────
@@ -766,6 +905,9 @@ async function onHackComplete({ resource, amount }) {
     const nodeIce = effectiveNodeIce(node);  // ICE at time of hack — used for ping range
     activeHack.value = null;
 
+    // Quest trigger: first breach (success counts)
+    tutorial.markStepDone('hack');
+
     // Escalate node ICE — each successful breach tightens the node's defences
     if (nodeId) {
         nodeHackCounts.value.set(nodeId, (nodeHackCounts.value.get(nodeId) ?? 0) + 1);
@@ -823,6 +965,9 @@ async function onHackFailed({ resource, amount }) {
     // Capture node before clearing activeHack — needed for ICE + SS damage
     const failedNode = activeHack.value?.node ?? selectedNode.value;
     activeHack.value = null;
+
+    // Quest trigger: first breach (failure counts — you learn either way)
+    tutorial.markStepDone('hack');
 
     // Failed breach: no rewards.
 
@@ -985,6 +1130,15 @@ async function onUseCommand(cmd) {
 
     // ── Dispatch per-command map effects ──────────────────────────────────────
     switch (cmd.name) {
+
+        case 'Crash':
+            // Node-targeted trap — revert the premature cooldown and enter
+            // targeting mode. Cooldown is applied once the player picks a node.
+            match.cooldown  = false;
+            match.movesLeft = 0;
+            crashTargetMode.value = { cmd, match };
+            console.log('[CRASH] Targeting mode active — awaiting node selection.');
+            break;
 
         case 'Ghost Protocol':
             // Trace suppression: handled server-side by NodeController::deplete()
@@ -1285,7 +1439,13 @@ async function onUseConsumable(consumableId) {
 provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, currentNodeId, useConsumable: onUseConsumable });
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
+function onKeyDown(e) {
+    if (e.key === 'Escape') cancelCrashTarget();
+}
+
 onMounted(async () => {
+    window.addEventListener('keydown', onKeyDown);
+
     // Drive the replenish countdown in nodeResources — 1 s resolution is enough.
     _nowTick = setInterval(() => { _now.value = Date.now(); }, 1000);
 
@@ -1368,6 +1528,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+    window.removeEventListener('keydown', onKeyDown);
     ws.disconnect();
     stopBountyPolling();
     stopPendingPoll();
@@ -1378,6 +1539,97 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ── Welcome modal ───────────────────────────────────────────────────────────── */
+.welcome-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.welcome-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 32px 36px;
+    background: #06060e;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    box-shadow: 0 0 0 1px rgba(0,255,255,0.05), 0 24px 60px rgba(0,0,0,0.8);
+    max-width: 440px;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.welcome-tag {
+    font-size: 8px;
+    color: rgba(0, 255, 255, 0.3);
+    letter-spacing: 0.2em;
+}
+
+.welcome-title {
+    font-size: 20px;
+    color: #00FFFF;
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 20px rgba(0,255,255,0.3);
+}
+
+.welcome-body {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.04em;
+    line-height: 2;
+}
+
+.welcome-note {
+    display: block;
+    margin-top: 8px;
+    color: rgba(0, 255, 136, 0.5);
+    font-size: 9px;
+}
+
+.welcome-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.welcome-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.welcome-btn--primary {
+    padding: 10px 20px;
+    background: rgba(0, 255, 136, 0.08);
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    color: #00FF88;
+}
+.welcome-btn--primary:hover {
+    background: rgba(0, 255, 136, 0.15);
+    border-color: #00FF88;
+}
+
+.welcome-btn--ghost {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.2);
+    padding: 10px 4px;
+}
+.welcome-btn--ghost:hover { color: rgba(255,255,255,0.45); }
+
+.welcome-fade-enter-active,
+.welcome-fade-leave-active { transition: opacity 0.3s ease; }
+.welcome-fade-enter-from,
+.welcome-fade-leave-to     { opacity: 0; }
+
+/* ── Map row ─────────────────────────────────────────────────────────────────── */
 .map-row {
     display: flex;
     flex: 1;
@@ -1409,6 +1661,60 @@ onUnmounted(() => {
     pointer-events: none;
     z-index: 5;
 }
+
+/* ── Crash mine targeting banner ─────────────────────────────────────────────── */
+.crash-targeting-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px;
+    background: rgba(8, 4, 12, 0.9);
+    border: 1px solid rgba(255, 69, 180, 0.5);
+    font-family: 'JetBrains Mono', monospace;
+    z-index: 20;
+    box-shadow: 0 0 20px rgba(255, 69, 180, 0.15);
+}
+
+.ct-icon {
+    font-size: 11px;
+    color: rgba(255, 69, 180, 0.9);
+    animation: ct-pulse 1s ease-in-out infinite;
+}
+
+.ct-text {
+    font-size: 9px;
+    color: rgba(255, 69, 180, 0.85);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+}
+
+.ct-cancel {
+    background: transparent;
+    border: 1px solid rgba(255, 69, 180, 0.3);
+    color: rgba(255, 69, 180, 0.6);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.ct-cancel:hover {
+    border-color: rgba(255, 69, 180, 0.7);
+    color: rgba(255, 69, 180, 1);
+    background: rgba(255, 69, 180, 0.06);
+}
+
+@keyframes ct-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+.targeting-fade-enter-active,
+.targeting-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.targeting-fade-enter-from,
+.targeting-fade-leave-to     { opacity: 0; transform: translateX(-50%) translateY(-6px); }
 
 /* ── ICE alert banner ─────────────────────────────────────────────────────── */
 .ice-alert {

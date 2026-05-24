@@ -13,7 +13,12 @@
 import HomePage      from './pages/HomePage.vue';
 import CityFeed      from './pages/CityFeed.vue';
 import HowToPlay     from './pages/HowToPlay.vue';
-import CyberDocStore from './pages/CyberDocStore.vue';
+import CyberDocStore   from './pages/CyberDocStore.vue';
+import CyberDocPatch   from './pages/CyberDocPatch.vue';
+import CyberDocKnuckle from './pages/CyberDocKnuckle.vue';
+import CyberDocVeil    from './pages/CyberDocVeil.vue';
+import CyberDocAxiom   from './pages/CyberDocAxiom.vue';
+import CyberDocFloat   from './pages/CyberDocFloat.vue';
 import SysStats      from './pages/SysStats.vue';
 import SysRig        from './pages/SysRig.vue';
 import SysCommands       from './pages/SysCommands.vue';
@@ -31,7 +36,12 @@ const ROUTES = [
     { url: 'splice://home',              title: 'New Tab',          component: HomePage      },
     { url: 'splice://darknet.spk/feed',  title: 'DarkNet // Feed',  component: CityFeed      },
     { url: 'splice://sys.local/manual',  title: 'SYS Manual',       component: HowToPlay     },
-    { url: 'splice://cyberdoc.net/shop', title: 'CyberDoc // Shop', component: CyberDocStore },
+    { url: 'splice://cyberdoc.net/shop',    title: 'CyberDoc // Shop',         component: CyberDocStore   },
+    { url: 'splice://cyberdoc.ns/patch',   title: "Patch's Clinic",           component: CyberDocPatch   },
+    { url: 'splice://cyberdoc.ba/knuckle', title: "Knuckle's Med-Wagon",      component: CyberDocKnuckle },
+    { url: 'splice://cyberdoc.dt/veil',    title: "Veil's Parlour",           component: CyberDocVeil    },
+    { url: 'splice://cyberdoc.ud/axiom',   title: 'Axiom Systems',            component: CyberDocAxiom   },
+    { url: 'splice://cyberdoc.sv/float',   title: "Float's Repair Bay",       component: CyberDocFloat   },
 
     // ── Runner sys apps ───────────────────────────────────────────────────────
     { url: 'splice://sys.local/stats',     title: 'Runner Status', component: SysStats     },
@@ -60,7 +70,12 @@ export const SPLICE = {
     HOME:      'splice://home',
     FEED:      'splice://darknet.spk/feed',
     MANUAL:    'splice://sys.local/manual',
-    CYBER_DOC: 'splice://cyberdoc.net/shop',
+    CYBER_DOC:        'splice://cyberdoc.net/shop',   // generic fallback
+    CYBER_DOC_PATCH:   'splice://cyberdoc.ns/patch',
+    CYBER_DOC_KNUCKLE: 'splice://cyberdoc.ba/knuckle',
+    CYBER_DOC_VEIL:    'splice://cyberdoc.dt/veil',
+    CYBER_DOC_AXIOM:   'splice://cyberdoc.ud/axiom',
+    CYBER_DOC_FLOAT:   'splice://cyberdoc.sv/float',
 
     // Runner sys apps
     STATS:     'splice://sys.local/stats',
@@ -70,5 +85,6 @@ export const SPLICE = {
     STAT_GUIDE:       'splice://sys.local/guide/stats',
     GRID_BREACH_GUIDE: 'splice://sys.local/guide/gridbreach',
     TUTORIAL:          'splice://sys.local/tutorial',
+    TERMINAL:          'splice://sys.local/tutorial',   // NavBar TERMINAL app — same page as TUTORIAL
     INVENTORY: 'splice://sys.local/inventory',
 };

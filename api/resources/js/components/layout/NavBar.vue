@@ -25,6 +25,7 @@
         >
             <span class="tb-icon">{{ app.icon }}</span>
             <span class="tb-label">{{ app.label }}</span>
+            <span v-if="app.badged && hasTutorialBadge" class="tb-badge" />
         </button>
 
         <div class="tb-fill" />
@@ -46,16 +47,18 @@ import { SPLICE }   from '@/components/browser/SpliceRouter.js';
 import GameMenu from '@/components/layout/GameMenu.vue';
 
 const props = defineProps({
-    activeBrowserUrl: { type: String, default: null },
+    activeBrowserUrl:  { type: String,  default: null  },
+    hasTutorialBadge:  { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['launch', 'tutorial']);
 
 const APPS = [
-    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS' },
-    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'   },
-    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'  },
-    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'   },
+    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS'    },
+    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'       },
+    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'      },
+    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'       },
+    { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true },
 ];
 
 // Active when the browser is open on this app's URL
@@ -108,6 +111,7 @@ onUnmounted(() => clearInterval(timer));
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s, color 0.12s;
     flex-shrink: 0;
+    position: relative;
 }
 
 .tb-btn:hover {
@@ -134,6 +138,21 @@ onUnmounted(() => clearInterval(timer));
 .tb-app:hover .tb-label   { color: #00FFFF; }
 .tb-app.tb-btn--active .tb-icon  { color: #00FFFF; text-shadow: 0 0 8px rgba(0,255,255,0.6); }
 .tb-app.tb-btn--active .tb-label { color: rgba(0, 255, 255, 0.85); letter-spacing: 0.1em; }
+
+/* ── Badge dot — shown on TERMINAL when a quest step completes ────────────── */
+.tb-badge {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00FF88;
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.8);
+    animation: badge-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes badge-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
 /* ── Separator ────────────────────────────────────────────────────────────── */
 .tb-sep {

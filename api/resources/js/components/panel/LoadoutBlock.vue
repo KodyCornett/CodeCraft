@@ -171,13 +171,13 @@ function selectCmd(cmd) {
     font-family: 'JetBrains Mono', monospace;
 }
 .lb-idle-icon { font-size: 14px; color: rgba(0,255,255,0.4); }
-.lb-idle-text { font-size: 7px; color: rgba(0,255,255,0.7); letter-spacing: 0.14em; text-shadow: 0 0 8px rgba(0,255,255,.4); }
+.lb-idle-text { font-size: 9px; color: rgba(0,255,255,0.78); letter-spacing: 0.14em; text-shadow: 0 0 8px rgba(0,255,255,.4); }
 
 .lb-content { font-family: 'JetBrains Mono', monospace; }
 
 .lb-slot-label {
-    font-size: 7px;
-    color: rgba(0,255,255,.75);
+    font-size: 8px;
+    color: rgba(0,255,255,.82);
     letter-spacing: .14em;
     padding: 8px 14px 4px;
     text-shadow: 0 0 6px rgba(0,255,255,.4);
@@ -237,18 +237,18 @@ function selectCmd(cmd) {
     flex: 1;
     min-width: 0;
 }
-.lb-cmd-name { font-size: 8px; color: rgba(0,255,255,.75); letter-spacing: .06em; }
-.lb-cmd-tier { font-size: 7px; color: rgba(0,255,255,.3); }
-.lb-cmd-type { font-size: 6px; letter-spacing: .1em; padding: 1px 4px; border-radius: 1px; }
+.lb-cmd-name { font-size: 9px; color: rgba(0,255,255,.88); letter-spacing: .06em; }
+.lb-cmd-tier { font-size: 8px; color: rgba(0,255,255,.55); }
+.lb-cmd-type { font-size: 7px; letter-spacing: .1em; padding: 1px 4px; border-radius: 1px; }
 .type--trap      { color: rgba(255,69,180,.7); border: 1px solid rgba(255,69,180,.2); }
 .type--stealth   { color: rgba(125,249,255,.7); border: 1px solid rgba(125,249,255,.2); }
 .type--defensive { color: rgba(0,255,136,.7);  border: 1px solid rgba(0,255,136,.2); }
 .type--offensive { color: rgba(255,51,51,.8);  border: 1px solid rgba(255,51,51,.2); }
 
-.lb-cd-badge     { font-size: 6px; color: rgba(255,51,51,.5);  letter-spacing: .1em; }
-.lb-ready-badge  { font-size: 6px; color: rgba(0,255,136,.45); letter-spacing: .1em; }
+.lb-cd-badge     { font-size: 7px; color: rgba(255,51,51,.75);  letter-spacing: .1em; }
+.lb-ready-badge  { font-size: 7px; color: rgba(0,255,136,.75); letter-spacing: .1em; }
 .lb-active-badge {
-    font-size: 6px;
+    font-size: 7px;
     color: #7DF9FF;
     letter-spacing: .1em;
     animation: active-pulse 1s ease-in-out infinite;
@@ -271,24 +271,24 @@ function selectCmd(cmd) {
 }
 .lb-detail-row { display: flex; gap: 8px; align-items: flex-start; }
 .lb-detail-key {
-    font-size: 6px;
-    color: rgba(0,255,255,.28);
+    font-size: 8px;
+    color: rgba(0,255,255,.62);
     letter-spacing: .1em;
-    width: 30px;
+    width: 34px;
     flex-shrink: 0;
     padding-top: 1px;
 }
 .lb-detail-val {
-    font-size: 7px;
-    color: rgba(0,255,255,.55);
+    font-size: 9px;
+    color: rgba(0,255,255,.78);
     letter-spacing: .03em;
     line-height: 1.6;
 }
 
 .lb-hint {
     padding: 8px 14px 10px;
-    font-size: 7px;
-    color: rgba(0,255,255,.18);
+    font-size: 9px;
+    color: rgba(0,255,255,.52);
     letter-spacing: .06em;
     font-style: italic;
 }
@@ -314,8 +314,8 @@ function selectCmd(cmd) {
 
 .lb-cd-notice {
     margin-top: 6px;
-    font-size: 6px;
-    color: rgba(255,51,51,.45);
+    font-size: 8px;
+    color: rgba(255,51,51,.72);
     letter-spacing: .08em;
     line-height: 1.6;
 }
@@ -355,20 +355,20 @@ function selectCmd(cmd) {
     margin-bottom: 8px;
 }
 .lb-ss-label {
-    font-size: 7px;
-    color: rgba(0,255,255,.5);
+    font-size: 8px;
+    color: rgba(0,255,255,.72);
     letter-spacing: .18em;
     text-shadow: 0 0 8px rgba(0,255,255,.25);
 }
 .lb-ss-readout {
     font-size: 12px;
-    color: rgba(0,255,255,.8);
+    color: rgba(0,255,255,.9);
     letter-spacing: .04em;
     text-shadow: 0 0 10px rgba(0,255,255,.4);
 }
 .lb-ss-denom {
-    font-size: 8px;
-    color: rgba(0,255,255,.3);
+    font-size: 9px;
+    color: rgba(0,255,255,.55);
 }
 .lb-ss-track {
     position: relative;
@@ -405,7 +405,7 @@ function selectCmd(cmd) {
     align-items: center;
     min-height: 14px;
 }
-.lb-ss-pct { font-size: 8px; color: rgba(0,255,255,.4); letter-spacing: .06em; }
+.lb-ss-pct { font-size: 8px; color: rgba(0,255,255,.65); letter-spacing: .06em; }
 .ss-val--crit { color: #FF3333; text-shadow: 0 0 8px rgba(255,51,51,.5); }
 .ss-val--limp { color: #FF3333; text-shadow: 0 0 8px rgba(255,51,51,.5); }
 
@@ -418,10 +418,10 @@ function selectCmd(cmd) {
     animation: ss-crit-pulse .8s ease-in-out infinite;
 }
 .lb-stat { display: flex; align-items: center; gap: 4px; }
-.lb-stat-key { font-size: 6px; color: rgba(0,255,255,.25); letter-spacing: .1em; }
-.lb-stat-val { font-size: 8px; color: rgba(0,255,255,.5); }
+.lb-stat-key { font-size: 8px; color: rgba(0,255,255,.62); letter-spacing: .1em; }
+.lb-stat-val { font-size: 9px; color: rgba(0,255,255,.72); }
 .lb-stat--ready { color: #00FF88; }
-.lb-stat-sep { font-size: 8px; color: rgba(0,255,255,.2); }
+.lb-stat-sep { font-size: 9px; color: rgba(0,255,255,.38); }
 .lb-cd-warn {
     margin-left: auto;
     font-size: 6px;

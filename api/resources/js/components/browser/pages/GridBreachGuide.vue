@@ -154,8 +154,7 @@
                         A corrupted data row. Using a GLITCH row to confirm a correct coordinate
                         costs <strong class="hl-amber">−2 seconds</strong> from your timer.
                         Submitting a wrong coordinate in a GLITCH row costs <strong class="hl-red">−3 seconds</strong>.
-                        Avoid GLITCH rows unless the target is only seeded there — but that will never happen.
-                        Targets are always seeded in safe rows first.
+                        Avoid GLITCH rows where possible — targets can be seeded there, so sometimes you have no choice but to pay the penalty.
                     </p>
                 </div>
 
@@ -165,11 +164,15 @@
                 </div>
                 <div class="sec-rule">
                     <span class="rule-key">ICE 5–6</span>
-                    <span class="rule-val">Rows 4 and 8 are LOCKED. Row 8 is GLITCH.</span>
+                    <span class="rule-val">1 LOCKED row + 1 GLITCH row — positions randomised each match.</span>
                 </div>
                 <div class="sec-rule">
-                    <span class="rule-key">ICE 7+</span>
-                    <span class="rule-val">Row 2 also becomes LOCKED. Row 6 gains GLITCH at ICE 8.</span>
+                    <span class="rule-key">ICE 7</span>
+                    <span class="rule-val">2 LOCKED rows + 1 GLITCH row — positions randomised each match.</span>
+                </div>
+                <div class="sec-rule">
+                    <span class="rule-key">ICE 8+</span>
+                    <span class="rule-val">2 LOCKED rows + 2 GLITCH rows — positions randomised each match.</span>
                 </div>
             </section>
 
@@ -259,7 +262,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, inject, onMounted } from 'vue';
+
+// ── Tutorial trigger — marks 'read_manual' step when this page is visited ─────
+const tutorial = inject('tutorial', null);
+onMounted(() => tutorial?.markStepDone('read_manual'));
 
 defineProps({ url: { type: String, default: '' } });
 

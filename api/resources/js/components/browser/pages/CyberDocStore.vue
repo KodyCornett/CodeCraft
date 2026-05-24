@@ -3,8 +3,11 @@
 
         <header class="store-header">
             <div class="store-brand">
-                <span class="store-logo">⬡ CYBERDOC</span>
-                <span class="store-tagline">// Authorized Hardware &amp; Software Vendor</span>
+                <span class="store-logo">⬡ {{ npc.storeName.toUpperCase() }}</span>
+                <div class="store-brand-sub">
+                    <span class="store-district">{{ npc.district.toUpperCase() }}</span>
+                    <span class="store-tagline">// {{ npc.tagline }}</span>
+                </div>
             </div>
             <div class="store-balances">
                 <div class="bal-item">
@@ -50,6 +53,15 @@
                 :class="{ active: activeCategory === cat.id }"
                 @click="activeCategory = cat.id"
             >{{ cat.label }}</button>
+        </div>
+
+        <!-- ── Off-site lockout banner ──────────────────────────────────────── -->
+        <div v-if="!atCyberDoc" class="offsite-banner">
+            <span class="offsite-icon">⛔</span>
+            <div class="offsite-body">
+                <span class="offsite-title">NOT ON LOCATION</span>
+                <span class="offsite-sub">You are browsing remotely. Navigate to a CyberDoc node on the map to make purchases.</span>
+            </div>
         </div>
 
         <!-- ── Rigs shop ─────────────────────────────────────────────────────── -->
@@ -192,8 +204,8 @@
                         </div>
                         <button
                             class="ccard-buy-btn"
-                            :disabled="!chassisMaxed || rig.tier > 1 || !canAffordChassis(chassis)"
-                            :title="chassisBtnTitle(chassis)"
+                            :disabled="!atCyberDoc || !chassisMaxed || rig.tier > 1 || !canAffordChassis(chassis)"
+                            :title="!atCyberDoc ? 'Navigate to a CyberDoc node to purchase' : chassisBtnTitle(chassis)"
                             @click="onPurchaseChassis(chassis)"
                         >
                             {{ rig.tier > 1 ? 'OWNED TIER' : 'PURCHASE' }}
@@ -276,8 +288,8 @@
                     <button
                         v-if="s.canUp"
                         class="su-btn"
-                        :disabled="!canAffordStat(s.cost) || chassisMaxed"
-                        :title="chassisMaxed ? 'Chassis fully upgraded — purchase NullTek Series 2 to continue' : statBtnTitle(s)"
+                        :disabled="!atCyberDoc || !canAffordStat(s.cost) || chassisMaxed"
+                        :title="!atCyberDoc ? 'Navigate to a CyberDoc node to invest' : chassisMaxed ? 'Chassis fully upgraded — purchase NullTek Series 2 to continue' : statBtnTitle(s)"
                         @click="onUpgradeStat(s.key, s.cost)"
                     >INVEST</button>
 
@@ -340,8 +352,8 @@
                             </div>
                             <button
                                 class="cmd-buy-btn"
-                                :disabled="!canAfford(cmd) || !ramMeetsRequirement(tier)"
-                                :title="buyBtnTitle(cmd, tier)"
+                                :disabled="!atCyberDoc || !canAfford(cmd) || !ramMeetsRequirement(tier)"
+                                :title="!atCyberDoc ? 'Navigate to a CyberDoc node to purchase' : buyBtnTitle(cmd, tier)"
                                 @click="onBuyCommand(cmd)"
                             >PURCHASE</button>
                         </div>
@@ -382,7 +394,7 @@
                         <button
                             v-else
                             class="buy-btn"
-                            :disabled="playerCreds < item.price"
+                            :disabled="!atCyberDoc || playerCreds < item.price"
                             @click="onBuy(item)"
                         >PURCHASE</button>
                     </template>
@@ -392,7 +404,7 @@
                         <span v-if="consumableQty(item.id) > 0" class="item-qty">×{{ consumableQty(item.id) }}</span>
                         <button
                             class="buy-btn"
-                            :disabled="playerCreds < item.price"
+                            :disabled="!atCyberDoc || playerCreds < item.price"
                             @click="onBuy(item)"
                         >{{ consumableQty(item.id) > 0 ? '+1 MORE' : 'PURCHASE' }}</button>
                         <button
@@ -413,7 +425,18 @@ import { ref, computed, inject, onMounted } from 'vue';
 import axios from 'axios';
 import { useUpgradeCosts } from '@/composables/useUpgradeCosts.js';
 
-defineProps({ url: { type: String, default: '' } });
+defineProps({
+    url: { type: String, default: '' },
+    npc: {
+        type: Object,
+        default: () => ({
+            handle:    'CYBERDOC',
+            storeName: 'CyberDoc',
+            district:  'Network',
+            tagline:   'Authorized Hardware & Software Vendor',
+        }),
+    },
+});
 
 // ── Real player state from Game.vue ──────────────────────────────────────────
 const gameState     = inject('gameState', null);
@@ -423,6 +446,10 @@ const allCommands   = gameState?.commands       ?? ref([]);
 const inventory     = gameState?.inventory      ?? ref({ hardware: [], consumables: [] });
 const useConsumable = gameState?.useConsumable  ?? null;
 const currentNodeId = gameState?.currentNodeId  ?? ref(null);
+
+// Purchases are only permitted when the player is physically on a CyberDoc hub node.
+// All cyberdoc nodes follow the pattern XX-hub (NS-hub, BA-hub, DT-hub, UD-hub, SV-hub).
+const atCyberDoc = computed(() => currentNodeId.value?.endsWith('-hub') ?? false);
 
 const playerCreds       = computed(() => player.value?.creds       ?? 0);
 const playerPocketCreds = computed(() => player.value?.pocketCreds ?? 0);
@@ -879,8 +906,8 @@ function onResetCooldowns() {
 
 .store-brand {
     display: flex;
-    align-items: baseline;
-    gap: 12px;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .store-logo {
@@ -888,12 +915,28 @@ function onResetCooldowns() {
     color: #FFB300;
     letter-spacing: 0.12em;
     text-shadow: 0 0 14px rgba(255, 179, 0, 0.4);
+    line-height: 1;
+}
+
+.store-brand-sub {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.store-district {
+    font-size: 8px;
+    color: rgba(255, 179, 0, 0.55);
+    letter-spacing: 0.14em;
+    border: 1px solid rgba(255, 179, 0, 0.2);
+    padding: 0px 6px;
 }
 
 .store-tagline {
-    font-size: 9px;
-    color: rgba(255, 179, 0, 0.35);
-    letter-spacing: 0.07em;
+    font-size: 8px;
+    color: rgba(255, 179, 0, 0.32);
+    letter-spacing: 0.06em;
+    font-style: italic;
 }
 
 .store-balances {
@@ -1976,5 +2019,41 @@ function onResetCooldowns() {
 .use-btn:hover {
     background: rgba(0, 255, 136, 0.16);
     border-color: #00FF88;
+}
+
+/* ── Off-site lockout banner ──────────────────────────────────────────────── */
+.offsite-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 20px;
+    background: rgba(255, 51, 51, 0.05);
+    border-bottom: 1px solid rgba(255, 51, 51, 0.25);
+    flex-shrink: 0;
+}
+
+.offsite-icon {
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.offsite-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.offsite-title {
+    font-size: 9px;
+    color: #FF4444;
+    letter-spacing: 0.16em;
+}
+
+.offsite-sub {
+    font-size: 8px;
+    color: rgba(255, 68, 68, 0.6);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
 }
 </style>

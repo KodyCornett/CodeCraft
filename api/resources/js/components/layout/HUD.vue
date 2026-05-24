@@ -193,13 +193,13 @@ const flashClass = computed(() =>
 
 .hud-key {
     font-size: 9px;
-    color: rgba(0, 255, 255, 0.35);
+    color: rgba(0, 255, 255, 0.62);
     letter-spacing: 0.1em;
 }
 
 .hud-sep {
     font-size: 9px;
-    color: rgba(0, 255, 255, 0.2);
+    color: rgba(0, 255, 255, 0.38);
 }
 
 .hud-val {
@@ -208,7 +208,7 @@ const flashClass = computed(() =>
     letter-spacing: 0.06em;
 }
 
-.hud-val--dim { color: rgba(0, 255, 255, 0.55); }
+.hud-val--dim { color: rgba(0, 255, 255, 0.82); }
 
 /* ── Divider ──────────────────────────────────────────────────────────────── */
 .hud-divider {
@@ -228,7 +228,7 @@ const flashClass = computed(() =>
 .val-ss-dead { color: rgba(255,51,51,.3); }
 
 /* ── Tech Points ─────────────────────────────────────────────────────────── */
-.hud-val--tp { color: rgba(125,249,255,.75); }
+.hud-val--tp { color: rgba(125,249,255,.9); }
 
 /* ── Uplink states ────────────────────────────────────────────────────────── */
 .val-uplink-ok   { color: #00FF88; }
@@ -244,7 +244,7 @@ const flashClass = computed(() =>
 
 /* Hack counter */
 .hud-ticker     { font-size: 10px; letter-spacing: 0.06em; }
-.ticker--idle   { color: rgba(0, 255, 255, 0.45); }
+.ticker--idle   { color: rgba(0, 255, 255, 0.68); }
 .ticker--active { color: #FFB300; }
 .ticker--warn   {
     color: #FF6B00;

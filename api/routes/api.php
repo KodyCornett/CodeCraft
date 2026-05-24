@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BountyController;
+use App\Http\Controllers\TutorialController;
 use App\Http\Controllers\CombatChallengeController;
 use App\Http\Controllers\CombatController;
 use App\Http\Controllers\InventoryController;
@@ -111,6 +112,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/store/purchase-peripheral',     [StoreController::class, 'purchasePeripheral']);
     Route::post('/store/purchase-consumable',     [StoreController::class, 'purchaseConsumable']);
     Route::post('/store/purchase-command',        [StoreController::class, 'purchaseCommand']);
+
+// ---------------------------------------------------------------------------
+// Tutorial
+// ---------------------------------------------------------------------------
+
+    // Credits quest rewards directly to wallet_creds (safe — not stealable in PvP).
+    // Throttled to prevent reward farming; a new player completes at most 3 quests.
+    Route::post('/tutorial/reward', [TutorialController::class, 'reward'])
+        ->middleware('throttle:10,1');
 
 // ---------------------------------------------------------------------------
 // Inventory

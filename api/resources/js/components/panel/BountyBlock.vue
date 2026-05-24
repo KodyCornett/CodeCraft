@@ -154,15 +154,15 @@ function accuracyLabel(level) {
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
 }
-.bb-idle-icon { font-size: 14px; color: rgba(0,255,255,0.1); }
-.bb-idle-text { font-size: 7px; color: rgba(0,255,255,0.22); letter-spacing: 0.14em; }
-.bb-idle-sub  { font-size: 7px; color: rgba(0,255,255,0.12); letter-spacing: 0.06em; }
+.bb-idle-icon { font-size: 14px; color: rgba(0,255,255,0.35); }
+.bb-idle-text { font-size: 9px; color: rgba(0,255,255,0.75); letter-spacing: 0.14em; }
+.bb-idle-sub  { font-size: 9px; color: rgba(0,255,255,0.58); letter-spacing: 0.06em; }
 
 .bb-content { font-family: 'JetBrains Mono', monospace; }
 
 .bb-list-label {
-    font-size: 7px;
-    color: rgba(0,255,255,.18);
+    font-size: 8px;
+    color: rgba(0,255,255,.65);
     letter-spacing: .14em;
     padding: 8px 14px 4px;
 }
@@ -182,7 +182,7 @@ function accuracyLabel(level) {
 }
 
 .bb-os-banner {
-    font-size: 6px;
+    font-size: 8px;
     color: #FF3333;
     letter-spacing: .14em;
     animation: os-flash 1.2s ease-in-out infinite;
@@ -212,13 +212,13 @@ function accuracyLabel(level) {
 
 .bb-star       { font-size: 10px; line-height: 1; transition: color .2s; }
 .bb-star--lit  { color: #FFB300; text-shadow: 0 0 6px rgba(255,179,0,.8); }
-.bb-star--dim  { color: rgba(255,255,255,.12); }
+.bb-star--dim  { color: rgba(255,255,255,.28); }
 
 .bb-self-stars { display: flex; align-items: center; gap: 2px; }
 
 .bb-reward { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
-.bb-reward-label { font-size: 6px; color: rgba(0,255,136,.3); letter-spacing: .1em; }
-.bb-reward-val { font-size: 8px; color: #00FF88; letter-spacing: .06em; }
+.bb-reward-label { font-size: 7px; color: rgba(0,255,136,.65); letter-spacing: .1em; }
+.bb-reward-val { font-size: 9px; color: #00FF88; letter-spacing: .06em; }
 
 .bb-ping {
     display: flex;
@@ -226,14 +226,14 @@ function accuracyLabel(level) {
     gap: 8px;
 }
 .bb-ping-key {
-    font-size: 6px;
-    color: rgba(0,255,255,.22);
+    font-size: 7px;
+    color: rgba(0,255,255,.6);
     letter-spacing: .1em;
-    width: 36px;
+    width: 40px;
     flex-shrink: 0;
 }
-.bb-ping-val      { font-size: 7px; color: rgba(0,255,200,.55); letter-spacing: .06em; }
-.bb-ping-district { font-size: 7px; color: rgba(0,255,255,.4);  letter-spacing: .06em; }
+.bb-ping-val      { font-size: 8px; color: rgba(0,255,200,.82); letter-spacing: .06em; }
+.bb-ping-district { font-size: 8px; color: rgba(0,255,255,.72); letter-spacing: .06em; }
 
 .bb-accuracy {
     display: flex;
@@ -250,8 +250,8 @@ function accuracyLabel(level) {
 .pip--on  { background: #FF3333; box-shadow: 0 0 3px rgba(255,51,51,.5); }
 .pip--off { background: rgba(0,255,255,.1); }
 .bb-acc-label {
-    font-size: 6px;
-    color: rgba(255,51,51,.55);
+    font-size: 7px;
+    color: rgba(255,51,51,.78);
     letter-spacing: .1em;
     margin-left: 3px;
 }
@@ -270,15 +270,15 @@ function accuracyLabel(level) {
 .bb-self--os     { background: rgba(255,51,51,.03);  border-top-color: rgba(255,51,51,.2); }
 
 .bb-self-row { display: flex; align-items: center; gap: 8px; }
-.bb-self-key { font-size: 6px; color: rgba(0,255,255,.22); letter-spacing: .1em; width: 56px; flex-shrink: 0; }
+.bb-self-key { font-size: 8px; color: rgba(0,255,255,.65); letter-spacing: .1em; width: 72px; flex-shrink: 0; }
 .bb-self-val { font-size: 8px; letter-spacing: .06em; }
-.self--none   { color: rgba(0,255,136,.4); }
+.self--none   { color: rgba(0,255,136,.7); }
 .self--active { color: #FFB300; }
 
 .bb-self-mult        { font-size: 8px; color: #FFB300; letter-spacing: .06em; }
 .self-mult--os       { color: #FF4444; }
 .bb-os-self   {
-    font-size: 7px;
+    font-size: 8px;
     color: #FF3333;
     letter-spacing: .12em;
     animation: os-flash 1.2s ease-in-out infinite;

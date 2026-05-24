@@ -170,6 +170,21 @@
                 </g>
             </g>
 
+            <!-- Crash mine markers — client-only, only visible to placing player -->
+            <g class="crash-mine-layer">
+                <g
+                    v-for="mine in props.crashMines"
+                    :key="mine.canvasId"
+                    class="crash-mine"
+                    pointer-events="none"
+                >
+                    <circle :cx="mine.x" :cy="mine.y" r="11" class="mine-ring" />
+                    <line :x1="mine.x - 4" :y1="mine.y - 4" :x2="mine.x + 4" :y2="mine.y + 4" class="mine-cross" />
+                    <line :x1="mine.x + 4" :y1="mine.y - 4" :x2="mine.x - 4" :y2="mine.y + 4" class="mine-cross" />
+                    <text :x="mine.x" :y="mine.y - 15" class="mine-ttl">{{ mine.movesLeft }}M</text>
+                </g>
+            </g>
+
             <!-- Player marker — pulsing ring above everything else -->
             <g v-if="playerToken" class="player-marker">
                 <circle
@@ -237,6 +252,7 @@ const props = defineProps({
     nodes:         { type: Array,  default: () => [] },
     links:         { type: Array,  default: () => [] },
     pings:         { type: Array,  default: () => [] },
+    crashMines:    { type: Array,  default: () => [] },
     currentNodeId: { type: String, default: null     },
     playerUplink:  { type: Number, default: 3        },
     playerSs:      { type: Number, default: 100      },
@@ -442,13 +458,8 @@ function createDistrict(centerCell, neighborCells, name, abbr) {
         }
     }
 
-    // Use the true geometric midpoint for label placement so it stays centered
-    // regardless of which vertex the hub landed on.
-    const labelY = midPx.y < 150
-        ? midPx.y + HEX_SIZE * 2.5 + 20
-        : midPx.y - HEX_SIZE * 2.5 - 12;
-
-    return { name, color, hexPolygons, allNodes, hub, labelX: midPx.x, labelY };
+    // Place the label at the true geometric center of the cluster.
+    return { name, color, hexPolygons, allNodes, hub, labelX: midPx.x, labelY: midPx.y };
 }
 
 function createNeighborhood({ q, r, name }) {
@@ -1208,12 +1219,14 @@ defineExpose({
 
 .district-name {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
-    fill: rgba(0, 255, 255, 0.6);
+    font-size: 13px;
+    font-weight: 600;
+    fill: rgba(0, 255, 255, 0.88);
     text-anchor: middle;
     dominant-baseline: middle;
     pointer-events: none;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.16em;
+    filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.55)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
 }
 
 .route-edge {
@@ -1363,5 +1376,35 @@ defineExpose({
 @keyframes ping-dot-pulse {
     0%, 100% { opacity: 1;   transform: scale(1);   }
     50%       { opacity: 0.3; transform: scale(0.6); }
+}
+
+/* ── Crash mine markers ──────────────────────────────────────────────────────── */
+
+.mine-ring {
+    fill: rgba(255, 69, 180, 0.08);
+    stroke: rgba(255, 69, 180, 0.75);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 2;
+    animation: mine-pulse 1.4s ease-in-out infinite;
+}
+
+.mine-cross {
+    stroke: rgba(255, 69, 180, 0.85);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    animation: mine-pulse 1.4s ease-in-out infinite;
+}
+
+.mine-ttl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px;
+    fill: rgba(255, 69, 180, 0.65);
+    text-anchor: middle;
+    letter-spacing: 0.08em;
+}
+
+@keyframes mine-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
 }
 </style>
