@@ -93,9 +93,11 @@
                         :bounty-multiplier="player.bountyMultiplier"
                         :pvp-mode="true"
                         :pvp-opponent="activePvpCombat.opponent"
+                        :pvp-commands="pvpReadyCommands"
                         @complete="onPvpComplete"
                         @failed="onPvpComplete({ won: false, amount: 0 })"
                         @abort="activePvpCombat = null"
+                        @pvp-command-used="onPvpCommandUsed"
                     />
                 </Transition>
 
@@ -319,6 +321,10 @@ const {
 const activePvpCombat   = ref(null);   // { opponent, challengeId, nodeCanvasId } when combat is live
 const pvpResult         = ref(null);   // { won, loot } shown after combat
 const awaitingChallenge = ref(false);  // true while waiting for target to accept
+
+// Equipped commands passed into the PvP GridBreach command panel.
+// Includes each command's current cooldown state so the panel dims spent ones.
+const pvpReadyCommands = computed(() => commands.value.filter(c => c.equipped));
 
 // Critical system failure overlay — shown when SS hits 0
 const criticalFailure   = ref(null);   // { repairCost } or null
@@ -572,11 +578,6 @@ function fireFalsePing(targetNode) {
 let _movePingCounter = 0;
 function handlePlayerMoved(event) {
     onPlayerMoved(event);   // update currentNode, uplink, district
-
-    // Restore uplink to full whenever the player lands on a CyberDoc node
-    if (getByCanvasId(event.nodeId)?.type === 'cyberdoc') {
-        player.value.uplink = player.value.maxUplink;
-    }
 
     // Persist position to backend so other players can detect same-node presence.
     // The response carries remaining_uplink — sync it so a mid-session reload
@@ -1060,8 +1061,7 @@ async function bankCreds() {
         }
         player.value.pocketCreds = 0;
 
-        // Restore uplink to full
-        player.value.uplink = player.value.maxUplink;
+        // Uplink is restored by visit() when the storefront opens — not on bank.
 
         // Reset bounty run state
         player.value.bountyLevel      = result.player?.bounty_level      ?? 0;
@@ -1335,6 +1335,18 @@ function launchPvpGridBreach(opponent, challengeId, role) {
         iceLevel,
     };
     console.log(`[PVP] GridBreach launching vs ${opponent.handle} — ICE ${iceLevel}`);
+}
+
+// Called when the player activates a command inside PvP GridBreach.
+// Applies cooldown to the command in the shared commands ref so it's correctly
+// marked on-cooldown after the duel (same as map-mode command use).
+function onPvpCommandUsed({ commandId }) {
+    const cmd = commands.value.find(c => c.id === commandId);
+    if (cmd) {
+        cmd.cooldown  = true;
+        cmd.movesLeft = 0;
+    }
+    console.log(`[PVP CMD] Cooldown applied server-side for command ${commandId}`);
 }
 
 // Called when the PvP GridBreach timer expires and the player dismisses the overlay.

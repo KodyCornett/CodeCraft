@@ -168,6 +168,11 @@ class RigController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
+        $node = \App\Models\Node::find($player->current_node_id);
+        if ($node === null || $node->type !== 'cyberdoc') {
+            return response()->json(['message' => 'You must be at a CyberDoc terminal.'], 403);
+        }
+
         $rig = $this->rigService->getRigForPlayer($player);
         if ($rig === null) {
             return response()->json(['message' => 'No rig found for this player.'], 404);
@@ -250,6 +255,11 @@ class RigController extends Controller
         $player = Player::where('user_id', $request->user()->id)->first();
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $node = \App\Models\Node::find($player->current_node_id);
+        if ($node === null || $node->type !== 'cyberdoc') {
+            return response()->json(['message' => 'You must be at a CyberDoc terminal.'], 403);
         }
 
         $rig = $this->rigService->getRigForPlayer($player);

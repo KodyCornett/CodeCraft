@@ -97,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // CyberDoc
 // ---------------------------------------------------------------------------
 
+    Route::post('/cyberdoc/visit',           [CyberDocController::class, 'visit']);
     Route::post('/cyberdoc/bank',            [CyberDocController::class, 'bank']);
     Route::post('/cyberdoc/repair',          [CyberDocController::class, 'repair']);
     Route::post('/cyberdoc/install',         [CyberDocController::class, 'install']);

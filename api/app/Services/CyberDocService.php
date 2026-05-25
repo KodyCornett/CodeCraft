@@ -72,13 +72,8 @@ class CyberDocService
             }
 
             $player->save();
-
-            // Reset current_uplink to chassis base so the next run starts with a full pool.
-            $rig = $this->rigService->getRigForPlayer($player);
-            if ($rig !== null) {
-                $rig->current_uplink = (int) ($rig->chassis->base_uplink ?? 3);
-                $rig->save();
-            }
+            // Note: current_uplink is reset in CyberDocController::visit(), not here.
+            // Uplink restores when the player opens the storefront, not when they bank.
         });
 
         return ['pocket_banked' => $pocketBanked];

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Node;
 use App\Models\Player;
 use App\Services\CyberDocService;
 use App\Services\RigService;
@@ -14,6 +15,49 @@ class CyberDocController extends Controller
         private readonly CyberDocService $cyberDocService,
         private readonly RigService      $rigService,
     ) {}
+
+    /**
+     * Assert the player is physically at a CyberDoc node.
+     * Returns a 403 JsonResponse if not, or null if the check passes.
+     */
+    private function assertAtCyberDoc(Player $player): ?JsonResponse
+    {
+        $node = Node::find($player->current_node_id);
+        if ($node === null || $node->type !== 'cyberdoc') {
+            return response()->json(['message' => 'You must be at a CyberDoc terminal.'], 403);
+        }
+        return null;
+    }
+
+    /**
+     * POST /api/cyberdoc/visit
+     *
+     * Called when the player opens the CyberDoc storefront.
+     * Validates that the player is physically at a CyberDoc node, then
+     * resets current_uplink to chassis base and returns the new value.
+     *
+     * Body: {} (empty — identity comes from session)
+     */
+    public function visit(Request $request): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
+
+        $rig           = $this->rigService->getRigForPlayer($player);
+        $currentUplink = null;
+        if ($rig !== null) {
+            $currentUplink = $this->rigService->restoreUplinkToFull($rig);
+        }
+
+        return response()->json([
+            'message'        => 'CyberDoc terminal accessed.',
+            'current_uplink' => $currentUplink,
+        ]);
+    }
 
     /**
      * POST /api/cyberdoc/bank
@@ -29,6 +73,8 @@ class CyberDocController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         $cyberdocCanvasId = $request->input('cyberdoc_canvas_id');
         $result = $this->cyberDocService->bankCreds($player, $cyberdocCanvasId);
@@ -62,6 +108,8 @@ class CyberDocController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         try {
             $cost = $this->cyberDocService->repairCost($player);
@@ -100,6 +148,8 @@ class CyberDocController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
+
         try {
             $playerPeripheral = $this->cyberDocService->installEncrypt($player, $data['encrypt_id']);
         } catch (\InvalidArgumentException|\RuntimeException $e) {
@@ -134,6 +184,8 @@ class CyberDocController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
+
         try {
             $this->cyberDocService->setLoadout($player, $data['active_command_ids']);
         } catch (\InvalidArgumentException|\RuntimeException $e) {
@@ -165,6 +217,8 @@ class CyberDocController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         try {
             $newLevel = $this->cyberDocService->upgradeCommand($player, $data['command_id']);
@@ -198,6 +252,8 @@ class CyberDocController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         try {
             $result = $this->cyberDocService->reallocateStats($player, $data['from_stat'], $data['to_stat']);

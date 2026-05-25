@@ -332,10 +332,22 @@ class RigService
             $player->pvp_wins_this_run     = 0;
             $player->is_limping            = false;
 
-            // Teleport to a spawn node
-            $spawnNode = \App\Models\Node::where('is_spawn', true)->inRandomOrder()->first();
-            if ($spawnNode) {
-                $player->current_node_id = $spawnNode->id;
+            // Teleport to the nearest CyberDoc node so the player can pay for repairs
+            // immediately upon resuming play. Fall back to a random spawn node only if
+            // no CyberDoc nodes exist in the database.
+            $destNode    = null;
+            $currentNode = \App\Models\Node::find($player->current_node_id);
+            if ($currentNode !== null) {
+                $destNode = \App\Models\Node::where('type', 'cyberdoc')
+                    ->selectRaw('*, (POW(x - ?, 2) + POW(y - ?, 2)) AS dist', [$currentNode->x, $currentNode->y])
+                    ->orderBy('dist')
+                    ->first();
+            }
+            if ($destNode === null) {
+                $destNode = \App\Models\Node::where('is_spawn', true)->inRandomOrder()->first();
+            }
+            if ($destNode !== null) {
+                $player->current_node_id = $destNode->id;
             }
         }
 

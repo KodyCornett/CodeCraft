@@ -170,9 +170,11 @@ class CombatController extends Controller
             return response()->json(['message' => 'Player data missing.'], 500);
         }
 
-        // ── 1. Apply PvP damage to the loser's rig ────────────────────────────
-        // Must run first so we know whether it's an elimination before resolving loot.
+        // ── 1. Calculate PvP damage and determine elimination before touching pocket ──
         // Formula: max(15, 20 + (winnerCpu × 5) − (loserFirewall × 5))
+        // IMPORTANT: loot must be resolved before applyDamage() so that
+        // criticalFailure() (which zeroes pocket_creds) does not wipe the loot
+        // pool before the winner can claim it.
         $winnerRig   = $this->rigService->getRigForPlayer($winner);
         $loserRig    = $this->rigService->getRigForPlayer($loser);
         $damageEvent = null;
@@ -188,6 +190,18 @@ class CombatController extends Controller
             : 0;
         $pvpDamage = max(15, 20 + ($winnerCpu * 5) - ($loserFirewall * 5));
 
+        // Pre-calculate elimination so loot can be resolved before damage is applied.
+        $currentSs     = (int) ($loserRig?->current_ss ?? 0);
+        $isElimination = $loserRig !== null && ($currentSs - $pvpDamage) <= 0;
+
+        // ── 2. Resolve loot before applying damage ────────────────────────────
+        // Survivable: winner takes steal_pct%, loser keeps the rest (ICE seizes nothing).
+        // Elimination: winner takes steal_pct%, ICE seizes the rest, loser zeroed.
+        // Must run before applyDamage() — criticalFailure() zeroes pocket_creds and
+        // would wipe the loot pool if damage were applied first.
+        $loot = $this->bountyService->resolvePvpLoot($winner, $loser, $isElimination);
+
+        // ── 3. Apply PvP damage to the loser's rig ────────────────────────────
         if ($loserRig !== null) {
             $damageResult = $this->rigService->applyDamage(
                 rig:    $loserRig,
@@ -199,12 +213,6 @@ class CombatController extends Controller
             $damageEvent = $damageResult['event'];
         }
 
-        // ── 2. Resolve loot — behaviour depends on whether loser was eliminated ──
-        // Survivable: winner takes steal_pct%, loser keeps the rest (ICE seizes nothing).
-        // Elimination: winner takes steal_pct%, ICE seizes the rest, loser zeroed.
-        $isElimination = $damageEvent === 'critical_failure';
-        $loot = $this->bountyService->resolvePvpLoot($winner, $loser, $isElimination);
-
         // ── 3. Post-combat silent moves ────────────────────────────────────────
         // Both players get 2 moves of challenge immunity — enough to leave the node
         // and change direction before they can be attacked again.
@@ -212,9 +220,13 @@ class CombatController extends Controller
         $winner->save();
 
         // ── 4. Reset loser state ──────────────────────────────────────────────
-        // Critical failure already wiped bounty/run state in RigService::criticalFailure().
-        // For a survivable loss resetAfterPvpLoss() only sets is_limping.
-        $this->bountyService->resetAfterPvpLoss($loser);
+        // Critical failure already wiped bounty/run state in RigService::criticalFailure()
+        // and explicitly cleared is_limping (the player is beyond limping — they need repair).
+        // Only set is_limping for a survivable loss; do not overwrite the false that
+        // criticalFailure() already persisted.
+        if ($damageEvent !== 'critical_failure') {
+            $this->bountyService->resetAfterPvpLoss($loser);
+        }
 
         // Give loser the same 2-move window — resetAfterPvpLoss() calls save() so
         // we set this after and save again.

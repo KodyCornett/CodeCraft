@@ -1,6 +1,19 @@
 <template>
     <div class="store-page">
 
+        <!-- ── Location gate ─────────────────────────────────────────────────── -->
+        <div v-if="visitChecking" class="access-gate access-gate--checking">
+            <span class="gate-icon">◈</span>
+            <span class="gate-msg">AUTHENTICATING TERMINAL…</span>
+        </div>
+        <div v-else-if="!atCyberDoc" class="access-gate access-gate--denied">
+            <span class="gate-icon">⛔</span>
+            <span class="gate-msg">ACCESS DENIED</span>
+            <span class="gate-sub">You must be physically at a CyberDoc terminal.</span>
+        </div>
+
+        <template v-else>
+
         <header class="store-header">
             <div class="store-brand">
                 <span class="store-logo">⬡ {{ npc.storeName.toUpperCase() }}</span>
@@ -417,6 +430,8 @@
             </div>
         </div>
 
+        </template><!-- end v-else (atCyberDoc) -->
+
     </div>
 </template>
 
@@ -447,9 +462,31 @@ const inventory     = gameState?.inventory      ?? ref({ hardware: [], consumabl
 const useConsumable = gameState?.useConsumable  ?? null;
 const currentNodeId = gameState?.currentNodeId  ?? ref(null);
 
-// Purchases are only permitted when the player is physically on a CyberDoc hub node.
-// All cyberdoc nodes follow the pattern XX-hub (NS-hub, BA-hub, DT-hub, UD-hub, SV-hub).
-const atCyberDoc = computed(() => currentNodeId.value?.endsWith('-hub') ?? false);
+// Access is server-confirmed on mount via POST /api/cyberdoc/visit.
+// The server checks the player's current_node_id against node type === 'cyberdoc'.
+// Client-side location strings are not trusted for access control.
+const atCyberDoc    = ref(false);
+const visitChecking = ref(true);   // true while the visit request is in flight
+
+async function visitCyberDoc() {
+    visitChecking.value = true;
+    atCyberDoc.value    = false;
+    try {
+        const res = await axios.post('/api/cyberdoc/visit');
+        atCyberDoc.value = true;
+        // Sync uplink — server resets it to chassis base on every visit.
+        if (res.data.current_uplink != null && gameState?.player) {
+            gameState.player.value.uplink    = res.data.current_uplink;
+            gameState.player.value.maxUplink = res.data.current_uplink;
+        }
+        console.log('[CYBERDOC] Terminal accessed. Uplink restored.');
+    } catch (e) {
+        atCyberDoc.value = false;
+        console.warn('[CYBERDOC] Access denied:', e?.response?.data?.message ?? e.message);
+    } finally {
+        visitChecking.value = false;
+    }
+}
 
 const playerCreds       = computed(() => player.value?.creds       ?? 0);
 const playerPocketCreds = computed(() => player.value?.pocketCreds ?? 0);
@@ -654,7 +691,10 @@ async function fetchCatalog() {
     }
 }
 
-onMounted(fetchCatalog);
+onMounted(async () => {
+    await visitCyberDoc();
+    fetchCatalog();
+});
 
 const filteredItems = computed(() => {
     if (activeCategory.value === 'all') return catalogItems.value;
@@ -892,6 +932,22 @@ function onResetCooldowns() {
     font-family: 'JetBrains Mono', monospace;
     overflow: hidden;
 }
+
+/* ── Location gate ────────────────────────────────────────────────────────── */
+.access-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.access-gate--checking { color: #4FC3F7; }
+.access-gate--denied   { color: #ff4444; }
+.gate-icon { font-size: 32px; }
+.gate-msg  { font-size: 14px; letter-spacing: 0.15em; }
+.gate-sub  { font-size: 10px; opacity: 0.6; letter-spacing: 0.08em; }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 .store-header {

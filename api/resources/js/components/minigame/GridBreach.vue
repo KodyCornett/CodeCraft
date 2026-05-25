@@ -138,6 +138,51 @@
                 </div>
             </div>
 
+            <!-- ── PvP Command Panel — only rendered in pvpMode with equipped commands ── -->
+            <div v-if="pvpMode && pvpCommands.length > 0" class="gb-cmd-panel">
+                <div class="gb-cmd-panel-label">// HACK COMMANDS — ONE USE PER DUEL</div>
+                <div class="gb-cmd-slots">
+                    <button
+                        v-for="cmd in pvpCommands"
+                        :key="cmd.id"
+                        class="gb-cmd-slot"
+                        :class="{
+                            'gb-cmd-slot--ready':  !pvpCommandsUsed.has(cmd.id) && !cmd.cooldown && status === 'playing',
+                            'gb-cmd-slot--used':   pvpCommandsUsed.has(cmd.id),
+                            'gb-cmd-slot--cd':     cmd.cooldown && !pvpCommandsUsed.has(cmd.id),
+                            [`gb-cmd-slot--${cmd.type}`]: true,
+                        }"
+                        :disabled="status !== 'playing' || pvpCommandsUsed.has(cmd.id) || cmd.cooldown"
+                        @click="activatePvpCommand(cmd)"
+                        @mouseenter="selectedPvpCmd = cmd"
+                        @mouseleave="selectedPvpCmd = null"
+                    >
+                        <span class="gb-cmd-slot-name">{{ cmd.name.toUpperCase() }}</span>
+                        <span class="gb-cmd-slot-tier">T{{ cmd.tier }}</span>
+                        <span
+                            class="gb-cmd-slot-state"
+                            :class="{
+                                'state--used': pvpCommandsUsed.has(cmd.id),
+                                'state--cd':   cmd.cooldown && !pvpCommandsUsed.has(cmd.id),
+                                'state--rdy':  !pvpCommandsUsed.has(cmd.id) && !cmd.cooldown,
+                            }"
+                        >
+                            {{ pvpCommandsUsed.has(cmd.id) ? 'USED' : cmd.cooldown ? 'CD' : 'RDY' }}
+                        </span>
+                    </button>
+                </div>
+                <div class="gb-cmd-hint">
+                    <template v-if="selectedPvpCmd">
+                        <span class="gb-cmd-hint-name">{{ selectedPvpCmd.name.toUpperCase() }}</span>
+                        <span class="gb-cmd-hint-sep">//</span>
+                        <span class="gb-cmd-hint-effect">{{ selectedPvpCmd.hackEffect }}</span>
+                    </template>
+                    <template v-else>
+                        <span class="gb-cmd-hint-idle">Hover a command to preview its breach effect</span>
+                    </template>
+                </div>
+            </div>
+
             <!-- ── Status bar ────────────────────────────────────────────────── -->
             <div class="gb-statusbar">
                 <span>SYSTEM STATUS:</span>
@@ -185,9 +230,10 @@ const props = defineProps({
     bountyMultiplier: { type: Number,  default: 1.0     },
     pvpMode:          { type: Boolean, default: false   },
     pvpOpponent:      { type: Object,  default: null    },
+    pvpCommands:      { type: Array,   default: () => [] },  // equipped commands, passed only in pvpMode
 });
 
-const emit = defineEmits(['complete', 'failed', 'abort']);
+const emit = defineEmits(['complete', 'failed', 'abort', 'pvp-command-used']);
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLS = ['A','B','C','D','E','F','G','H','I','J'];
@@ -358,6 +404,7 @@ function getSafeRows() {
 // ─── Scramble — fires every 2 seconds ─────────────────────────────────────────
 function scrambleGrid() {
     if (status.value !== 'playing') return;
+    if (isScrambleSuppressed()) return;   // PvP: Firewall Patch / Blackout / DDOS suppress this
 
     const g = grid.value.map(row => [...row]);
 
@@ -524,6 +571,13 @@ function cellClass(rIdx, cIdx, cell) {
             && cell === sequence.value[currentStep.value]
             && meta.modifier !== 'locked';
         if (isTarget) classes.push('cell--target');
+
+        // PvP OS Exploit: flash ALL remaining sequence targets on the board
+        if (highlightAllTargets.value && props.pvpMode && status.value === 'playing'
+                && sequence.value.slice(currentStep.value).includes(cell)
+                && meta.modifier !== 'locked') {
+            classes.push('cell--pvp-reveal');
+        }
     }
 
     if (flashCell.value?.row === rIdx && flashCell.value?.col === cIdx) {
@@ -565,6 +619,256 @@ const gainDisplay = computed(() => {
     if (score.value === 0) return '';
     return `(${score.value} SEQ COMPLETE)`;
 });
+
+// ─── PvP command system ───────────────────────────────────────────────────────
+//
+// Commands are only available when pvpMode === true and pvpCommands.length > 0.
+// Each command may be used at most once per match (tracked in pvpCommandsUsed).
+// Emitting 'pvp-command-used' tells Game.vue to apply the cooldown to the
+// command in the shared commands ref so it appears on-cooldown after the duel.
+//
+// Because PvP GridBreach is not real-time between players (both run solo, winner
+// determined by score comparison on the server), every "opponent" effect from
+// the hackEffect descriptions is translated into a self-benefit for this player:
+//
+//   Crash / Signal Noise / Decoy  → seed extra target copies into your grid
+//   Firewall Patch                → suppress board scrambles for 8 s
+//   Ghost Protocol / Scramble / Fork Bomb → seed all remaining targets into grid
+//   Packet Flood                  → +12 s on timer
+//   Dark Mode                     → +10 s on timer
+//   Blackout                      → suppress scrambles 10 s + add 5 s
+//   Trojan / RootKit              → auto-advance 1 sequence step
+//   OS Exploit                    → flash all remaining targets for 3 s
+//   Buffer Overflow               → unlock all locked rows for 15 s
+//   DDOS                          → suppress scrambles 3 s (board freeze)
+//
+
+// Tracks IDs of commands already used this match (Set inside ref — replaced on each use
+// so Vue reactivity fires correctly without needing reactive()).
+const pvpCommandsUsed = ref(new Set());
+
+// Scramble suppression: scrambleGrid() returns early while Date.now() < this value.
+const scrambleSuppressUntil = ref(0);
+
+// OS Exploit reveal: all remaining-sequence cells glow when this is true.
+const highlightAllTargets = ref(false);
+
+// Hovered command in the command panel — drives the hint line at the bottom.
+const selectedPvpCmd = ref(null);
+
+// Cleanup handles for timed PvP effects.
+let _highlightTimer    = null;
+let _rowUnlockTimer    = null;
+let _savedRowModifiers = null;   // holds the pre-unlock modifier map
+
+/** Returns true if scramble suppression is currently active, pruning expired entries. */
+function isScrambleSuppressed() {
+    if (scrambleSuppressUntil.value <= 0) return false;
+    if (Date.now() < scrambleSuppressUntil.value) return true;
+    scrambleSuppressUntil.value = 0;
+    return false;
+}
+
+// ── Per-effect helpers ────────────────────────────────────────────────────────
+
+function pvpAddTime(seconds) {
+    timeLeft.value += seconds;
+    showFlash(`+${seconds}s INJECTED INTO TIMER`, 'correct');
+}
+
+function pvpSuppressScramble(seconds) {
+    scrambleSuppressUntil.value = Date.now() + seconds * 1_000;
+    showFlash(`SCRAMBLE SUPPRESSED — ${seconds}s`, 'correct');
+}
+
+/** Seeds N extra copies of the current sequence target into safe, unlocked cells. */
+function pvpSeedExtraTargets(count) {
+    const target = sequence.value[currentStep.value];
+    if (!target) return;
+    const g        = grid.value.map(row => [...row]);
+    const safeRows = getSafeRows();
+    let   seeded   = 0;
+    for (let attempt = 0; attempt < 40 && seeded < count; attempt++) {
+        const row = safeRows[Math.floor(Math.random() * safeRows.length)];
+        const col = Math.floor(Math.random() * 10);
+        if (!lockedCells.value.has(`${row},${col}`)) {
+            g[row][col] = target;
+            seeded++;
+        }
+    }
+    grid.value = g;
+    showFlash(`${seeded} EXTRA TARGET${seeded !== 1 ? 'S' : ''} SEEDED INTO GRID`, 'correct');
+}
+
+/** Seeds 2 copies of every remaining sequence target into safe cells. */
+function pvpSeedAllRemainingTargets() {
+    const g        = grid.value.map(row => [...row]);
+    const safeRows = getSafeRows();
+    const remaining = sequence.value.slice(currentStep.value);
+    remaining.forEach((val, i) => {
+        for (let copy = 0; copy < 2; copy++) {
+            const row = safeRows[(i * 3 + copy) % safeRows.length];
+            const col = Math.floor(Math.random() * 10);
+            if (!lockedCells.value.has(`${row},${col}`)) {
+                g[row][col] = val;
+            }
+        }
+    });
+    grid.value = g;
+    showFlash('FULL SEQUENCE SEEDED — ALL TARGETS VISIBLE', 'correct');
+}
+
+/**
+ * Finds the first unlocked cell matching the current target and locks it in,
+ * advancing the sequence. If no match exists on the current board the target
+ * is injected into the first available safe cell then confirmed.
+ */
+function pvpAutoAdvanceStep() {
+    if (status.value !== 'playing') return;
+    const target   = sequence.value[currentStep.value];
+    if (!target) return;
+    const safeRows = getSafeRows();
+
+    for (const row of safeRows) {
+        for (let col = 0; col < 10; col++) {
+            const key = `${row},${col}`;
+            if (!lockedCells.value.has(key) && grid.value[row][col] === target) {
+                setFlashCell(row, col, 'correct');
+                lockedCells.value = new Map([...lockedCells.value, [key, target]]);
+                currentStep.value++;
+                rivalPressure.value = Math.min(99, rivalPressure.value + 3);
+                if (currentStep.value >= sequence.value.length) {
+                    score.value++;
+                    buildSequence();
+                    scrambleGrid();
+                    showFlash(`SEQUENCE AUTO-BREACHED — SCORE: ${score.value}`, 'correct');
+                } else {
+                    scrambleGrid();
+                    showFlash(`AUTO-ADVANCE: ${target} CONFIRMED`, 'correct');
+                }
+                return;
+            }
+        }
+    }
+    // Target not visible — inject it then confirm
+    const g = grid.value.map(row => [...row]);
+    seedCurrentTarget(g);
+    grid.value = g;
+    currentStep.value++;
+    rivalPressure.value = Math.min(99, rivalPressure.value + 3);
+    if (currentStep.value >= sequence.value.length) {
+        score.value++;
+        buildSequence();
+        scrambleGrid();
+        showFlash(`SEQUENCE AUTO-BREACHED — SCORE: ${score.value}`, 'correct');
+    } else {
+        showFlash(`AUTO-ADVANCE: ${target} INJECTED + CONFIRMED`, 'correct');
+    }
+}
+
+/** Highlights all remaining-sequence matching cells for N seconds (OS Exploit). */
+function pvpFlashAllTargets(seconds) {
+    clearTimeout(_highlightTimer);
+    highlightAllTargets.value = true;
+    const current = sequence.value[currentStep.value];
+    showFlash(`TARGET LOCK — ALL [${current}] HIGHLIGHTED FOR ${seconds}s`, 'correct');
+    _highlightTimer = setTimeout(() => { highlightAllTargets.value = false; }, seconds * 1_000);
+}
+
+/**
+ * Clears all row modifiers (locked / glitch) for 15 s, re-seeding the board so
+ * every row is accessible. Restores original modifiers after the timer expires.
+ * (Buffer Overflow — bypasses ICE-locked rows for 1 sequence duration.)
+ */
+function pvpUnlockAllRows() {
+    if (_savedRowModifiers === null) {
+        _savedRowModifiers = new Map(rowModifiers.value);
+    }
+    rowModifiers.value = new Map();
+    // Re-seed all remaining targets now that all rows are accessible
+    const g = grid.value.map(row => [...row]);
+    seedAllTargets(g, sequence.value);
+    grid.value = g;
+    showFlash('ICE ROWS BYPASSED — ALL ROWS ACCESSIBLE', 'correct');
+    clearTimeout(_rowUnlockTimer);
+    _rowUnlockTimer = setTimeout(() => {
+        if (_savedRowModifiers !== null) {
+            rowModifiers.value = _savedRowModifiers;
+            _savedRowModifiers = null;
+        }
+    }, 15_000);
+}
+
+// ── Main PvP command dispatcher ───────────────────────────────────────────────
+
+function activatePvpCommand(cmd) {
+    if (status.value !== 'playing') return;
+    if (pvpCommandsUsed.value.has(cmd.id)) return;
+    if (cmd.cooldown) return;
+
+    // Mark used — replace the Set so Vue reactivity fires
+    pvpCommandsUsed.value = new Set([...pvpCommandsUsed.value, cmd.id]);
+    // Tell Game.vue to apply cooldown to this command
+    emit('pvp-command-used', { commandId: cmd.id });
+
+    switch (cmd.name) {
+        case 'Crash':
+        case 'Signal Noise':
+        case 'Decoy':
+            pvpSeedExtraTargets(3);
+            break;
+
+        case 'Firewall Patch':
+            pvpSuppressScramble(8);
+            break;
+
+        case 'Ghost Protocol':
+        case 'Scramble':
+            pvpSeedAllRemainingTargets();
+            break;
+
+        case 'Packet Flood':
+            pvpAddTime(12);
+            break;
+
+        case 'Dark Mode':
+            pvpAddTime(10);
+            break;
+
+        case 'Blackout':
+            pvpSuppressScramble(10);
+            pvpAddTime(5);
+            break;
+
+        case 'Trojan':
+        case 'RootKit':
+            pvpAutoAdvanceStep();
+            break;
+
+        case 'OS Exploit':
+            pvpFlashAllTargets(3);
+            break;
+
+        case 'Buffer Overflow':
+            pvpUnlockAllRows();
+            break;
+
+        case 'DDOS':
+            pvpSuppressScramble(3);
+            break;
+
+        case 'Fork Bomb':
+            pvpSeedAllRemainingTargets();
+            pvpAddTime(8);
+            break;
+
+        default:
+            pvpSeedExtraTargets(3);
+            break;
+    }
+
+    console.log(`[PVP CMD] ${cmd.name.toUpperCase()} activated inside GridBreach`);
+}
 
 // ─── Reward formula ───────────────────────────────────────────────────────────
 //
@@ -703,6 +1007,8 @@ onUnmounted(() => {
     clearInterval(tickInterval);
     clearInterval(scrambleInterval);
     clearTimeout(flashTimerRef.value);
+    clearTimeout(_highlightTimer);
+    clearTimeout(_rowUnlockTimer);
 });
 </script>
 
@@ -1145,4 +1451,105 @@ onUnmounted(() => {
 
 .outcome-fade-enter-active { transition: opacity 0.25s ease; }
 .outcome-fade-enter-from   { opacity: 0; }
+
+/* ── PvP reveal cell (OS Exploit) ───────────────────────────────────────────── */
+.cell--pvp-reveal {
+    color: #FF69B4 !important;
+    text-shadow: 0 0 8px rgba(255,105,180,0.65);
+    animation: pvp-reveal-pulse 0.6s ease-in-out infinite;
+}
+@keyframes pvp-reveal-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── PvP Command Panel ──────────────────────────────────────────────────────── */
+.gb-cmd-panel {
+    border-top: 1px solid rgba(255,105,180,0.15);
+    border-bottom: 1px solid rgba(255,105,180,0.08);
+    background: rgba(255,105,180,0.025);
+    padding: 7px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gb-cmd-panel-label {
+    font-size: 8px;
+    color: rgba(255,105,180,0.55);
+    letter-spacing: 0.14em;
+}
+
+.gb-cmd-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.gb-cmd-slot {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    background: transparent;
+    border: 1px solid rgba(255,105,180,0.18);
+    color: rgba(255,105,180,0.5);
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 8px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+.gb-cmd-slot--ready {
+    border-color: rgba(255,105,180,0.4);
+    color: rgba(255,105,180,0.85);
+}
+.gb-cmd-slot--ready:hover:not(:disabled) {
+    border-color: #FF69B4;
+    color: #FF69B4;
+    background: rgba(255,105,180,0.07);
+    box-shadow: 0 0 8px rgba(255,105,180,0.15);
+}
+.gb-cmd-slot--used {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: rgba(255,105,180,0.08);
+}
+.gb-cmd-slot--cd {
+    opacity: 0.28;
+    cursor: not-allowed;
+    border-color: rgba(255,51,51,0.15);
+    color: rgba(255,51,51,0.4);
+}
+
+/* Per command-type accent colours */
+.gb-cmd-slot--offensive.gb-cmd-slot--ready { border-color: rgba(255,51,51,0.45); color: rgba(255,51,51,0.85); }
+.gb-cmd-slot--offensive.gb-cmd-slot--ready:hover:not(:disabled) { border-color: #FF3333; color: #FF3333; background: rgba(255,51,51,0.07); box-shadow: 0 0 8px rgba(255,51,51,0.15); }
+.gb-cmd-slot--stealth.gb-cmd-slot--ready  { border-color: rgba(125,249,255,0.4); color: rgba(125,249,255,0.85); }
+.gb-cmd-slot--stealth.gb-cmd-slot--ready:hover:not(:disabled)  { border-color: #7DF9FF; color: #7DF9FF; background: rgba(125,249,255,0.07); box-shadow: 0 0 8px rgba(125,249,255,0.15); }
+.gb-cmd-slot--defensive.gb-cmd-slot--ready{ border-color: rgba(0,255,136,0.4);  color: rgba(0,255,136,0.85); }
+.gb-cmd-slot--defensive.gb-cmd-slot--ready:hover:not(:disabled){ border-color: #00FF88; color: #00FF88; background: rgba(0,255,136,0.07); box-shadow: 0 0 8px rgba(0,255,136,0.15); }
+.gb-cmd-slot--trap.gb-cmd-slot--ready     { border-color: rgba(255,179,0,0.4);  color: rgba(255,179,0,0.85); }
+.gb-cmd-slot--trap.gb-cmd-slot--ready:hover:not(:disabled)     { border-color: #FFB300; color: #FFB300; background: rgba(255,179,0,0.07); box-shadow: 0 0 8px rgba(255,179,0,0.15); }
+
+.gb-cmd-slot-name { font-size: 8px; letter-spacing: 0.06em; }
+.gb-cmd-slot-tier { font-size: 7px; opacity: 0.55; }
+
+.gb-cmd-slot-state {
+    font-size: 6px;
+    letter-spacing: 0.1em;
+    margin-left: 2px;
+}
+.state--rdy  { color: rgba(0,255,136,0.7); }
+.state--used { color: rgba(255,255,255,0.2); }
+.state--cd   { color: rgba(255,51,51,0.5); }
+
+.gb-cmd-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 8px;
+    min-height: 14px;
+}
+.gb-cmd-hint-name   { color: #FF69B4; letter-spacing: 0.06em; flex-shrink: 0; }
+.gb-cmd-hint-sep    { color: rgba(255,105,180,0.3); flex-shrink: 0; }
+.gb-cmd-hint-effect { color: rgba(0,255,255,0.55); letter-spacing: 0.03em; }
+.gb-cmd-hint-idle   { color: rgba(255,105,180,0.25); letter-spacing: 0.04em; font-style: italic; }
 </style>

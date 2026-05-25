@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Command;
 use App\Models\Consumable;
+use App\Models\Node;
 use App\Models\Peripheral;
 use App\Models\Player;
 use App\Services\InventoryService;
@@ -14,6 +15,19 @@ use Illuminate\Support\Facades\DB;
 class StoreController extends Controller
 {
     public function __construct(private readonly InventoryService $inventoryService) {}
+
+    /**
+     * Assert the player is physically at a CyberDoc node.
+     * Returns a 403 JsonResponse if not, or null if the check passes.
+     */
+    private function assertAtCyberDoc(Player $player): ?JsonResponse
+    {
+        $node = Node::find($player->current_node_id);
+        if ($node === null || $node->type !== 'cyberdoc') {
+            return response()->json(['message' => 'You must be at a CyberDoc terminal.'], 403);
+        }
+        return null;
+    }
 
     // -------------------------------------------------------------------------
     // Catalog
@@ -82,6 +96,8 @@ class StoreController extends Controller
             return response()->json(['message' => 'Player not found.'], 404);
         }
 
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
+
         try {
             $encrypt = $this->inventoryService->purchasePeripheral($player, $data['peripheral_id']);
         } catch (\InvalidArgumentException $e) {
@@ -121,6 +137,8 @@ class StoreController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         try {
             $row = $this->inventoryService->purchaseConsumable($player, $data['consumable_id']);
@@ -163,6 +181,8 @@ class StoreController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
+
+        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         $command = Command::find($data['command_id']);
         if ($command === null) {
