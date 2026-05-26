@@ -128,14 +128,14 @@ class PlayerController extends Controller
             ->get()
             ->keyBy('id');
 
-        $catalog = \App\Models\Command::orderBy('tier')->orderBy('name')->get();
+        $catalog = \App\Models\Command::orderBy('context')->orderBy('name')->get();
 
         $commands = $catalog->map(function ($cmd) use ($owned) {
             $playerCmd = $owned->get($cmd->id);
             return [
                 'id'          => $cmd->id,
                 'name'        => $cmd->name,
-                'tier'        => $cmd->tier,
+                'context'     => $cmd->context,   // 'map' | 'hack'
                 'type'        => $cmd->type,
                 'description' => $cmd->description,
                 'price'       => [
@@ -146,10 +146,12 @@ class PlayerController extends Controller
                     'maxLevel' => (int) $cmd->max_level,
                     'costTp'   => (int) $cmd->upgrade_cost_tp,
                 ],
-                'targetType'  => $cmd->target_type,
-                'duration'    => $cmd->duration,   // array|null via cast
-                'mapEffect'   => $cmd->map_effect,
-                'hackEffect'  => $cmd->hack_effect,
+                'targetType'          => $cmd->target_type,
+                'duration'            => $cmd->duration,            // array|null via cast
+                'levelScaling'        => $cmd->level_scaling,       // array|null via cast
+                'mapEffect'           => $cmd->map_effect,
+                'gridbreachEffect'    => $cmd->gridbreach_effect,
+                'packethijackEffect'  => $cmd->packethijack_effect,
                 // Player-specific state
                 'owned'       => $playerCmd !== null,
                 'equipped'    => $playerCmd?->pivot->is_active ?? false,

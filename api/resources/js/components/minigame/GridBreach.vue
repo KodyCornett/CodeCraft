@@ -49,7 +49,7 @@
             <div class="gb-rule gb-rule--light" />
 
             <!-- ── Grid ─────────────────────────────────────────────────────── -->
-            <div class="gb-grid-section">
+            <div class="gb-grid-section" :class="{ 'gb-grid-section--flicker': gridFlicker }">
 
                 <!-- Column headers -->
                 <div class="gb-col-row">
@@ -175,7 +175,7 @@
                     <template v-if="selectedPvpCmd">
                         <span class="gb-cmd-hint-name">{{ selectedPvpCmd.name.toUpperCase() }}</span>
                         <span class="gb-cmd-hint-sep">//</span>
-                        <span class="gb-cmd-hint-effect">{{ selectedPvpCmd.hackEffect }}</span>
+                        <span class="gb-cmd-hint-effect">{{ selectedPvpCmd.gridbreachEffect }}</span>
                     </template>
                     <template v-else>
                         <span class="gb-cmd-hint-idle">Hover a command to preview its breach effect</span>
@@ -408,10 +408,13 @@ function scrambleGrid() {
 
     const g = grid.value.map(row => [...row]);
 
-    // Regenerate all non-locked cells
+    // Regenerate all non-locked, non-decoy cells.
+    // Decoy cells are kept stable so they continue to display the fake target value
+    // for the remainder of their 2.5 s window.
     for (let r = 0; r < 10; r++) {
         for (let c = 0; c < 10; c++) {
-            if (!lockedCells.value.has(`${r},${c}`)) {
+            const key = `${r},${c}`;
+            if (!lockedCells.value.has(key) && !decoyCoords.value.has(key)) {
                 g[r][c] = randHex();
             }
         }
@@ -435,7 +438,10 @@ function seedCurrentTarget(g) {
     for (let attempt = 0; attempt < 30; attempt++) {
         const row = safeRows[Math.floor(Math.random() * safeRows.length)];
         const col = Math.floor(Math.random() * 10);
-        if (!lockedCells.value.has(`${row},${col}`)) {
+        const key = `${row},${col}`;
+        // Never place the real target on a decoy cell — the player must be able
+        // to distinguish by position, not just by finding any cell with the value.
+        if (!lockedCells.value.has(key) && !decoyCoords.value.has(key)) {
             g[row][col] = target;
             return;
         }
@@ -485,6 +491,18 @@ function submitCoord() {
 
     const cellVal = grid.value[row][col];
     const target  = sequence.value[currentStep.value];
+
+    // Decoy intercept — must run before the value comparison because decoy cells
+    // deliberately display the target value and would otherwise register as correct.
+    if (decoyCoords.value.has(cellKey)) {
+        setFlashCell(row, col, 'wrong');
+        showFlash(`DECOY TRIGGERED — FALSE TARGET @ ${COLS[col]}${row + 1} — KEEP SEARCHING`, 'wrong');
+        // Remove this individual decoy so the same trap can't fire twice
+        const trimmed = new Set(decoyCoords.value);
+        trimmed.delete(cellKey);
+        decoyCoords.value = trimmed;
+        return;
+    }
 
     if (cellVal === target) {
         // ✓ Correct coordinate
@@ -656,10 +674,22 @@ const highlightAllTargets = ref(false);
 // Hovered command in the command panel — drives the hint line at the bottom.
 const selectedPvpCmd = ref(null);
 
+// Crash command: brief visual flicker on the entire grid section.
+const gridFlicker = ref(false);
+
+// Decoy command: tracks "row,col" keys whose cells display the current target
+// value but are fake — intercepted in submitCoord before the value check passes.
+// Also respected by scrambleGrid (keeps fakes stable) and seedCurrentTarget
+// (never places the real target on a decoy cell).
+const decoyCoords = ref(new Set());
+
 // Cleanup handles for timed PvP effects.
-let _highlightTimer    = null;
-let _rowUnlockTimer    = null;
-let _savedRowModifiers = null;   // holds the pre-unlock modifier map
+let _highlightTimer      = null;
+let _rowUnlockTimer      = null;
+let _flickerTimer        = null;
+let _signalNoiseTimer    = null;
+let _decoyTimer          = null;
+let _savedRowModifiers   = null;   // holds the pre-unlock modifier map
 
 /** Returns true if scramble suppression is currently active, pruning expired entries. */
 function isScrambleSuppressed() {
@@ -799,6 +829,86 @@ function pvpUnlockAllRows() {
     }, 15_000);
 }
 
+/**
+ * Crash — flickers the entire grid section for 1.5 s.
+ * Pure visual disruption; no cell values are changed.
+ */
+function pvpFlickerGrid() {
+    clearTimeout(_flickerTimer);
+    gridFlicker.value = true;
+    showFlash('CRASH PULSE — GRID INTERFERENCE', 'wrong');
+    _flickerTimer = setTimeout(() => { gridFlicker.value = false; }, 1_500);
+}
+
+/**
+ * Signal Noise — temporarily marks one random unmodified row as 'glitch' for 1.5 s.
+ * Uses the same rules as a seeded glitch row: correct pick costs −2 s, wrong pick
+ * costs −3 s, and the row displays in amber with the GLITCH! tag.
+ */
+function pvpTempGlitchRow() {
+    const available = Array.from({ length: 10 }, (_, i) => i)
+        .filter(i => !rowModifiers.value.has(i));
+    if (available.length === 0) return;
+
+    const row    = available[Math.floor(Math.random() * available.length)];
+    const newMap = new Map(rowModifiers.value);
+    newMap.set(row, 'glitch');
+    rowModifiers.value = newMap;
+
+    showFlash(`SIGNAL NOISE — ROW ${row + 1} CORRUPTED (1.5s)`, 'glitch');
+
+    clearTimeout(_signalNoiseTimer);
+    _signalNoiseTimer = setTimeout(() => {
+        const restored = new Map(rowModifiers.value);
+        restored.delete(row);
+        rowModifiers.value = restored;
+    }, 1_500);
+}
+
+/**
+ * Decoy — plants 3 fake copies of the current target hexakey in safe, unlocked
+ * cells for 2.5 s. They look identical to the real target (same value, same
+ * cell--target pulse). Hitting one triggers a wrong-answer penalty and removes
+ * that individual fake. On expiry the board refreshes to clear all remaining fakes.
+ */
+function pvpDecoy() {
+    const target = sequence.value[currentStep.value];
+    if (!target) return;
+
+    const safeRows  = getSafeRows();
+    const g         = grid.value.map(row => [...row]);
+    const planted   = [];
+
+    for (let attempt = 0; attempt < 60 && planted.length < 3; attempt++) {
+        const row = safeRows[Math.floor(Math.random() * safeRows.length)];
+        const col = Math.floor(Math.random() * 10);
+        const key = `${row},${col}`;
+        if (!lockedCells.value.has(key) && !decoyCoords.value.has(key)) {
+            g[row][col] = target;
+            planted.push(key);
+        }
+    }
+
+    grid.value = g;
+    decoyCoords.value = new Set([...decoyCoords.value, ...planted]);
+
+    showFlash(`DECOY — ${planted.length} FALSE TARGET${planted.length !== 1 ? 'S' : ''} PLANTED (2.5s)`, 'glitch');
+
+    clearTimeout(_decoyTimer);
+    _decoyTimer = setTimeout(() => {
+        if (status.value !== 'playing') return;
+        // Wipe remaining decoy values and refresh the board
+        const restored = grid.value.map(row => [...row]);
+        for (const key of decoyCoords.value) {
+            const [r, c] = key.split(',').map(Number);
+            if (!lockedCells.value.has(key)) restored[r][c] = randHex();
+        }
+        seedCurrentTarget(restored);
+        grid.value = restored;
+        decoyCoords.value = new Set();
+    }, 2_500);
+}
+
 // ── Main PvP command dispatcher ───────────────────────────────────────────────
 
 function activatePvpCommand(cmd) {
@@ -813,9 +923,15 @@ function activatePvpCommand(cmd) {
 
     switch (cmd.name) {
         case 'Crash':
+            pvpFlickerGrid();
+            break;
+
         case 'Signal Noise':
+            pvpTempGlitchRow();
+            break;
+
         case 'Decoy':
-            pvpSeedExtraTargets(3);
+            pvpDecoy();
             break;
 
         case 'Firewall Patch':
@@ -1009,6 +1125,9 @@ onUnmounted(() => {
     clearTimeout(flashTimerRef.value);
     clearTimeout(_highlightTimer);
     clearTimeout(_rowUnlockTimer);
+    clearTimeout(_flickerTimer);
+    clearTimeout(_signalNoiseTimer);
+    clearTimeout(_decoyTimer);
 });
 </script>
 
@@ -1451,6 +1570,25 @@ onUnmounted(() => {
 
 .outcome-fade-enter-active { transition: opacity 0.25s ease; }
 .outcome-fade-enter-from   { opacity: 0; }
+
+/* ── Crash grid flicker ─────────────────────────────────────────────────────── */
+.gb-grid-section--flicker {
+    animation: grid-flicker 1.5s ease forwards;
+    pointer-events: none;   /* block input for the duration */
+}
+@keyframes grid-flicker {
+    0%   { opacity: 1;   filter: none; }
+    8%   { opacity: 0.1; filter: brightness(3) saturate(0); }
+    15%  { opacity: 0.9; filter: none; }
+    28%  { opacity: 0.2; filter: brightness(2) hue-rotate(160deg); }
+    35%  { opacity: 1;   filter: none; }
+    50%  { opacity: 0.4; filter: brightness(2.5) saturate(0); }
+    58%  { opacity: 0.9; filter: none; }
+    72%  { opacity: 0.1; filter: brightness(3); }
+    78%  { opacity: 1;   filter: none; }
+    90%  { opacity: 0.7; filter: brightness(1.4); }
+    100% { opacity: 1;   filter: none; }
+}
 
 /* ── PvP reveal cell (OS Exploit) ───────────────────────────────────────────── */
 .cell--pvp-reveal {

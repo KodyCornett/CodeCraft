@@ -46,13 +46,17 @@
             <!-- Selected command detail -->
             <div v-if="selectedCmd" class="lb-detail">
                 <div class="lb-detail-name">{{ selectedCmd.name.toUpperCase() }}</div>
-                <div class="lb-detail-row">
+                <div v-if="selectedCmd.mapEffect" class="lb-detail-row">
                     <span class="lb-detail-key">MAP</span>
                     <span class="lb-detail-val">{{ selectedCmd.mapEffect }}</span>
                 </div>
-                <div class="lb-detail-row">
-                    <span class="lb-detail-key">HACK</span>
-                    <span class="lb-detail-val">{{ selectedCmd.hackEffect }}</span>
+                <div v-if="selectedCmd.gridbreachEffect" class="lb-detail-row">
+                    <span class="lb-detail-key">GRIDBREACH</span>
+                    <span class="lb-detail-val">{{ selectedCmd.gridbreachEffect }}</span>
+                </div>
+                <div v-if="selectedCmd.packethijackEffect" class="lb-detail-row">
+                    <span class="lb-detail-key">PACKET HIJACK</span>
+                    <span class="lb-detail-val">{{ selectedCmd.packethijackEffect }}</span>
                 </div>
                 <button
                     v-if="!selectedCmd.cooldown"

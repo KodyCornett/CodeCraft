@@ -64,9 +64,17 @@
                             <!-- Expanded: full detail -->
                             <Transition name="expand">
                                 <div v-if="expandedId === cmd.id" class="card-detail">
-                                    <div class="detail-row">
-                                        <span class="detail-key">HACK</span>
-                                        <span class="detail-val">{{ cmd.hackEffect }}</span>
+                                    <div v-if="cmd.mapEffect" class="detail-row">
+                                        <span class="detail-key">MAP</span>
+                                        <span class="detail-val">{{ cmd.mapEffect }}</span>
+                                    </div>
+                                    <div v-if="cmd.gridbreachEffect" class="detail-row">
+                                        <span class="detail-key">GRIDBREACH</span>
+                                        <span class="detail-val">{{ cmd.gridbreachEffect }}</span>
+                                    </div>
+                                    <div v-if="cmd.packethijackEffect" class="detail-row">
+                                        <span class="detail-key">PACKET HIJACK</span>
+                                        <span class="detail-val">{{ cmd.packethijackEffect }}</span>
                                     </div>
                                     <div class="detail-row">
                                         <span class="detail-key">TARGET</span>

@@ -62,13 +62,17 @@
                             <div v-if="cmd.cooldown" class="cmd-cd-notice">
                                 ⚠ ON COOLDOWN — RESET AT CYBERDOC
                             </div>
-                            <div class="cmd-effect-row">
+                            <div v-if="cmd.mapEffect" class="cmd-effect-row">
                                 <span class="effect-key">MAP</span>
                                 <span class="effect-val">{{ cmd.mapEffect }}</span>
                             </div>
-                            <div class="cmd-effect-row">
-                                <span class="effect-key">HACK</span>
-                                <span class="effect-val">{{ cmd.hackEffect }}</span>
+                            <div v-if="cmd.gridbreachEffect" class="cmd-effect-row">
+                                <span class="effect-key">GRIDBREACH</span>
+                                <span class="effect-val">{{ cmd.gridbreachEffect }}</span>
+                            </div>
+                            <div v-if="cmd.packethijackEffect" class="cmd-effect-row">
+                                <span class="effect-key">PACKET HIJACK</span>
+                                <span class="effect-val">{{ cmd.packethijackEffect }}</span>
                             </div>
                         </div>
                     </Transition>
@@ -145,13 +149,17 @@
                             <!-- Expanded effect detail -->
                             <Transition name="expand">
                                 <div v-if="expandedId === cmd.id && !tierLocked(tier)" class="cmd-detail">
-                                    <div class="cmd-effect-row">
+                                    <div v-if="cmd.mapEffect" class="cmd-effect-row">
                                         <span class="effect-key">MAP</span>
                                         <span class="effect-val">{{ cmd.mapEffect }}</span>
                                     </div>
-                                    <div class="cmd-effect-row">
-                                        <span class="effect-key">HACK</span>
-                                        <span class="effect-val">{{ cmd.hackEffect }}</span>
+                                    <div v-if="cmd.gridbreachEffect" class="cmd-effect-row">
+                                        <span class="effect-key">GRIDBREACH</span>
+                                        <span class="effect-val">{{ cmd.gridbreachEffect }}</span>
+                                    </div>
+                                    <div v-if="cmd.packethijackEffect" class="cmd-effect-row">
+                                        <span class="effect-key">PACKET HIJACK</span>
+                                        <span class="effect-val">{{ cmd.packethijackEffect }}</span>
                                     </div>
                                 </div>
                             </Transition>
