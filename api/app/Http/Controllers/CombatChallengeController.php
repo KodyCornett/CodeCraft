@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CombatChallengeReceived;
+use App\Events\PlayerCombatStateChanged;
 use App\Models\CombatChallenge;
 use App\Models\Node;
 use App\Models\Player;
@@ -109,6 +111,8 @@ class CombatChallengeController extends Controller
             'expires_at'     => now()->addSeconds(self::TTL_SECONDS),
         ]);
 
+        CombatChallengeReceived::dispatch($challenge);
+
         return response()->json([
             'challenge_id' => $challenge->id,
             'expires_in'   => self::TTL_SECONDS,
@@ -211,6 +215,9 @@ class CombatChallengeController extends Controller
 
         $challenge->status = 'accepted';
         $challenge->save();
+
+        PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, true);
+        PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, true);
 
         $challenger = $challenge->challenger()->first();
 

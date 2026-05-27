@@ -28,6 +28,9 @@ class ChassisTemplate extends Model
         'cap_firewall',
         'cap_storage',
         'cap_os',
+        'base_map_slots',
+        'base_hack_slots',
+        'base_open_slots',
     ];
 
     protected $casts = [
@@ -45,6 +48,9 @@ class ChassisTemplate extends Model
         'cap_firewall'     => 'integer',
         'cap_storage'      => 'integer',
         'cap_os'           => 'integer',
+        'base_map_slots'   => 'integer',
+        'base_hack_slots'  => 'integer',
+        'base_open_slots'  => 'integer',
     ];
 
     public function playerRigs(): HasMany

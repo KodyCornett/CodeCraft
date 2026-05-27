@@ -21,20 +21,17 @@
         <!-- ── Body ─────────────────────────────────────────────────────────── -->
         <div class="cat-body">
 
-            <template v-for="tier in [1, 2, 3, 4, 5]" :key="tier">
-                <div v-if="commandsForTier(tier).length" class="tier-section">
+            <template v-for="ctx in ['map', 'hack']" :key="ctx">
+                <div v-if="commandsForContext(ctx).length" class="tier-section">
 
                     <div class="tier-heading">
-                        <span class="tier-label">TIER {{ tier }}</span>
-                        <span class="tier-ram">RAM {{ tier }}+ REQUIRED</span>
-                        <span class="tier-price-hint">
-                            {{ tierPrice(tier).creds.toLocaleString() }} ₡ + {{ tierPrice(tier).techPoints }} TP
-                        </span>
+                        <span class="tier-label">{{ ctx === 'map' ? 'MAP COMMANDS' : 'HACK COMMANDS' }}</span>
+                        <span class="tier-ram">{{ ctx === 'map' ? 'Used during map traversal' : 'Used inside GridBreach &amp; Packet Hijack' }}</span>
                     </div>
 
                     <div class="tier-grid">
                         <div
-                            v-for="cmd in commandsForTier(tier)"
+                            v-for="cmd in commandsForContext(ctx)"
                             :key="cmd.id"
                             class="cmd-card"
                             :class="{
@@ -57,8 +54,8 @@
 
                             <!-- Quick effect summary (always visible) -->
                             <div class="card-summary">
-                                <span class="summary-key">MAP</span>
-                                <span class="summary-val">{{ cmd.mapEffect }}</span>
+                                <span class="summary-key">{{ cmd.context === 'hack' ? 'BREACH' : 'MAP' }}</span>
+                                <span class="summary-val">{{ cmd.context === 'hack' ? cmd.gridbreachEffect : cmd.mapEffect }}</span>
                             </div>
 
                             <!-- Expanded: full detail -->
@@ -117,6 +114,8 @@ const expandedId   = ref(null);
 const filters = [
     { id: 'all',       label: 'ALL'       },
     { id: 'owned',     label: 'OWNED'     },
+    { id: 'map',       label: 'MAP'       },
+    { id: 'hack',      label: 'HACK'      },
     { id: 'trap',      label: 'TRAP'      },
     { id: 'stealth',   label: 'STEALTH'   },
     { id: 'defensive', label: 'DEFENSIVE' },
@@ -125,18 +124,14 @@ const filters = [
 
 const ownedCount = computed(() => allCommands.value.filter(c => c.owned).length);
 
-function commandsForTier(tier) {
+function commandsForContext(ctx) {
     return allCommands.value.filter(c => {
-        if (c.tier !== tier) return false;
-        if (activeFilter.value === 'all') return true;
+        if (c.context !== ctx) return false;
+        if (activeFilter.value === 'all')  return true;
         if (activeFilter.value === 'owned') return c.owned;
+        if (activeFilter.value === 'map' || activeFilter.value === 'hack') return true; // already filtered by ctx
         return c.type === activeFilter.value;
     });
-}
-
-// Price hint shown on tier header — uses first command in tier (all same price per tier)
-function tierPrice(tier) {
-    return allCommands.value.find(c => c.tier === tier)?.price ?? { creds: 0, techPoints: 0 };
 }
 
 function toggleExpand(id) {

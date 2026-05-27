@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PlayerCombatStateChanged;
 use App\Models\CombatChallenge;
 use App\Models\Player;
 use App\Services\BountyService;
@@ -292,6 +293,9 @@ class CombatController extends Controller
         $challenge->result_payload = $payload;
         $challenge->status         = 'resolved';
         $challenge->save();
+
+        PlayerCombatStateChanged::dispatch($winner->id, $nodeCanvasId, false);
+        PlayerCombatStateChanged::dispatch($loser->id,  $nodeCanvasId, false);
 
         return response()->json(array_merge(['resolved' => true], $payload));
     }

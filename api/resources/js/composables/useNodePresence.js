@@ -1,65 +1,79 @@
 /**
  * useNodePresence
  *
- * Polls GET /api/nodes/{canvasId}/players every 3 seconds when the player
- * is standing on a node, returning other players present at the same location.
+ * Subscribes to a Reverb presence channel (node.{canvasId}) when the player
+ * is standing on a node. The here/joining/leaving callbacks replace the
+ * former 3-second polling loop.
+ *
+ * The channel auth in routes/channels.php returns a member object with the
+ * same shape that NodeInfoBlock expects, so no transformation is needed here.
  *
  * Used by NodeInfoBlock to show the PLAYERS section and [HACK] button.
- * Polling stops when canvasId is null or the composable is torn down.
  */
 
 import { ref, watch, onUnmounted } from 'vue';
-import axios from 'axios';
 
 export function useNodePresence(currentNodeIdRef, playerIdRef) {
-    const nodePlayers = ref([]);   // other players at the current node
-    const polling     = ref(false);
+    const nodePlayers = ref([]);
+    const polling     = ref(false); // kept for API compatibility — always false with Reverb
 
-    let _timer = null;
+    let _channel        = null;
+    let _currentCanvasId = null;
 
-    async function fetchPresence(canvasId) {
-        if (!canvasId) {
-            nodePlayers.value = [];
-            return;
+    function leaveChannel() {
+        if (_currentCanvasId) {
+            if (window.Echo) window.Echo.leave(`node.${_currentCanvasId}`);
+            _channel         = null;
+            _currentCanvasId = null;
         }
-        // Guard: skip until the player is authenticated (playerId is set after
-        // login() resolves). Session auth uses cookies — no Authorization header.
-        if (!playerIdRef?.value) return;
-
-        try {
-            const res = await axios.get(`/api/nodes/${canvasId}/players`);
-            nodePlayers.value = res.data.players ?? [];
-        } catch {
-            // Silent — presence is best-effort
-        }
-    }
-
-    function startPolling(canvasId) {
-        stopPolling();
-        if (!canvasId) return;
-
-        polling.value = true;
-        fetchPresence(canvasId);   // immediate first fetch
-        _timer = setInterval(() => fetchPresence(canvasId), 3_000);
-    }
-
-    function stopPolling() {
-        clearInterval(_timer);
-        _timer = null;
-        polling.value     = false;
         nodePlayers.value = [];
     }
 
-    // Restart polling whenever the player moves to a different node.
-    // NOT immediate — avoids a 401 from the pre-auth geometry default that is
-    // set before login() resolves. The post-login spawn placement or first
-    // movement will trigger the watch and kick off the first poll.
+    function joinChannel(canvasId) {
+        if (!canvasId || !playerIdRef?.value) return;
+        if (canvasId === _currentCanvasId)    return;
+        if (!window.Echo)                     return;
+
+        leaveChannel();
+        _currentCanvasId = canvasId;
+
+        _channel = window.Echo.join(`node.${canvasId}`)
+            .here((members) => {
+                // Full member list on initial join — exclude self
+                nodePlayers.value = members.filter(m => m.id !== playerIdRef.value);
+            })
+            .joining((member) => {
+                // Another player arrived — add if not already present
+                if (member.id === playerIdRef.value) return;
+                if (!nodePlayers.value.find(p => p.id === member.id)) {
+                    nodePlayers.value = [...nodePlayers.value, member];
+                }
+            })
+            .leaving((member) => {
+                // A player left — remove them
+                nodePlayers.value = nodePlayers.value.filter(p => p.id !== member.id);
+            })
+            .listen('.combat.state.changed', ({ player_id, in_combat }) => {
+                // Patch in_combat live so the [HACK] button hides during active fights
+                nodePlayers.value = nodePlayers.value.map(p =>
+                    p.id === player_id ? { ...p, in_combat } : p
+                );
+            })
+            .error((error) => {
+                console.warn('[useNodePresence] Channel error:', error);
+                // Reset so a subsequent node move can retry the join
+                _channel         = null;
+                _currentCanvasId = null;
+                nodePlayers.value = [];
+            });
+    }
+
     watch(currentNodeIdRef, (newId) => {
-        if (newId) startPolling(newId);
-        else       stopPolling();
+        if (newId && playerIdRef?.value) joinChannel(newId);
+        else                             leaveChannel();
     });
 
-    onUnmounted(stopPolling);
+    onUnmounted(leaveChannel);
 
     return { nodePlayers, polling };
 }

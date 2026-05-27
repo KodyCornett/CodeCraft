@@ -50,6 +50,10 @@ class ChassisTemplateSeeder extends Seeder
                 // Upgrade limits
                 'peripheral_slots' => 0,
                 'total_point_cap'  => 9,   // v1.0 → v1.9
+                // Loadout slots — 1 map, 1 hack, 1 open. No hardware slots (tier 1).
+                'base_map_slots'   => 1,
+                'base_hack_slots'  => 1,
+                'base_open_slots'  => 1,
             ],
 
             // ── Tier 2 — NullTek Ghost ────────────────────────────────────────
@@ -72,6 +76,10 @@ class ChassisTemplateSeeder extends Seeder
                 'cap_os'           => 9,
                 'peripheral_slots' => 2,
                 'total_point_cap'  => 18,  // v2.0 → v2.9
+                // Loadout slots — map-heavy evasion build. 2 hardware slots.
+                'base_map_slots'   => 2,
+                'base_hack_slots'  => 1,
+                'base_open_slots'  => 0,
             ],
 
             // ── Tier 2 — NullTek Breaker ──────────────────────────────────────
@@ -94,6 +102,10 @@ class ChassisTemplateSeeder extends Seeder
                 'cap_os'           => 5,
                 'peripheral_slots' => 2,
                 'total_point_cap'  => 18,
+                // Loadout slots — hack-heavy breach build. 2 hardware slots.
+                'base_map_slots'   => 1,
+                'base_hack_slots'  => 2,
+                'base_open_slots'  => 0,
             ],
 
             // ── Tier 2 — NullTek Vault ────────────────────────────────────────
@@ -116,6 +128,10 @@ class ChassisTemplateSeeder extends Seeder
                 'cap_os'           => 5,
                 'peripheral_slots' => 3,
                 'total_point_cap'  => 18,
+                // Loadout slots — configurable tank build. 3 hardware slots (no open base).
+                'base_map_slots'   => 1,
+                'base_hack_slots'  => 1,
+                'base_open_slots'  => 0,
             ],
         ];
 

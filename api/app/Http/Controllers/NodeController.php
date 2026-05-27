@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\BountyBoardUpdated;
 use App\Models\Node;
 use App\Models\NodeTrace;
 use App\Models\Player;
@@ -275,7 +276,7 @@ class NodeController extends Controller
                 if ($data['resource'] === 'movement') {
                     $rig = $player->rig()->with('chassis')->first();
                     if ($rig !== null) {
-                        $currentUplink = $this->rigService->restoreUplinkToFull($rig);
+                        $currentUplink = $this->rigService->restoreUplinkToFull($rig, $player);
                     }
                 }
 
@@ -298,6 +299,8 @@ class NodeController extends Controller
 
             return compact('node', 'bountyEvent', 'pocketAfter', 'techAfter', 'currentUplink');
         });
+
+        BountyBoardUpdated::dispatch();
 
         return response()->json([
             'node' => [

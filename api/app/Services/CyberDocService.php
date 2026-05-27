@@ -16,7 +16,7 @@ use RuntimeException;
  *
  * Rules:
  *  - Loadout can only be changed at a CyberDoc.
- *  - Active command count is capped by the player's effective RAM stat.
+ *  - Loadout slot count is chassis-based and expandable via command_module peripherals.
  *  - Hardware encrypts must be installed here to take effect.
  *  - Stat reallocation moves 1 level from one stat to another for a cred fee.
  *    It does NOT trigger the ring tax (it's a direct swap, not an upgrade).
@@ -247,11 +247,16 @@ class CyberDocService
     // -------------------------------------------------------------------------
 
     /**
-     * Set the player's active combat command loadout.
+     * Set the player's active command loadout.
      *
      * Rules:
      *  - All command IDs must be owned by the player.
-     *  - Active count may not exceed the player's effective RAM stat.
+     *  - Slot capacity comes from the chassis base slots + installed command_module
+     *    peripherals (Nav Wraith = map slot, ICE Pick = hack slot). RAM no longer
+     *    gates slot count.
+     *  - Map commands may occupy map slots or open slots.
+     *  - Hack commands may occupy hack slots or open slots.
+     *  - Total active commands may not exceed total available slots.
      *
      * @param  array<string> $activeCommandIds  UUIDs of commands to mark active.
      * @throws InvalidArgumentException On invalid commands or slot overflow.
@@ -264,12 +269,11 @@ class CyberDocService
             throw new RuntimeException('Player has no rig — cannot determine loadout slot count.');
         }
 
-        $effectiveStats = $this->rigService->effectiveStats($rig, $player);
-        $maxSlots       = $effectiveStats['ram']['effective'];
+        $slots = $this->rigService->loadoutSlots($rig, $player);
 
-        if (count($activeCommandIds) > $maxSlots) {
+        if (count($activeCommandIds) > $slots['total']) {
             throw new InvalidArgumentException(
-                "Loadout exceeds available slots. Max: {$maxSlots}, requested: " . count($activeCommandIds) . '.'
+                "Loadout exceeds available slots. Max: {$slots['total']}, requested: " . count($activeCommandIds) . '.'
             );
         }
 
@@ -283,6 +287,28 @@ class CyberDocService
             throw new InvalidArgumentException(
                 'Player does not own command(s): ' . implode(', ', $unowned)
             );
+        }
+
+        // Validate typed slot capacity: map commands need map or open slots;
+        // hack commands need hack or open slots.
+        if (!empty($activeCommandIds)) {
+            $commandContexts = DB::table('commands')
+                ->whereIn('id', $activeCommandIds)
+                ->pluck('context', 'id');
+
+            $mapCount  = collect($commandContexts)->filter(fn ($c) => $c === 'map')->count();
+            $hackCount = collect($commandContexts)->filter(fn ($c) => $c === 'hack')->count();
+
+            if ($mapCount > ($slots['map'] + $slots['open'])) {
+                throw new InvalidArgumentException(
+                    "Too many map commands. Available map/open slots: " . ($slots['map'] + $slots['open']) . ", requested: {$mapCount}."
+                );
+            }
+            if ($hackCount > ($slots['hack'] + $slots['open'])) {
+                throw new InvalidArgumentException(
+                    "Too many hack commands. Available hack/open slots: " . ($slots['hack'] + $slots['open']) . ", requested: {$hackCount}."
+                );
+            }
         }
 
         DB::transaction(function () use ($player, $activeCommandIds) {

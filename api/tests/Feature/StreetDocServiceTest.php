@@ -4,17 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\ChassisTemplate;
 use App\Models\Command;
-use App\Models\District;
 use App\Models\HardwareEncrypt;
-use App\Models\Node;
 use App\Models\Peripheral;
 use App\Models\Player;
 use App\Models\PlayerPeripheral;
 use App\Models\PlayerRig;
-use App\Models\StreetDoc;
 use App\Services\BountyService;
 use App\Services\RigService;
-use App\Services\StreetDocService;
+use App\Services\CyberDocService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -23,12 +20,12 @@ class StreetDocServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    private StreetDocService $service;
+    private CyberDocService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new StreetDocService(new RigService(), new BountyService());
+        $this->service = new CyberDocService(new RigService(), new BountyService());
     }
 
     // =========================================================================
@@ -63,34 +60,13 @@ class StreetDocServiceTest extends TestCase
         return [$player, $rig, $chassis];
     }
 
-    /** Create a StreetDoc with the minimum required relations (District + Node). */
-    private function makeStreetDoc(): StreetDoc
-    {
-        $district = District::create(['name' => 'Test District']);
-        $node = Node::create([
-            'district_id'              => $district->id,
-            'business_name'            => 'Test Node',
-            'latitude'                 => 47.6588,
-            'longitude'                => -117.4260,
-            'tier'                     => 1,
-            'cred_value_base'          => 100,
-            'cred_resource_depleted'   => false,
-            'movement_resource_depleted' => false,
-        ]);
-
-        return StreetDoc::create([
-            'node_id'     => $node->id,
-            'district_id' => $district->id,
-            'name'        => 'Test Street Doc',
-        ]);
-    }
-
     /** Create a Command and assign it to the player via player_commands. */
-    private function assignCommand(Player $player, bool $isActive = false): Command
+    private function assignCommand(Player $player, bool $isActive = false, string $context = 'map'): Command
     {
         $command = Command::create([
             'name'        => 'TestCmd_' . uniqid(),
             'type'        => 'offensive',
+            'context'     => $context,
             'description' => 'Test command',
         ]);
 
@@ -118,76 +94,6 @@ class StreetDocServiceTest extends TestCase
         ]);
 
         return [$encrypt, $peripheral];
-    }
-
-    // =========================================================================
-    // visitStreetDoc
-    // =========================================================================
-
-    public function test_visit_sets_last_street_doc_id(): void
-    {
-        [$player] = $this->makePlayer();
-        $doc = $this->makeStreetDoc();
-
-        $this->service->visitStreetDoc($player, $doc->id);
-
-        $this->assertSame($doc->id, $player->fresh()->last_street_doc_id);
-    }
-
-    public function test_visit_returns_street_doc_model(): void
-    {
-        [$player] = $this->makePlayer();
-        $doc = $this->makeStreetDoc();
-
-        $result = $this->service->visitStreetDoc($player, $doc->id);
-
-        $this->assertSame($doc->id, $result->id);
-        $this->assertSame('Test Street Doc', $result->name);
-    }
-
-    public function test_visit_triggers_extract_when_nodes_hacked(): void
-    {
-        [$player] = $this->makePlayer(['nodes_hacked_this_run' => 5, 'bounty_level' => 5]);
-        $doc = $this->makeStreetDoc();
-
-        $this->service->visitStreetDoc($player, $doc->id);
-
-        // extractToStreetDoc resets nodes_hacked_this_run to 0
-        $this->assertSame(0, $player->fresh()->nodes_hacked_this_run);
-    }
-
-    public function test_visit_triggers_extract_when_pvp_wins_exist(): void
-    {
-        [$player] = $this->makePlayer(['pvp_wins_this_run' => 2, 'bounty_level' => 0]);
-        $doc = $this->makeStreetDoc();
-
-        $this->service->visitStreetDoc($player, $doc->id);
-
-        $this->assertSame(0, $player->fresh()->pvp_wins_this_run);
-    }
-
-    public function test_visit_does_not_extract_when_no_active_run(): void
-    {
-        [$player] = $this->makePlayer([
-            'nodes_hacked_this_run' => 0,
-            'pvp_wins_this_run'     => 0,
-            'bounty_level'          => 0,
-        ]);
-        $doc = $this->makeStreetDoc();
-
-        $this->service->visitStreetDoc($player, $doc->id);
-
-        // Counters stay at zero — extract was not called
-        $this->assertSame(0, $player->fresh()->nodes_hacked_this_run);
-        $this->assertSame(0, $player->fresh()->pvp_wins_this_run);
-    }
-
-    public function test_visit_throws_when_street_doc_not_found(): void
-    {
-        [$player] = $this->makePlayer();
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->service->visitStreetDoc($player, '00000000-0000-0000-0000-000000000000');
     }
 
     // =========================================================================
@@ -341,9 +247,10 @@ class StreetDocServiceTest extends TestCase
 
     public function test_set_loadout_activates_specified_commands(): void
     {
-        [$player] = $this->makePlayer([], ['ram_level' => 2]);
-        $cmd1 = $this->assignCommand($player);
-        $cmd2 = $this->assignCommand($player);
+        // Chassis has 1 map + 1 open slot → 2 map commands fit (1 typed + 1 overflow to open)
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 0, 'base_open_slots' => 1]);
+        $cmd1 = $this->assignCommand($player, context: 'map');
+        $cmd2 = $this->assignCommand($player, context: 'map');
 
         $this->service->setLoadout($player, [$cmd1->id, $cmd2->id]);
 
@@ -359,9 +266,9 @@ class StreetDocServiceTest extends TestCase
 
     public function test_set_loadout_deactivates_commands_not_in_list(): void
     {
-        [$player] = $this->makePlayer([], ['ram_level' => 2]);
-        $cmd1 = $this->assignCommand($player, isActive: true);
-        $cmd2 = $this->assignCommand($player, isActive: true);
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 1, 'base_open_slots' => 1]);
+        $cmd1 = $this->assignCommand($player, isActive: true, context: 'map');
+        $cmd2 = $this->assignCommand($player, isActive: true, context: 'hack');
 
         // Only activate cmd1
         $this->service->setLoadout($player, [$cmd1->id]);
@@ -376,8 +283,8 @@ class StreetDocServiceTest extends TestCase
 
     public function test_set_loadout_accepts_empty_array(): void
     {
-        [$player] = $this->makePlayer([], ['ram_level' => 2]);
-        $cmd1 = $this->assignCommand($player, isActive: true);
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 1, 'base_open_slots' => 1]);
+        $cmd1 = $this->assignCommand($player, isActive: true, context: 'map');
 
         $this->service->setLoadout($player, []);
 
@@ -389,23 +296,52 @@ class StreetDocServiceTest extends TestCase
         $this->assertFalse((bool) $isActive);
     }
 
-    public function test_set_loadout_throws_when_count_exceeds_ram_slots(): void
+    public function test_set_loadout_throws_when_count_exceeds_slot_capacity(): void
     {
-        // base_ram=0 so effective RAM = ram_level only → 1 slot max
-        [$player] = $this->makePlayer([], ['ram_level' => 1], ['base_ram' => 0]);
-        $cmd1 = $this->assignCommand($player);
-        $cmd2 = $this->assignCommand($player);
+        // Chassis has 1 map slot and 0 open slots → only 1 map command allowed.
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 0, 'base_open_slots' => 0]);
+        $cmd1 = $this->assignCommand($player, context: 'map');
+        $cmd2 = $this->assignCommand($player, context: 'map');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->setLoadout($player, [$cmd1->id, $cmd2->id]);
     }
 
+    public function test_set_loadout_throws_when_map_commands_exceed_map_and_open_slots(): void
+    {
+        // 1 map slot, 0 open slots → 2 map commands must fail typed validation.
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 1, 'base_open_slots' => 0]);
+        $cmd1 = $this->assignCommand($player, context: 'map');
+        $cmd2 = $this->assignCommand($player, context: 'map');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->setLoadout($player, [$cmd1->id, $cmd2->id]);
+    }
+
+    public function test_set_loadout_allows_map_command_in_open_slot(): void
+    {
+        // 1 map slot + 1 open slot → 2 map commands should fit
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 0, 'base_open_slots' => 1]);
+        $cmd1 = $this->assignCommand($player, context: 'map');
+        $cmd2 = $this->assignCommand($player, context: 'map');
+
+        $this->service->setLoadout($player, [$cmd1->id, $cmd2->id]);
+
+        $count = DB::table('player_commands')
+            ->where('player_id', $player->id)
+            ->where('is_active', true)
+            ->count();
+
+        $this->assertSame(2, $count);
+    }
+
     public function test_set_loadout_throws_when_command_not_owned(): void
     {
-        [$player] = $this->makePlayer([], ['ram_level' => 2]);
+        [$player] = $this->makePlayer([], [], ['base_map_slots' => 1, 'base_hack_slots' => 1, 'base_open_slots' => 1]);
         $unownedCommand = Command::create([
             'name'        => 'Unowned',
             'type'        => 'offensive',
+            'context'     => 'map',
             'description' => 'Not in player inventory',
         ]);
 

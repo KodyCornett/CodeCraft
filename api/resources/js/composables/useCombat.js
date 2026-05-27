@@ -6,8 +6,9 @@
  * Challenge flow:
  *   1. Challenger calls challenge(targetId, nodeCanvasId)
  *      → POST /api/combat/challenge
- *   2. Target polls checkPending() every 2s
- *      → GET /api/combat/pending
+ *      → Reverb broadcasts CombatChallengeReceived to the target's private channel
+ *   2. Target receives the challenge instantly via Echo private channel listener
+ *      (replaces the former 2s GET /api/combat/pending poll)
  *   3. Target calls accept(challengeId) or decline(challengeId)
  *   4. Both clients enter GridBreach PvP mode
  *   5. Winner calls submitResult(winnerId, loserId, nodeId)
@@ -19,10 +20,9 @@ import axios   from 'axios';
 
 export function useCombat(playerId) {
 
-    const busy            = ref(false);
-    const error           = ref(null);
-    const incomingChallenge = ref(null);   // set when a pending challenge arrives
-    let   _pendingTimer   = null;
+    const busy              = ref(false);
+    const error             = ref(null);
+    const incomingChallenge = ref(null);
 
     const pid = () => typeof playerId === 'object' ? playerId.value : playerId;
 
@@ -47,25 +47,29 @@ export function useCombat(playerId) {
 
     // ── Target side ───────────────────────────────────────────────────────────
 
-    async function checkPending() {
-        try {
-            const res = await axios.get('/api/combat/pending');
-            incomingChallenge.value = res.data.challenge ?? null;
-        } catch {
-            // Silent
-        }
-    }
-
-    function startPendingPoll(intervalMs = 2_000) {
+    /**
+     * Subscribe to the player's private Reverb channel.
+     * Incoming challenge.received events populate incomingChallenge instantly.
+     * The intervalMs param is kept for API compatibility but is no longer used.
+     */
+    function startPendingPoll(intervalMs = 2_000) { // eslint-disable-line no-unused-vars
         stopPendingPoll();
-        checkPending();
-        _pendingTimer = setInterval(checkPending, intervalMs);
+        if (!pid() || !window.Echo) return;
+
+        window.Echo.private(`player.${pid()}`)
+            .listen('.challenge.received', (data) => {
+                incomingChallenge.value = data.challenge ?? null;
+            });
     }
 
     function stopPendingPoll() {
-        clearInterval(_pendingTimer);
-        _pendingTimer = null;
+        if (pid() && window.Echo) {
+            window.Echo.leave(`player.${pid()}`);
+        }
     }
+
+    // checkPending kept for any callers that may invoke it directly — no-op now.
+    async function checkPending() {}
 
     async function accept(challengeId) {
         busy.value  = true;
@@ -89,16 +93,11 @@ export function useCombat(playerId) {
             data = res.data;
         } catch { /* silent */ }
         incomingChallenge.value = null;
-        return data;   // caller uses penalty + critical_failure fields
+        return data;
     }
 
     // ── Result submission ─────────────────────────────────────────────────────
 
-    /**
-     * Submit this player's GridBreach score for a PvP challenge.
-     * Returns { resolved: true, ...payload } if both scores are now in,
-     * or { resolved: false } if the opponent hasn't submitted yet.
-     */
     async function submitResult(challengeId, score, nodeCanvasId) {
         busy.value  = true;
         error.value = null;
@@ -117,11 +116,6 @@ export function useCombat(playerId) {
         }
     }
 
-    /**
-     * Poll for a resolved result after submitting first.
-     * Returns { resolved: true, ...payload } when the opponent's score is in,
-     * or { resolved: false } while still waiting.
-     */
     async function pollResult(challengeId) {
         try {
             const res = await axios.get(`/api/combat/result/${challengeId}`);

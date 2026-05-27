@@ -337,21 +337,20 @@
                 ALL AVAILABLE COMMANDS OWNED
             </div>
 
-            <template v-for="tier in [1, 2, 3, 4, 5]" :key="tier">
-                <div v-if="commandsForTier(tier).length" class="cmd-tier-group">
+            <template v-for="ctx in ['map', 'hack']" :key="ctx">
+                <div v-if="commandsForContext(ctx).length" class="cmd-tier-group">
 
                     <div class="cmd-tier-heading">
-                        <span class="cmd-tier-label">TIER {{ tier }}</span>
+                        <span class="cmd-tier-label">{{ ctx === 'map' ? 'MAP COMMANDS' : 'HACK COMMANDS' }}</span>
                         <span class="cmd-tier-req">
-                            RAM {{ tier }}+ REQUIRED
+                            {{ ctx === 'map' ? 'Used during map traversal' : 'Used inside GridBreach &amp; Packet Hijack' }}
                         </span>
                     </div>
 
                     <div
-                        v-for="cmd in commandsForTier(tier)"
+                        v-for="cmd in commandsForContext(ctx)"
                         :key="cmd.id"
                         class="cmd-shop-row"
-                        :class="{ 'cmd-shop-row--locked': !ramMeetsRequirement(tier) }"
                     >
                         <div class="cmd-shop-main">
                             <span class="cmd-shop-type" :class="`shop-type--${cmd.type}`">
@@ -365,17 +364,14 @@
                             </div>
                             <button
                                 class="cmd-buy-btn"
-                                :disabled="!atCyberDoc || !canAfford(cmd) || !ramMeetsRequirement(tier)"
-                                :title="!atCyberDoc ? 'Navigate to a CyberDoc node to purchase' : buyBtnTitle(cmd, tier)"
+                                :disabled="!atCyberDoc || !canAfford(cmd)"
+                                :title="!atCyberDoc ? 'Navigate to a CyberDoc node to purchase' : buyBtnTitle(cmd)"
                                 @click="onBuyCommand(cmd)"
                             >PURCHASE</button>
                         </div>
                         <div class="cmd-shop-effect">
-                            <span class="eff-key">MAP</span>
-                            <span class="eff-val">{{ cmd.mapEffect }}</span>
-                        </div>
-                        <div v-if="!ramMeetsRequirement(tier)" class="cmd-lock-notice">
-                            🔒 Requires RAM {{ tier }} — upgrade your rig to unlock
+                            <span class="eff-key">{{ cmd.context === 'hack' ? 'BREACH' : 'MAP' }}</span>
+                            <span class="eff-val">{{ cmd.context === 'hack' ? cmd.gridbreachEffect : cmd.mapEffect }}</span>
                         </div>
                     </div>
                 </div>
@@ -393,7 +389,12 @@
             >
                 <div class="item-rarity">{{ item.rarity.toUpperCase() }}</div>
                 <div class="item-name">{{ item.name }}</div>
-                <div class="item-stat">
+                <!-- Command modules show slot type + tier instead of stat/boost -->
+                <div v-if="item.peripheral_type === 'command_module'" class="item-stat">
+                    <span class="stat-key">{{ item.slot_type?.toUpperCase() }} SLOT</span>
+                    <span class="stat-val stat-val--slot">T{{ item.slot_tier }}</span>
+                </div>
+                <div v-else-if="item.stat" class="item-stat">
                     <span class="stat-key">{{ item.stat.toUpperCase() }}</span>
                     <span class="stat-val">+{{ item.boost }}</span>
                 </div>
@@ -774,12 +775,8 @@ const purchasableCommands = computed(() =>
     allCommands.value.filter(c => !c.owned)
 );
 
-function commandsForTier(tier) {
-    return purchasableCommands.value.filter(c => c.tier === tier);
-}
-
-function ramMeetsRequirement(tier) {
-    return (rig.value?.ram ?? 0) >= tier;
+function commandsForContext(ctx) {
+    return purchasableCommands.value.filter(c => c.context === ctx);
 }
 
 function canAfford(cmd) {
@@ -787,15 +784,14 @@ function canAfford(cmd) {
         && playerTechPoints.value >= cmd.price.techPoints;
 }
 
-function buyBtnTitle(cmd, tier) {
-    if (!ramMeetsRequirement(tier)) return `Requires RAM ${tier}`;
+function buyBtnTitle(cmd) {
     if (playerCreds.value < cmd.price.creds)           return 'Not enough Creds';
     if (playerTechPoints.value < cmd.price.techPoints) return 'Not enough Tech Points';
     return `Purchase ${cmd.name}`;
 }
 
 async function onBuyCommand(cmd) {
-    if (!canAfford(cmd) || !ramMeetsRequirement(cmd.tier)) return;
+    if (!canAfford(cmd)) return;
     try {
         const res = await axios.post('/api/store/purchase-command', {
             player_id:  player.value.id,
@@ -812,7 +808,6 @@ async function onBuyCommand(cmd) {
 // ── Stat upgrades ─────────────────────────────────────────────────────────────
 const STAT_META = [
     { key: 'cpu',      label: 'CPU',      desc: 'Reduces ICE advantage — widens your hack window and timer.' },
-    { key: 'ram',      label: 'RAM',      desc: 'Unlocks higher command tiers and increases command slot capacity.' },
     { key: 'os',       label: 'OS',       desc: 'Reduces ping accuracy. Raises the OS+Storage ceiling for CPU, RAM, and FW.' },
     { key: 'storage',  label: 'STORAGE',  desc: 'Increases inventory and loadout slots. Freely investable — each point extends the ceiling for CPU, RAM, and FW.' },
     { key: 'firewall', label: 'FIREWALL', desc: 'Reduces bounty ping frequency and improves breach defence.' },
@@ -2002,6 +1997,9 @@ function onResetCooldowns() {
     font-size: 12px;
     color: #00FF88;
     letter-spacing: 0.06em;
+}
+.stat-val--slot {
+    color: rgba(125, 249, 255, 0.85);
 }
 
 .item-desc {

@@ -1,12 +1,11 @@
 /**
  * useBountyBoard
  *
- * Polls GET /api/leaderboard/bounty and maps the raw backend response
- * (where bounty_level = nodes_hacked_this_run) into the star-level format
- * BountyBlock.vue expects.
+ * Fetches GET /api/leaderboard/bounty on startup, then re-fetches whenever
+ * Reverb broadcasts a BountyBoardUpdated event on the 'bounty-board' channel.
+ * The former 30-second setInterval is replaced by this event-driven refresh.
  *
- * Excludes the current player — they see their own status in the
- * "Your Bounty" section at the bottom of BountyBlock, not in the target list.
+ * External API is unchanged — Game.vue still calls startPolling() / stopPolling().
  *
  * Star level mapping (mirrors BOUNTY_THRESHOLDS in Game.vue):
  *   10–14 hacks → ★ 1
@@ -14,15 +13,11 @@
  *   20–24 hacks → ★★★ 3
  *   25–29 hacks → ★★★★ 4  (Open Season)
  *   30+   hacks → ★★★★★ 5
- *
- * Reward shown = floor(pocket_creds × steal_pct)
- * so hunters can see what they stand to gain at a glance.
  */
 
 import { ref, readonly } from 'vue';
 import axios from 'axios';
 
-// Must mirror BountyService::STEAL_TIERS exactly (CLAUDE.md thresholds 10/15/20/25/30)
 function stealPct(hackCount, isOpenSeason) {
     if (isOpenSeason || hackCount >= 30) return 75;
     if (hackCount >= 25) return 60;
@@ -42,7 +37,6 @@ function hackCountToStarLevel(hackCount, isOpenSeason) {
 }
 
 function toEntry(api) {
-    // API returns nodes_hacked (aliased from nodes_hacked_this_run by BountyController)
     const hacks      = api.nodes_hacked ?? 0;
     const os         = api.is_open_season ?? false;
     const stars      = hackCountToStarLevel(hacks, os);
@@ -54,16 +48,16 @@ function toEntry(api) {
     return {
         playerId:     api.player_id,
         handle:       api.handle,
-        stars,                          // 1–5 used by BountyBlock for star icons
-        level:        stars,            // kept for levelClass / accuracyPips compat
+        stars,
+        level:        stars,
         hackCount:    hacks,
-        reward,                         // creds the hunter earns on successful extract
-        pocketCreds:  pocket,           // total the target is carrying
+        reward,
+        pocketCreds:  pocket,
         stealPct:     pct,
         multiplier,
-        bonusPct:     Math.round((multiplier - 1.0) * 100),  // "+25%" style
+        bonusPct:     Math.round((multiplier - 1.0) * 100),
         district:     api.current_district ?? 'UNKNOWN',
-        lastPing:     api.current_district ?? null,          // real pings come via WebSocket
+        lastPing:     api.current_district ?? null,
         isOpenSeason: os,
     };
 }
@@ -72,8 +66,6 @@ export function useBountyBoard(currentPlayerId) {
     const entries = ref([]);
     const loading = ref(false);
     const error   = ref(null);
-
-    let _timer = null;
 
     async function fetchBoard() {
         try {
@@ -94,14 +86,18 @@ export function useBountyBoard(currentPlayerId) {
         }
     }
 
-    /** Fetch once then poll every `intervalMs` (default 30 s). */
-    function startPolling(intervalMs = 30_000) {
+    /** Fetch once then subscribe to Reverb for real-time updates. */
+    function startPolling() {
+        stopPolling();   // prevent duplicate listeners if called more than once
         fetchBoard();
-        _timer = setInterval(fetchBoard, intervalMs);
+        if (!window.Echo) return;
+        window.Echo.channel('bounty-board')
+            .listen('.board.updated', () => fetchBoard());
     }
 
     function stopPolling() {
-        if (_timer) { clearInterval(_timer); _timer = null; }
+        if (!window.Echo) return;
+        window.Echo.leave('bounty-board');
     }
 
     return {

@@ -44,15 +44,18 @@ class StoreController extends Controller
     public function catalog(): JsonResponse
     {
         $hardware = Peripheral::orderBy('rarity')->orderBy('name')->get()->map(fn ($p) => [
-            'id'          => $p->id,
-            'category'    => 'hardware',
-            'name'        => $p->name,
-            'stat'        => $p->stat_boosted,
-            'boost'       => $p->boost_amount,
-            'rarity'      => $p->rarity,
-            'port_cost'   => $p->port_cost,
-            'price_creds' => $p->price_creds,
-            'desc'        => null,
+            'id'              => $p->id,
+            'category'        => 'hardware',
+            'name'            => $p->name,
+            'peripheral_type' => $p->peripheral_type ?? 'stat_boost',
+            'stat'            => $p->stat_boosted,
+            'boost'           => $p->boost_amount,
+            'slot_type'       => $p->slot_type,
+            'slot_tier'       => $p->slot_tier,
+            'rarity'          => $p->rarity,
+            'port_cost'       => $p->port_cost,
+            'price_creds'     => $p->price_creds,
+            'desc'            => null,
         ]);
 
         $consumables = Consumable::orderBy('category')->orderBy('rarity')->orderBy('name')->get()->map(fn ($c) => [

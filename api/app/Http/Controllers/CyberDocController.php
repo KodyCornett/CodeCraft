@@ -50,7 +50,7 @@ class CyberDocController extends Controller
         $rig           = $this->rigService->getRigForPlayer($player);
         $currentUplink = null;
         if ($rig !== null) {
-            $currentUplink = $this->rigService->restoreUplinkToFull($rig);
+            $currentUplink = $this->rigService->restoreUplinkToFull($rig, $player);
         }
 
         return response()->json([

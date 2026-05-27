@@ -31,6 +31,11 @@ class ChassisTemplateFactory extends Factory
             'peripheral_slots' => 4,
             'base_uplink'      => 3,
             'total_point_cap'  => 10,
+            // Default loadout slots — 1 map, 1 hack, 1 open (mirrors BlackHat config).
+            // Tests that need specific slot counts should pass chassis overrides.
+            'base_map_slots'   => 1,
+            'base_hack_slots'  => 1,
+            'base_open_slots'  => 1,
         ];
     }
 }

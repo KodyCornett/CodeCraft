@@ -186,12 +186,10 @@ class RigService
         // Enforce stat-cap consequences triggered by the new SS level.
         // RAM cap: deactivate loadout slots from the top down if effective RAM dropped.
         // CPU cap: deactivate commands whose level now exceeds effective CPU.
-        $deactivatedRam = [];
         $deactivatedCpu = [];
 
         if ($player !== null) {
             $newStats       = $this->effectiveStats($rig, $player);
-            $deactivatedRam = $this->enforceRamCap($player, $newStats['ram']['effective']);
             $deactivatedCpu = $this->enforceCpuCommandCap($player, $newStats['cpu']['effective']);
         }
 
@@ -199,7 +197,7 @@ class RigService
             'rig'             => $rig,
             'player'          => $player,
             'event'           => $event,
-            'deactivated_ram' => $deactivatedRam,
+            'deactivated_ram' => [],   // RAM no longer gates loadout slots — always empty
             'deactivated_cpu' => $deactivatedCpu,
         ];
     }
@@ -270,6 +268,64 @@ class RigService
     }
 
     /**
+     * Compute the player's available loadout slots by type.
+     *
+     * Base slots come from the chassis (base_map_slots, base_hack_slots, base_open_slots).
+     * Installed command_module peripherals add typed slots on top of the base.
+     *   - Nav Wraith series → +1 map slot per installed unit
+     *   - ICE Pick series   → +1 hack slot per installed unit
+     *
+     * The slot_tier on a command_module peripheral defines the maximum command
+     * level that may be equipped in that hardware slot (T1 = L1, T2 = L1–L2, T3 = L1–L3).
+     * Base chassis slots are uncapped (any level up to L3 is allowed).
+     *
+     * Returns:
+     *   map   — total map slots available
+     *   hack  — total hack slots available
+     *   open  — total open slots (accepts either context)
+     *   total — sum of all three
+     *
+     * @return array{map: int, hack: int, open: int, total: int}
+     */
+    public function loadoutSlots(PlayerRig $rig, Player $player): array
+    {
+        $chassis  = $rig->chassis;
+        $mapSlots  = (int) ($chassis->base_map_slots  ?? 0);
+        $hackSlots = (int) ($chassis->base_hack_slots ?? 0);
+        $openSlots = (int) ($chassis->base_open_slots ?? 0);
+
+        // Add slots from installed, undamaged command_module peripherals.
+        $rows = $player->relationLoaded('playerPeripherals')
+            ? $player->playerPeripherals
+            : PlayerPeripheral::where('player_id', $player->id)
+                ->where('is_installed', true)
+                ->where('is_damaged', false)
+                ->with('peripheral')
+                ->get();
+
+        $rows
+            ->where('is_installed', true)
+            ->where('is_damaged', false)
+            ->each(function (PlayerPeripheral $pp) use (&$mapSlots, &$hackSlots): void {
+                if ($pp->peripheral === null) return;
+                if ($pp->peripheral->peripheral_type !== 'command_module') return;
+
+                match ($pp->peripheral->slot_type) {
+                    'map'  => $mapSlots++,
+                    'hack' => $hackSlots++,
+                    default => null,
+                };
+            });
+
+        return [
+            'map'   => $mapSlots,
+            'hack'  => $hackSlots,
+            'open'  => $openSlots,
+            'total' => $mapSlots + $hackSlots + $openSlots,
+        ];
+    }
+
+    /**
      * Restore a rig's current_uplink to its chassis base value (full restore).
      *
      * Called when the player successfully hacks an uplink node.
@@ -277,9 +333,11 @@ class RigService
      *
      * Returns the restored current_uplink value.
      */
-    public function restoreUplinkToFull(PlayerRig $rig): int
+    public function restoreUplinkToFull(PlayerRig $rig, ?Player $player = null): int
     {
-        $rig->current_uplink = (int) ($rig->chassis->base_uplink ?? 3);
+        $base                = (int) ($rig->chassis->base_uplink ?? 3);
+        $uplinkBoost         = $player !== null ? ($this->peripheralBoosts($player)['uplink'] ?? 0) : 0;
+        $rig->current_uplink = $base + $uplinkBoost;
         $rig->save();
         return $rig->current_uplink;
     }
@@ -320,7 +378,8 @@ class RigService
     {
         $rig->is_limping     = false;
         // Reset uplink so the next run starts with a full pool after repair.
-        $rig->current_uplink = (int) ($rig->chassis->base_uplink ?? 3);
+        $uplinkBoost         = $player !== null ? ($this->peripheralBoosts($player)['uplink'] ?? 0) : 0;
+        $rig->current_uplink = (int) ($rig->chassis->base_uplink ?? 3) + $uplinkBoost;
         // current_ss remains 0 — locked until repaired
 
         if ($player) {
@@ -365,7 +424,7 @@ class RigService
      */
     public function peripheralBoosts(Player $player): array
     {
-        $boosts = ['cpu' => 0, 'ram' => 0, 'firewall' => 0, 'storage' => 0, 'os' => 0];
+        $boosts = ['cpu' => 0, 'ram' => 0, 'firewall' => 0, 'storage' => 0, 'os' => 0, 'uplink' => 0];
 
         // Re-use the already-loaded relationship to avoid an extra DB query when
         // this method is called inside a loop (e.g. NodeController::players()).
@@ -531,55 +590,14 @@ class RigService
 
         $stats = $this->effectiveStats($rig, $player);
 
-        // CPU check runs FIRST — deactivates commands whose level exceeds effective CPU.
-        // Those commands are now is_active = false before the RAM check reads the
-        // active list, so they cannot appear in both return arrays. This eliminates
-        // duplicate reporting without any post-hoc de-duplication.
+        // CPU check — deactivates commands whose level exceeds effective CPU.
+        // RAM no longer gates loadout slot count, so enforceRamCap is not called here.
         $droppedByCpu = $this->enforceCpuCommandCap($player, $stats['cpu']['effective']);
 
-        // RAM check runs SECOND — only sees the commands still active after the CPU
-        // filter, so its slot-drop count is always accurate.
-        $droppedByRam = $this->enforceRamCap($player, $stats['ram']['effective']);
-
         return [
-            'deactivated_ram' => $droppedByRam,
+            'deactivated_ram' => [],   // RAM no longer gates loadout slots
             'deactivated_cpu' => $droppedByCpu,
         ];
-    }
-
-    /**
-     * Deactivate loadout slots from the highest slot downward until the active
-     * command count fits within $maxSlots (the new effective RAM value).
-     *
-     * Returns an array of slot numbers that were dropped (e.g. [4, 3]).
-     */
-    private function enforceRamCap(Player $player, int $maxSlots): array
-    {
-        return \DB::transaction(function () use ($player, $maxSlots) {
-            $active = \DB::table('player_commands')
-                ->where('player_id', $player->id)
-                ->where('is_active', true)
-                ->whereNotNull('loadout_slot')
-                ->orderBy('loadout_slot', 'desc')
-                ->lockForUpdate()
-                ->get(['command_id', 'loadout_slot']);
-
-            $excess = $active->count() - $maxSlots;
-            if ($excess <= 0) {
-                return [];
-            }
-
-            $toDrop    = $active->take($excess);
-            $dropIds   = $toDrop->pluck('command_id')->toArray();
-            $dropSlots = $toDrop->pluck('loadout_slot')->toArray();
-
-            \DB::table('player_commands')
-                ->where('player_id', $player->id)
-                ->whereIn('command_id', $dropIds)
-                ->update(['is_active' => false, 'loadout_slot' => null]);
-
-            return $dropSlots;
-        });
     }
 
     /**

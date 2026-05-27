@@ -5,11 +5,16 @@
         <header class="sys-header">
             <div class="sys-header-left">
                 <span class="sys-title">SYS.COMMANDS</span>
-                <span class="sys-sub">{{ equippedCommands.length }}/{{ maxSlots }} SLOTS</span>
+                <span class="sys-sub">{{ equippedCommands.length }}/{{ totalSlots }} SLOTS</span>
             </div>
             <div class="sys-header-right">
-                <span class="sys-ram-label">RAM GATE</span>
-                <span class="sys-ram-val">T{{ rig.ram ?? 2 }} MAX</span>
+                <span class="sys-slot-pip" title="Map slots">MAP {{ mapSlotsUsed }}/{{ slots.map }}</span>
+                <span class="sys-slot-sep">·</span>
+                <span class="sys-slot-pip" title="Hack slots">HACK {{ hackSlotsUsed }}/{{ slots.hack }}</span>
+                <template v-if="slots.open > 0">
+                    <span class="sys-slot-sep">·</span>
+                    <span class="sys-slot-pip" title="Open slots">OPEN {{ openSlotsUsed }}/{{ slots.open }}</span>
+                </template>
             </div>
         </header>
 
@@ -21,67 +26,139 @@
                 <div class="section-title-row">
                     <span class="section-title">ACTIVE LOADOUT</span>
                     <span class="section-slots" :class="slotsClass">
-                        {{ equippedCommands.length }} / {{ maxSlots }}
+                        {{ equippedCommands.length }} / {{ totalSlots }}
                     </span>
                 </div>
 
-                <!-- Equipped commands -->
-                <div
-                    v-for="cmd in equippedCommands"
-                    :key="cmd.id"
-                    class="cmd-row"
-                    :class="{
-                        'cmd-row--cooldown': cmd.cooldown,
-                        'cmd-row--expanded': expandedId === cmd.id,
-                    }"
-                    @click="toggleExpand(cmd.id)"
-                >
-                    <div class="cmd-main">
-                        <span class="cmd-status-dot" :class="cmd.cooldown ? 'dot--cd' : 'dot--ready'" />
-                        <span class="cmd-tier">T{{ cmd.tier }}</span>
-                        <span class="cmd-type-badge" :class="`type--${cmd.type}`">
-                            {{ cmd.type.toUpperCase() }}
-                        </span>
-                        <span class="cmd-name" :class="{ 'name--cd': cmd.cooldown }">
-                            {{ cmd.name.toUpperCase() }}
-                        </span>
-                        <span v-if="cmd.cooldown" class="cmd-cd-tag">COOLDOWN</span>
-                        <button
-                            v-else
-                            class="cmd-unequip-btn"
-                            title="Remove from loadout"
-                            @click.stop="unequipCommand(cmd)"
-                        >
-                            [–]
-                        </button>
-                    </div>
-
-                    <!-- Expanded effect detail -->
-                    <Transition name="expand">
-                        <div v-if="expandedId === cmd.id" class="cmd-detail">
-                            <div v-if="cmd.cooldown" class="cmd-cd-notice">
-                                ⚠ ON COOLDOWN — RESET AT CYBERDOC
-                            </div>
-                            <div v-if="cmd.mapEffect" class="cmd-effect-row">
-                                <span class="effect-key">MAP</span>
-                                <span class="effect-val">{{ cmd.mapEffect }}</span>
-                            </div>
-                            <div v-if="cmd.gridbreachEffect" class="cmd-effect-row">
-                                <span class="effect-key">GRIDBREACH</span>
-                                <span class="effect-val">{{ cmd.gridbreachEffect }}</span>
-                            </div>
-                            <div v-if="cmd.packethijackEffect" class="cmd-effect-row">
-                                <span class="effect-key">PACKET HIJACK</span>
-                                <span class="effect-val">{{ cmd.packethijackEffect }}</span>
-                            </div>
+                <!-- Map slot group -->
+                <div class="slot-group-label">MAP SLOTS</div>
+                <template v-for="i in slots.map" :key="`map-${i}`">
+                    <div v-if="equippedByContext('map')[i - 1]" class="cmd-row"
+                        :class="{
+                            'cmd-row--cooldown': equippedByContext('map')[i - 1].cooldown,
+                            'cmd-row--expanded': expandedId === equippedByContext('map')[i - 1].id,
+                        }"
+                        @click="toggleExpand(equippedByContext('map')[i - 1].id)"
+                    >
+                        <div class="cmd-main">
+                            <span class="cmd-status-dot" :class="equippedByContext('map')[i - 1].cooldown ? 'dot--cd' : 'dot--ready'" />
+                            <span class="cmd-context-badge ctx--map">MAP</span>
+                            <span class="cmd-type-badge" :class="`type--${equippedByContext('map')[i - 1].type}`">
+                                {{ equippedByContext('map')[i - 1].type.toUpperCase() }}
+                            </span>
+                            <span class="cmd-name" :class="{ 'name--cd': equippedByContext('map')[i - 1].cooldown }">
+                                {{ equippedByContext('map')[i - 1].name.toUpperCase() }}
+                            </span>
+                            <span v-if="equippedByContext('map')[i - 1].cooldown" class="cmd-cd-tag">COOLDOWN</span>
+                            <button v-else class="cmd-unequip-btn" title="Remove from loadout"
+                                @click.stop="unequipCommand(equippedByContext('map')[i - 1])">[–]</button>
                         </div>
-                    </Transition>
-                </div>
+                        <Transition name="expand">
+                            <div v-if="expandedId === equippedByContext('map')[i - 1].id" class="cmd-detail">
+                                <div v-if="equippedByContext('map')[i - 1].cooldown" class="cmd-cd-notice">⚠ ON COOLDOWN — RESET AT CYBERDOC</div>
+                                <div v-if="equippedByContext('map')[i - 1].mapEffect" class="cmd-effect-row">
+                                    <span class="effect-key">MAP</span>
+                                    <span class="effect-val">{{ equippedByContext('map')[i - 1].mapEffect }}</span>
+                                </div>
+                            </div>
+                        </Transition>
+                    </div>
+                    <div v-else class="cmd-row cmd-row--empty">
+                        <span class="empty-slot-label">[ MAP SLOT {{ i }} ]</span>
+                    </div>
+                </template>
 
-                <!-- Empty slots -->
-                <div v-for="i in emptySlots" :key="`empty-${i}`" class="cmd-row cmd-row--empty">
-                    <span class="empty-slot-label">[ EMPTY SLOT ]</span>
-                </div>
+                <!-- Hack slot group -->
+                <div class="slot-group-label slot-group-label--hack">HACK SLOTS</div>
+                <template v-for="i in slots.hack" :key="`hack-${i}`">
+                    <div v-if="equippedByContext('hack')[i - 1]" class="cmd-row"
+                        :class="{
+                            'cmd-row--cooldown': equippedByContext('hack')[i - 1].cooldown,
+                            'cmd-row--expanded': expandedId === equippedByContext('hack')[i - 1].id,
+                        }"
+                        @click="toggleExpand(equippedByContext('hack')[i - 1].id)"
+                    >
+                        <div class="cmd-main">
+                            <span class="cmd-status-dot" :class="equippedByContext('hack')[i - 1].cooldown ? 'dot--cd' : 'dot--ready'" />
+                            <span class="cmd-context-badge ctx--hack">HACK</span>
+                            <span class="cmd-type-badge" :class="`type--${equippedByContext('hack')[i - 1].type}`">
+                                {{ equippedByContext('hack')[i - 1].type.toUpperCase() }}
+                            </span>
+                            <span class="cmd-name" :class="{ 'name--cd': equippedByContext('hack')[i - 1].cooldown }">
+                                {{ equippedByContext('hack')[i - 1].name.toUpperCase() }}
+                            </span>
+                            <span v-if="equippedByContext('hack')[i - 1].cooldown" class="cmd-cd-tag">COOLDOWN</span>
+                            <button v-else class="cmd-unequip-btn" title="Remove from loadout"
+                                @click.stop="unequipCommand(equippedByContext('hack')[i - 1])">[–]</button>
+                        </div>
+                        <Transition name="expand">
+                            <div v-if="expandedId === equippedByContext('hack')[i - 1].id" class="cmd-detail">
+                                <div v-if="equippedByContext('hack')[i - 1].cooldown" class="cmd-cd-notice">⚠ ON COOLDOWN — RESET AT CYBERDOC</div>
+                                <div v-if="equippedByContext('hack')[i - 1].gridbreachEffect" class="cmd-effect-row">
+                                    <span class="effect-key">GRIDBREACH</span>
+                                    <span class="effect-val">{{ equippedByContext('hack')[i - 1].gridbreachEffect }}</span>
+                                </div>
+                                <div v-if="equippedByContext('hack')[i - 1].packethijackEffect" class="cmd-effect-row">
+                                    <span class="effect-key">PACKET HIJACK</span>
+                                    <span class="effect-val">{{ equippedByContext('hack')[i - 1].packethijackEffect }}</span>
+                                </div>
+                            </div>
+                        </Transition>
+                    </div>
+                    <div v-else class="cmd-row cmd-row--empty">
+                        <span class="empty-slot-label">[ HACK SLOT {{ i }} ]</span>
+                    </div>
+                </template>
+
+                <!-- Open slot group (only rendered when chassis has open slots) -->
+                <template v-if="slots.open > 0">
+                    <div class="slot-group-label slot-group-label--open">OPEN SLOTS</div>
+                    <template v-for="i in slots.open" :key="`open-${i}`">
+                        <div v-if="equippedOpen[i - 1]" class="cmd-row"
+                            :class="{
+                                'cmd-row--cooldown': equippedOpen[i - 1].cooldown,
+                                'cmd-row--expanded': expandedId === equippedOpen[i - 1].id,
+                            }"
+                            @click="toggleExpand(equippedOpen[i - 1].id)"
+                        >
+                            <div class="cmd-main">
+                                <span class="cmd-status-dot" :class="equippedOpen[i - 1].cooldown ? 'dot--cd' : 'dot--ready'" />
+                                <span class="cmd-context-badge" :class="`ctx--${equippedOpen[i - 1].context}`">
+                                    {{ equippedOpen[i - 1].context.toUpperCase() }}
+                                </span>
+                                <span class="cmd-type-badge" :class="`type--${equippedOpen[i - 1].type}`">
+                                    {{ equippedOpen[i - 1].type.toUpperCase() }}
+                                </span>
+                                <span class="cmd-name" :class="{ 'name--cd': equippedOpen[i - 1].cooldown }">
+                                    {{ equippedOpen[i - 1].name.toUpperCase() }}
+                                </span>
+                                <span v-if="equippedOpen[i - 1].cooldown" class="cmd-cd-tag">COOLDOWN</span>
+                                <button v-else class="cmd-unequip-btn" title="Remove from loadout"
+                                    @click.stop="unequipCommand(equippedOpen[i - 1])">[–]</button>
+                            </div>
+                            <Transition name="expand">
+                                <div v-if="expandedId === equippedOpen[i - 1].id" class="cmd-detail">
+                                    <div v-if="equippedOpen[i - 1].cooldown" class="cmd-cd-notice">⚠ ON COOLDOWN — RESET AT CYBERDOC</div>
+                                    <div v-if="equippedOpen[i - 1].mapEffect" class="cmd-effect-row">
+                                        <span class="effect-key">MAP</span>
+                                        <span class="effect-val">{{ equippedOpen[i - 1].mapEffect }}</span>
+                                    </div>
+                                    <div v-if="equippedOpen[i - 1].gridbreachEffect" class="cmd-effect-row">
+                                        <span class="effect-key">GRIDBREACH</span>
+                                        <span class="effect-val">{{ equippedOpen[i - 1].gridbreachEffect }}</span>
+                                    </div>
+                                    <div v-if="equippedOpen[i - 1].packethijackEffect" class="cmd-effect-row">
+                                        <span class="effect-key">PACKET HIJACK</span>
+                                        <span class="effect-val">{{ equippedOpen[i - 1].packethijackEffect }}</span>
+                                    </div>
+                                </div>
+                            </Transition>
+                        </div>
+                        <div v-else class="cmd-row cmd-row--empty">
+                            <span class="empty-slot-label">[ OPEN SLOT {{ i }} ]</span>
+                        </div>
+                    </template>
+                </template>
 
                 <!-- Loadout full notice -->
                 <div v-if="slotsAtMax" class="loadout-full-notice">
@@ -103,52 +180,46 @@
                     NO COMMANDS IN LIBRARY — VISIT CYBERDOC TO PURCHASE
                 </div>
 
-                <!-- Tier group headers -->
-                <template v-for="tier in [1, 2, 3, 4, 5]" :key="tier">
-                    <div v-if="commandsByTier(tier).length" class="tier-group">
-                        <div class="tier-header" :class="tierLocked(tier) ? 'tier-header--locked' : ''">
-                            <span class="tier-label">TIER {{ tier }}</span>
-                            <span v-if="tierLocked(tier)" class="tier-lock">
-                                🔒 REQUIRES RAM {{ tier }}+
+                <!-- Context group headers: map then hack -->
+                <template v-for="ctx in ['map', 'hack']" :key="ctx">
+                    <div v-if="commandsByContext(ctx).length" class="tier-group">
+                        <div class="tier-header">
+                            <span class="tier-label">{{ ctx.toUpperCase() }} COMMANDS</span>
+                            <span class="tier-unlocked">
+                                {{ contextSlotsAvailable(ctx) > 0 ? contextSlotsAvailable(ctx) + ' SLOT(S) FREE' : 'SLOTS FULL' }}
                             </span>
-                            <span v-else class="tier-unlocked">UNLOCKED</span>
                         </div>
 
                         <div
-                            v-for="cmd in commandsByTier(tier)"
+                            v-for="cmd in commandsByContext(ctx)"
                             :key="cmd.id"
                             class="cmd-row cmd-row--library"
-                            :class="{
-                                'cmd-row--locked':   tierLocked(tier),
-                                'cmd-row--expanded': expandedId === cmd.id,
-                            }"
-                            @click="!tierLocked(tier) && toggleExpand(cmd.id)"
+                            :class="{ 'cmd-row--expanded': expandedId === cmd.id }"
+                            @click="toggleExpand(cmd.id)"
                         >
                             <div class="cmd-main">
-                                <span class="cmd-tier" :class="{ 'tier--locked': tierLocked(tier) }">
-                                    T{{ cmd.tier }}
+                                <span class="cmd-context-badge" :class="`ctx--${cmd.context}`">
+                                    {{ cmd.context.toUpperCase() }}
                                 </span>
-                                <span class="cmd-type-badge" :class="tierLocked(tier) ? 'type--locked' : `type--${cmd.type}`">
+                                <span class="cmd-type-badge" :class="`type--${cmd.type}`">
                                     {{ cmd.type.toUpperCase() }}
                                 </span>
-                                <span class="cmd-name cmd-name--lib" :class="{ 'name--locked': tierLocked(tier) }">
+                                <span class="cmd-name cmd-name--lib">
                                     {{ cmd.name.toUpperCase() }}
                                 </span>
                                 <button
-                                    v-if="!tierLocked(tier)"
                                     class="cmd-equip-btn"
-                                    :disabled="slotsAtMax"
-                                    :title="slotsAtMax ? 'Loadout full' : 'Add to loadout'"
+                                    :disabled="contextSlotsAvailable(cmd.context) <= 0"
+                                    :title="contextSlotsAvailable(cmd.context) <= 0 ? 'No slots available' : 'Add to loadout'"
                                     @click.stop="equipCommand(cmd)"
                                 >
                                     [+]
                                 </button>
-                                <span v-else class="cmd-locked-tag">LOCKED</span>
                             </div>
 
                             <!-- Expanded effect detail -->
                             <Transition name="expand">
-                                <div v-if="expandedId === cmd.id && !tierLocked(tier)" class="cmd-detail">
+                                <div v-if="expandedId === cmd.id" class="cmd-detail">
                                     <div v-if="cmd.mapEffect" class="cmd-effect-row">
                                         <span class="effect-key">MAP</span>
                                         <span class="effect-val">{{ cmd.mapEffect }}</span>
@@ -181,27 +252,49 @@ defineProps({ url: { type: String, default: '' } });
 
 const gameState = inject('gameState', null);
 const commands  = gameState?.commands ?? ref([]);
-const rig       = gameState?.rig      ?? ref({ ram: 2, storage: 2 });
+const rig       = gameState?.rig      ?? ref({});
 
-// Slot capacity — governed by RAM stat (mirrors CyberDocService::setLoadout server enforcement).
-// Storage controls the total command library size, not the active loadout slots.
-const maxSlots = computed(() => rig.value?.ram ?? 2);
-const slotsAtMax = computed(() => equippedCommands.value.length >= maxSlots.value);
-const emptySlots = computed(() => Math.max(0, maxSlots.value - equippedCommands.value.length));
-const slotsClass = computed(() => slotsAtMax.value ? 'slots--full' : '');
+// Typed slot counts from chassis + installed command modules (populated by /api/player/me).
+const slots = computed(() => rig.value?.loadoutSlots ?? { map: 1, hack: 1, open: 1, total: 3 });
+const totalSlots = computed(() => slots.value.total ?? 3);
 
 // Filtered views
 const equippedCommands   = computed(() => commands.value.filter(c => c.equipped));
 const unequippedCommands = computed(() => commands.value.filter(c => c.owned && !c.equipped));
 
-// Library grouped by tier
-function commandsByTier(tier) {
-    return unequippedCommands.value.filter(c => c.tier === tier);
+// Equipped commands split by context (for typed slot columns).
+// Open slots display overflow commands that didn't fit their typed slots.
+function equippedByContext(ctx) {
+    return equippedCommands.value.filter(c => c.context === ctx);
 }
 
-// Tier locked if RAM stat is below the tier requirement
-function tierLocked(tier) {
-    return (rig.value?.ram ?? 2) < tier;
+// For open slots: commands equipped beyond what the typed slots can hold.
+const equippedOpen = computed(() => {
+    const mapOverflow  = equippedByContext('map').slice(slots.value.map);
+    const hackOverflow = equippedByContext('hack').slice(slots.value.hack);
+    return [...mapOverflow, ...hackOverflow];
+});
+
+// Per-context slot usage counters (for the header pips).
+const mapSlotsUsed  = computed(() => Math.min(equippedByContext('map').length,  slots.value.map));
+const hackSlotsUsed = computed(() => Math.min(equippedByContext('hack').length, slots.value.hack));
+const openSlotsUsed = computed(() => equippedOpen.value.length);
+
+const slotsAtMax = computed(() => equippedCommands.value.length >= totalSlots.value);
+const slotsClass = computed(() => slotsAtMax.value ? 'slots--full' : '');
+
+// How many slots of the given context are still free (including open slots as overflow).
+function contextSlotsAvailable(ctx) {
+    const equipped = equippedByContext(ctx).length;
+    const typed    = slots.value[ctx] ?? 0;
+    const freeTyped = Math.max(0, typed - equipped);
+    const freeOpen  = Math.max(0, slots.value.open - equippedOpen.value.length);
+    return freeTyped + freeOpen;
+}
+
+// Library grouped by context
+function commandsByContext(ctx) {
+    return unequippedCommands.value.filter(c => c.context === ctx);
 }
 
 // Expand/collapse detail
@@ -212,7 +305,7 @@ function toggleExpand(id) {
 
 // Equip / unequip
 function equipCommand(cmd) {
-    if (slotsAtMax.value) return;
+    if (contextSlotsAvailable(cmd.context) <= 0) return;
     cmd.equipped = true;
     if (expandedId.value === cmd.id) expandedId.value = null;
 }
@@ -248,8 +341,8 @@ function unequipCommand(cmd) {
 
 .sys-title    { font-size: 13px; color: #00FFFF; letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(0,255,255,0.3); }
 .sys-sub      { font-size: 9px;  color: rgba(0,255,255,0.3); letter-spacing: 0.1em; }
-.sys-ram-label { font-size: 8px; color: rgba(0,255,255,0.2); letter-spacing: 0.12em; }
-.sys-ram-val   { font-size: 9px; color: rgba(0,255,255,0.5); letter-spacing: 0.1em; }
+.sys-slot-pip { font-size: 8px; color: rgba(0,255,255,0.45); letter-spacing: 0.1em; }
+.sys-slot-sep { font-size: 8px; color: rgba(0,255,255,0.15); margin: 0 2px; }
 
 /* ── Body ───────────────────────────────────────────────────────────────────── */
 .sys-body    { flex: 1; overflow-y: auto; padding: 0 24px 24px; }
@@ -271,6 +364,16 @@ function unequipCommand(cmd) {
 .section-sub   { font-size: 8px; color: rgba(0,255,255,0.18); letter-spacing: 0.1em; }
 .section-slots { font-size: 8px; letter-spacing: 0.1em; color: rgba(0,255,255,0.4); }
 .slots--full   { color: #FFB300; }
+
+/* ── Slot group labels ──────────────────────────────────────────────────────── */
+.slot-group-label {
+    font-size: 7px;
+    color: rgba(0,255,255,0.2);
+    letter-spacing: 0.18em;
+    padding: 10px 0 4px;
+}
+.slot-group-label--hack { color: rgba(255,69,69,0.25); }
+.slot-group-label--open { color: rgba(255,179,0,0.25); }
 
 /* ── Command rows ───────────────────────────────────────────────────────────── */
 .cmd-row {
@@ -307,7 +410,19 @@ function unequipCommand(cmd) {
 .dot--cd    { background: rgba(255,51,51,0.4); }
 @keyframes dot-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-/* Tier */
+/* Context badge — map / hack indicator on equipped and library rows */
+.cmd-context-badge {
+    font-size: 7px;
+    letter-spacing: 0.1em;
+    padding: 1px 5px;
+    border: 1px solid;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.ctx--map  { color: rgba(0,255,255,0.7);  border-color: rgba(0,255,255,0.25);  background: rgba(0,255,255,0.04); }
+.ctx--hack { color: rgba(255,69,69,0.75); border-color: rgba(255,69,69,0.25);  background: rgba(255,69,69,0.04); }
+
+/* Tier (kept for any legacy refs, hidden from new rows) */
 .cmd-tier       { font-size: 8px; color: rgba(0,255,255,0.3); flex-shrink: 0; }
 .tier--locked   { color: rgba(255,255,255,0.15); }
 

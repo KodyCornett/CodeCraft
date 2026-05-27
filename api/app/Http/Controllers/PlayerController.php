@@ -68,13 +68,15 @@ class PlayerController extends Controller
                 'current_ss'  => (int) $rig->current_ss,
                 'max_ss'      => $this->rigService->maxSs($rig),
                 'is_limping'  => (bool) $rig->is_limping,
-                // Chassis-locked uplink (max pool for this chassis)
-                'uplink'         => (int) ($rig->chassis->base_uplink ?? 3),
+                // Effective uplink (chassis base + peripheral boost).
+                // Computed once to avoid a second DB query for the null-fallback path.
+                'uplink'         => ($uplinkMax = (int) ($rig->chassis->base_uplink ?? 3)
+                                  + ($this->rigService->peripheralBoosts($player)['uplink'] ?? 0)),
                 // Persisted remaining uplink for the current run.
-                // null means the run hasn't started yet — client treats it as full pool.
+                // null means the run hasn't started yet — client treats it as the full pool.
                 'current_uplink' => $rig->current_uplink !== null
                     ? (int) $rig->current_uplink
-                    : (int) ($rig->chassis->base_uplink ?? 3),
+                    : $uplinkMax,
                 // Effective stats (each entry: base, level, peripheral_boost, effective)
                 'stats'       => $this->rigService->effectiveStats($rig, $player),
                 // Stat caps from chassis
@@ -99,6 +101,8 @@ class PlayerController extends Controller
                     'cap'   => (int) $rig->chassis->total_point_cap,
                 ],
                 'peripheral_slots' => (int) ($rig->chassis->peripheral_slots ?? 0),
+                // Typed loadout slot counts (chassis base + installed command modules).
+                'loadout_slots'    => $this->rigService->loadoutSlots($rig, $player),
             ] : null,
         ]);
     }
@@ -250,8 +254,9 @@ class PlayerController extends Controller
         // ── 3. Uplink check ───────────────────────────────────────────────────
         $rig = $player->rig()->with('chassis')->first();
         if ($rig !== null) {
-            $baseUplink  = (int) ($rig->chassis->base_uplink ?? 3);
-            $curUplink   = $rig->current_uplink ?? $baseUplink;
+            $effectiveMax = (int) ($rig->chassis->base_uplink ?? 3)
+                          + ($this->rigService->peripheralBoosts($player)['uplink'] ?? 0);
+            $curUplink    = $rig->current_uplink ?? $effectiveMax;
             if ($curUplink <= 0) {
                 return response()->json(['message' => 'No uplink remaining — bank your run at a Street Doc first.'], 422);
             }
@@ -279,10 +284,10 @@ class PlayerController extends Controller
 
         // Decrement persisted uplink by 1 each move (floor 0).
         // $rig is already loaded from the uplink guard above.
+        // $effectiveMax is already computed — use it as the null fallback here too.
         $remainingUplink = null;
         if ($rig !== null) {
-            $baseUplink          = (int) ($rig->chassis->base_uplink ?? 3);
-            $current             = $rig->current_uplink ?? $baseUplink;
+            $current             = $rig->current_uplink ?? $effectiveMax;
             $rig->current_uplink = max(0, $current - 1);
             $rig->save();
             $remainingUplink = $rig->current_uplink;
