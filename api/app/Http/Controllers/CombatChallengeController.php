@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Events\CombatChallengeReceived;
+use App\Events\PacketHijackStarted;
 use App\Events\PlayerCombatStateChanged;
 use App\Models\CombatChallenge;
 use App\Models\Node;
+use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Services\BountyService;
+use App\Services\PacketHijackService;
 use App\Services\RigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,9 +23,11 @@ use Illuminate\Support\Str;
  *   1. Challenger POSTs to /combat/challenge  → creates a pending challenge
  *   2. Target polls  GET  /combat/pending      → sees the incoming challenge
  *   3. Target POSTs  to  /combat/challenge/{id}/accept or /decline
- *   4. On accept: both clients enter GridBreach
+ *   4. On accept: PacketHijackMatch is created; PacketHijackStarted events
+ *      are broadcast to both players; both clients launch the terminal UI
  *   5. On decline: decliner takes 20 SS damage + bounty-scaled pocket steal
- *   6. Winner POSTs to /combat/result (CombatController)
+ *   6. Match resolution is handled server-side by PacketHijackController
+ *      when the winning player submits a verified malware inject payload
  *
  * Decline penalty (same cost as losing a fight — running is never free):
  *   - 20 flat SS damage (can trigger critical failure if SS ≤ 20)
@@ -43,8 +48,9 @@ class CombatChallengeController extends Controller
     private const DECLINE_SS_DAMAGE = 20;
 
     public function __construct(
-        private readonly BountyService $bountyService,
-        private readonly RigService    $rigService,
+        private readonly BountyService       $bountyService,
+        private readonly RigService          $rigService,
+        private readonly PacketHijackService $phService,
     ) {}
 
     /**
@@ -199,7 +205,9 @@ class CombatChallengeController extends Controller
     /**
      * POST /api/combat/challenge/{id}/accept
      *
-     * Target accepts the challenge — both clients now launch GridBreach PvP mode.
+     * Target accepts the challenge — creates a Packet Hijack match, broadcasts
+     * PacketHijackStarted to both players, and returns the match_id + roles
+     * so each client can subscribe to the match channel and render the terminal.
      */
     public function accept(Request $request, string $id): JsonResponse
     {
@@ -219,19 +227,89 @@ class CombatChallengeController extends Controller
         PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, true);
         PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, true);
 
-        $challenger = $challenge->challenger()->first();
+        // ── Create Packet Hijack match ────────────────────────────────────────
+        $challenger = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
+            ->find($challenge->challenger_id);
+        $defender   = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
+            ->find($challenge->target_id);
+
+        // Generate unique rig IPs for each player (what the opponent must locate)
+        $challengerRigIp = $this->phService->generateRigIp();
+        $defenderRigIp   = $this->phService->generateRigIp();
+
+        // Ensure the two generated IPs are distinct
+        while ($defenderRigIp === $challengerRigIp) {
+            $defenderRigIp = $this->phService->generateRigIp();
+        }
+
+        // challenger_target_ip = the IP the CHALLENGER must find = DEFENDER's rig
+        // defender_target_ip   = the IP the DEFENDER must find   = CHALLENGER's rig
+        $challengerPool = $this->phService->generateIpPool($defenderRigIp);
+        $defenderPool   = $this->phService->generateIpPool($challengerRigIp);
+
+        $challengerRig = $challenger?->rig;
+        $defenderRig   = $defender?->rig;
+
+        $challengerPorts = ($challengerRig && $challenger)
+            ? $this->phService->generatePortTopology($challengerRig, $challenger)
+            : $this->phService->generatePortTopology(
+                $this->rigService->getRigForPlayer($challenger) ?? $challengerRig,
+                $challenger
+            );
+
+        $defenderPorts = ($defenderRig && $defender)
+            ? $this->phService->generatePortTopology($defenderRig, $defender)
+            : $this->phService->generatePortTopology(
+                $this->rigService->getRigForPlayer($defender) ?? $defenderRig,
+                $defender
+            );
+
+        /** @var PacketHijackMatch $match */
+        $match = PacketHijackMatch::create([
+            'id'                  => (string) Str::uuid(),
+            'challenger_id'       => $challenge->challenger_id,
+            'defender_id'         => $challenge->target_id,
+            'status'              => 'phase1',
+            'challenger_target_ip'=> $defenderRigIp,
+            'defender_target_ip'  => $challengerRigIp,
+            'challenger_ip_pool'  => $challengerPool,
+            'defender_ip_pool'    => $defenderPool,
+            'challenger_ports'    => $challengerPorts,
+            'defender_ports'      => $defenderPorts,
+            'challenger_phase'    => 1,
+            'defender_phase'      => 1,
+            'started_at'          => now(),
+        ]);
+
+        // ── Broadcast started events (15-item opening sample each) ────────────
+        $phService = $this->phService;
+
+        PacketHijackStarted::dispatch(
+            matchId:      $match->id,
+            playerId:     $challenge->challenger_id,
+            role:         'challenger',
+            ipPoolSample: $phService->commandNetstat($challengerPool),
+        );
+
+        PacketHijackStarted::dispatch(
+            matchId:      $match->id,
+            playerId:     $challenge->target_id,
+            role:         'defender',
+            ipPoolSample: $phService->commandNetstat($defenderPool),
+        );
 
         return response()->json([
-            'challenge_id' => $challenge->id,
+            'match_id'     => $match->id,
             'challenger'   => [
-                'id'           => $challenger->id,
-                'handle'       => $challenger->handle,
-                'pocket_creds' => (int) ($challenger->pocket_creds ?? 0),
+                'id'           => $challenge->challenger_id,
+                'handle'       => $challenger?->handle,
+                'pocket_creds' => (int) ($challenger?->pocket_creds ?? 0),
             ],
             'target' => [
                 'id'           => $me->id,
                 'handle'       => $me->handle,
                 'pocket_creds' => (int) ($me->pocket_creds ?? 0),
+                'role'         => 'defender',
             ],
         ]);
     }

@@ -22,6 +22,11 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
+        User::factory()->create([
+            'name' => 'Test User 2',
+            'email' => 'test2@example.com',
+        ]);
+
         $this->call(PeripheralSeeder::class);
         $this->call(ConsumableSeeder::class);
         $this->call(PlayerSeeder::class);     // must run after User factory above

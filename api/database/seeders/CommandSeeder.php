@@ -387,7 +387,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Delays your next board scramble, protecting current sequence progress.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Delays your next board scramble, giving you more time to complete the current sequence. L1: +4 seconds. L2: +7 seconds.',
-                'packethijack_effect' => 'Auto-resolves one sniff deduction step in Phase 1, narrowing your target list without manual input.',
+                'packethijack_effect' => 'Reveals the first octet of the target IP (e.g. 192.x.x.x), narrowing your Phase 1 search to one RFC-1918 range without giving away the subnet.',
                 'level_scaling'       => [
                     '1' => ['delay_seconds' => 4],
                     '2' => ['delay_seconds' => 7],
@@ -429,7 +429,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Temporarily widens your hexakey input window.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Widens your input window per hexakey for the duration. L1: +35% for 5 seconds. L2: +50% for 7 seconds.',
-                'packethijack_effect' => 'Speeds up your Phase 1 sniff resolution, reducing the number of deduction steps required.',
+                'packethijack_effect' => 'Raises your exploit threshold from 25% to 45% for the next exploit command only — allows cracking ports that would normally be too well-defended. Consumed on the next successful exploit.',
                 'level_scaling'       => [
                     '1' => ['input_boost_pct' => 35, 'seconds' => 5],
                     '2' => ['input_boost_pct' => 50, 'seconds' => 7],
@@ -450,7 +450,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Auto-completes your current hexakey sequence for a free score.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Instantly completes your current sequence and counts it as a full score. L2: also delays your next scramble by 3 seconds.',
-                'packethijack_effect' => 'Skips the scan step on one port, jumping directly to exploit input.',
+                'packethijack_effect' => 'Activates a mirror shield. The next opponent rig command is reflected: if it was a self-buff they used, you receive the same buff; if it was an attack against you, it also fires back on them. Consumed on first trigger.',
                 'level_scaling'       => [
                     '1' => ['scramble_delay_seconds' => 0],
                     '2' => ['scramble_delay_seconds' => 3],
@@ -471,7 +471,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Highlights your next correct hexakey targets and widens the input window for those inputs.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Highlights your next correct hexakey target(s) and extends the input window for those inputs by 50%. You still have to press them. L1: 1 hexakey highlighted. L2: 2 hexakeys highlighted.',
-                'packethijack_effect' => 'Automatically flags the lowest-bias port in the current topology, skipping manual scan input for that port.',
+                'packethijack_effect' => 'Auto-scans the lowest-bias non-shattered port in your topology, returning the same output as a manual scan port command without spending an input. You still have to exploit it yourself.',
                 'level_scaling'       => [
                     '1' => ['hexakeys_highlighted' => 1, 'window_boost_pct' => 50],
                     '2' => ['hexakeys_highlighted' => 2, 'window_boost_pct' => 50],

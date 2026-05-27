@@ -5,6 +5,7 @@ use App\Http\Controllers\BountyController;
 use App\Http\Controllers\TutorialController;
 use App\Http\Controllers\CombatChallengeController;
 use App\Http\Controllers\CombatController;
+use App\Http\Controllers\PacketHijackController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\NodeController;
 use App\Http\Controllers\PlayerController;
@@ -85,6 +86,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/combat/challenge/{id}/status',           [CombatChallengeController::class, 'status']);
     Route::post('/combat/challenge/{id}/accept',          [CombatChallengeController::class, 'accept']);
     Route::post('/combat/challenge/{id}/decline',         [CombatChallengeController::class, 'decline']);
+
+// ---------------------------------------------------------------------------
+// Packet Hijack
+// ---------------------------------------------------------------------------
+
+    // command: 120/min — generous to cover fast typing; blocks scripted flooding
+    Route::post('/packet-hijack/{match}/command', [PacketHijackController::class, 'command'])
+        ->middleware('throttle:120,1');
+    Route::get('/packet-hijack/{match}/state',   [PacketHijackController::class, 'state']);
 
 // ---------------------------------------------------------------------------
 // Leaderboards

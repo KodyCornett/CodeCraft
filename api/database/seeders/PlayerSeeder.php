@@ -90,5 +90,45 @@ class PlayerSeeder extends Seeder
         }
 
         $this->command?->info("PlayerSeeder: player '{$player->handle}' ready (id: {$player->id})");
+
+        // ── Test user 2 ───────────────────────────────────────────────────── //
+        $user2 = User::where('email', 'test2@example.com')->first();
+
+        if (!$user2) {
+            $this->command?->warn('PlayerSeeder: test2 user not found — skipping.');
+            return;
+        }
+
+        $player2 = Player::firstOrCreate(
+            ['user_id' => $user2->id],
+            [
+                'handle'           => 'GhostRunner',
+                'current_district' => 'DOWNTOWN',
+                'bounty_level'     => 0,
+            ],
+        );
+
+        $existingRig2 = DB::table('player_rigs')
+            ->where('player_id', $player2->id)
+            ->first();
+
+        if (!$existingRig2) {
+            DB::table('player_rigs')->insert([
+                'id'                  => (string) Str::uuid(),
+                'player_id'           => $player2->id,
+                'chassis_template_id' => $chassisId,
+                'cpu_level'           => 3,
+                'ram_level'           => 2,
+                'firewall_level'      => 1,
+                'storage_level'       => 2,
+                'os_level'            => 2,
+                'current_ss'          => 100,
+                'is_limping'          => false,
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ]);
+        }
+
+        $this->command?->info("PlayerSeeder: player '{$player2->handle}' ready (id: {$player2->id})");
     }
 }

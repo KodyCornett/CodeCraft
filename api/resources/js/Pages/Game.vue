@@ -79,25 +79,27 @@
                     />
                 </Transition>
 
-                <!-- Grid-Breach mini-game (PvP) -->
+                <!-- Packet Hijack terminal (PvP) — replaces GridBreach for PvP combat -->
                 <Transition name="breach-fade">
-                    <GridBreach
-                        v-if="activePvpCombat"
-                        :node="{ ice: activePvpCombat.iceLevel, id: activePvpCombat.nodeCanvasId }"
-                        resource="creds"
-                        :player-cpu="rig.cpu"
-                        :player-ram="rig.ram"
-                        :player-os="rig.os"
-                        :player-firewall="rig.firewall"
-                        :player-max-uplink="player.maxUplink"
-                        :bounty-multiplier="player.bountyMultiplier"
-                        :pvp-mode="true"
-                        :pvp-opponent="activePvpCombat.opponent"
-                        :pvp-commands="pvpReadyCommands"
-                        @complete="onPvpComplete"
-                        @failed="onPvpComplete({ won: false, amount: 0 })"
-                        @abort="activePvpCombat = null"
-                        @pvp-command-used="onPvpCommandUsed"
+                    <PacketHijack
+                        v-if="activePacketHijack"
+                        :match-id="ph.matchId"
+                        :role="ph.role"
+                        :phase="ph.phase"
+                        :command-history="ph.commandHistory"
+                        :ports="ph.ports"
+                        :target-ip="ph.targetIp"
+                        :is-locked="ph.isLocked"
+                        :lock-countdown="ph.lockCountdown"
+                        :defender-alert-active="ph.defenderAlertActive"
+                        :match-result="ph.matchResult"
+                        :is-complete="ph.isComplete"
+                        :busy="ph.busy"
+                        :hack-commands="hackCommands"
+                        :used-rig-commands="ph.usedRigCommands"
+                        @submit-command="ph.submitCommand"
+                        @use-rig-command="ph.submitRigCommand"
+                        @match-complete="onPacketHijackMatchComplete"
                     />
                 </Transition>
 
@@ -125,7 +127,7 @@
                                 <span class="pvp-ch-label">FROM</span>
                                 <span class="pvp-ch-name">{{ incomingChallenge.challenger?.handle ?? 'UNKNOWN' }}</span>
                             </div>
-                            <div class="pvp-challenge-sub">You are being challenged to Grid-Breach combat</div>
+                            <div class="pvp-challenge-sub">You are being challenged to Packet Hijack combat</div>
                             <div class="pvp-challenge-actions">
                                 <button class="pvp-btn pvp-btn--accept" @click="onAcceptChallenge">
                                     [ACCEPT]
@@ -259,6 +261,7 @@ import BootSequence             from '@/components/shared/BootSequence.vue';
 import OpenSeasonNotification  from '@/components/shared/OpenSeasonNotification.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
+import PacketHijack  from '@/components/minigame/PacketHijack.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
 import { useMapData }        from '@/composables/useMapData.js';
@@ -272,6 +275,7 @@ import { usePosition }       from '@/composables/usePosition.js';
 import { useNodePresence }   from '@/composables/useNodePresence.js';
 import { useNodeTraces }     from '@/composables/useNodeTraces.js';
 import { useCombat }         from '@/composables/useCombat.js';
+import { usePacketHijack }   from '@/composables/usePacketHijack.js';
 import { useGameState }      from '@/composables/useGameState.js';
 import { useHeartbeat }     from '@/composables/useHeartbeat.js';
 import { useAudio }        from '@/composables/useAudio.js';
@@ -318,13 +322,18 @@ const {
 } = useCombat(playerId);
 
 // PvP combat state
-const activePvpCombat   = ref(null);   // { opponent, challengeId, nodeCanvasId } when combat is live
+const activePvpCombat   = ref(null);   // reserved — not used for PvP (Packet Hijack replaced GridBreach)
 const pvpResult         = ref(null);   // { won, loot } shown after combat
 const awaitingChallenge = ref(false);  // true while waiting for target to accept
 
-// Equipped commands passed into the PvP GridBreach command panel.
-// Includes each command's current cooldown state so the panel dims spent ones.
-const pvpReadyCommands = computed(() => commands.value.filter(c => c.equipped));
+// Packet Hijack — terminal PvP mini-game
+const ph                  = usePacketHijack(playerId);
+const activePacketHijack  = ref(false);  // true while the PH terminal overlay is shown
+
+// Equipped hack-context commands passed into the PH terminal as the rig loadout strip.
+const hackCommands = computed(() =>
+    (commands.value ?? []).filter(c => c.is_active && c.context === 'hack')
+);
 
 // Critical system failure overlay — shown when SS hits 0
 const criticalFailure   = ref(null);   // { repairCost } or null
@@ -1259,7 +1268,8 @@ async function onHackPlayer(targetPlayer) {
             if (status === 'accepted') {
                 clearInterval(pollAccept);
                 awaitingChallenge.value = false;
-                launchPvpGridBreach(targetPlayer, challengeId, 'challenger');
+                // PacketHijackStarted WS event fires simultaneously — ph.init() is
+                // called from the .packet-hijack.started listener registered on mount.
             } else if (status === 'declined') {
                 clearInterval(pollAccept);
                 awaitingChallenge.value = false;
@@ -1280,15 +1290,17 @@ async function onHackPlayer(targetPlayer) {
     }, 2_000);
 }
 
-// Called when the target accepts an incoming challenge
+// Called when the target accepts an incoming challenge.
+// acceptChallenge() triggers server-side PacketHijackMatch creation and broadcasts
+// PacketHijackStarted to both players. The .packet-hijack.started Echo listener
+// registered on mount calls ph.init() and sets activePacketHijack = true.
 async function onAcceptChallenge() {
     const c = incomingChallenge.value;
     if (!c) return;
 
     const result = await acceptChallenge(c.id);
     if (!result) return;
-
-    launchPvpGridBreach(c.challenger, c.id, 'target');
+    // WS event handles the terminal launch — nothing else needed here.
 }
 
 async function onDeclineChallenge() {
@@ -1434,6 +1446,32 @@ function applyPvpResult(result, opponentHandle) {
     console.log(`[PVP] ${won ? 'WON' : 'LOST'} vs ${opponentHandle} | scores: ${result.winner_score}–${result.loser_score}`);
 }
 
+// Called when PacketHijack.vue emits 'match-complete' (player clicked DISCONNECT).
+// Mirrors applyPvpResult() — syncs local economy state from the WS payload.
+function onPacketHijackMatchComplete(result) {
+    activePacketHijack.value = false;
+    ph.destroy();
+
+    if (result.isWinner) {
+        player.value.pocketCreds = (player.value.pocketCreds ?? 0) + (result.credsStolen ?? 0);
+    } else {
+        player.value.pocketCreds = 0;
+        player.value.isLimping   = true;
+    }
+
+    // Sync full state from the server to pick up bounty escalation and SS changes
+    axios.get('/api/player/me').then(res => {
+        if (res.data?.player) {
+            player.value.bountyLevel      = res.data.player.bounty_level      ?? player.value.bountyLevel;
+            player.value.bountyMultiplier = res.data.player.bounty_multiplier ?? player.value.bountyMultiplier;
+            player.value.isOpenSeason     = res.data.player.is_open_season    ?? player.value.isOpenSeason;
+        }
+        if (res.data?.rig) {
+            player.value.currentSS = res.data.rig.current_ss ?? player.value.currentSS;
+        }
+    }).catch(() => { /* silent — stale state until next interaction */ });
+}
+
 // ── Consumable use — wraps gameState useConsumable to sync activeEffects ──────
 // Software consumables return active_effects from the server. Game.vue owns the
 // activeEffects ref so the movement handler can decrement them correctly. This
@@ -1510,6 +1548,19 @@ onMounted(async () => {
 
     // Start polling for incoming PvP challenges (2s interval)
     startPendingPoll(2_000);
+
+    // Listen for Packet Hijack match start on the player's private channel.
+    // PacketHijackStarted is broadcast by the server when accept() is called.
+    // Both players (challenger + defender) receive this event simultaneously.
+    if (playerId.value && window.Echo) {
+        window.Echo.private(`player.${playerId.value}`)
+            .listen('.packet-hijack.started', (data) => {
+                ph.init(data.match_id, data.role, data.ip_pool_sample ?? []);
+                activePacketHijack.value  = true;
+                awaitingChallenge.value   = false;
+                incomingChallenge.value   = null;
+            });
+    }
 
 
     // Step 3 — fetch all 228 nodes (bearer token is now set by login above)

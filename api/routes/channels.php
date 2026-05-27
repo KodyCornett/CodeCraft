@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CombatChallenge;
+use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Services\RigService;
 use Illuminate\Support\Facades\Broadcast;
@@ -21,6 +22,21 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 Broadcast::channel('player.{playerId}', function ($user, string $playerId) {
     $player = Player::where('user_id', $user->id)->value('id');
     return $player === $playerId;
+});
+
+// Private channel for Packet Hijack match events.
+// Both participants (challenger and defender) are authorised.
+// All four PH event classes broadcast on this channel.
+Broadcast::channel('packet-hijack.{matchId}', function ($user, string $matchId) {
+    $player = Player::where('user_id', $user->id)->value('id');
+    if ($player === null) return false;
+
+    return PacketHijackMatch::where('id', $matchId)
+        ->where(function ($q) use ($player) {
+            $q->where('challenger_id', $player)
+              ->orWhere('defender_id', $player);
+        })
+        ->exists();
 });
 
 // Presence channel for node co-location — who is standing on this node right now.
