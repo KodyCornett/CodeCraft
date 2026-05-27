@@ -307,7 +307,6 @@ class PacketHijackController extends Controller
                 outputLines:   [
                     '[VERIFYING NODE GATEWAY ROUTE...]',
                     '[SUCCESS]: TARGET IP SIGNATURE CONFIRMED. TERMINAL COMPROMISED.',
-                    '[ALERT]: PIVOTING TO TARGET DEFENSIVE TOPOLOGY... CHASSIS LOCKED.',
                 ],
                 phaseAdvanced: true,
             );
@@ -506,10 +505,12 @@ class PacketHijackController extends Controller
     // =========================================================================
 
     /**
-     * Execute an equipped hack-context rig command during an active PH match.
+     * Execute an equipped rig command during an active PH match.
      *
      * Validates:
-     *   - The player has the command equipped (is_active) and it is a 'hack' command.
+     *   - The player has the command equipped (is_active) and it is a 'hack' or 'map' command.
+     *   - Ghost Protocol and Signal Noise are 'map'-context commands that carry defined
+     *     Packet Hijack effects, so both contexts are accepted here.
      *   - The command has not already been used this match (one-use-per-match guard).
      *
      * Then delegates to PacketHijackService::applyRigCommand(), saves match state,
@@ -529,7 +530,7 @@ class PacketHijackController extends Controller
 
         $playerCmd = $activeCommands->first(function ($pc) use ($slug) {
             $cmdSlug = strtolower(str_replace(' ', '_', $pc->command->name ?? ''));
-            return $cmdSlug === $slug && ($pc->command->context ?? '') === 'hack';
+            return $cmdSlug === $slug && in_array($pc->command->context ?? '', ['hack', 'map'], true);
         });
 
         if ($playerCmd === null) {

@@ -1051,6 +1051,15 @@ class PacketHijackService
             $added[] = "{$port} [{$newEntry['service']}]";
         }
 
+        // Re-lock exfil if it was already unlocked — the new unshattered port
+        // means the all-clear condition is no longer valid.
+        foreach ($ports as $i => $entry) {
+            if ((int) $entry['port'] === self::EXFIL_PORT && $entry['unlocked']) {
+                $ports[$i]['unlocked'] = false;
+                $ports[$i]['bias']     = 100;
+            }
+        }
+
         $match->$portsKey = $ports;
 
         $countLabel = count($added) === 1 ? '1 PHANTOM PORT' : count($added) . ' PHANTOM PORTS';

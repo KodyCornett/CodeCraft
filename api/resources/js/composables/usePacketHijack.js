@@ -74,9 +74,15 @@ export function usePacketHijack(playerId) {
     }
 
     function unsubscribe() {
+        // Stop listening to PH events on the player channel, but do NOT call
+        // Echo.leave() — Game.vue holds a packet-hijack.started listener on the
+        // same channel and must stay alive for subsequent matches.
         const pid = typeof playerId === 'object' ? playerId.value : playerId;
-        if (pid && window.Echo) {
-            window.Echo.leave(`player.${pid}`);
+        if (pid && window.Echo && echoChannel.value) {
+            window.Echo.private(`player.${pid}`)
+                .stopListening('.packet-hijack.command-result')
+                .stopListening('.packet-hijack.phase-transition')
+                .stopListening('.packet-hijack.complete');
         }
         echoChannel.value = null;
     }

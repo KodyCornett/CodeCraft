@@ -330,9 +330,11 @@ const awaitingChallenge = ref(false);  // true while waiting for target to accep
 const ph                  = usePacketHijack(playerId);
 const activePacketHijack  = ref(false);  // true while the PH terminal overlay is shown
 
-// Equipped hack-context commands passed into the PH terminal as the rig loadout strip.
+// Equipped hack- and map-context commands passed into the PH terminal as the rig loadout strip.
+// Ghost Protocol and Signal Noise are 'map' context but carry Packet Hijack effects, so both
+// contexts are included here.
 const hackCommands = computed(() =>
-    (commands.value ?? []).filter(c => c.is_active && c.context === 'hack')
+    (commands.value ?? []).filter(c => c.is_active && (c.context === 'hack' || c.context === 'map'))
 );
 
 // Critical system failure overlay — shown when SS hits 0
