@@ -63,8 +63,11 @@ export function useCombat(playerId) {
     }
 
     function stopPendingPoll() {
+        // Use stopListening rather than leave() so other listeners on the same
+        // player.{id} channel (packet-hijack.started, etc.) are not destroyed.
         if (pid() && window.Echo) {
-            window.Echo.leave(`player.${pid()}`);
+            window.Echo.private(`player.${pid()}`)
+                .stopListening('.challenge.received');
         }
     }
 

@@ -698,7 +698,11 @@ const REPLENISH_MS = 10 * 60 * 1000;
 /** Seconds until a depleted resource replenishes, or 0 if already ready. */
 function secsUntilReplenish(lastHackedAt) {
     if (!lastHackedAt) return 0;
-    const readyAt = new Date(lastHackedAt).getTime() + REPLENISH_MS;
+    // Laravel may serialize datetime without a timezone offset ("Y-m-d H:i:s").
+    // JS treats a space-separated datetime without a tz as local time, which shifts
+    // the countdown by the user's UTC offset. Normalize to an unambiguous UTC string.
+    const ts = String(lastHackedAt).replace(' ', 'T').replace(/([+-]\d{2}:\d{2}|Z)$/, '') + 'Z';
+    const readyAt = new Date(ts).getTime() + REPLENISH_MS;
     return Math.max(0, Math.ceil((readyAt - _now.value) / 1000));
 }
 

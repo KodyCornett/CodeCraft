@@ -693,6 +693,12 @@ class PacketHijackController extends Controller
         $match->completed_at = now();
         $match->save();
 
+        // Close the originating challenge so neither player is permanently flagged in-combat
+        \App\Models\CombatChallenge::where('challenger_id', $match->challenger_id)
+            ->where('target_id', $match->defender_id)
+            ->where('status', 'accepted')
+            ->update(['status' => 'resolved']);
+
         // ── 6. Broadcast outcome to both players ──────────────────────────────
         PacketHijackCommandResult::dispatch(
             matchId:     $match->id,

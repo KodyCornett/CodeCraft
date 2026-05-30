@@ -68,9 +68,11 @@ export function useNodePresence(currentNodeIdRef, playerIdRef) {
             });
     }
 
-    watch(currentNodeIdRef, (newId) => {
-        if (newId && playerIdRef?.value) joinChannel(newId);
-        else                             leaveChannel();
+    // Watch both refs together so that if currentNodeId is already set when
+    // playerId becomes available (common on fresh spawn), the join still fires.
+    watch([currentNodeIdRef, playerIdRef], ([newId, pid]) => {
+        if (newId && pid) joinChannel(newId);
+        else if (!newId)  leaveChannel();
     });
 
     onUnmounted(leaveChannel);

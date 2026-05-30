@@ -14,12 +14,12 @@
                 <template v-if="matchResult.isWinner">
                     <div class="ph-complete-title">[ BREACH COMPLETE ]</div>
                     <div class="ph-complete-line">NODE FULLY PURGED. CRED BUFFER ACQUIRED.</div>
-                    <div class="ph-complete-creds">+{{ matchResult.credsStolen.toLocaleString() }} ₡ TRANSFERRED</div>
+                    <div class="ph-complete-creds">+{{ (matchResult.credsStolen ?? 0).toLocaleString() }} ₡ TRANSFERRED</div>
                 </template>
                 <template v-else>
                     <div class="ph-complete-title ph-complete-title--loss">[ CONNECTION TERMINATED ]</div>
                     <div class="ph-complete-line">INTRUSION DETECTED. WALLET SEIZED.</div>
-                    <div class="ph-complete-creds ph-complete-creds--loss">-{{ matchResult.credsStolen.toLocaleString() }} ₡ LOST</div>
+                    <div class="ph-complete-creds ph-complete-creds--loss">-{{ (matchResult.credsStolen ?? 0).toLocaleString() }} ₡ LOST</div>
                 </template>
                 <button class="ph-complete-btn" @click="$emit('match-complete', matchResult)">
                     DISCONNECT

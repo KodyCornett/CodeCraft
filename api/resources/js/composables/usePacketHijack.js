@@ -46,9 +46,20 @@ export function usePacketHijack(playerId) {
     // ── Init — called when PacketHijackStarted event fires ───────────────────
 
     function init(mId, playerRole, ipPoolSample) {
-        matchId.value  = mId;
-        role.value     = playerRole;
-        phase.value    = 1;
+        // Reset all match state so stale results from a previous match don't bleed in
+        matchId.value             = mId;
+        role.value                = playerRole;
+        phase.value               = 1;
+        commandHistory.value      = [];
+        ports.value               = [];
+        targetIp.value            = null;
+        isLocked.value            = false;
+        lockUntil.value           = null;
+        lockCountdown.value       = 0;
+        defenderAlertActive.value = false;
+        matchResult.value         = null;
+        usedRigCommands.value     = [];
+        clearInterval(lockTimer);
 
         // Show the opening netstat sample as the first terminal output
         _appendHistory(
