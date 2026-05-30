@@ -21,9 +21,9 @@ CodeCraft is a real-time multiplayer cyberpunk hacking game. Players move across
 | Layer | Technology |
 |---|---|
 | Backend | Laravel 11, PHP 8.5, SQLite (dev) |
-| Auth | Laravel Sanctum — session-based for the SPA, Bearer tokens for the Kotlin engine |
+| Auth | Laravel Sanctum — session-based for the SPA |
 | Frontend | Vue 3 (Composition API), Inertia.js, Vite |
-| Realtime | WebSocket engine (Kotlin, not yet running — `VITE_ENGINE_ENABLED=false` in .env) |
+| Realtime | Laravel Reverb (WebSocket) — pending installation |
 | Font | JetBrains Mono (monospace throughout) |
 | Map | SVG hex grid, 228 canvas nodes |
 
@@ -36,7 +36,7 @@ api/
   app/
     Http/Controllers/       One controller per resource. Keep controllers thin.
       Auth/LoginController  Web session login/logout
-      AuthController        POST /api/auth/token (Kotlin engine only)
+      AuthController        POST /api/auth/token (reserved — can be removed)
       PlayerController      /api/player/me, /api/player/position
       NodeController        /api/nodes, /api/nodes/{id}/players, /api/nodes/{id}/deplete
       RigController         /api/rig CRUD
@@ -81,7 +81,7 @@ api/
       useBountyBoard.js     Polls /api/leaderboard/bounty every 30s
       useDepletion.js       POST /api/nodes/{id}/deplete after each hack
       useStreetDoc.js       POST /api/street-doc/visit
-      useWebSocket.js       WS stub (disabled — set VITE_ENGINE_ENABLED=true when ready)
+      useWebSocket.js       WS stub — will be replaced by Laravel Echo when Reverb is installed
       useBrowserState.js    Controls which SPLICE browser URL is active
 ```
 
@@ -112,7 +112,7 @@ api/
 | Stat | PvE | PvP | GridBreach | Other |
 |---|---|---|---|---|
 | **CPU** | Node ICE gate (can't attempt nodes with ICE >4 above CPU). Cache pool (CPU+RAM). | Damage multiplier: `20 + CPU×5 − FW×5` | Sequence length | Command level cap — max equippable command level = effective CPU |
-| **RAM** | Cache pool (CPU+RAM) | — | Game length: base 30s + (RAM × 5s) | Loadout slots — active commands = effective RAM |
+| **RAM** | Cache pool (CPU+RAM) | — | Game length: base 30s + (RAM × 5s) | Chassis-only — cannot be upgraded via invested points. |
 | **Firewall** | SS damage reduction: `max(1, nodeICE − Firewall)` | Damage absorption: `loserFW × 5` subtracted from formula | Shields hexakeys from opponent commands | Death spiral stat — degrades under SS loss, causing more damage per hit |
 | **Storage** | — | — | — | Pocket creds carry cap. Command library: `Storage × 2` = total commands owned. Item inventory slots. **Never degrades.** |
 | **OS** | Ping evasion — wider rings = harder to locate | Harder to locate on map | Input window: base 3s + (OS × 0.3s) per move | Degrades heavily under SS loss |
@@ -129,6 +129,31 @@ effective_stat = base_stat + invested_level + peripheral_boost
 - Cannot exceed `cap_*` from `chassis_templates`
 
 All stat math lives in `RigService::effectiveStats()`. Never recompute stats on the client — always trust the API snapshot.
+
+### Loadout Slots
+
+Loadout slots are **chassis-based + hardware-expandable**, not stat-driven. RAM no longer controls slot count.
+
+Each chassis has three typed base slot counts (`base_map_slots`, `base_hack_slots`, `base_open_slots`):
+
+| Chassis | Map | Hack | Open | Hardware slots | Max loadout |
+|---|---|---|---|---|---|
+| BlackHat v1.0 | 1 | 1 | 1 | 0 | 3 |
+| GX-7 Ghost | 2 | 1 | 0 | 2 | 5 |
+| BR-9 Breaker | 1 | 2 | 0 | 2 | 5 |
+| VT-3 Vault | 1 | 1 | 0 | 3 | 5 |
+
+Players expand hardware slots by installing **command module peripherals** (same shared port pool as stat-boost peripherals):
+- **Nav Wraith Mk.I/II/III** — adds 1 map slot. Mk tier = max command level for that slot (T1=L1, T2=L2, T3=L3).
+- **ICE Pick Mk.I/II/III** — adds 1 hack slot. Same tier gating.
+
+Slot rules:
+- Map slots accept map-context commands only.
+- Hack slots accept hack-context commands only.
+- Open slots accept either context (overflow).
+- Validation: map commands ≤ map + open slots; hack commands ≤ hack + open slots; total ≤ total slots.
+
+`RigService::loadoutSlots()` is the server-authoritative slot calculator. Always call it — never derive slot counts client-side.
 
 ### System Stability (SS)
 
@@ -163,7 +188,9 @@ Repair cost = floor((missingSS / maxSS) × 600)
 
 ### Uplink
 
-Uplink is **chassis-locked** — it cannot be boosted by invested points or peripherals. The only way to increase uplink is to upgrade to a higher-tier chassis. It sets the player's movement range per run.
+Uplink sets the player's movement range per run. It **cannot be boosted by invested points** — the only two ways to increase it are:
+1. Upgrade to a higher-tier chassis.
+2. Install **Deep Link** hardware peripherals (Mk.I +1 / Mk.II +2 / Mk.III +3). These are stat-boost peripherals that draw from the same port pool as other hardware and add directly to effective uplink.
 
 ---
 
@@ -279,11 +306,11 @@ Sanctum's `EnsureFrontendRequestsAreStateful` middleware is prepended to the API
 
 1. **Never put game math in a controller or component.** Controllers validate + delegate. Components render + emit.
 2. **All stat values come from `RigService::effectiveStats()`**. Never manually add `base_*` + `*_level` on the client.
-3. **Uplink is chassis-locked.** Never make it upgradeable via invested points.
+3. **Uplink cannot be raised by invested points.** It can only grow via chassis upgrade or Deep Link hardware peripherals.
 4. **Cache = CPU + RAM effective values.** Recompute server-side after every stat change.
 5. **Pocket vs wallet distinction is load-bearing.** Hacks → pocket. Street Doc → wallet. Store purchases → wallet only.
 6. **Node presence polling must not run pre-auth.** `useNodePresence` guards `fetchPresence()` with an auth token check.
-7. **WebSocket is disabled** (`VITE_ENGINE_ENABLED=false`). `useWebSocket` returns a stub. Set to `true` when the Kotlin engine is running.
+7. **WebSocket is a stub.** `useWebSocket` returns a silent no-op. It will be replaced by Laravel Echo pointed at Reverb when real-time is installed. Do not add logic to the stub.
 8. **The SPLICE browser routes are all in `SpliceRouter.js`**. Add new pages there — nothing else needs changing.
 9. **Pings are client-side only for now.** The WebSocket engine will broadcast real pings when it's live. Client-side pings are approximations.
 10. **One migration per change.** Never alter existing migration files — always add a new one.

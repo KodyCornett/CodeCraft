@@ -47,6 +47,7 @@ export function usePacketHijack(playerId) {
 
     function init(mId, playerRole, ipPoolSample) {
         // Reset all match state so stale results from a previous match don't bleed in
+        console.log('[PH] init called — matchResult before reset:', JSON.stringify(matchResult.value), '| old matchId:', matchId.value, '→ new:', mId);
         matchId.value             = mId;
         role.value                = playerRole;
         phase.value               = 1;
@@ -137,6 +138,7 @@ export function usePacketHijack(playerId) {
     }
 
     function _onMatchComplete(data) {
+        console.log('[PH] _onMatchComplete fired — data.match_id:', data.match_id, '| matchId.value:', matchId.value, '| match:', data.match_id === matchId.value);
         if (data.match_id !== matchId.value) return;
 
         matchResult.value = {

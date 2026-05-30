@@ -131,6 +131,19 @@
       <excludeFolder url="file://$MODULE_DIR$/web/storage/framework" />
       <excludeFolder url="file://$MODULE_DIR$/api/storage/app" />
       <excludeFolder url="file://$MODULE_DIR$/api/storage/framework" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/clue/redis-protocol" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/clue/redis-react" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/evenement/evenement" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/laravel/reverb" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/pusher/pusher-php-server" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/ratchet/rfc6455" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/cache" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/dns" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/event-loop" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/promise" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/promise-timer" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/socket" />
+      <excludeFolder url="file://$MODULE_DIR$/api/vendor/react/stream" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
