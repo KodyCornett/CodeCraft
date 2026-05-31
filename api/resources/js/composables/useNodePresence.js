@@ -43,10 +43,13 @@ export function useNodePresence(currentNodeIdRef, playerIdRef) {
                 nodePlayers.value = members.filter(m => m.id !== playerIdRef.value);
             })
             .joining((member) => {
-                // Another player arrived — add if not already present
+                // Another player arrived or rejoined — upsert so a refresh overwrites stale data
                 if (member.id === playerIdRef.value) return;
-                if (!nodePlayers.value.find(p => p.id === member.id)) {
+                const existing = nodePlayers.value.findIndex(p => p.id === member.id);
+                if (existing === -1) {
                     nodePlayers.value = [...nodePlayers.value, member];
+                } else {
+                    nodePlayers.value = nodePlayers.value.map(p => p.id === member.id ? member : p);
                 }
             })
             .leaving((member) => {
@@ -73,6 +76,12 @@ export function useNodePresence(currentNodeIdRef, playerIdRef) {
     watch([currentNodeIdRef, playerIdRef], ([newId, pid]) => {
         if (newId && pid) joinChannel(newId);
         else if (!newId)  leaveChannel();
+    });
+
+    // If playerId resolves after currentNodeId is already set (same canvas ID before
+    // and after login means the currentNodeId watcher never re-fires), join now.
+    watch(playerIdRef, (newPlayerId) => {
+        if (newPlayerId && currentNodeIdRef?.value) joinChannel(currentNodeIdRef.value);
     });
 
     onUnmounted(leaveChannel);

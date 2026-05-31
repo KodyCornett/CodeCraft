@@ -39,6 +39,7 @@ export function useCombat(playerId) {
             return res.data;   // { challenge_id, expires_in }
         } catch (e) {
             error.value = e?.response?.data?.message ?? 'Challenge failed';
+            console.warn('[COMBAT] Challenge failed:', error.value);
             return null;
         } finally {
             busy.value = false;
@@ -83,6 +84,7 @@ export function useCombat(playerId) {
             return res.data;
         } catch (e) {
             error.value = e?.response?.data?.message ?? 'Accept failed';
+            incomingChallenge.value = null;
             return null;
         } finally {
             busy.value = false;

@@ -24,6 +24,7 @@
                 :resources="resources"
                 :node-players="nodePlayers"
                 :traces="traces"
+                :current-player-id="currentPlayerId"
                 @hack="$emit('hack', $event)"
                 @open-store="$emit('open-store')"
                 @hack-player="$emit('hack-player', $event)"
@@ -61,8 +62,9 @@ defineProps({
     isOnNode:    { type: Boolean, default: false },
     isAdjacent:  { type: Boolean, default: false },
     resources:   { type: Object,  default: null },
-    nodePlayers: { type: Array,   default: () => [] },
-    traces:      { type: Array,   default: () => [] },
+    nodePlayers:     { type: Array,  default: () => [] },
+    traces:          { type: Array,  default: () => [] },
+    currentPlayerId: { type: String, default: null },
 
     // Loadout + SS
     commands:  { type: Array,   default: () => [] },

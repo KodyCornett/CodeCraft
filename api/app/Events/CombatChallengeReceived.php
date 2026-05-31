@@ -49,6 +49,7 @@ class CombatChallengeReceived implements ShouldBroadcast
         return [
             'challenge' => [
                 'id'             => $this->challenge->id,
+                'target_id'      => $this->challenge->target_id,
                 'challenger'     => [
                     'id'                 => $challenger->id,
                     'handle'             => $challenger->handle,

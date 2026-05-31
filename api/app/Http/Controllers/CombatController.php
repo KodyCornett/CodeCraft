@@ -70,6 +70,10 @@ class CombatController extends Controller
             ));
         }
 
+        if ($challenge->status !== 'accepted') {
+            return response()->json(['message' => 'Challenge not active.'], 422);
+        }
+
         // ── Score ceiling check ───────────────────────────────────────────────
         // Reject scores that are physically impossible given the player's stats.
         // GridBreach: game_length = 30s + (RAM × 5s), input_window = 3s + (OS × 0.3s).

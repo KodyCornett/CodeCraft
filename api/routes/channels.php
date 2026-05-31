@@ -65,7 +65,13 @@ Broadcast::channel('node.{canvasId}', function ($user, string $canvasId) {
         'in_combat'          => CombatChallenge::where(function ($q) use ($player) {
             $q->where('challenger_id', $player->id)
               ->orWhere('target_id', $player->id);
-        })->whereIn('status', ['pending', 'accepted'])->exists(),
+        })->where(function ($q) {
+            $q->where('status', 'accepted')
+              ->orWhere(function ($q2) {
+                  $q2->where('status', 'pending')
+                     ->where('expires_at', '>', now());
+              });
+        })->exists(),
         'effective_firewall' => $effectiveFirewall,
     ];
 });

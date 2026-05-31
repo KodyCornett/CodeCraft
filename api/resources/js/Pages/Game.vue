@@ -1242,6 +1242,7 @@ async function onUseCommand(cmd) {
 // Called when the [HACK] button is clicked next to a player in NodeInfoBlock
 async function onHackPlayer(targetPlayer) {
     if (!currentNodeId.value) return;
+    if (!playerId.value || targetPlayer.id === playerId.value) return;
 
     awaitingChallenge.value = true;
     const result = await sendChallenge(targetPlayer.id, currentNodeId.value);
@@ -1304,6 +1305,14 @@ async function onAcceptChallenge() {
     const c = incomingChallenge.value;
     if (!c) return;
 
+    // Guard: we must be the target, not the challenger.
+    // If target_id doesn't match our player ID the event was misrouted or stale.
+    if (c.target_id && c.target_id !== playerId.value) {
+        console.warn('[COMBAT] Discarding stale/misrouted challenge — not the target');
+        incomingChallenge.value = null;
+        return;
+    }
+
     const result = await acceptChallenge(c.id);
     if (!result) return;
     // WS event handles the terminal launch — nothing else needed here.
@@ -1312,6 +1321,11 @@ async function onAcceptChallenge() {
 async function onDeclineChallenge() {
     const c = incomingChallenge.value;
     if (!c) return;
+
+    if (c.target_id && c.target_id !== playerId.value) {
+        incomingChallenge.value = null;
+        return;
+    }
 
     const result = await declineChallenge(c.id);
 
@@ -1590,6 +1604,9 @@ onMounted(async () => {
             console.log('[BOOT] Position restored at', savedCanvasId);
         } else {
             console.log('[SPAWN] Player placed at', spawnCanvasId);
+            // Persist spawn placement so the server knows current_node_id before
+            // the first move — without this every move fails the spawn-only gate.
+            updatePosition(spawnCanvasId, player.value.district);
         }
     } else {
         console.warn('[SPAWN] No spawn nodes found — using canvas default');

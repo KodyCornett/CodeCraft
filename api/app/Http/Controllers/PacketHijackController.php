@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Events\PacketHijackCommandResult;
 use App\Events\PacketHijackMatchComplete;
 use App\Events\PacketHijackPhaseTransition;
+use App\Events\PlayerCombatStateChanged;
+use App\Models\CombatChallenge;
 use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Models\PlayerCommand;
@@ -693,11 +695,18 @@ class PacketHijackController extends Controller
         $match->completed_at = now();
         $match->save();
 
-        // Close the originating challenge so neither player is permanently flagged in-combat
-        \App\Models\CombatChallenge::where('challenger_id', $match->challenger_id)
+        // ── 5b. Resolve the originating challenge and clear in-combat state ───
+        $challenge = CombatChallenge::where('challenger_id', $match->challenger_id)
             ->where('target_id', $match->defender_id)
             ->where('status', 'accepted')
-            ->update(['status' => 'resolved']);
+            ->first();
+
+        if ($challenge !== null) {
+            $challenge->status = 'resolved';
+            $challenge->save();
+            PlayerCombatStateChanged::dispatch($winner->id, $challenge->node_canvas_id, false);
+            PlayerCombatStateChanged::dispatch($loser->id,  $challenge->node_canvas_id, false);
+        }
 
         // ── 6. Broadcast outcome to both players ──────────────────────────────
         PacketHijackCommandResult::dispatch(

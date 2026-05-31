@@ -88,11 +88,20 @@ class CombatChallengeController extends Controller
             return response()->json(['message' => 'PvP is not permitted in safe zones.'], 422);
         }
 
-        // Block challenge if target is already in an active combat
+        // Block challenge if target is already in an active combat.
+        // Pending challenges past their TTL are not considered active — they
+        // only become 'expired' in the DB when the pending() poll fires, so
+        // we must gate on expires_at here rather than relying on status alone.
         $targetInCombat = CombatChallenge::where(function ($q) use ($target) {
             $q->where('challenger_id', $target->id)
               ->orWhere('target_id', $target->id);
-        })->whereIn('status', ['pending', 'accepted'])->exists();
+        })->where(function ($q) {
+            $q->where('status', 'accepted')
+              ->orWhere(function ($q2) {
+                  $q2->where('status', 'pending')
+                     ->where('expires_at', '>', now());
+              });
+        })->exists();
 
         if ($targetInCombat) {
             return response()->json(['message' => 'Target is already in combat.'], 422);
@@ -138,11 +147,17 @@ class CombatChallengeController extends Controller
             return response()->json(['challenge' => null]);
         }
 
-        // Expire stale challenges silently
-        CombatChallenge::where('target_id', $me->id)
+        // Expire stale challenges and clear their in_combat state in Reverb
+        $stale = CombatChallenge::where('target_id', $me->id)
             ->where('status', 'pending')
             ->where('expires_at', '<', now())
-            ->update(['status' => 'expired']);
+            ->get();
+
+        foreach ($stale as $expired) {
+            $expired->update(['status' => 'expired']);
+            PlayerCombatStateChanged::dispatch($expired->challenger_id, $expired->node_canvas_id, false);
+            PlayerCombatStateChanged::dispatch($expired->target_id,     $expired->node_canvas_id, false);
+        }
 
         $challenge = CombatChallenge::where('target_id', $me->id)
             ->where('status', 'pending')
@@ -197,6 +212,9 @@ class CombatChallengeController extends Controller
         if ($challenge->isExpired() && $challenge->status === 'pending') {
             $challenge->status = 'expired';
             $challenge->save();
+
+            PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, false);
+            PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, false);
         }
 
         return response()->json(['status' => $challenge->status]);
@@ -212,11 +230,12 @@ class CombatChallengeController extends Controller
     public function accept(Request $request, string $id): JsonResponse
     {
         $challenge = CombatChallenge::find($id);
-        if ($challenge === null || $challenge->isExpired()) {
+        if ($challenge === null || $challenge->status !== 'pending' || $challenge->isExpired()) {
             return response()->json(['message' => 'Challenge not found or expired.'], 404);
         }
 
         $me = Player::where('user_id', $request->user()->id)->first();
+        \Log::error('ACCEPT DEBUG', ['me' => $me?->id, 'target' => $challenge?->target_id, 'challenge' => $id, 'user' => $request->user()?->id]);
         if ($me?->id !== $challenge->target_id) {
             return response()->json(['message' => 'Not your challenge.'], 403);
         }
@@ -328,7 +347,7 @@ class CombatChallengeController extends Controller
     public function decline(Request $request, string $id): JsonResponse
     {
         $challenge = CombatChallenge::find($id);
-        if ($challenge === null || $challenge->isExpired()) {
+        if ($challenge === null || $challenge->status !== 'pending' || $challenge->isExpired()) {
             return response()->json(['message' => 'Challenge not found or expired.'], 404);
         }
 
@@ -371,6 +390,9 @@ class CombatChallengeController extends Controller
         // ── 4. Mark challenge declined ────────────────────────────────────────
         $challenge->status = 'declined';
         $challenge->save();
+
+        PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, false);
+        PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, false);
 
         $response = [
             'ok'          => true,
