@@ -15,7 +15,7 @@
  * Components receive refs and call submitCommand() — that is all.
  */
 
-import { ref, readonly, computed } from 'vue';
+import { ref, readonly, computed, reactive } from 'vue';
 import axios from 'axios';
 
 export function usePacketHijack(playerId) {
@@ -298,25 +298,27 @@ export function usePacketHijack(playerId) {
         unsubscribe();
     }
 
-    return {
-        // State (readonly to components)
-        matchId:             readonly(matchId),
-        role:                readonly(role),
-        phase:               readonly(phase),
-        commandHistory:      readonly(commandHistory),
-        ports:               readonly(ports),
-        targetIp:            readonly(targetIp),
-        isLocked:            readonly(isLocked),
-        lockCountdown:       readonly(lockCountdown),
-        defenderAlertActive: readonly(defenderAlertActive),
-        matchResult:         readonly(matchResult),
+    // Wrap in reactive() so nested refs auto-unwrap when accessed via ph.xxx
+    // Without this, ph.isComplete is a computed ref object (always truthy),
+    // causing PacketHijack's v-if="isComplete" to always render the end screen.
+    return reactive({
+        matchId,
+        role,
+        phase,
+        commandHistory,
+        ports,
+        targetIp,
+        isLocked,
+        lockCountdown,
+        defenderAlertActive,
+        matchResult,
         isComplete,
-        busy:                readonly(busy),
-        usedRigCommands:     readonly(usedRigCommands),
+        busy,
+        usedRigCommands,
         // Actions
         init,
         submitCommand,
         submitRigCommand,
         destroy,
-    };
+    });
 }
