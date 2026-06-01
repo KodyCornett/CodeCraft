@@ -914,9 +914,9 @@ class PacketHijackService
 
         if ($tier === 2) {
             // Replace second segment
-            $cred['display'] = $cred['tier1'] . '-' . $value . '-' . ($cred['tier3_found'] ? $cred['tier3'] : '????');
+            $cred['display'] = $cred['tier1'] . '-' . $value . '-' . (isset($cred['tier3_found']) ? $cred['tier3'] : '????');
         } elseif ($tier === 3) {
-            $cred['display'] = $cred['tier1'] . '-' . ($cred['tier2_found'] ? $cred['tier2'] : '????') . '-' . $value;
+            $cred['display'] = $cred['tier1'] . '-' . (isset($cred['tier2_found']) ? $cred['tier2'] : '????') . '-' . $value;
             $cred['tier3_found'] = true;
         }
 
