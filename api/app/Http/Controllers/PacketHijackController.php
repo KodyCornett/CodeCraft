@@ -208,12 +208,16 @@ class PacketHijackController extends Controller
             '[CASE FILE POPULATED — INVESTIGATE SUSPECTS TO IDENTIFY TARGET]',
         ];
 
+        // Only send IP + flushed to the client on netstat — all other attributes
+        // are revealed progressively through ping, traceroute, arp, whois.
+        $bare = array_map(fn($s) => ['ip' => $s['ip'], 'flushed' => $s['flushed']], $match->suspectsFor($role));
+
         PacketHijackCommandResult::dispatch(
-            matchId:        $match->id,
-            playerId:       $me->id,
-            command:        $raw,
-            outputLines:    $lines,
-            updatedSuspects: $match->suspectsPublicView($role),
+            matchId:         $match->id,
+            playerId:        $me->id,
+            command:         $raw,
+            outputLines:     $lines,
+            updatedSuspects: $bare,
         );
 
         return response()->json(['ok' => true]);
