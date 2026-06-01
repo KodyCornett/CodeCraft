@@ -257,35 +257,50 @@ class CombatChallengeController extends Controller
         $challengerSuspects = $this->phService->generateNodeConnections($defenderRigIp,   $defenderOs);
         $defenderSuspects   = $this->phService->generateNodeConnections($challengerRigIp, $challengerOs);
 
-        $challengerPorts = ($challengerRig && $challenger)
-            ? $this->phService->generatePortTopology($challengerRig, $challenger)
-            : $this->phService->generatePortTopology(
-                $this->rigService->getRigForPlayer($challenger) ?? $challengerRig,
-                $challenger
-            );
+        $challengerRig = $challengerRig ?? $this->rigService->getRigForPlayer($challenger);
+        $defenderRig   = $defenderRig   ?? $this->rigService->getRigForPlayer($defender);
 
-        $defenderPorts = ($defenderRig && $defender)
+        $challengerPorts = $challengerRig && $challenger
+            ? $this->phService->generatePortTopology($challengerRig, $challenger)
+            : [];
+
+        $defenderPorts = $defenderRig && $defender
             ? $this->phService->generatePortTopology($defenderRig, $defender)
-            : $this->phService->generatePortTopology(
-                $this->rigService->getRigForPlayer($defender) ?? $defenderRig,
-                $defender
-            );
+            : [];
+
+        // Phase 2 fingerprints — challenger attacks defender's system, defender attacks challenger's.
+        // Fingerprint derives Tier 1 credential prefixes from the TARGET's dominant stat.
+        $challengerFingerprint = ($defenderRig && $defender)
+            ? $this->phService->generateFingerprint($defenderRig, $defender, $defenderPorts)
+            : [];
+
+        $defenderFingerprint = ($challengerRig && $challenger)
+            ? $this->phService->generateFingerprint($challengerRig, $challenger, $challengerPorts)
+            : [];
+
+        // Phase 3 filesystems — one per player, wallet randomised per match.
+        $challengerFilesystem = $this->phService->generateFilesystem();
+        $defenderFilesystem   = $this->phService->generateFilesystem();
 
         /** @var PacketHijackMatch $match */
         $match = PacketHijackMatch::create([
-            'id'                   => (string) Str::uuid(),
-            'challenger_id'        => $challenge->challenger_id,
-            'defender_id'          => $challenge->target_id,
-            'status'               => 'phase1',
-            'challenger_target_ip' => $defenderRigIp,
-            'defender_target_ip'   => $challengerRigIp,
-            'challenger_suspects'  => $challengerSuspects,
-            'defender_suspects'    => $defenderSuspects,
-            'challenger_ports'     => $challengerPorts,
-            'defender_ports'       => $defenderPorts,
-            'challenger_phase'     => 1,
-            'defender_phase'       => 1,
-            'started_at'           => now(),
+            'id'                       => (string) Str::uuid(),
+            'challenger_id'            => $challenge->challenger_id,
+            'defender_id'              => $challenge->target_id,
+            'status'                   => 'phase1',
+            'challenger_target_ip'     => $defenderRigIp,
+            'defender_target_ip'       => $challengerRigIp,
+            'challenger_suspects'      => $challengerSuspects,
+            'defender_suspects'        => $defenderSuspects,
+            'challenger_ports'         => $challengerPorts,
+            'challenger_fingerprint'   => $challengerFingerprint,
+            'challenger_filesystem'    => $challengerFilesystem,
+            'defender_ports'           => $defenderPorts,
+            'defender_fingerprint'     => $defenderFingerprint,
+            'defender_filesystem'      => $defenderFilesystem,
+            'challenger_phase'         => 1,
+            'defender_phase'           => 1,
+            'started_at'               => now(),
         ]);
 
         // ── Broadcast started events — blank terminal, player types netstat ───

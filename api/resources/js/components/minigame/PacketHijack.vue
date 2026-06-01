@@ -34,8 +34,8 @@
             <div class="ph-topbar">
                 <span class="ph-topbar-id">MATCH_ID: {{ matchId?.slice(0, 8).toUpperCase() }}</span>
                 <span class="ph-topbar-role">ROLE: <span class="ph-role-val">{{ role?.toUpperCase() }}</span></span>
-                <span class="ph-topbar-phase" :class="phase === 2 ? 'phase--two' : 'phase--one'">
-                    PHASE {{ phase }}: {{ phase === 1 ? 'RECON HUNT' : 'PORT INTRUSION' }}
+                <span class="ph-topbar-phase" :class="phase === 3 ? 'phase--three' : phase === 2 ? 'phase--two' : 'phase--one'">
+                    PHASE {{ phase }}: {{ phase === 1 ? 'RECON HUNT' : phase === 2 ? 'SYSTEM FINGERPRINT' : 'FILESYSTEM EXTRACTION' }}
                 </span>
                 <button class="ph-ref-toggle" :class="{ 'ref-toggle--active': showPanel }" @click="showPanel = !showPanel">[?]</button>
             </div>
@@ -120,8 +120,22 @@
 
                     <div class="ph-rule ph-rule--light" />
 
+                    <!-- Auth prompt — shown after successful breach -->
+                    <div v-if="awaitingAuth && phase === 2" class="ph-auth-prompt">
+                        <div class="ph-auth-title">[ SYSTEM LOGIN // ENTER CREDENTIALS ]</div>
+                        <div class="ph-auth-row">
+                            <span class="ph-auth-label">USERNAME &gt;</span>
+                            <input v-model="authUser" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER OS CREDENTIAL" @keydown.enter="onSubmitAuth" />
+                        </div>
+                        <div class="ph-auth-row">
+                            <span class="ph-auth-label">PASSWORD &gt;</span>
+                            <input v-model="authPass" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER HOSTNAME CREDENTIAL" @keydown.enter="onSubmitAuth" />
+                        </div>
+                        <button class="ph-auth-submit" @click="onSubmitAuth">AUTHENTICATE</button>
+                    </div>
+
                     <!-- Input row -->
-                    <div class="ph-input-row">
+                    <div class="ph-input-row" v-show="!awaitingAuth || phase !== 2">
                         <span class="ph-prompt">SYS_INPUT &gt;</span>
                         <div v-if="isLocked" class="ph-locked">
                             <span class="ph-lock-msg">[ INPUT LOCKED — {{ lockCountdown }}s ]</span>
@@ -230,27 +244,117 @@
                             </div>
                         </template>
 
-                        <!-- ── Phase 2: port commands only ── -->
-                        <template v-else>
-                            <div class="ph-ref-title">CMD REF</div>
-                            <div class="ph-ref-phase">// PHASE 2 — INTRUSION</div>
-                            <div class="ph-ref-entry">
-                                <div class="ph-ref-cmd">probe port &lt;n&gt;</div>
-                                <div class="ph-ref-desc">Analyse a port's service and encryption weakness.</div>
+                        <!-- ── Phase 2: fingerprint panel + cmd ref ── -->
+                        <template v-else-if="phase === 2">
+                            <!-- Fingerprint display -->
+                            <div class="ph-cf-section">
+                                <div class="ph-ref-title">SYSTEM FINGERPRINT</div>
+                                <div class="ph-ref-phase">// {{ targetIp || '?.?.?.?' }}</div>
+
+                                <div v-if="!fingerprint || !fingerprint.ports" class="ph-ref-empty">
+                                    RUN scan &lt;ip&gt; TO INITIALISE
+                                </div>
+
+                                <template v-else>
+                                    <!-- OS + Hostname credentials -->
+                                    <div class="ph-fp-cred">
+                                        <span class="ph-fp-label">OS</span>
+                                        <span class="ph-fp-value" :class="fingerprint.os?.display === fingerprint.os?.full ? 'fp--complete' : ''">
+                                            {{ fingerprint.os?.display || (fingerprint.os?.tier1 + '-????-???') }}
+                                        </span>
+                                    </div>
+                                    <div class="ph-fp-cred">
+                                        <span class="ph-fp-label">HOST</span>
+                                        <span class="ph-fp-value" :class="fingerprint.hostname?.display === fingerprint.hostname?.full ? 'fp--complete' : ''">
+                                            {{ fingerprint.hostname?.display || (fingerprint.hostname?.tier1 + '-????-????') }}
+                                        </span>
+                                    </div>
+
+                                    <div class="ph-panel-rule" style="margin: 6px 0" />
+
+                                    <!-- Port topology -->
+                                    <div class="ph-cf-header">
+                                        <span class="ph-cf-col" style="width:44px">PORT</span>
+                                        <span class="ph-cf-col" style="width:56px">SERVICE</span>
+                                        <span class="ph-cf-col" style="flex:1">EXPOSURE</span>
+                                    </div>
+                                    <div v-for="p in fingerprint.ports" :key="p.port"
+                                        class="ph-cf-row"
+                                        :class="{ 'cf-row--flushed': p.shattered }"
+                                    >
+                                        <span class="ph-cf-col" style="width:44px;color:rgba(0,255,255,0.7)">{{ p.port }}</span>
+                                        <span class="ph-cf-col" style="width:56px;color:rgba(0,255,255,0.5)">{{ p.service }}</span>
+                                        <span class="ph-cf-col" style="flex:1" :class="exposureClass(p.exposure)">{{ p.probed ? p.exposure : '???' }}</span>
+                                    </div>
+                                </template>
                             </div>
-                            <div class="ph-ref-entry">
-                                <div class="ph-ref-cmd">decode port &lt;n&gt;</div>
-                                <div class="ph-ref-desc">Manually chip away at bias — works on any port regardless of level.</div>
+
+                            <div class="ph-panel-rule" />
+
+                            <!-- Phase 2 cmd ref -->
+                            <div class="ph-cmd-ref-section">
+                                <div class="ph-ref-title">CMD REF</div>
+                                <div class="ph-ref-phase">// PHASE 2 — FINGERPRINT</div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">scan &lt;ip&gt;</div>
+                                    <div class="ph-ref-desc">Discover open ports on the target system.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">probe &lt;port&gt;</div>
+                                    <div class="ph-ref-desc">Fingerprint a port. Read the banner — fragments are hidden in the output.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">validate &lt;string&gt;</div>
+                                    <div class="ph-ref-desc">Confirm if a string from a banner is a valid credential fragment.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">decode &lt;port&gt;</div>
+                                    <div class="ph-ref-desc">Weaken MODERATE or LOW exposure ports before exploiting.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">exploit &lt;port&gt;</div>
+                                    <div class="ph-ref-desc">Shatter a port. CRITICAL/HIGH can be exploited directly.</div>
+                                </div>
+                                <div class="ph-ref-entry ph-ref-entry--commit">
+                                    <div class="ph-ref-cmd">breach &lt;ip&gt; &lt;port&gt;</div>
+                                    <div class="ph-ref-desc">Once fingerprint complete + port shattered — trigger breach.</div>
+                                </div>
                             </div>
-                            <div class="ph-ref-entry">
-                                <div class="ph-ref-cmd">exploit port &lt;n&gt;</div>
-                                <div class="ph-ref-desc">Shatter a port when bias is 25% or lower. Cascades to remaining ports.</div>
+                        </template>
+
+                        <!-- ── Phase 3: filesystem map + cmd ref ── -->
+                        <template v-else-if="phase === 3">
+                            <div class="ph-cf-section">
+                                <div class="ph-ref-title">FILESYSTEM MAP</div>
+                                <div class="ph-ref-phase">// {{ currentPath }}</div>
+
+                                <div class="ph-fs-path">
+                                    <div v-for="p in exploredPaths" :key="p" class="ph-fs-path-entry"
+                                        :class="{ 'fs-path--current': p === currentPath }">
+                                        {{ p }}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="ph-ref-entry ph-ref-entry--commit">
-                                <div class="ph-ref-cmd">breach &lt;ip&gt;</div>
-                                <div class="ph-ref-desc">Deploy final payload. Use the IP you found in Phase 1.</div>
+
+                            <div class="ph-panel-rule" />
+
+                            <div class="ph-cmd-ref-section">
+                                <div class="ph-ref-title">CMD REF</div>
+                                <div class="ph-ref-phase">// PHASE 3 — EXTRACTION</div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">ls</div>
+                                    <div class="ph-ref-desc">List contents of current directory.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">cd &lt;dir&gt;</div>
+                                    <div class="ph-ref-desc">Move into a directory. Use cd .. to go back up.</div>
+                                </div>
+                                <div class="ph-ref-entry ph-ref-entry--commit">
+                                    <div class="ph-ref-cmd">extract</div>
+                                    <div class="ph-ref-desc">Steal the wallet when you find it. Wins the match.</div>
+                                </div>
+                                <div class="ph-ref-note">WALLET IS HIDDEN SOMEWHERE IN THE FILESYSTEM</div>
                             </div>
-                            <div class="ph-ref-note">EXFIL PORT 8080 UNLOCKS AFTER ALL GATES SHATTERED</div>
                         </template>
 
                     </div>
@@ -270,10 +374,20 @@ const props = defineProps({
     role:                { type: String,  required: true },
     phase:               { type: Number,  required: true },
     commandHistory:      { type: Array,   required: true },
+    // Phase 1
     suspects:            { type: Array,   default: () => [] },
     octetClue:           { type: String,  default: null },
     activeSuspectCount:  { type: Number,  default: 0 },
     boardReady:          { type: Boolean, default: false },
+    // Phase 2
+    fingerprint:         { type: Object,  default: null },
+    portScanResult:      { type: Array,   default: () => [] },
+    awaitingAuth:        { type: Boolean, default: false },
+    // Phase 3
+    currentPath:         { type: String,  default: '/' },
+    directoryEntries:    { type: Array,   default: () => [] },
+    exploredPaths:       { type: Array,   default: () => [] },
+    // Legacy
     ports:               { type: Array,   default: () => [] },
     targetIp:            { type: String,  default: null },
     isLocked:            { type: Boolean, default: false },
@@ -286,16 +400,25 @@ const props = defineProps({
     usedRigCommands:     { type: Array,   default: () => [] },
 });
 
-const emit = defineEmits(['submit-command', 'match-complete', 'use-rig-command']);
+const emit = defineEmits(['submit-command', 'submit-auth', 'match-complete', 'use-rig-command']);
 
 const inputEl    = ref(null);
 const historyEl  = ref(null);
 const inputValue = ref('');
 const showPanel  = ref(true);
 const panelWidth = ref(270);
+const authUser   = ref('');
+const authPass   = ref('');
 
 let historyNav  = [];
 let historyNavI = -1;
+
+function onSubmitAuth() {
+    if (!authUser.value.trim() || !authPass.value.trim()) return;
+    emit('submit-auth', authUser.value.trim(), authPass.value.trim());
+    authUser.value = '';
+    authPass.value = '';
+}
 
 // ── Panel drag resize ─────────────────────────────────────────────────────────
 
@@ -419,6 +542,14 @@ function portStatus(entry) {
 
 function commandSlug(name) {
     return name.toLowerCase().replace(/ /g, '_');
+}
+
+function exposureClass(exposure) {
+    if (!exposure || exposure === '???') return '';
+    if (exposure === 'CRITICAL') return 'cf-val--live';
+    if (exposure === 'HIGH')     return 'cf-val--degraded';
+    if (exposure === 'MODERATE') return 'cf-val--degraded';
+    return 'cf-val--dead';
 }
 
 function lineClass(line) {
@@ -891,6 +1022,116 @@ function lineClass(line) {
     height: 32px;
     background: rgba(0,255,255,0.4);
     border-radius: 1px;
+}
+
+/* ── Phase 3 color ───────────────────────────────────────────────────────── */
+.phase--three { color: #00ff88; }
+
+/* ── Auth prompt ─────────────────────────────────────────────────────────── */
+.ph-auth-prompt {
+    flex-shrink: 0;
+    padding: 12px 14px;
+    background: rgba(0,255,136,0.04);
+    border-top: 1px solid rgba(0,255,136,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ph-auth-title {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: #00ff88;
+    margin-bottom: 4px;
+}
+
+.ph-auth-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ph-auth-label {
+    font-size: 11px;
+    color: rgba(0,255,255,0.5);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.ph-auth-input {
+    flex: 1;
+    background: rgba(0,255,136,0.05);
+    border: 1px solid rgba(0,255,136,0.25);
+    outline: none;
+    font-family: inherit;
+    font-size: 11px;
+    color: #00ff88;
+    letter-spacing: 0.06em;
+    padding: 4px 8px;
+}
+
+.ph-auth-submit {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px solid rgba(0,255,136,0.4);
+    color: rgba(0,255,136,0.8);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    padding: 5px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+}
+.ph-auth-submit:hover {
+    border-color: #00ff88;
+    color: #00ff88;
+}
+
+/* ── Fingerprint credentials ─────────────────────────────────────────────── */
+.ph-fp-cred {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+.ph-fp-label {
+    font-size: 8px;
+    color: rgba(0,255,255,0.3);
+    letter-spacing: 0.1em;
+    width: 36px;
+    flex-shrink: 0;
+}
+
+.ph-fp-value {
+    font-size: 9px;
+    color: rgba(0,255,255,0.55);
+    letter-spacing: 0.04em;
+    word-break: break-all;
+}
+
+.fp--complete {
+    color: #00ff88 !important;
+}
+
+/* ── Filesystem path trail ───────────────────────────────────────────────── */
+.ph-fs-path {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+}
+
+.ph-fs-path-entry {
+    font-size: 9px;
+    color: rgba(0,255,255,0.3);
+    letter-spacing: 0.04em;
+}
+
+.fs-path--current {
+    color: #00ff88;
 }
 
 /* ── Slide transition ────────────────────────────────────────────────────── */

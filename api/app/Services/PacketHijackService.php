@@ -54,7 +54,57 @@ class PacketHijackService
     private const PHASE1_COMMANDS = ['netstat', 'ping', 'traceroute', 'arp', 'whois', 'sniff', 'flush', 'inject'];
 
     /** Recognised Phase 2 commands. */
-    private const PHASE2_COMMANDS = ['probe', 'exploit', 'decode', 'breach'];
+    private const PHASE2_COMMANDS = ['scan', 'probe', 'validate', 'exploit', 'decode', 'breach'];
+
+    /** Recognised Phase 3 commands. */
+    private const PHASE3_COMMANDS = ['ls', 'cd', 'extract'];
+
+    /** Dominant stat → hostname prefix + OS prefix */
+    private const STAT_PREFIXES = [
+        'cpu'      => ['hostname' => 'CORE',    'os' => 'PROC'],
+        'firewall' => ['hostname' => 'WALL',    'os' => 'SHIELD'],
+        'os'       => ['hostname' => 'PHANTOM', 'os' => 'GHOST'],
+        'storage'  => ['hostname' => 'CACHE',   'os' => 'VAULT'],
+        'ram'      => ['hostname' => 'STACK',   'os' => 'HEAP'],
+    ];
+
+    /** Tier 2 hostname word pool */
+    private const HOSTNAME_WORDS = [
+        'CIPHER', 'WRAITH', 'NEXUS', 'DAEMON', 'VECTOR', 'STATIC',
+        'PULSE', 'RELAY', 'SIGNAL', 'PRISM', 'FLUX', 'VORTEX',
+        'APEX', 'ZERO', 'BYTE', 'NODE', 'GRID', 'MESH',
+        'SPIKE', 'TRACE', 'DRIFT', 'SURGE', 'ECHO', 'PHASE',
+        'TORQUE', 'RAZOR', 'BLADE', 'COIL', 'WIRE', 'LINK',
+    ];
+
+    /** Tier 2 OS version pool */
+    private const OS_VERSIONS = [
+        '4.2', '11.7', '3.9', '7.1', '2.4', '9.3',
+        '6.0', '14.2', '5.8', '8.4', '1.9', '12.1',
+    ];
+
+    /** Port service + version strings for banner generation */
+    private const PORT_SERVICES = [
+        21   => ['service' => 'FTP',   'versions' => ['vsftpd 3.0.3', 'ProFTPD 1.3.5', 'Pure-FTPd 1.0.47']],
+        22   => ['service' => 'SSH',   'versions' => ['OpenSSH 7.2p1', 'OpenSSH 6.9', 'Dropbear 2019.78']],
+        80   => ['service' => 'HTTP',  'versions' => ['Apache 2.4.49', 'nginx 1.18.0', 'Apache 2.2.34']],
+        443  => ['service' => 'HTTPS', 'versions' => ['TLS 1.3 / nginx', 'TLS 1.2 / Apache', 'TLS 1.3 / Caddy']],
+        3306 => ['service' => 'MySQL', 'versions' => ['MySQL 5.6.0', 'MySQL 5.7.32', 'MariaDB 10.3.27']],
+    ];
+
+    /** Filesystem wallet locations — path segments */
+    private const WALLET_LOCATIONS = [
+        ['home', 'user', 'wallet'],
+        ['home', 'runner', 'wallet'],
+        ['var', 'cache', 'data', 'wallet'],
+        ['tmp', '.hidden', 'wallet'],
+        ['net', 'relay', 'wallet'],
+        ['home', 'user', 'documents', 'finance', 'wallet'],
+        ['var', 'lib', 'wallet'],
+        ['home', 'user', 'data', 'wallet'],
+        ['sys', 'net', 'cache', 'wallet'],
+        ['tmp', 'session', 'wallet'],
+    ];
 
     /** Port flavor text for probe command — indexed by port number. */
     private const PORT_FLAVOR = [
@@ -278,6 +328,281 @@ class PacketHijackService
         return $ports;
     }
 
+    /**
+     * Generate the Phase 2 system fingerprint for one player's side.
+     *
+     * Derives Tier 1 credential prefixes from the TARGET player's dominant
+     * effective stat (read-only — no stat values are modified).
+     * Splits OS and hostname each into 3 tiers, hides fragments in port banners.
+     *
+     * Schema:
+     *   hostname: { full, tier1, tier2, tier3, display (fills as found) }
+     *   os:       { full, tier1, tier2, tier3, display }
+     *   ports: [{
+     *     port, service, version, exposure, probed, shattered,
+     *     banner_lines: [],     — raw output shown to attacker on probe
+     *     fragments: [{value, type (hostname|os), tier (2|3)}]  — hidden in banner
+     *   }]
+     *   exploit_port: int       — the designated entry port (CRITICAL/HIGH)
+     *   validated_hostname: ''  — assembled so far
+     *   validated_os: ''
+     */
+    public function generateFingerprint(PlayerRig $rig, Player $player, array $portTopology): array
+    {
+        $stats = $this->rigService->effectiveStats($rig, $player);
+
+        // ── Dominant stat → Tier 1 prefixes ──────────────────────────────────
+        $statValues = [
+            'cpu'      => $stats['cpu']['effective'],
+            'firewall' => $stats['firewall']['effective'],
+            'os'       => $stats['os']['effective'],
+            'storage'  => $stats['storage']['effective'],
+            'ram'      => $stats['ram']['effective'],
+        ];
+        arsort($statValues);
+        $dominant = array_key_first($statValues);
+        $prefixes = self::STAT_PREFIXES[$dominant];
+
+        // ── Build credential tiers ────────────────────────────────────────────
+        $hostnameTier1 = $prefixes['hostname'];
+        $hostnameTier2 = self::HOSTNAME_WORDS[array_rand(self::HOSTNAME_WORDS)];
+        $hostnameTier3 = strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
+
+        $osTier1 = $prefixes['os'];
+        $osTier2 = self::OS_VERSIONS[array_rand(self::OS_VERSIONS)];
+        $osTier3 = strtoupper(substr(bin2hex(random_bytes(2)), 0, 3));
+
+        $fullHostname = "{$hostnameTier1}-{$hostnameTier2}-{$hostnameTier3}";
+        $fullOs       = "{$osTier1}-{$osTier2}-{$osTier3}";
+
+        // ── Assign fragments to ports ─────────────────────────────────────────
+        // Four fragments: hostname T2, hostname T3, os T2, os T3
+        // Each goes into a different port banner. Randomised per match.
+        $fragments = [
+            ['value' => $hostnameTier2, 'type' => 'hostname', 'tier' => 2],
+            ['value' => $hostnameTier3, 'type' => 'hostname', 'tier' => 3],
+            ['value' => $osTier2,       'type' => 'os',       'tier' => 2],
+            ['value' => $osTier3,       'type' => 'os',       'tier' => 3],
+        ];
+        shuffle($fragments);
+
+        // ── Build port entries with banners ───────────────────────────────────
+        $firewall    = $stats['firewall']['effective'];
+        $portEntries = [];
+        $frag_idx    = 0;
+
+        // Use non-exfil ports from the topology for fingerprint
+        $topologyPorts = array_filter($portTopology, fn($p) => $p['port'] !== self::EXFIL_PORT);
+        $topologyPorts = array_values($topologyPorts);
+
+        // Pick exploit port — prefer CRITICAL/HIGH exposure
+        $exploitPort = null;
+
+        foreach ($topologyPorts as $i => $tp) {
+            $portNum  = $tp['port'];
+            $svcData  = self::PORT_SERVICES[$portNum] ?? ['service' => 'UNKNOWN', 'versions' => ['1.0']];
+            $version  = $svcData['versions'][array_rand($svcData['versions'])];
+
+            // Exposure rating based on port bias + firewall
+            $bias     = (int) $tp['bias'];
+            $exposure = $this->biasToExposure($bias, $firewall);
+
+            // Track best exploit port
+            if ($exploitPort === null && in_array($exposure, ['CRITICAL', 'HIGH'], true)) {
+                $exploitPort = $portNum;
+            }
+
+            // Assign one fragment to this port
+            $portFragment = $frag_idx < count($fragments) ? $fragments[$frag_idx++] : null;
+
+            // Generate banner lines with fragment hidden among noise
+            $bannerLines = $this->generateBanner($portNum, $version, $portFragment, $hostnameTier1, $osTier1);
+
+            $portEntries[] = [
+                'port'        => $portNum,
+                'service'     => $svcData['service'],
+                'version'     => $version,
+                'exposure'    => $exposure,
+                'probed'      => false,
+                'shattered'   => false,
+                'banner_lines'=> $bannerLines,
+                'fragment'    => $portFragment,  // server-side only, never sent to client
+            ];
+        }
+
+        // Fallback if no CRITICAL/HIGH found
+        if ($exploitPort === null && count($portEntries) > 0) {
+            $exploitPort = $portEntries[0]['port'];
+        }
+
+        return [
+            'hostname' => [
+                'full'    => $fullHostname,
+                'tier1'   => $hostnameTier1,
+                'tier2'   => $hostnameTier2,
+                'tier3'   => $hostnameTier3,
+                'display' => $hostnameTier1 . '-????-????',
+            ],
+            'os' => [
+                'full'    => $fullOs,
+                'tier1'   => $osTier1,
+                'tier2'   => $osTier2,
+                'tier3'   => $osTier3,
+                'display' => $osTier1 . '-????-???',
+            ],
+            'ports'              => $portEntries,
+            'exploit_port'       => $exploitPort,
+            'validated_hostname' => '',
+            'validated_os'       => '',
+        ];
+    }
+
+    /**
+     * Convert a port's bias value to a human-readable EXPOSURE rating.
+     * Firewall stat raises effective resistance.
+     */
+    private function biasToExposure(int $bias, int $firewall): string
+    {
+        $effective = $bias + ($firewall * 3);
+        if ($effective <= 20)  return 'CRITICAL';
+        if ($effective <= 40)  return 'HIGH';
+        if ($effective <= 65)  return 'MODERATE';
+        if ($effective <= 85)  return 'LOW';
+        return 'MINIMAL';
+    }
+
+    /**
+     * Generate a realistic-looking service banner for a port.
+     * Hides the real fragment among noise strings of similar format.
+     */
+    private function generateBanner(int $port, string $version, ?array $fragment, string $hostPrefix, string $osPrefix): array
+    {
+        $noise = [
+            'SYN-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4)),
+            'PKT-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4)),
+            strtoupper(substr(bin2hex(random_bytes(2)), 0, 4)),
+            strtoupper(self::HOSTNAME_WORDS[array_rand(self::HOSTNAME_WORDS)]),
+        ];
+
+        $lines = match ($port) {
+            21 => [
+                "220 FTP Service Ready — {$version}",
+                "System-ID: " . $noise[0],
+                "Auth-Mode: PLAIN",
+                "Build-Tag: " . $noise[2],
+                "Session-Node: " . ($fragment ? $fragment['value'] : $noise[1]),
+                "Transfer-Mode: BINARY",
+            ],
+            22 => [
+                "SSH-2.0-{$version}",
+                "Key-Exchange: diffie-hellman-group14-sha256",
+                "Node-ID: " . ($fragment ? $fragment['value'] : $noise[0]),
+                "Auth-Methods: publickey,password",
+                "Cipher: aes128-ctr",
+                "Host-Tag: " . $noise[3],
+            ],
+            80 => [
+                "HTTP/1.1 200 OK",
+                "Server: {$version}",
+                "X-Node-Tag: " . $noise[1],
+                "X-Build: " . ($fragment ? $fragment['value'] : $noise[2]),
+                "X-Powered-By: FastCGI",
+                "Content-Type: text/html",
+            ],
+            443 => [
+                "TLS HANDSHAKE — {$version}",
+                "Cipher-Suite: TLS_AES_256_GCM_SHA384",
+                "Cert-CN: " . $noise[0],
+                "Session-ID: " . ($fragment ? $fragment['value'] : $noise[3]),
+                "OCSP-Status: GOOD",
+                "Pin-Hash: " . $noise[2],
+            ],
+            3306 => [
+                "MySQL Protocol — {$version}",
+                "Auth-Plugin: caching_sha2_password",
+                "Server-Tag: " . $noise[2],
+                "Build-ID: " . ($fragment ? $fragment['value'] : $noise[0]),
+                "Charset: utf8mb4",
+                "Status: AUTOCOMMIT",
+            ],
+            default => [
+                "SERVICE RESPONSE — Port {$port}",
+                "Version: {$version}",
+                "Node: " . ($fragment ? $fragment['value'] : $noise[0]),
+            ],
+        };
+
+        return $lines;
+    }
+
+    /**
+     * Generate a Phase 3 filesystem for one player's side.
+     * Wallet is placed at a randomised location in the tree.
+     *
+     * Returns a nested directory tree and the wallet path string.
+     */
+    public function generateFilesystem(): array
+    {
+        // Pick a random wallet location
+        $walletPath = self::WALLET_LOCATIONS[array_rand(self::WALLET_LOCATIONS)];
+
+        // Build base tree
+        $tree = [
+            'home' => [
+                'user'   => ['logs' => [], 'config' => []],
+                'runner' => ['cache' => []],
+            ],
+            'var'  => [
+                'cache' => ['data' => []],
+                'lib'   => [],
+                'log'   => [],
+            ],
+            'sys'  => [
+                'net'  => ['cache' => []],
+                'proc' => [],
+            ],
+            'tmp'  => [
+                '.hidden' => [],
+                'session' => [],
+            ],
+            'net'  => [
+                'relay' => [],
+                'mesh'  => [],
+            ],
+        ];
+
+        // Inject wallet at the target path
+        $tree = $this->injectWallet($tree, $walletPath);
+
+        return [
+            'tree'         => $tree,
+            'wallet_path'  => '/' . implode('/', $walletPath),
+            'current_path' => '/',
+        ];
+    }
+
+    /**
+     * Recursively inject 'wallet' at the given path segments into the tree.
+     */
+    private function injectWallet(array $tree, array $pathSegments): array
+    {
+        if (count($pathSegments) === 1) {
+            // Last segment is the wallet itself
+            $tree['wallet'] = null;
+            return $tree;
+        }
+
+        $dir = $pathSegments[0];
+        $rest = array_slice($pathSegments, 1);
+
+        if (!isset($tree[$dir])) {
+            $tree[$dir] = [];
+        }
+
+        $tree[$dir] = $this->injectWallet($tree[$dir], $rest);
+        return $tree;
+    }
+
     // =========================================================================
     // Command Parser
     // =========================================================================
@@ -311,7 +636,7 @@ class PacketHijackService
         }
 
         $command     = strtolower($tokens[0]);
-        $allCommands = array_merge(self::PHASE1_COMMANDS, self::PHASE2_COMMANDS);
+        $allCommands = array_merge(self::PHASE1_COMMANDS, self::PHASE2_COMMANDS, self::PHASE3_COMMANDS);
 
         if (!in_array($command, $allCommands, true)) {
             return ['valid' => false, 'error' => "COMMAND NOT FOUND: {$tokens[0]}"];
@@ -320,18 +645,26 @@ class PacketHijackService
         $argCount = count($tokens) - 1;
 
         $argRequirements = [
+            // Phase 1
             'netstat'    => [0, 1],   // netstat --active
-            'ping'       => [1, 1],   // ping <ip>
+            'ping'       => [1, 1],   // ping <ip or partial>
             'traceroute' => [1, 1],   // traceroute <ip>
             'arp'        => [0, 1],   // arp --scan
             'whois'      => [1, 1],   // whois <ip>
             'sniff'      => [0, 1],   // sniff --traffic
             'flush'      => [1, 1],   // flush <ip>
             'inject'     => [1, 1],   // inject <ip>
-            'probe'      => [2, 2],   // probe port <number>
-            'exploit'    => [2, 2],   // exploit port <number>
-            'decode'     => [2, 2],   // decode port <number>
-            'breach'     => [1, 1],   // breach <ip>
+            // Phase 2
+            'scan'       => [1, 1],   // scan <ip>
+            'probe'      => [1, 1],   // probe <port>
+            'validate'   => [1, 1],   // validate <string>
+            'exploit'    => [1, 1],   // exploit <port>
+            'decode'     => [1, 1],   // decode <port>
+            'breach'     => [2, 2],   // breach <ip> <port>
+            // Phase 3
+            'ls'         => [0, 0],   // ls
+            'cd'         => [1, 1],   // cd <dir> or cd ..
+            'extract'    => [0, 0],   // extract
         ];
 
         [$min, $max] = $argRequirements[$command];
@@ -486,21 +819,426 @@ class PacketHijackService
     }
 
     // =========================================================================
-    // Phase 2 — Port Commands
+    // Phase 2 — Fingerprint Commands
     // =========================================================================
 
     /**
-     * probe port <number> — returns rich port status with service flavor text.
+     * scan <ip> — opens Phase 2 investigation.
+     * Returns port numbers only — no service, version, exposure or fragments.
+     * Same role as netstat in Phase 1: populates the board, nothing more.
+     */
+    public function commandScan(array $fingerprint): array
+    {
+        return array_map(fn($p) => [
+            'port'      => $p['port'],
+            'service'   => '???',
+            'version'   => '???',
+            'exposure'  => '???',
+            'probed'    => false,
+            'shattered' => $p['shattered'],
+        ], $fingerprint['ports']);
+    }
+
+    /**
+     * probe <port> — fingerprint a specific port.
+     * Returns the banner lines (with fragment hidden in noise) and exposure rating.
+     * Marks the port as probed in the fingerprint.
+     * Never reveals which line contains the fragment — player has to read and validate.
      *
-     * Replaces the old scan command. Same mechanic but returns service-specific
-     * flavor text explaining why the port is or isn't exploitable, making the
-     * topology feel like real infrastructure rather than abstract numbers.
-     *
-     * Checks active sector-corrupt entries and bait traps — fake bias overrides
-     * apply here exactly as they did on scan.
-     *
-     * Returns ['found' => true,  'entry' => array, 'flavor' => array]
+     * Returns ['found' => true, 'port' => array, 'banner' => array]
      *      or ['found' => false, 'error' => string]
+     */
+    public function commandProbe(array &$fingerprint, int $portNumber): array
+    {
+        foreach ($fingerprint['ports'] as $i => $p) {
+            if ((int) $p['port'] !== $portNumber) continue;
+
+            $fingerprint['ports'][$i]['probed'] = true;
+
+            return [
+                'found'    => true,
+                'port'     => $portNumber,
+                'service'  => $p['service'],
+                'version'  => $p['version'],
+                'exposure' => $p['exposure'],
+                'banner'   => $p['banner_lines'],
+            ];
+        }
+
+        return ['found' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
+    }
+
+    /**
+     * validate <string> — check if a string matches any credential fragment.
+     * No penalty for wrong input. Updates the fingerprint display if valid.
+     *
+     * Returns ['valid' => true, 'type' => string, 'tier' => int, 'updated_display' => array]
+     *      or ['valid' => false]
+     */
+    public function commandValidate(array &$fingerprint, string $input): array
+    {
+        $upper = strtoupper(trim($input));
+
+        foreach ($fingerprint['ports'] as $p) {
+            $frag = $p['fragment'] ?? null;
+            if ($frag === null) continue;
+
+            if (strtoupper($frag['value']) !== $upper) continue;
+
+            // Valid fragment found — update the display string
+            $type = $frag['type']; // 'hostname' or 'os'
+            $tier = $frag['tier']; // 2 or 3
+
+            // Build updated display
+            $this->updateFingerprintDisplay($fingerprint, $type, $tier, $frag['value']);
+
+            return [
+                'valid'            => true,
+                'type'             => $type,
+                'tier'             => $tier,
+                'value'            => $frag['value'],
+                'hostname_display' => $fingerprint['hostname']['display'],
+                'os_display'       => $fingerprint['os']['display'],
+            ];
+        }
+
+        return ['valid' => false];
+    }
+
+    /**
+     * Update the display string for a credential after a fragment is validated.
+     */
+    private function updateFingerprintDisplay(array &$fingerprint, string $type, int $tier, string $value): void
+    {
+        $cred = &$fingerprint[$type];
+
+        if ($tier === 2) {
+            // Replace second segment
+            $cred['display'] = $cred['tier1'] . '-' . $value . '-' . ($cred['tier3_found'] ? $cred['tier3'] : '????');
+        } elseif ($tier === 3) {
+            $cred['display'] = $cred['tier1'] . '-' . ($cred['tier2_found'] ? $cred['tier2'] : '????') . '-' . $value;
+            $cred['tier3_found'] = true;
+        }
+
+        if ($tier === 2) $cred['tier2_found'] = true;
+
+        // Check if complete
+        if (isset($cred['tier2_found']) && isset($cred['tier3_found'])) {
+            $cred['display'] = $cred['full'];
+        }
+    }
+
+    /**
+     * Check whether both hostname and OS credentials are fully validated.
+     */
+    public function fingerprintComplete(array $fingerprint): bool
+    {
+        $h = $fingerprint['hostname'];
+        $o = $fingerprint['os'];
+        return ($h['display'] === $h['full']) && ($o['display'] === $o['full']);
+    }
+
+    /**
+     * exploit <port> — attempt to shatter a port based on exposure vs attacker CPU.
+     * CRITICAL/HIGH → direct exploit succeeds.
+     * MODERATE → requires at least one decode first.
+     * LOW/MINIMAL → requires two decodes / overclock.
+     */
+    public function commandExploitFingerprint(
+        array     &$fingerprint,
+        int       $portNumber,
+        PlayerRig $rig,
+        Player    $player,
+        bool      $overclocked = false,
+        array     $baitPorts   = []
+    ): array {
+        // Bait check
+        foreach ($baitPorts as $bait) {
+            if ((int) $bait['port'] === $portNumber) {
+                return ['success' => false, 'baited' => true, 'lock_seconds' => (float) $bait['lock_seconds']];
+            }
+        }
+
+        foreach ($fingerprint['ports'] as $i => $p) {
+            if ((int) $p['port'] !== $portNumber) continue;
+
+            if ($p['shattered']) {
+                return ['success' => false, 'error' => "PORT {$portNumber} ALREADY SHATTERED"];
+            }
+
+            if (!$p['probed']) {
+                return ['success' => false, 'error' => "PORT {$portNumber} NOT PROBED — RUN probe {$portNumber} FIRST"];
+            }
+
+            $exposure  = $p['exposure'];
+            $threshold = $overclocked ? 'MODERATE' : 'HIGH';
+
+            $exploitable = match ($exposure) {
+                'CRITICAL' => true,
+                'HIGH'     => true,
+                'MODERATE' => $overclocked || ($p['decode_count'] ?? 0) >= 1,
+                'LOW'      => $overclocked || ($p['decode_count'] ?? 0) >= 2,
+                'MINIMAL'  => $overclocked,
+                default    => false,
+            };
+
+            if (!$exploitable) {
+                $hint = in_array($exposure, ['MODERATE', 'LOW']) ? ' — USE decode FIRST' : ' — PORT TOO HARDENED';
+                return ['success' => false, 'error' => "EXPLOIT FAILED: {$exposure} EXPOSURE{$hint}"];
+            }
+
+            $fingerprint['ports'][$i]['shattered'] = true;
+
+            return ['success' => true, 'port' => $portNumber, 'fingerprint' => $fingerprint];
+        }
+
+        return ['success' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
+    }
+
+    /**
+     * decode <port> — reduce resistance on a port, enabling exploit on MODERATE/LOW ports.
+     * Increments decode_count on the port entry.
+     */
+    public function commandDecodeFingerprint(array &$fingerprint, int $portNumber): array
+    {
+        foreach ($fingerprint['ports'] as $i => $p) {
+            if ((int) $p['port'] !== $portNumber) continue;
+            if ($p['shattered']) {
+                return ['success' => false, 'error' => "PORT {$portNumber} ALREADY SHATTERED"];
+            }
+
+            $fingerprint['ports'][$i]['decode_count'] = ($p['decode_count'] ?? 0) + 1;
+            $count = $fingerprint['ports'][$i]['decode_count'];
+
+            return [
+                'success'      => true,
+                'port'         => $portNumber,
+                'decode_count' => $count,
+                'exposure'     => $p['exposure'],
+                'fingerprint'  => $fingerprint,
+            ];
+        }
+
+        return ['success' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
+    }
+
+    /**
+     * breach <ip> <port> — fire exploit payload at the designated port.
+     * Validates:
+     *   - IP matches the target IP from Phase 1
+     *   - Port is shattered in the fingerprint
+     *   - Fingerprint is complete (both credentials fully validated)
+     *
+     * On success: triggers connection sequence → auth prompt.
+     * On failure: corrupts 1-2 fragments and ejects player.
+     */
+    public function commandBreachFingerprint(
+        array  $fingerprint,
+        string $targetIp,
+        string $inputIp,
+        int    $inputPort
+    ): array {
+        if ($inputIp !== $targetIp) {
+            return ['success' => false, 'reason' => 'ip_mismatch', 'error' => 'IP MISMATCH — TARGET SIGNATURE REJECTED'];
+        }
+
+        // Find the port
+        $portEntry = null;
+        foreach ($fingerprint['ports'] as $p) {
+            if ((int) $p['port'] === $inputPort) { $portEntry = $p; break; }
+        }
+
+        if ($portEntry === null) {
+            return ['success' => false, 'reason' => 'port_not_found', 'error' => "PORT {$inputPort} NOT IN TARGET TOPOLOGY"];
+        }
+
+        if (!$portEntry['shattered']) {
+            return ['success' => false, 'reason' => 'port_not_shattered', 'error' => "PORT {$inputPort} NOT SHATTERED — EXPLOIT FIRST"];
+        }
+
+        if (!$this->fingerprintComplete($fingerprint)) {
+            return ['success' => false, 'reason' => 'incomplete', 'error' => 'SYSTEM FINGERPRINT INCOMPLETE — CONTINUE PROBING'];
+        }
+
+        return ['success' => true, 'awaiting_auth' => true];
+    }
+
+    /**
+     * Authenticate with discovered credentials.
+     * Player types the full assembled hostname as username, OS as password.
+     *
+     * On success: advances to Phase 3.
+     * On failure: corrupts fragments based on how wrong the attempt was.
+     */
+    public function commandAuthenticate(
+        array  &$fingerprint,
+        string $usernameInput,
+        string $passwordInput
+    ): array {
+        $correctUser = $fingerprint['hostname']['full'];
+        $correctPass = $fingerprint['os']['full'];
+
+        if (strtoupper($usernameInput) === strtoupper($correctUser) &&
+            strtoupper($passwordInput) === strtoupper($correctPass)) {
+            return ['success' => true];
+        }
+
+        // Determine how wrong — corrupt fragments accordingly
+        $corrupted = $this->corruptFragments($fingerprint, $usernameInput, $passwordInput);
+
+        return [
+            'success'   => false,
+            'corrupted' => $corrupted,
+            'error'     => 'AUTHENTICATION FAILED — CREDENTIALS REJECTED',
+            'fingerprint' => $fingerprint,
+        ];
+    }
+
+    /**
+     * Corrupt 1-3 fragments on auth failure based on how wrong the attempt was.
+     * Returns list of corrupted fragment descriptions.
+     */
+    private function corruptFragments(array &$fingerprint, string $user, string $pass): array
+    {
+        $corrupted = [];
+        $corruptCount = 1;
+
+        // More wrong = more corruption
+        $userMatch = similar_text(strtoupper($user), strtoupper($fingerprint['hostname']['full']));
+        $passMatch = similar_text(strtoupper($pass), strtoupper($fingerprint['os']['full']));
+
+        if ($userMatch < 4 && $passMatch < 4) $corruptCount = 3;
+        elseif ($userMatch < 6 || $passMatch < 6) $corruptCount = 2;
+
+        // Reset random validated fragments
+        $allFragments = [
+            ['cred' => 'hostname', 'tier' => 2, 'label' => 'HOSTNAME MID-SEGMENT'],
+            ['cred' => 'hostname', 'tier' => 3, 'label' => 'HOSTNAME SUFFIX'],
+            ['cred' => 'os',       'tier' => 2, 'label' => 'OS VERSION BUILD'],
+            ['cred' => 'os',       'tier' => 3, 'label' => 'OS BUILD HASH'],
+        ];
+
+        shuffle($allFragments);
+        $toCorrupt = array_slice($allFragments, 0, $corruptCount);
+
+        foreach ($toCorrupt as $frag) {
+            $cred = $frag['cred'];
+            $tier = $frag['tier'];
+
+            if ($tier === 2) {
+                $fingerprint[$cred]['tier2_found'] = false;
+                $fingerprint[$cred]['display']     = $fingerprint[$cred]['tier1'] . '-????-' .
+                    ($fingerprint[$cred]['tier3_found'] ?? false ? $fingerprint[$cred]['tier3'] : '????');
+            } else {
+                $fingerprint[$cred]['tier3_found'] = false;
+                $fingerprint[$cred]['display']     = $fingerprint[$cred]['tier1'] . '-' .
+                    ($fingerprint[$cred]['tier2_found'] ?? false ? $fingerprint[$cred]['tier2'] : '????') . '-????';
+            }
+
+            $corrupted[] = $frag['label'];
+        }
+
+        return $corrupted;
+    }
+
+    // =========================================================================
+    // Phase 3 — Filesystem Commands
+    // =========================================================================
+
+    /**
+     * ls — list contents of the current directory.
+     * Returns directory entries at the current path.
+     */
+    public function commandLs(array $filesystem): array
+    {
+        $node = $this->navigateToPath($filesystem['tree'], $filesystem['current_path']);
+        if ($node === null) {
+            return ['success' => false, 'error' => 'DIRECTORY READ ERROR'];
+        }
+
+        $entries = [];
+        foreach ($node as $name => $contents) {
+            $entries[] = [
+                'name'     => $name,
+                'is_dir'   => is_array($contents),
+                'is_wallet'=> $name === 'wallet' && $contents === null,
+            ];
+        }
+
+        return ['success' => true, 'path' => $filesystem['current_path'], 'entries' => $entries];
+    }
+
+    /**
+     * cd <dir> — change directory. Supports 'cd ..' to go up one level.
+     * Updates current_path in the filesystem object.
+     */
+    public function commandCd(array &$filesystem, string $dir): array
+    {
+        $currentPath = $filesystem['current_path'];
+
+        if ($dir === '..') {
+            if ($currentPath === '/') {
+                return ['success' => false, 'error' => 'ALREADY AT ROOT'];
+            }
+            $parts       = array_filter(explode('/', $currentPath));
+            array_pop($parts);
+            $newPath     = '/' . implode('/', $parts);
+            $filesystem['current_path'] = $newPath ?: '/';
+            return ['success' => true, 'path' => $filesystem['current_path']];
+        }
+
+        // Navigate forward
+        $targetPath = rtrim($currentPath, '/') . '/' . $dir;
+        $node       = $this->navigateToPath($filesystem['tree'], $targetPath);
+
+        if ($node === null) {
+            return ['success' => false, 'error' => "DIRECTORY NOT FOUND: {$dir}"];
+        }
+
+        if (!is_array($node)) {
+            return ['success' => false, 'error' => "{$dir} IS NOT A DIRECTORY"];
+        }
+
+        $filesystem['current_path'] = $targetPath;
+        return ['success' => true, 'path' => $filesystem['current_path']];
+    }
+
+    /**
+     * extract — steal the wallet from current directory.
+     * Only succeeds if wallet exists in current directory.
+     */
+    public function commandExtract(array $filesystem): array
+    {
+        $node = $this->navigateToPath($filesystem['tree'], $filesystem['current_path']);
+        if ($node === null || !array_key_exists('wallet', $node)) {
+            return ['success' => false, 'error' => 'NO WALLET FOUND IN CURRENT DIRECTORY — KEEP LOOKING'];
+        }
+
+        return ['success' => true];
+    }
+
+    /**
+     * Navigate a filesystem tree to a given path string.
+     * Returns the node at that path, or null if not found.
+     */
+    private function navigateToPath(array $tree, string $path): ?array
+    {
+        if ($path === '/') return $tree;
+
+        $parts = array_filter(explode('/', $path));
+        $node  = $tree;
+
+        foreach ($parts as $part) {
+            if (!is_array($node) || !array_key_exists($part, $node)) return null;
+            $node = $node[$part];
+        }
+
+        return is_array($node) ? $node : null;
+    }
+
+    /**
+     * probe port <number> — OLD method kept for rig command compatibility.
+     * New fingerprint-based probe is commandProbe() above.
      */
     public function commandProbePort(
         array $ports,
@@ -511,20 +1249,11 @@ class PacketHijackService
         foreach ($ports as $entry) {
             if ((int) $entry['port'] === $portNumber) {
                 $fakeBias = $this->resolveFakeBias($portNumber, $corruptPorts, $baitPorts);
-
-                $displayEntry = $fakeBias !== null
-                    ? array_merge($entry, ['bias' => $fakeBias])
-                    : $entry;
-
-                $flavor = self::PORT_FLAVOR[$portNumber] ?? [
-                    "SERVICE DETECTED ON PORT {$portNumber}",
-                    'UNKNOWN PROTOCOL',
-                ];
-
+                $displayEntry = $fakeBias !== null ? array_merge($entry, ['bias' => $fakeBias]) : $entry;
+                $flavor = self::PORT_FLAVOR[$portNumber] ?? ["SERVICE DETECTED ON PORT {$portNumber}", 'UNKNOWN PROTOCOL'];
                 return ['found' => true, 'entry' => $displayEntry, 'flavor' => $flavor];
             }
         }
-
         return ['found' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
     }
 
