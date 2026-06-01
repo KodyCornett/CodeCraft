@@ -143,71 +143,111 @@
                     </div>
                 </div>
 
-                <!-- Right: case file (Phase 1) or command ref (Phase 2) -->
+                <!-- Right: case file + command ref -->
                 <Transition name="ref-slide">
                     <div v-if="showPanel" class="ph-ref-panel">
 
-                        <!-- Phase 1: live case file -->
+                        <!-- ── Phase 1: case file ── -->
                         <template v-if="phase === 1">
-                            <div class="ph-ref-title">CASE FILE</div>
-                            <div class="ph-ref-phase">// NODE SUSPECTS</div>
+                            <!-- Case file — full height, no scroll, all rows visible -->
+                            <div class="ph-cf-section">
+                                <div class="ph-ref-title">CASE FILE</div>
+                                <div class="ph-ref-phase">// NODE SUSPECTS</div>
 
-                            <div v-if="!boardReady" class="ph-ref-empty">
-                                RUN netstat --active TO POPULATE
+                                <div v-if="!boardReady" class="ph-ref-empty">
+                                    RUN netstat --active TO POPULATE
+                                </div>
+
+                                <template v-else>
+                                    <div class="ph-cf-stats">
+                                        ACTIVE: {{ activeSuspectCount }} / {{ suspects.length }}
+                                        <span v-if="octetClue" class="ph-cf-clue"> // OCTET: {{ octetClue }}</span>
+                                    </div>
+                                    <div class="ph-cf-header">
+                                        <span class="ph-cf-col ph-cf-col--ip">IP</span>
+                                        <span class="ph-cf-col ph-cf-col--ping">PING</span>
+                                        <span class="ph-cf-col ph-cf-col--hops">HPS</span>
+                                        <span class="ph-cf-col ph-cf-col--arp">ARP</span>
+                                    </div>
+                                    <div
+                                        v-for="s in suspects"
+                                        :key="s.ip"
+                                        class="ph-cf-row"
+                                        :class="{ 'cf-row--flushed': s.flushed }"
+                                    >
+                                        <span class="ph-cf-col ph-cf-col--ip">{{ s.ip }}</span>
+                                        <span class="ph-cf-col ph-cf-col--ping" :class="pingClass(s)">
+                                            {{ pingDisplay(s) }}
+                                        </span>
+                                        <span class="ph-cf-col ph-cf-col--hops">
+                                            {{ s.hops !== undefined ? s.hops : '???' }}
+                                        </span>
+                                        <span class="ph-cf-col ph-cf-col--arp" :class="arpClass(s)">
+                                            {{ arpDisplay(s) }}
+                                        </span>
+                                    </div>
+                                </template>
                             </div>
 
-                            <template v-else>
-                                <div class="ph-cf-stats">
-                                    ACTIVE: {{ activeSuspectCount }} / {{ suspects.length }}
-                                    <span v-if="octetClue" class="ph-cf-clue"> // OCTET: {{ octetClue }}</span>
+                            <!-- Divider -->
+                            <div class="ph-panel-rule" />
+
+                            <!-- Command ref — scrollable, sits below case file -->
+                            <div class="ph-cmd-ref-section">
+                                <div class="ph-ref-title">CMD REF</div>
+                                <div class="ph-ref-phase">// PHASE 1 — RECON</div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">ping &lt;ip&gt;</div>
+                                    <div class="ph-ref-desc">Probe a suspect for response time. Fast = likely active player.</div>
                                 </div>
-                                <div class="ph-cf-header">
-                                    <span class="ph-cf-col ph-cf-col--ip">IP</span>
-                                    <span class="ph-cf-col ph-cf-col--ping">PING</span>
-                                    <span class="ph-cf-col ph-cf-col--hops">HOPS</span>
-                                    <span class="ph-cf-col ph-cf-col--arp">ARP</span>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">traceroute &lt;ip&gt;</div>
+                                    <div class="ph-ref-desc">Map route to suspect. Low hop count = same local network.</div>
                                 </div>
-                                <div
-                                    v-for="s in suspects"
-                                    :key="s.ip"
-                                    class="ph-cf-row"
-                                    :class="{ 'cf-row--flushed': s.flushed }"
-                                >
-                                    <span class="ph-cf-col ph-cf-col--ip">{{ s.ip }}</span>
-                                    <span class="ph-cf-col ph-cf-col--ping" :class="pingClass(s)">
-                                        {{ pingDisplay(s) }}
-                                    </span>
-                                    <span class="ph-cf-col ph-cf-col--hops">
-                                        {{ s.hops !== undefined ? s.hops : '???' }}
-                                    </span>
-                                    <span class="ph-cf-col ph-cf-col--arp" :class="arpClass(s)">
-                                        {{ arpDisplay(s) }}
-                                    </span>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">arp --scan</div>
+                                    <div class="ph-ref-desc">Check when all suspects were last active. Your target just arrived.</div>
                                 </div>
-                            </template>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">whois &lt;ip&gt;</div>
+                                    <div class="ph-ref-desc">Query registry data. May reveal chassis type if target has low OS.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">sniff --traffic</div>
+                                    <div class="ph-ref-desc">Intercept a live packet fragment. Reveals one octet of target IP.</div>
+                                </div>
+                                <div class="ph-ref-entry">
+                                    <div class="ph-ref-cmd">flush &lt;ip&gt;</div>
+                                    <div class="ph-ref-desc">Remove a confirmed non-target from your case file.</div>
+                                </div>
+                                <div class="ph-ref-entry ph-ref-entry--commit">
+                                    <div class="ph-ref-cmd">inject &lt;ip&gt;</div>
+                                    <div class="ph-ref-desc">Commit your guess and deploy payload. Wrong = input locked.</div>
+                                </div>
+                            </div>
                         </template>
 
-                        <!-- Phase 2: command quick ref -->
+                        <!-- ── Phase 2: port commands only ── -->
                         <template v-else>
                             <div class="ph-ref-title">CMD REF</div>
                             <div class="ph-ref-phase">// PHASE 2 — INTRUSION</div>
                             <div class="ph-ref-entry">
                                 <div class="ph-ref-cmd">probe port &lt;n&gt;</div>
-                                <div class="ph-ref-desc">Analyse a port's service and encryption bias</div>
+                                <div class="ph-ref-desc">Analyse a port's service and encryption weakness.</div>
                             </div>
                             <div class="ph-ref-entry">
                                 <div class="ph-ref-cmd">decode port &lt;n&gt;</div>
-                                <div class="ph-ref-desc">Manually chip away at bias — works on any port</div>
+                                <div class="ph-ref-desc">Manually chip away at bias — works on any port regardless of level.</div>
                             </div>
                             <div class="ph-ref-entry">
                                 <div class="ph-ref-cmd">exploit port &lt;n&gt;</div>
-                                <div class="ph-ref-desc">Shatter port if bias ≤ 25%. Cascades remaining.</div>
+                                <div class="ph-ref-desc">Shatter a port when bias is 25% or lower. Cascades to remaining ports.</div>
                             </div>
                             <div class="ph-ref-entry ph-ref-entry--commit">
                                 <div class="ph-ref-cmd">breach &lt;ip&gt;</div>
-                                <div class="ph-ref-desc">Deploy final payload once exfil port unlocks.</div>
+                                <div class="ph-ref-desc">Deploy final payload. Use the IP you found in Phase 1.</div>
                             </div>
-                            <div class="ph-ref-note">EXFIL UNLOCKS AFTER ALL GATES SHATTERED</div>
+                            <div class="ph-ref-note">EXFIL PORT 8080 UNLOCKS AFTER ALL GATES SHATTERED</div>
                         </template>
 
                     </div>
@@ -443,8 +483,8 @@ function lineClass(line) {
 /* ── Terminal shell ──────────────────────────────────────────────────────── */
 .ph-terminal {
     position: relative;
-    width: min(960px, 96vw);
-    height: min(640px, 92vh);
+    width: min(1060px, 98vw);
+    height: min(820px, 96vh);
     background: #08080f;
     border: 1px solid rgba(0,255,255,0.18);
     display: flex;
@@ -711,12 +751,34 @@ function lineClass(line) {
 
 /* ── Side panel ──────────────────────────────────────────────────────────── */
 .ph-ref-panel {
-    width: 260px;
+    width: 270px;
     flex-shrink: 0;
     border-left: 1px solid rgba(0,255,255,0.1);
     background: rgba(0,255,255,0.015);
-    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Case file section — natural height, no scroll, all rows always visible */
+.ph-cf-section {
+    flex-shrink: 0;
+    padding: 10px 12px 8px;
+}
+
+/* Divider between case file and command ref */
+.ph-panel-rule {
+    height: 1px;
+    background: rgba(0,255,255,0.1);
+    flex-shrink: 0;
+    margin: 0;
+}
+
+/* Command ref section — scrollable, takes remaining space */
+.ph-cmd-ref-section {
+    flex: 1;
     overflow-y: auto;
+    padding: 10px 12px;
     scrollbar-width: thin;
     scrollbar-color: rgba(0,255,255,0.1) transparent;
     display: flex;
@@ -782,5 +844,15 @@ function lineClass(line) {
     overflow: hidden;
 }
 .ref-slide-enter-from, .ref-slide-leave-to  { width: 0; opacity: 0; }
-.ref-slide-enter-to,   .ref-slide-leave-from { width: 260px; opacity: 1; }
+.ref-slide-enter-to,   .ref-slide-leave-from { width: 270px; opacity: 1; }
+
+/* Phase 2 ref renders directly in .ph-ref-panel — needs its own padding */
+.ph-ref-panel > .ph-ref-title,
+.ph-ref-panel > .ph-ref-phase,
+.ph-ref-panel > .ph-ref-entry,
+.ph-ref-panel > .ph-ref-note {
+    padding-left: 12px;
+    padding-right: 12px;
+}
+.ph-ref-panel > .ph-ref-title { padding-top: 10px; }
 </style>
