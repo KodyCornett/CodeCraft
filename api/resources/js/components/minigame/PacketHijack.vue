@@ -143,9 +143,12 @@
                     </div>
                 </div>
 
+                <!-- Drag handle -->
+                <div v-if="showPanel" class="ph-drag-handle" @mousedown="startDrag" title="Drag to resize"></div>
+
                 <!-- Right: case file + command ref -->
                 <Transition name="ref-slide">
-                    <div v-if="showPanel" class="ph-ref-panel">
+                    <div v-if="showPanel" class="ph-ref-panel" :style="{ width: panelWidth + 'px' }">
 
                         <!-- ── Phase 1: case file ── -->
                         <template v-if="phase === 1">
@@ -289,9 +292,36 @@ const inputEl    = ref(null);
 const historyEl  = ref(null);
 const inputValue = ref('');
 const showPanel  = ref(true);
+const panelWidth = ref(270);
 
 let historyNav  = [];
 let historyNavI = -1;
+
+// ── Panel drag resize ─────────────────────────────────────────────────────────
+
+function startDrag(e) {
+    e.preventDefault();
+    const startX     = e.clientX;
+    const startWidth = panelWidth.value;
+
+    function onMove(e) {
+        // Dragging left increases panel width, dragging right decreases
+        const delta = startX - e.clientX;
+        panelWidth.value = Math.min(520, Math.max(200, startWidth + delta));
+    }
+
+    function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    }
+
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
 
 // Random threat message — rotates per match open
 const threatMessages = [
@@ -838,13 +868,38 @@ function lineClass(line) {
 .cf-val--degraded { color: #FFB300 !important; }
 .cf-val--dead     { color: rgba(255,68,68,0.5) !important; }
 
+/* ── Drag handle ─────────────────────────────────────────────────────────── */
+.ph-drag-handle {
+    width: 4px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: rgba(0,255,255,0.08);
+    transition: background 0.15s;
+    position: relative;
+    z-index: 2;
+}
+.ph-drag-handle:hover {
+    background: rgba(0,255,255,0.3);
+}
+.ph-drag-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1px;
+    height: 32px;
+    background: rgba(0,255,255,0.4);
+    border-radius: 1px;
+}
+
 /* ── Slide transition ────────────────────────────────────────────────────── */
 .ref-slide-enter-active, .ref-slide-leave-active {
-    transition: width 0.2s ease, opacity 0.2s ease;
+    transition: opacity 0.2s ease;
     overflow: hidden;
 }
-.ref-slide-enter-from, .ref-slide-leave-to  { width: 0; opacity: 0; }
-.ref-slide-enter-to,   .ref-slide-leave-from { width: 270px; opacity: 1; }
+.ref-slide-enter-from, .ref-slide-leave-to  { opacity: 0; }
+.ref-slide-enter-to,   .ref-slide-leave-from { opacity: 1; }
 
 /* Phase 2 ref renders directly in .ph-ref-panel — needs its own padding */
 .ph-ref-panel > .ph-ref-title,
