@@ -28,7 +28,7 @@
         </div>
 
         <!-- ── Main terminal ─────────────────────────────────────────────────── -->
-        <div v-else class="ph-terminal">
+        <div v-else class="ph-terminal" tabindex="-1" @click="refocusInput" @keydown="onTerminalKeydown">
 
             <!-- Top bar -->
             <div class="ph-topbar">
@@ -395,6 +395,21 @@ function refocusInput() {
     }
 }
 
+// Route any keystroke on the terminal to the input so the player never
+// has to click the field. Ignores modifier-only keys and lets auth inputs
+// handle themselves.
+function onTerminalKeydown(e) {
+    if (props.awaitingAuth || props.isLocked || props.isComplete) return;
+    if (!inputEl.value) return;
+    if (document.activeElement === inputEl.value) return;
+    // Don't steal focus for pure modifier keys, tab, escape, or function keys
+    const skip = ['Tab', 'Escape', 'Meta', 'Control', 'Alt', 'Shift',
+                  'CapsLock', 'NumLock', 'ScrollLock', 'Pause', 'ContextMenu'];
+    if (skip.includes(e.key) || e.key.startsWith('F')) return;
+    // Redirect: focus the input and let the event re-fire there naturally
+    inputEl.value.focus();
+}
+
 function historyUp() {
     if (historyNav.length === 0) return;
     historyNavI = Math.min(historyNavI + 1, historyNav.length - 1);
@@ -502,8 +517,8 @@ function lineClass(line) {
     background: rgba(0, 0, 0, 0.92);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 
@@ -542,9 +557,9 @@ function lineClass(line) {
 
 .ph-complete-box {
     border: 1px solid rgba(0,255,255,0.3);
-    padding: 40px 56px;
+    padding: clamp(20px, 4vh, 40px) clamp(24px, 4vw, 56px);
     text-align: center;
-    min-width: 380px;
+    width: clamp(280px, 50vw, 480px);
     background: rgba(8,8,15,0.95);
 }
 
@@ -573,13 +588,15 @@ function lineClass(line) {
 /* ── Terminal shell ──────────────────────────────────────────────────────── */
 .ph-terminal {
     position: relative;
-    width: min(1280px, 99vw);
-    height: min(860px, 97vh);
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
     background: #08080f;
     border: 1px solid rgba(0,255,255,0.18);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    outline: none;
 }
 
 .ph-terminal::after {
@@ -616,9 +633,8 @@ function lineClass(line) {
 /* ── Phase data zone (top strip, full width) ─────────────────────────────── */
 .ph-data-zone {
     flex-shrink: 0;
-    padding: 8px 14px;
+    padding: 6px 14px;
     background: rgba(0,255,255,0.02);
-    min-height: 68px;
 }
 
 .ph-data-empty {
@@ -638,21 +654,22 @@ function lineClass(line) {
 
 .ph-suspect-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 4px 8px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 3px 6px;
 }
 
 .ph-suspect-card {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 9px;
+    font-size: clamp(8px, 0.85vw, 9.5px);
     padding: 3px 6px;
     border: 1px solid rgba(0,255,255,0.07);
     background: rgba(0,255,255,0.02);
     white-space: nowrap;
     overflow: hidden;
     transition: opacity 0.2s;
+    min-width: 0;
 }
 
 .suspect-card--flushed {
@@ -660,10 +677,10 @@ function lineClass(line) {
     text-decoration: line-through;
 }
 
-.psc-ip    { color: rgba(0,255,255,0.65); font-size: 8.5px; flex-shrink: 0; min-width: 94px; }
+.psc-ip    { color: rgba(0,255,255,0.65); font-size: clamp(7.5px, 0.8vw, 9px); flex-shrink: 0; }
 .psc-sep   { color: rgba(0,255,255,0.15); flex-shrink: 0; }
-.psc-label { color: rgba(0,255,255,0.25); font-size: 7.5px; letter-spacing: 0.06em; flex-shrink: 0; }
-.psc-val   { color: rgba(0,255,255,0.5);  font-size: 8.5px; flex-shrink: 0; min-width: 42px; }
+.psc-label { color: rgba(0,255,255,0.25); font-size: clamp(7px, 0.7vw, 8px); letter-spacing: 0.04em; flex-shrink: 0; }
+.psc-val   { color: rgba(0,255,255,0.5);  font-size: clamp(7.5px, 0.8vw, 9px); flex-shrink: 0; min-width: 36px; }
 
 /* Phase 2 — fingerprint horizontal strip */
 .ph-fp-strip {
@@ -910,7 +927,7 @@ function lineClass(line) {
 
 /* ── Right panel (CMD ref + rig cmds) ────────────────────────────────────── */
 .ph-ref-panel {
-    width: 220px;
+    width: clamp(170px, 18vw, 230px);
     flex-shrink: 0;
     border-left: 1px solid rgba(0,255,255,0.1);
     background: rgba(0,255,255,0.015);
