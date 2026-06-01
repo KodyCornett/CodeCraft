@@ -56,8 +56,10 @@ class PacketHijackController extends Controller
     public function command(Request $request, string $matchId): JsonResponse
     {
         $data = $request->validate([
-            'input'       => ['nullable', 'string', 'max:200', 'required_without:rig_command'],
-            'rig_command' => ['nullable', 'string', 'max:100', 'required_without:input'],
+            'input'       => ['nullable', 'string', 'max:200'],
+            'rig_command' => ['nullable', 'string', 'max:100'],
+            'auth_user'   => ['nullable', 'string', 'max:100'],
+            'auth_pass'   => ['nullable', 'string', 'max:100'],
         ]);
 
         $me = Player::where('user_id', $request->user()->id)->first();
@@ -95,6 +97,11 @@ class PacketHijackController extends Controller
                 ], 429);
             }
 
+            // ── Auth path — submitted after breach connection established ────────
+            if (!empty($data['auth_user']) || !empty($data['auth_pass'])) {
+                return $this->handleAuth($match, $role, $me, $data['auth_user'] ?? '', $data['auth_pass'] ?? '');
+            }
+
             // ── Rig command path (Phase 7) ────────────────────────────────────
             if (!empty($data['rig_command'])) {
                 return $this->handleRigCommand($match, $role, $me, $data['rig_command']);
@@ -119,9 +126,10 @@ class PacketHijackController extends Controller
 
             // ── Phase guard ───────────────────────────────────────────────────
             $phase1Commands = ['netstat', 'ping', 'traceroute', 'arp', 'whois', 'sniff', 'flush', 'inject'];
-            $phase2Commands = ['probe', 'exploit', 'decode', 'breach'];
+            $phase2Commands = ['scan', 'probe', 'validate', 'exploit', 'decode', 'breach'];
+            $phase3Commands = ['ls', 'cd', 'extract'];
 
-            if ($currentPhase === 1 && in_array($command, $phase2Commands, true)) {
+            if ($currentPhase === 1 && (in_array($command, $phase2Commands, true) || in_array($command, $phase3Commands, true))) {
                 PacketHijackCommandResult::dispatch(
                     matchId:     $match->id,
                     playerId:    $me->id,
@@ -131,7 +139,7 @@ class PacketHijackController extends Controller
                 return response()->json(['ok' => true]);
             }
 
-            if ($currentPhase === 2 && in_array($command, $phase1Commands, true)) {
+            if ($currentPhase === 2 && (in_array($command, $phase1Commands, true) || in_array($command, $phase3Commands, true))) {
                 PacketHijackCommandResult::dispatch(
                     matchId:     $match->id,
                     playerId:    $me->id,
@@ -141,8 +149,19 @@ class PacketHijackController extends Controller
                 return response()->json(['ok' => true]);
             }
 
+            if ($currentPhase === 3 && !in_array($command, $phase3Commands, true)) {
+                PacketHijackCommandResult::dispatch(
+                    matchId:     $match->id,
+                    playerId:    $me->id,
+                    command:     $data['input'],
+                    outputLines: ['[ERROR]: SYSTEM BREACHED — USE FILESYSTEM COMMANDS ONLY'],
+                );
+                return response()->json(['ok' => true]);
+            }
+
             // ── Dispatch to the appropriate command handler ───────────────────
             return match ($command) {
+                // Phase 1
                 'netstat'    => $this->handleNetstat($match, $role, $me, $data['input']),
                 'ping'       => $this->handlePing($match, $role, $me, $data['input'], $args),
                 'traceroute' => $this->handleTraceroute($match, $role, $me, $data['input'], $args),
@@ -151,10 +170,17 @@ class PacketHijackController extends Controller
                 'sniff'      => $this->handleSniff($match, $role, $me, $data['input']),
                 'flush'      => $this->handleFlush($match, $role, $me, $data['input'], $args),
                 'inject'     => $this->handleInject($match, $role, $me, $data['input'], $args),
+                // Phase 2
+                'scan'       => $this->handleScan($match, $role, $me, $data['input'], $args),
                 'probe'      => $this->handleProbe($match, $role, $me, $data['input'], $args),
+                'validate'   => $this->handleValidate($match, $role, $me, $data['input'], $args),
                 'exploit'    => $this->handleExploit($match, $role, $me, $data['input'], $args),
                 'decode'     => $this->handleDecode($match, $role, $me, $data['input'], $args),
                 'breach'     => $this->handleBreach($match, $role, $me, $data['input'], $args),
+                // Phase 3
+                'ls'         => $this->handleLs($match, $role, $me, $data['input']),
+                'cd'         => $this->handleCd($match, $role, $me, $data['input'], $args),
+                'extract'    => $this->handleExtract($match, $role, $me, $data['input']),
                 default      => response()->json(['message' => 'Unhandled command.'], 500),
             };
         });
@@ -466,199 +492,337 @@ class PacketHijackController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function handleProbe(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    private function handleScan(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
-        // args: ['port', '<number>']
-        $portNumber   = isset($args[1]) ? (int) $args[1] : 0;
-        $ports        = $match->portsFor($role);
-        $corruptPorts = $match->corruptPortsFor($role);
-        $baitPorts    = $match->baitPortsFor($role);
+        $inputIp     = $args[0] ?? '';
+        $targetIp    = $match->targetIpFor($role);
+        $fingerprint = $match->fingerprintFor($role);
 
-        $result = $this->phService->commandProbePort($ports, $portNumber, $corruptPorts, $baitPorts);
-
-        if ($result['found']) {
-            $e      = $result['entry'];
-            $flavor = $result['flavor'];
-            $label  = $e['shattered']  ? 'SHATTERED'
-                : ($e['unlocked']      ? 'UNLOCKED'
-                : ($e['bias'] <= 25    ? 'CRITICAL LOW' : 'HIGH'));
-            $lines = [
-                "[PROBE]: PORT {$e['port']} [{$e['service']}]",
-                "[{$flavor[0]}]",
-                "[{$flavor[1]}]",
-                "[DECRYPTION BIAS]: {$label} [{$e['bias']}%]",
-            ];
-        } else {
-            $lines = ["[ERROR]: {$result['error']}"];
+        if ($inputIp !== $targetIp) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$inputIp} DOES NOT MATCH COMPROMISED TARGET — USE THE IP FROM PHASE 1"]);
+            return response()->json(['ok' => true]);
+        }
+        if (empty($fingerprint)) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ['[ERROR]: SYSTEM FINGERPRINT NOT INITIALISED']);
+            return response()->json(['ok' => true]);
         }
 
-        PacketHijackCommandResult::dispatch(
-            matchId:     $match->id,
-            playerId:    $me->id,
-            command:     $raw,
-            outputLines: $lines,
+        $portList = $this->phService->commandScan($fingerprint);
+        $portNums = implode(', ', array_column($portList, 'port'));
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: [
+                "[SCANNING {$targetIp}...]",
+                '[RESULT]: ' . count($portList) . " OPEN PORTS DETECTED — {$portNums}",
+                '[SYSTEM FINGERPRINT INITIALISED — PROBE PORTS TO IDENTIFY VULNERABILITIES]',
+            ],
+            portScanResult: $portList,
         );
+        return response()->json(['ok' => true]);
+    }
 
+    private function handleProbe(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $portNumber  = (int) ($args[0] ?? 0);
+        $fingerprint = $match->fingerprintFor($role);
+
+        if (empty($fingerprint)) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ['[ERROR]: RUN scan FIRST TO DISCOVER OPEN PORTS']);
+            return response()->json(['ok' => true]);
+        }
+
+        $result = $this->phService->commandProbe($fingerprint, $portNumber);
+
+        if (!$result['found']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
+            return response()->json(['ok' => true]);
+        }
+
+        $match->saveFingerprintFor($role, $fingerprint);
+        $match->save();
+
+        $lines = [
+            "[PROBE]: PORT {$result['port']} [{$result['service']}]",
+            "[VERSION]: {$result['version']}",
+            "[EXPOSURE]: {$result['exposure']}",
+            '---',
+        ];
+        foreach ($result['banner'] as $line) {
+            $lines[] = "  {$line}";
+        }
+        $lines[] = '---';
+        $lines[] = '[PROBE COMPLETE — VALIDATE ANY SUSPICIOUS STRINGS YOU FIND]';
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: $lines,
+            fingerprintUpdate: $match->fingerprintPublicView($role),
+        );
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleValidate(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $input       = $args[0] ?? '';
+        $fingerprint = $match->fingerprintFor($role);
+
+        if (empty($fingerprint)) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ['[ERROR]: RUN scan THEN probe FIRST']);
+            return response()->json(['ok' => true]);
+        }
+
+        $result = $this->phService->commandValidate($fingerprint, $input);
+
+        if (!$result['valid']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[VALIDATE]: {$input} — NO MATCHING SYSTEM FRAGMENT"]);
+            return response()->json(['ok' => true]);
+        }
+
+        $typeLabel = strtoupper($result['type']);
+        $tierLabel = $result['tier'] === 2 ? 'MID-SEGMENT' : 'SUFFIX';
+        $match->saveFingerprintFor($role, $fingerprint);
+        $match->save();
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: [
+                "[VALIDATE]: {$input}",
+                "[VALID]: {$typeLabel} FRAGMENT CONFIRMED — {$tierLabel}",
+                "[FINGERPRINT UPDATED]",
+            ],
+            fingerprintUpdate: $match->fingerprintPublicView($role),
+        );
         return response()->json(['ok' => true]);
     }
 
     private function handleExploit(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
-        // args: ['port', '<number>']
-        $portNumber  = isset($args[1]) ? (int) $args[1] : 0;
-        $ports       = $match->portsFor($role);
+        $portNumber  = (int) ($args[0] ?? 0);
+        $fingerprint = $match->fingerprintFor($role);
         $rig         = $this->rigService->getRigForPlayer($me);
+        $baitPorts   = $match->baitPortsFor($role);
 
-        if ($rig === null) {
-            return response()->json(['message' => 'Rig not found.'], 422);
+        if ($rig === null) return response()->json(['message' => 'Rig not found.'], 422);
+        if (empty($fingerprint)) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ['[ERROR]: RUN scan AND probe FIRST']);
+            return response()->json(['ok' => true]);
         }
 
         $overclocked = $match->overclockActiveFor($role);
-        $baitPorts   = $match->baitPortsFor($role);
+        $result      = $this->phService->commandExploitFingerprint($fingerprint, $portNumber, $rig, $me, $overclocked, $baitPorts);
 
-        $result = $this->phService->commandExploitPort($ports, $portNumber, $rig, $me, $overclocked, $baitPorts);
-
-        if ($result['success']) {
-            $portsKey        = "{$role}_ports";
-            $match->$portsKey = $result['ports'];
-
-            // Consume overclock after a successful exploit
-            if ($overclocked) {
-                $match->{"{$role}_overclock_active"} = false;
-            }
-
+        if (isset($result['baited'])) {
+            $lockKey         = "{$role}_locked_until";
+            $newLock         = Carbon::now()->addSeconds($result['lock_seconds']);
+            $match->$lockKey = $newLock;
+            $baitKey         = "{$role}_bait_ports";
+            $match->$baitKey = array_values(array_filter($match->$baitKey ?? [], fn($b) => (int)$b['port'] !== $portNumber));
             $match->save();
-
-            $lines = [
-                "[EXECUTING OVERRIDE ON PORT {$portNumber}...]",
-                "[SUCCESS]: PORT {$portNumber} SHATTERED. RE-ROUTING TARGET SYSTEM MEMORY...",
-                '[SYSTEM LOG]: DEFENSIVE OVERLAY SHIFTED!',
-            ];
-
-            foreach ($result['cascade_log'] as $cascade) {
-                $lines[] = "[ALERT]: PORT {$cascade['port']} DECRYPTION BIAS CRIPPLED FROM [{$cascade['old_bias']}%] DOWN TO [{$cascade['new_bias']}%]!";
-            }
-
-            if ($result['exfil_unlocked']) {
-                $lines[] = '[ALERT]: EXFILTRATION PORT 8080 UNLOCKED. SECURITY ENVELOPE NULLIFIED.';
-            }
-
-            PacketHijackCommandResult::dispatch(
-                matchId:      $match->id,
-                playerId:     $me->id,
-                command:      $raw,
-                outputLines:  $lines,
-                updatedPorts: $result['ports'],
-            );
-
-        } elseif (isset($result['baited'])) {
-            // ── Bait trap triggered ───────────────────────────────────────────
-            $lockSeconds = $result['lock_seconds'];
-            $lockKey     = "{$role}_locked_until";
-            $newLock     = Carbon::now()->addSeconds($lockSeconds);
-            $existing    = $match->$lockKey;
-
-            if ($existing === null || $existing->isPast() || $newLock->gt($existing)) {
-                $match->$lockKey = $newLock;
-            }
-
-            // Consume the bait entry
-            $baitKey        = "{$role}_bait_ports";
-            $match->$baitKey = array_values(array_filter(
-                $match->$baitKey ?? [],
-                fn($b) => (int) $b['port'] !== $portNumber
-            ));
-
-            $match->save();
-
-            PacketHijackCommandResult::dispatch(
-                matchId:     $match->id,
-                playerId:    $me->id,
-                command:     $raw,
-                outputLines: [
-                    "[ALERT]: HONEYPOT TRIGGERED ON PORT {$portNumber} — INPUT LOCKED FOR {$lockSeconds}s",
-                ],
-                lockUntil: $match->$lockKey->toIso8601String(),
-            );
-
-        } else {
-            PacketHijackCommandResult::dispatch(
-                matchId:     $match->id,
-                playerId:    $me->id,
-                command:     $raw,
-                outputLines: ["[ERROR]: {$result['error']}"],
-            );
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ALERT]: HONEYPOT TRIGGERED ON PORT {$portNumber} — INPUT LOCKED FOR {$result['lock_seconds']}s"],
+                lockUntil: $newLock->toIso8601String());
+            return response()->json(['ok' => true]);
         }
 
+        if (!$result['success']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
+            return response()->json(['ok' => true]);
+        }
+
+        if ($overclocked) $match->{"{$role}_overclock_active"} = false;
+        $match->saveFingerprintFor($role, $result['fingerprint']);
+        $match->save();
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: [
+                "[EXPLOIT]: TARGETING PORT {$portNumber}...",
+                "[SUCCESS]: PORT {$portNumber} SHATTERED — DEFENSIVE LAYER COLLAPSED",
+            ],
+            fingerprintUpdate: $match->fingerprintPublicView($role),
+        );
         return response()->json(['ok' => true]);
     }
 
     private function handleDecode(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
-        // args: ['port', '<number>']
-        $portNumber = isset($args[1]) ? (int) $args[1] : 0;
-        $ports      = $match->portsFor($role);
-        $rig        = $this->rigService->getRigForPlayer($me);
+        $portNumber  = (int) ($args[0] ?? 0);
+        $fingerprint = $match->fingerprintFor($role);
 
-        if ($rig === null) {
-            return response()->json(['message' => 'Rig not found.'], 422);
+        if (empty($fingerprint)) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ['[ERROR]: RUN scan AND probe FIRST']);
+            return response()->json(['ok' => true]);
         }
 
-        $result = $this->phService->commandDecodePort($ports, $portNumber, $rig, $me);
+        $result = $this->phService->commandDecodeFingerprint($fingerprint, $portNumber);
 
-        if ($result['success']) {
-            $portsKey        = "{$role}_ports";
-            $match->$portsKey = $result['ports'];
-            $match->save();
-
-            $lines = [
-                "[DECODE]: TARGETING PORT {$result['port']} [{$result['service']}]...",
-                "[PROGRESS]: ENCRYPTION LAYER CRACKED — BIAS REDUCED BY {$result['reduction']}%",
-                "[CURRENT BIAS]: {$result['new_bias']}%" . ($result['new_bias'] <= 25 ? ' — EXPLOITABLE' : ' — CONTINUE DECODING OR FIND ANOTHER ENTRY POINT'),
-            ];
-
-            PacketHijackCommandResult::dispatch(
-                matchId:      $match->id,
-                playerId:     $me->id,
-                command:      $raw,
-                outputLines:  $lines,
-                updatedPorts: $result['ports'],
-            );
-        } else {
-            PacketHijackCommandResult::dispatch(
-                matchId:     $match->id,
-                playerId:    $me->id,
-                command:     $raw,
-                outputLines: ["[ERROR]: {$result['error']}"],
-            );
+        if (!$result['success']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
+            return response()->json(['ok' => true]);
         }
 
+        $match->saveFingerprintFor($role, $result['fingerprint']);
+        $match->save();
+
+        $exploitable = ($result['exposure'] === 'MODERATE' && $result['decode_count'] >= 1)
+                    || ($result['exposure'] === 'LOW'      && $result['decode_count'] >= 2);
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: [
+                "[DECODE]: TARGETING PORT {$result['port']} [{$result['exposure']}]...",
+                "[PROGRESS]: ENCRYPTION LAYER WEAKENED — DECODE COUNT: {$result['decode_count']}",
+                $exploitable ? '[STATUS]: PORT NOW EXPLOITABLE' : '[STATUS]: CONTINUE DECODING OR FIND A WEAKER PORT',
+            ],
+            fingerprintUpdate: $match->fingerprintPublicView($role),
+        );
         return response()->json(['ok' => true]);
     }
 
     private function handleBreach(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
-        $inputIp  = $args[0] ?? '';
-        $ports    = $match->portsFor($role);
-        $targetIp = $match->targetIpFor($role);
+        $inputIp     = $args[0] ?? '';
+        $inputPort   = (int) ($args[1] ?? 0);
+        $targetIp    = $match->targetIpFor($role);
+        $fingerprint = $match->fingerprintFor($role);
 
-        $result = $this->phService->commandBreach($ports, $targetIp, $inputIp);
+        $result = $this->phService->commandBreachFingerprint($fingerprint, $targetIp, $inputIp, $inputPort);
 
         if (!$result['success']) {
-            PacketHijackCommandResult::dispatch(
-                matchId:     $match->id,
-                playerId:    $me->id,
-                command:     $raw,
-                outputLines: ["[ERROR]: {$result['error']}"],
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
+            return response()->json(['ok' => true]);
+        }
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: [
+                "[BREACH]: INJECTING PAYLOAD INTO PORT {$inputPort}...",
+                '[=============================>] 67%',
+                '[===========================================>] 100%',
+                "[CONNECTION ESTABLISHED — {$targetIp}:{$inputPort}]",
+                '[AUTHENTICATION REQUIRED — ENTER SYSTEM CREDENTIALS]',
+            ],
+            awaitingAuth: true,
+        );
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleAuth(PacketHijackMatch $match, string $role, Player $me, string $username, string $password): JsonResponse
+    {
+        $fingerprint = $match->fingerprintFor($role);
+        $result      = $this->phService->commandAuthenticate($fingerprint, $username, $password);
+
+        if ($result['success']) {
+            $phaseKey        = "{$role}_phase";
+            $match->$phaseKey = 3;
+            $match->save();
+
+            $filesystem = $match->filesystemFor($role);
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: '[AUTH]',
+                outputLines: [
+                    '[AUTHENTICATION SUCCESSFUL]',
+                    '[ACCESS GRANTED — SYSTEM BREACHED]',
+                    '[NAVIGATING FILESYSTEM — LOCATE AND EXTRACT TARGET WALLET]',
+                ],
+                phaseAdvanced:    true,
+                filesystemUpdate: ['current_path' => '/', 'entries' => $this->getDirectoryEntries($filesystem['tree'], '/')],
             );
+        } else {
+            $match->saveFingerprintFor($role, $result['fingerprint']);
+            $match->save();
+            $corruptedList = implode(', ', $result['corrupted']);
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: '[AUTH]',
+                outputLines: [
+                    '[AUTHENTICATION FAILED — CREDENTIALS REJECTED]',
+                    '[EMERGENCY DISCONNECT — INTRUSION DETECTED]',
+                    "[CASUALTY REPORT]: {$corruptedList} CORRUPTED",
+                    '[REBUILD REQUIRED — RE-PROBE AFFECTED VECTORS]',
+                ],
+                fingerprintUpdate: $match->fingerprintPublicView($role),
+            );
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    // ── Phase 3 ───────────────────────────────────────────────────────────────
+
+    private function handleLs(PacketHijackMatch $match, string $role, Player $me, string $raw): JsonResponse
+    {
+        $filesystem = $match->filesystemFor($role);
+        $result     = $this->phService->commandLs($filesystem);
+
+        if (!$result['success']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
             return response()->json(['ok' => true]);
         }
 
-        if ($match->status === 'complete') {
+        $lines = ["[{$result['path']}]"];
+        foreach ($result['entries'] as $entry) {
+            $suffix = $entry['is_wallet'] ? '  ← TARGET' : ($entry['is_dir'] ? '/' : '');
+            $lines[] = "  {$entry['name']}{$suffix}";
+        }
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw, outputLines: $lines,
+            filesystemUpdate: ['current_path' => $result['path'], 'entries' => $result['entries']]);
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleCd(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $dir        = $args[0] ?? '';
+        $filesystem = $match->filesystemFor($role);
+        $result     = $this->phService->commandCd($filesystem, $dir);
+
+        if (!$result['success']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
             return response()->json(['ok' => true]);
         }
 
+        $match->saveFilesystemFor($role, $filesystem);
+        $match->save();
+
+        PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+            outputLines: ["[CD]: NAVIGATED TO {$result['path']}"],
+            filesystemUpdate: ['current_path' => $result['path']]);
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleExtract(PacketHijackMatch $match, string $role, Player $me, string $raw): JsonResponse
+    {
+        $filesystem = $match->filesystemFor($role);
+        $result     = $this->phService->commandExtract($filesystem);
+
+        if (!$result['success']) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ["[ERROR]: {$result['error']}"]);
+            return response()->json(['ok' => true]);
+        }
+
+        if ($match->status === 'complete') return response()->json(['ok' => true]);
         return $this->resolveMatch($match, $me, $role, $raw);
+    }
+
+    private function getDirectoryEntries(array $tree, string $path): array
+    {
+        $parts = array_filter(explode('/', $path));
+        $node  = $tree;
+        foreach ($parts as $part) {
+            if (!isset($node[$part])) return [];
+            $node = $node[$part];
+        }
+        if (!is_array($node)) return [];
+        $entries = [];
+        foreach ($node as $name => $contents) {
+            $entries[] = ['name' => $name, 'is_dir' => is_array($contents), 'is_wallet' => $name === 'wallet' && $contents === null];
+        }
+        return $entries;
     }
 
     // =========================================================================
@@ -873,9 +1037,9 @@ class PacketHijackController extends Controller
             playerId:    $winner->id,
             command:     $raw,
             outputLines: [
-                '[BREACH]: TRANSMITTING PAYLOAD...',
+                '[EXTRACT]: SEIZING CRED BUFFER...',
                 '[==================================================>] 100%',
-                '[BREACH COMPLETE]: NODE FULLY PURGED. CRED BUFFER ACQUIRED.',
+                '[WALLET EXTRACTED]: CRED BUFFER TRANSFERRED.',
                 '[CONNECTION TERMINATED]: YOU WIN THE MATCH.',
             ],
         );

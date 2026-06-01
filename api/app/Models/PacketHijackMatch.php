@@ -19,8 +19,12 @@ class PacketHijackMatch extends Model
         'defender_target_ip',
         'challenger_ip_pool',
         'challenger_suspects',
+        'challenger_fingerprint',
+        'challenger_filesystem',
         'defender_ip_pool',
         'defender_suspects',
+        'defender_fingerprint',
+        'defender_filesystem',
         'challenger_ports',
         'defender_ports',
         'challenger_phase',
@@ -44,8 +48,12 @@ class PacketHijackMatch extends Model
     protected $casts = [
         'challenger_ip_pool'          => 'array',
         'challenger_suspects'         => 'array',
+        'challenger_fingerprint'      => 'array',
+        'challenger_filesystem'       => 'array',
         'defender_ip_pool'            => 'array',
         'defender_suspects'           => 'array',
+        'defender_fingerprint'        => 'array',
+        'defender_filesystem'         => 'array',
         'challenger_ports'            => 'array',
         'defender_ports'              => 'array',
         'challenger_phase'            => 'integer',
@@ -163,6 +171,61 @@ class PacketHijackMatch extends Model
     public function phaseOf(string $role): int
     {
         return $role === 'challenger' ? $this->challenger_phase : $this->defender_phase;
+    }
+
+    /**
+     * Get the full fingerprint for a given role (includes banner fragments — server only).
+     */
+    public function fingerprintFor(string $role): array
+    {
+        $key = "{$role}_fingerprint";
+        return $this->$key ?? [];
+    }
+
+    /**
+     * Get a safe public view of the fingerprint — strips server-only fragment data.
+     * Sends port entries with banner lines but never the raw fragment value mapping.
+     */
+    public function fingerprintPublicView(string $role): array
+    {
+        $fp = $this->fingerprintFor($role);
+        if (empty($fp)) return [];
+
+        $safe        = $fp;
+        $safe['ports'] = array_map(function ($p) {
+            $entry = $p;
+            unset($entry['fragment']); // never send to client
+            return $entry;
+        }, $fp['ports'] ?? []);
+
+        return $safe;
+    }
+
+    /**
+     * Get the filesystem for a given role.
+     */
+    public function filesystemFor(string $role): array
+    {
+        $key = "{$role}_filesystem";
+        return $this->$key ?? [];
+    }
+
+    /**
+     * Save fingerprint back to the match after mutation.
+     */
+    public function saveFingerprintFor(string $role, array $fingerprint): void
+    {
+        $key        = "{$role}_fingerprint";
+        $this->$key = $fingerprint;
+    }
+
+    /**
+     * Save filesystem back to the match after mutation.
+     */
+    public function saveFilesystemFor(string $role, array $filesystem): void
+    {
+        $key        = "{$role}_filesystem";
+        $this->$key = $filesystem;
     }
 
     // ── Phase 7 — Command state helpers ──────────────────────────────────────
