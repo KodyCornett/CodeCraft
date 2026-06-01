@@ -37,54 +37,95 @@
                 <span class="ph-topbar-phase" :class="phase === 3 ? 'phase--three' : phase === 2 ? 'phase--two' : 'phase--one'">
                     PHASE {{ phase }}: {{ phase === 1 ? 'RECON HUNT' : phase === 2 ? 'SYSTEM FINGERPRINT' : 'FILESYSTEM EXTRACTION' }}
                 </span>
-                <button class="ph-ref-toggle" :class="{ 'ref-toggle--active': showPanel }" @click="showPanel = !showPanel">[?]</button>
             </div>
             <div class="ph-rule" />
 
-            <!-- Phase 2 port matrix -->
-            <div v-if="phase === 2 && ports.length" class="ph-port-matrix">
-                <div class="ph-matrix-header">[ PORT STATUS MATRIX // TARGET: {{ targetIp }} ]</div>
-                <div class="ph-matrix-row ph-matrix-header-row">
-                    <span class="ph-matrix-col ph-matrix-col--port">PORT</span>
-                    <span class="ph-matrix-col ph-matrix-col--svc">SERVICE</span>
-                    <span class="ph-matrix-col ph-matrix-col--bias">BIAS</span>
-                    <span class="ph-matrix-col ph-matrix-col--status">STATUS</span>
+            <!-- ── Phase data zone (top, full width) ───────────────────────── -->
+
+            <!-- Phase 1: 3×5 suspect grid -->
+            <div v-if="phase === 1" class="ph-data-zone ph-data-zone--p1">
+                <div v-if="!boardReady" class="ph-data-empty">
+                    RUN <span class="ph-boot-cmd">netstat --active</span> TO BEGIN TRACE
                 </div>
-                <div
-                    v-for="entry in ports"
-                    :key="entry.port"
-                    class="ph-matrix-row"
-                    :class="portRowClass(entry)"
-                >
-                    <span class="ph-matrix-col ph-matrix-col--port">{{ entry.port }}</span>
-                    <span class="ph-matrix-col ph-matrix-col--svc">{{ entry.service }}</span>
-                    <span class="ph-matrix-col ph-matrix-col--bias">{{ entry.shattered ? '---' : entry.bias + '%' }}</span>
-                    <span class="ph-matrix-col ph-matrix-col--status">{{ portStatus(entry) }}</span>
-                </div>
-                <div class="ph-rule ph-rule--light" />
+                <template v-else>
+                    <div class="ph-suspect-meta">
+                        ACTIVE: {{ activeSuspectCount }} / {{ suspects.length }}
+                        <span v-if="octetClue" class="ph-cf-clue"> // OCTET LOCKED: {{ octetClue }}</span>
+                    </div>
+                    <div class="ph-suspect-grid">
+                        <div
+                            v-for="s in suspects"
+                            :key="s.ip"
+                            class="ph-suspect-card"
+                            :class="{ 'suspect-card--flushed': s.flushed }"
+                        >
+                            <span class="psc-ip">{{ s.ip }}</span>
+                            <span class="psc-sep">//</span>
+                            <span class="psc-label">PNG</span>
+                            <span class="psc-val" :class="pingClass(s)">{{ pingDisplay(s) }}</span>
+                            <span class="psc-sep">|</span>
+                            <span class="psc-label">HPS</span>
+                            <span class="psc-val">{{ s.hops !== undefined ? s.hops : '???' }}</span>
+                            <span class="psc-sep">|</span>
+                            <span class="psc-label">ARP</span>
+                            <span class="psc-val" :class="arpClass(s)">{{ arpDisplay(s) }}</span>
+                        </div>
+                    </div>
+                </template>
             </div>
 
-            <!-- Rig command strip -->
-            <div v-if="hackCommands && hackCommands.length" class="ph-rig-strip">
-                <span class="ph-rig-label">RIG:</span>
-                <button
-                    v-for="cmd in hackCommands"
-                    :key="cmd.name"
-                    class="ph-rig-btn"
-                    :class="{
-                        'rig-btn--used':   usedRigCommands.includes(commandSlug(cmd.name)),
-                        'rig-btn--locked': isLocked || busy,
-                        'rig-btn--level2': cmd.level === 2,
-                    }"
-                    :disabled="usedRigCommands.includes(commandSlug(cmd.name)) || isLocked || busy || isComplete"
-                    @click="$emit('use-rig-command', commandSlug(cmd.name))"
-                >
-                    {{ cmd.name.toUpperCase() }}
-                    <span class="ph-rig-lvl">L{{ cmd.level }}</span>
-                </button>
+            <!-- Phase 2: fingerprint strip -->
+            <div v-else-if="phase === 2" class="ph-data-zone ph-data-zone--p2">
+                <div v-if="!fingerprint || !fingerprint.ports" class="ph-data-empty">
+                    RUN <span class="ph-boot-cmd">scan {{ targetIp || '&lt;ip&gt;' }}</span> TO INITIALISE FINGERPRINT
+                </div>
+                <template v-else>
+                    <div class="ph-fp-strip">
+                        <div class="ph-fp-strip-cred">
+                            <span class="ph-fp-strip-label">OS</span>
+                            <span class="ph-fp-strip-val" :class="fingerprint.os?.display === fingerprint.os?.full ? 'fp--complete' : ''">
+                                {{ fingerprint.os?.display || (fingerprint.os?.tier1 + '-????-???') }}
+                            </span>
+                        </div>
+                        <div class="ph-fp-strip-divider" />
+                        <div class="ph-fp-strip-cred">
+                            <span class="ph-fp-strip-label">HOST</span>
+                            <span class="ph-fp-strip-val" :class="fingerprint.hostname?.display === fingerprint.hostname?.full ? 'fp--complete' : ''">
+                                {{ fingerprint.hostname?.display || (fingerprint.hostname?.tier1 + '-????-????') }}
+                            </span>
+                        </div>
+                        <div class="ph-fp-strip-divider" />
+                        <div class="ph-fp-ports">
+                            <div v-for="p in fingerprint.ports" :key="p.port"
+                                class="ph-fp-port-card"
+                                :class="{ 'fp-port--shattered': p.shattered }"
+                            >
+                                <span class="fpp-port">:{{ p.port }}</span>
+                                <span class="fpp-svc">{{ p.service }}</span>
+                                <span class="fpp-exp" :class="exposureClass(p.exposure)">{{ p.probed ? p.exposure : '???' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
             </div>
 
-            <!-- Body row: terminal col + side panel -->
+            <!-- Phase 3: filesystem trail -->
+            <div v-else-if="phase === 3" class="ph-data-zone ph-data-zone--p3">
+                <span class="ph-fs-label">PATH</span>
+                <div class="ph-fs-trail">
+                    <span
+                        v-for="p in exploredPaths"
+                        :key="p"
+                        class="ph-fs-crumb"
+                        :class="{ 'fs-crumb--current': p === currentPath }"
+                    >{{ p }}</span>
+                </div>
+                <span class="ph-fs-hint">// WALLET HIDDEN IN FILESYSTEM — USE ls / cd / extract</span>
+            </div>
+
+            <div class="ph-rule ph-rule--light" />
+
+            <!-- ── Lower body: terminal + right panel ──────────────────────── -->
             <div class="ph-body">
 
                 <!-- Left: history + input -->
@@ -157,208 +198,116 @@
                     </div>
                 </div>
 
-                <!-- Drag handle -->
-                <div v-if="showPanel" class="ph-drag-handle" @mousedown="startDrag" title="Drag to resize"></div>
+                <!-- Right: CMD ref (always visible, phase-aware) + rig cmds -->
+                <div class="ph-ref-panel">
 
-                <!-- Right: case file + command ref -->
-                <Transition name="ref-slide">
-                    <div v-if="showPanel" class="ph-ref-panel" :style="{ width: panelWidth + 'px' }">
-
-                        <!-- ── Phase 1: case file ── -->
-                        <template v-if="phase === 1">
-                            <!-- Case file — full height, no scroll, all rows visible -->
-                            <div class="ph-cf-section">
-                                <div class="ph-ref-title">CASE FILE</div>
-                                <div class="ph-ref-phase">// NODE SUSPECTS</div>
-
-                                <div v-if="!boardReady" class="ph-ref-empty">
-                                    RUN netstat --active TO POPULATE
-                                </div>
-
-                                <template v-else>
-                                    <div class="ph-cf-stats">
-                                        ACTIVE: {{ activeSuspectCount }} / {{ suspects.length }}
-                                        <span v-if="octetClue" class="ph-cf-clue"> // OCTET: {{ octetClue }}</span>
-                                    </div>
-                                    <div class="ph-cf-header">
-                                        <span class="ph-cf-col ph-cf-col--ip">IP</span>
-                                        <span class="ph-cf-col ph-cf-col--ping">PING</span>
-                                        <span class="ph-cf-col ph-cf-col--hops">HPS</span>
-                                        <span class="ph-cf-col ph-cf-col--arp">ARP</span>
-                                    </div>
-                                    <div
-                                        v-for="s in suspects"
-                                        :key="s.ip"
-                                        class="ph-cf-row"
-                                        :class="{ 'cf-row--flushed': s.flushed }"
-                                    >
-                                        <span class="ph-cf-col ph-cf-col--ip">{{ s.ip }}</span>
-                                        <span class="ph-cf-col ph-cf-col--ping" :class="pingClass(s)">
-                                            {{ pingDisplay(s) }}
-                                        </span>
-                                        <span class="ph-cf-col ph-cf-col--hops">
-                                            {{ s.hops !== undefined ? s.hops : '???' }}
-                                        </span>
-                                        <span class="ph-cf-col ph-cf-col--arp" :class="arpClass(s)">
-                                            {{ arpDisplay(s) }}
-                                        </span>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <!-- Divider -->
-                            <div class="ph-panel-rule" />
-
-                            <!-- Command ref — scrollable, sits below case file -->
-                            <div class="ph-cmd-ref-section">
-                                <div class="ph-ref-title">CMD REF</div>
-                                <div class="ph-ref-phase">// PHASE 1 — RECON</div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">ping &lt;ip&gt;</div>
-                                    <div class="ph-ref-desc">Probe a suspect for response time. Fast = likely active player.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">traceroute &lt;ip&gt;</div>
-                                    <div class="ph-ref-desc">Map route to suspect. Low hop count = same local network.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">arp --scan</div>
-                                    <div class="ph-ref-desc">Check when all suspects were last active. Your target just arrived.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">whois &lt;ip&gt;</div>
-                                    <div class="ph-ref-desc">Query registry data. May reveal chassis type if target has low OS.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">sniff --traffic</div>
-                                    <div class="ph-ref-desc">Intercept a live packet fragment. Reveals one octet of target IP.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">flush &lt;ip&gt;</div>
-                                    <div class="ph-ref-desc">Remove a confirmed non-target from your case file.</div>
-                                </div>
-                                <div class="ph-ref-entry ph-ref-entry--commit">
-                                    <div class="ph-ref-cmd">inject &lt;ip&gt;</div>
-                                    <div class="ph-ref-desc">Commit your guess and deploy payload. Wrong = input locked.</div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <!-- ── Phase 2: fingerprint panel + cmd ref ── -->
-                        <template v-else-if="phase === 2">
-                            <!-- Fingerprint display -->
-                            <div class="ph-cf-section">
-                                <div class="ph-ref-title">SYSTEM FINGERPRINT</div>
-                                <div class="ph-ref-phase">// {{ targetIp || '?.?.?.?' }}</div>
-
-                                <div v-if="!fingerprint || !fingerprint.ports" class="ph-ref-empty">
-                                    RUN scan &lt;ip&gt; TO INITIALISE
-                                </div>
-
-                                <template v-else>
-                                    <!-- OS + Hostname credentials -->
-                                    <div class="ph-fp-cred">
-                                        <span class="ph-fp-label">OS</span>
-                                        <span class="ph-fp-value" :class="fingerprint.os?.display === fingerprint.os?.full ? 'fp--complete' : ''">
-                                            {{ fingerprint.os?.display || (fingerprint.os?.tier1 + '-????-???') }}
-                                        </span>
-                                    </div>
-                                    <div class="ph-fp-cred">
-                                        <span class="ph-fp-label">HOST</span>
-                                        <span class="ph-fp-value" :class="fingerprint.hostname?.display === fingerprint.hostname?.full ? 'fp--complete' : ''">
-                                            {{ fingerprint.hostname?.display || (fingerprint.hostname?.tier1 + '-????-????') }}
-                                        </span>
-                                    </div>
-
-                                    <div class="ph-panel-rule" style="margin: 6px 0" />
-
-                                    <!-- Port topology -->
-                                    <div class="ph-cf-header">
-                                        <span class="ph-cf-col" style="width:44px">PORT</span>
-                                        <span class="ph-cf-col" style="width:56px">SERVICE</span>
-                                        <span class="ph-cf-col" style="flex:1">EXPOSURE</span>
-                                    </div>
-                                    <div v-for="p in fingerprint.ports" :key="p.port"
-                                        class="ph-cf-row"
-                                        :class="{ 'cf-row--flushed': p.shattered }"
-                                    >
-                                        <span class="ph-cf-col" style="width:44px;color:rgba(0,255,255,0.7)">{{ p.port }}</span>
-                                        <span class="ph-cf-col" style="width:56px;color:rgba(0,255,255,0.5)">{{ p.service }}</span>
-                                        <span class="ph-cf-col" style="flex:1" :class="exposureClass(p.exposure)">{{ p.probed ? p.exposure : '???' }}</span>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <div class="ph-panel-rule" />
-
-                            <!-- Phase 2 cmd ref -->
-                            <div class="ph-cmd-ref-section">
-                                <div class="ph-ref-title">CMD REF</div>
-                                <div class="ph-ref-phase">// PHASE 2 — FINGERPRINT</div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">scan &lt;ip&gt;</div>
-                                    <div class="ph-ref-desc">Discover open ports on the target system.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">probe &lt;port&gt;</div>
-                                    <div class="ph-ref-desc">Fingerprint a port. Read the banner — fragments are hidden in the output.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">validate &lt;string&gt;</div>
-                                    <div class="ph-ref-desc">Confirm if a string from a banner is a valid credential fragment.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">decode &lt;port&gt;</div>
-                                    <div class="ph-ref-desc">Weaken MODERATE or LOW exposure ports before exploiting.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">exploit &lt;port&gt;</div>
-                                    <div class="ph-ref-desc">Shatter a port. CRITICAL/HIGH can be exploited directly.</div>
-                                </div>
-                                <div class="ph-ref-entry ph-ref-entry--commit">
-                                    <div class="ph-ref-cmd">breach &lt;ip&gt; &lt;port&gt;</div>
-                                    <div class="ph-ref-desc">Once fingerprint complete + port shattered — trigger breach.</div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <!-- ── Phase 3: filesystem map + cmd ref ── -->
-                        <template v-else-if="phase === 3">
-                            <div class="ph-cf-section">
-                                <div class="ph-ref-title">FILESYSTEM MAP</div>
-                                <div class="ph-ref-phase">// {{ currentPath }}</div>
-
-                                <div class="ph-fs-path">
-                                    <div v-for="p in exploredPaths" :key="p" class="ph-fs-path-entry"
-                                        :class="{ 'fs-path--current': p === currentPath }">
-                                        {{ p }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="ph-panel-rule" />
-
-                            <div class="ph-cmd-ref-section">
-                                <div class="ph-ref-title">CMD REF</div>
-                                <div class="ph-ref-phase">// PHASE 3 — EXTRACTION</div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">ls</div>
-                                    <div class="ph-ref-desc">List contents of current directory.</div>
-                                </div>
-                                <div class="ph-ref-entry">
-                                    <div class="ph-ref-cmd">cd &lt;dir&gt;</div>
-                                    <div class="ph-ref-desc">Move into a directory. Use cd .. to go back up.</div>
-                                </div>
-                                <div class="ph-ref-entry ph-ref-entry--commit">
-                                    <div class="ph-ref-cmd">extract</div>
-                                    <div class="ph-ref-desc">Steal the wallet when you find it. Wins the match.</div>
-                                </div>
-                                <div class="ph-ref-note">WALLET IS HIDDEN SOMEWHERE IN THE FILESYSTEM</div>
-                            </div>
-                        </template>
-
+                    <!-- CMD REF — Phase 1 -->
+                    <div v-if="phase === 1" class="ph-cmd-ref-section">
+                        <div class="ph-ref-title">CMD REF</div>
+                        <div class="ph-ref-phase">// PHASE 1 — RECON</div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">ping &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">Probe a suspect. Fast response = active player.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">traceroute &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">Low hop count = same local network.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">arp --scan</div>
+                            <div class="ph-ref-desc">Check last-active times. Target just arrived.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">whois &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">May reveal chassis if target has low OS.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">sniff --traffic</div>
+                            <div class="ph-ref-desc">Intercepts one octet of target IP.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">flush &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">Remove a confirmed non-target.</div>
+                        </div>
+                        <div class="ph-ref-entry ph-ref-entry--commit">
+                            <div class="ph-ref-cmd">inject &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">Commit your guess. Wrong = input locked.</div>
+                        </div>
                     </div>
-                </Transition>
+
+                    <!-- CMD REF — Phase 2 -->
+                    <div v-else-if="phase === 2" class="ph-cmd-ref-section">
+                        <div class="ph-ref-title">CMD REF</div>
+                        <div class="ph-ref-phase">// PHASE 2 — FINGERPRINT</div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">scan &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">Discover open ports on target.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">probe &lt;port&gt;</div>
+                            <div class="ph-ref-desc">Read banner — credential fragments hidden inside.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">validate &lt;string&gt;</div>
+                            <div class="ph-ref-desc">Confirm a string is a valid credential fragment.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">decode &lt;port&gt;</div>
+                            <div class="ph-ref-desc">Weaken MODERATE / LOW ports before exploit.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">exploit &lt;port&gt;</div>
+                            <div class="ph-ref-desc">Shatter a port. CRITICAL/HIGH direct.</div>
+                        </div>
+                        <div class="ph-ref-entry ph-ref-entry--commit">
+                            <div class="ph-ref-cmd">breach &lt;ip&gt; &lt;port&gt;</div>
+                            <div class="ph-ref-desc">Fingerprint complete + port shattered = breach.</div>
+                        </div>
+                    </div>
+
+                    <!-- CMD REF — Phase 3 -->
+                    <div v-else-if="phase === 3" class="ph-cmd-ref-section">
+                        <div class="ph-ref-title">CMD REF</div>
+                        <div class="ph-ref-phase">// PHASE 3 — EXTRACTION</div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">ls</div>
+                            <div class="ph-ref-desc">List contents of current directory.</div>
+                        </div>
+                        <div class="ph-ref-entry">
+                            <div class="ph-ref-cmd">cd &lt;dir&gt;</div>
+                            <div class="ph-ref-desc">Navigate into a directory. cd .. to go back.</div>
+                        </div>
+                        <div class="ph-ref-entry ph-ref-entry--commit">
+                            <div class="ph-ref-cmd">extract</div>
+                            <div class="ph-ref-desc">Steal the wallet. Wins the match.</div>
+                        </div>
+                        <div class="ph-ref-note">WALLET IS HIDDEN — SEARCH THE FILESYSTEM</div>
+                    </div>
+
+                    <!-- Rig commands stub -->
+                    <div v-if="hackCommands && hackCommands.length" class="ph-rig-section">
+                        <div class="ph-panel-rule" />
+                        <div class="ph-ref-title ph-ref-title--rig">HACK CMDS</div>
+                        <div class="ph-rig-grid">
+                            <button
+                                v-for="cmd in hackCommands"
+                                :key="cmd.name"
+                                class="ph-rig-btn"
+                                :class="{
+                                    'rig-btn--used':   usedRigCommands.includes(commandSlug(cmd.name)),
+                                    'rig-btn--locked': isLocked || busy,
+                                    'rig-btn--level2': cmd.level === 2,
+                                }"
+                                :disabled="usedRigCommands.includes(commandSlug(cmd.name)) || isLocked || busy || isComplete"
+                                @click="$emit('use-rig-command', commandSlug(cmd.name))"
+                            >
+                                {{ cmd.name.toUpperCase() }}
+                                <span class="ph-rig-lvl">L{{ cmd.level }}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
 
             </div><!-- end ph-body -->
         </div>
@@ -405,8 +354,6 @@ const emit = defineEmits(['submit-command', 'submit-auth', 'match-complete', 'us
 const inputEl    = ref(null);
 const historyEl  = ref(null);
 const inputValue = ref('');
-const showPanel  = ref(true);
-const panelWidth = ref(270);
 const authUser   = ref('');
 const authPass   = ref('');
 
@@ -418,32 +365,6 @@ function onSubmitAuth() {
     emit('submit-auth', authUser.value.trim(), authPass.value.trim());
     authUser.value = '';
     authPass.value = '';
-}
-
-// ── Panel drag resize ─────────────────────────────────────────────────────────
-
-function startDrag(e) {
-    e.preventDefault();
-    const startX     = e.clientX;
-    const startWidth = panelWidth.value;
-
-    function onMove(e) {
-        // Dragging left increases panel width, dragging right decreases
-        const delta = startX - e.clientX;
-        panelWidth.value = Math.min(520, Math.max(200, startWidth + delta));
-    }
-
-    function onUp() {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-    }
-
-    document.body.style.cursor    = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
 }
 
 // Random threat message — rotates per match open
@@ -644,8 +565,8 @@ function lineClass(line) {
 /* ── Terminal shell ──────────────────────────────────────────────────────── */
 .ph-terminal {
     position: relative;
-    width: min(1060px, 98vw);
-    height: min(820px, 96vh);
+    width: min(1280px, 99vw);
+    height: min(860px, 97vh);
     background: #08080f;
     border: 1px solid rgba(0,255,255,0.18);
     display: flex;
@@ -678,100 +599,169 @@ function lineClass(line) {
 .ph-topbar-phase { margin-left: auto; }
 .phase--one { color: rgba(0,255,255,0.55); }
 .phase--two { color: #FFB300; }
+.phase--three { color: #00ff88; }
 .ph-role-val { color: #FF69B4; }
 
 .ph-rule        { height: 1px; background: rgba(0,255,255,0.18); flex-shrink: 0; }
 .ph-rule--light { height: 1px; background: rgba(0,255,255,0.07); flex-shrink: 0; }
 
-/* ── Ref toggle button ───────────────────────────────────────────────────── */
-.ph-ref-toggle {
-    background: transparent;
-    border: 1px solid rgba(0,255,255,0.2);
-    color: rgba(0,255,255,0.4);
-    font-family: inherit;
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    padding: 2px 7px;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
+/* ── Phase data zone (top strip, full width) ─────────────────────────────── */
+.ph-data-zone {
     flex-shrink: 0;
-}
-.ph-ref-toggle:hover,
-.ph-ref-toggle.ref-toggle--active {
-    border-color: rgba(0,255,255,0.6);
-    color: rgba(0,255,255,0.9);
-}
-
-/* ── Port matrix ─────────────────────────────────────────────────────────── */
-.ph-port-matrix {
-    flex-shrink: 0;
-    padding: 8px 14px 6px;
+    padding: 8px 14px;
     background: rgba(0,255,255,0.02);
-    font-size: 11px;
+    min-height: 68px;
 }
 
-.ph-matrix-header { color: rgba(255,179,0,0.7); letter-spacing: 0.1em; font-size: 10px; margin-bottom: 6px; }
-
-.ph-matrix-row { display: flex; padding: 2px 0; font-size: 11px; }
-.ph-matrix-header-row {
+.ph-data-empty {
+    font-size: 10px;
     color: rgba(0,255,255,0.3);
-    font-size: 9px;
     letter-spacing: 0.08em;
-    border-bottom: 1px solid rgba(0,255,255,0.08);
-    margin-bottom: 2px;
+    padding: 8px 0;
 }
 
-.ph-matrix-col { display: inline-block; }
-.ph-matrix-col--port   { width: 70px;  color: rgba(0,255,255,0.7); }
-.ph-matrix-col--svc    { width: 110px; color: rgba(0,255,255,0.5); }
-.ph-matrix-col--bias   { width: 80px; }
-.ph-matrix-col--status { flex: 1; }
-
-.port--high     .ph-matrix-col--bias   { color: #FF4444; }
-.port--high     .ph-matrix-col--status { color: rgba(255,68,68,0.7); }
-.port--low      .ph-matrix-col--bias   { color: #FFB300; }
-.port--low      .ph-matrix-col--status { color: #FFB300; }
-.port--shattered .ph-matrix-col        { color: rgba(0,255,255,0.2); text-decoration: line-through; }
-.port--exfil     .ph-matrix-col--bias  { color: #00ff88; }
-.port--exfil     .ph-matrix-col--status { color: #00ff88; animation: exfil-pulse 0.8s ease-in-out infinite; }
-.port--locked    .ph-matrix-col        { color: rgba(0,255,255,0.2); }
-
-@keyframes exfil-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-
-/* ── Rig strip ───────────────────────────────────────────────────────────── */
-.ph-rig-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 14px;
-    background: rgba(255,105,180,0.04);
-    border-bottom: 1px solid rgba(255,105,180,0.1);
-    flex-shrink: 0;
-    flex-wrap: wrap;
+/* Phase 1 — 3×5 suspect grid */
+.ph-suspect-meta {
+    font-size: 9px;
+    color: rgba(0,255,255,0.35);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
 }
 
-.ph-rig-label { font-size: 9px; letter-spacing: 0.15em; color: rgba(255,105,180,0.5); flex-shrink: 0; margin-right: 2px; }
+.ph-suspect-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px 8px;
+}
 
-.ph-rig-btn {
+.ph-suspect-card {
     display: flex;
     align-items: center;
     gap: 4px;
-    background: transparent;
-    border: 1px solid rgba(255,105,180,0.35);
-    color: rgba(255,105,180,0.85);
-    font-family: inherit;
     font-size: 9px;
-    letter-spacing: 0.12em;
-    padding: 3px 8px;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    padding: 3px 6px;
+    border: 1px solid rgba(0,255,255,0.07);
+    background: rgba(0,255,255,0.02);
     white-space: nowrap;
+    overflow: hidden;
+    transition: opacity 0.2s;
 }
-.ph-rig-btn:hover:not(:disabled) { border-color: rgba(255,105,180,0.8); color: #FF69B4; background: rgba(255,105,180,0.08); }
-.ph-rig-btn.rig-btn--level2 { border-color: rgba(255,150,50,0.4); color: rgba(255,150,50,0.85); }
-.ph-rig-btn.rig-btn--level2:hover:not(:disabled) { border-color: rgba(255,150,50,0.9); color: #FF9632; background: rgba(255,150,50,0.08); }
-.ph-rig-btn.rig-btn--used, .ph-rig-btn:disabled { border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); cursor: not-allowed; text-decoration: line-through; }
-.ph-rig-lvl { font-size: 7px; opacity: 0.6; letter-spacing: 0; }
+
+.suspect-card--flushed {
+    opacity: 0.2;
+    text-decoration: line-through;
+}
+
+.psc-ip    { color: rgba(0,255,255,0.65); font-size: 8.5px; flex-shrink: 0; min-width: 94px; }
+.psc-sep   { color: rgba(0,255,255,0.15); flex-shrink: 0; }
+.psc-label { color: rgba(0,255,255,0.25); font-size: 7.5px; letter-spacing: 0.06em; flex-shrink: 0; }
+.psc-val   { color: rgba(0,255,255,0.5);  font-size: 8.5px; flex-shrink: 0; min-width: 42px; }
+
+/* Phase 2 — fingerprint horizontal strip */
+.ph-fp-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    height: 100%;
+}
+
+.ph-fp-strip-cred {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 16px;
+    flex-shrink: 0;
+}
+
+.ph-fp-strip-label {
+    font-size: 8px;
+    color: rgba(0,255,255,0.3);
+    letter-spacing: 0.12em;
+}
+
+.ph-fp-strip-val {
+    font-size: 10px;
+    color: rgba(0,255,255,0.6);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+}
+
+.ph-fp-strip-divider {
+    width: 1px;
+    background: rgba(0,255,255,0.1);
+    align-self: stretch;
+    margin: 0 16px 0 0;
+    flex-shrink: 0;
+}
+
+.ph-fp-ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-content: flex-start;
+}
+
+.ph-fp-port-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 3px 8px;
+    border: 1px solid rgba(0,255,255,0.1);
+    background: rgba(0,255,255,0.02);
+    min-width: 74px;
+}
+
+.fp-port--shattered { opacity: 0.25; text-decoration: line-through; }
+
+.fpp-port { font-size: 10px; color: rgba(0,255,255,0.7); letter-spacing: 0.04em; }
+.fpp-svc  { font-size: 8px;  color: rgba(0,255,255,0.4); letter-spacing: 0.04em; }
+.fpp-exp  { font-size: 8px;  letter-spacing: 0.06em; margin-top: 1px; }
+
+/* Phase 3 — filesystem breadcrumb trail */
+.ph-data-zone--p3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    min-height: 44px;
+    padding: 6px 14px;
+}
+
+.ph-fs-label {
+    font-size: 8px;
+    color: rgba(0,255,255,0.3);
+    letter-spacing: 0.12em;
+    flex-shrink: 0;
+}
+
+.ph-fs-trail {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.ph-fs-crumb {
+    font-size: 10px;
+    color: rgba(0,255,255,0.35);
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border: 1px solid rgba(0,255,255,0.08);
+}
+
+.fs-crumb--current {
+    color: #00ff88;
+    border-color: rgba(0,255,136,0.3);
+    background: rgba(0,255,136,0.04);
+}
+
+.ph-fs-hint {
+    font-size: 8px;
+    color: rgba(0,255,255,0.2);
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
 
 /* ── Body row ────────────────────────────────────────────────────────────── */
 .ph-body {
@@ -910,9 +900,9 @@ function lineClass(line) {
 .ph-locked { flex: 1; display: flex; align-items: center; }
 .ph-lock-msg { font-size: 11px; color: #FF4444; letter-spacing: 0.1em; animation: alert-pulse 0.4s ease-in-out infinite alternate; }
 
-/* ── Side panel ──────────────────────────────────────────────────────────── */
+/* ── Right panel (CMD ref + rig cmds) ────────────────────────────────────── */
 .ph-ref-panel {
-    width: 270px;
+    width: 220px;
     flex-shrink: 0;
     border-left: 1px solid rgba(0,255,255,0.1);
     background: rgba(0,255,255,0.015);
@@ -921,13 +911,7 @@ function lineClass(line) {
     overflow: hidden;
 }
 
-/* Case file section — natural height, no scroll, all rows always visible */
-.ph-cf-section {
-    flex-shrink: 0;
-    padding: 10px 12px 8px;
-}
-
-/* Divider between case file and command ref */
+/* Divider */
 .ph-panel-rule {
     height: 1px;
     background: rgba(0,255,255,0.1);
@@ -935,7 +919,7 @@ function lineClass(line) {
     margin: 0;
 }
 
-/* Command ref section — scrollable, takes remaining space */
+/* Command ref — scrollable, fills top of right panel */
 .ph-cmd-ref-section {
     flex: 1;
     overflow-y: auto;
@@ -947,85 +931,52 @@ function lineClass(line) {
     gap: 3px;
 }
 
-.ph-ref-title  { font-size: 9px; letter-spacing: 0.2em; color: rgba(0,255,255,0.35); margin-bottom: 2px; }
-.ph-ref-phase  { font-size: 9px; letter-spacing: 0.08em; color: #FFB300; margin-bottom: 8px; opacity: 0.75; }
-.ph-ref-empty  { font-size: 9px; color: rgba(0,255,255,0.25); letter-spacing: 0.06em; margin-top: 8px; }
-.ph-ref-entry  { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.05); }
+.ph-ref-title         { font-size: 9px; letter-spacing: 0.2em; color: rgba(0,255,255,0.35); margin-bottom: 2px; }
+.ph-ref-title--rig    { color: rgba(255,105,180,0.4); padding: 8px 12px 4px; }
+.ph-ref-phase         { font-size: 9px; letter-spacing: 0.08em; color: #FFB300; margin-bottom: 8px; opacity: 0.75; }
+.ph-ref-empty         { font-size: 9px; color: rgba(0,255,255,0.25); letter-spacing: 0.06em; margin-top: 8px; }
+.ph-ref-entry         { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.05); }
 .ph-ref-entry--commit .ph-ref-cmd { color: #00ff88; }
-.ph-ref-cmd    { font-size: 10px; color: rgba(0,255,255,0.75); letter-spacing: 0.04em; word-break: break-all; }
-.ph-ref-desc   { font-size: 9px; color: rgba(0,255,255,0.35); letter-spacing: 0.03em; line-height: 1.4; }
-.ph-ref-note   { font-size: 8px; color: rgba(255,179,0,0.45); letter-spacing: 0.08em; margin-top: 8px; line-height: 1.5; }
+.ph-ref-cmd           { font-size: 10px; color: rgba(0,255,255,0.75); letter-spacing: 0.04em; word-break: break-all; }
+.ph-ref-desc          { font-size: 9px; color: rgba(0,255,255,0.35); letter-spacing: 0.03em; line-height: 1.4; }
+.ph-ref-note          { font-size: 8px; color: rgba(255,179,0,0.45); letter-spacing: 0.08em; margin-top: 8px; line-height: 1.5; }
 
-/* ── Case file grid ──────────────────────────────────────────────────────── */
-.ph-cf-stats {
-    font-size: 9px;
-    color: rgba(0,255,255,0.4);
-    letter-spacing: 0.06em;
-    margin-bottom: 6px;
+/* Rig commands — stub section below CMD ref */
+.ph-rig-section { flex-shrink: 0; }
+
+.ph-rig-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 12px 10px;
 }
 
-.ph-cf-clue { color: #FF69B4; }
-
-.ph-cf-header {
+.ph-rig-btn {
     display: flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid rgba(255,105,180,0.35);
+    color: rgba(255,105,180,0.85);
+    font-family: inherit;
     font-size: 8px;
-    color: rgba(0,255,255,0.25);
-    letter-spacing: 0.06em;
-    border-bottom: 1px solid rgba(0,255,255,0.08);
-    padding-bottom: 3px;
-    margin-bottom: 2px;
+    letter-spacing: 0.1em;
+    padding: 3px 7px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
 }
+.ph-rig-btn:hover:not(:disabled) { border-color: rgba(255,105,180,0.8); color: #FF69B4; background: rgba(255,105,180,0.08); }
+.ph-rig-btn.rig-btn--level2 { border-color: rgba(255,150,50,0.4); color: rgba(255,150,50,0.85); }
+.ph-rig-btn.rig-btn--level2:hover:not(:disabled) { border-color: rgba(255,150,50,0.9); color: #FF9632; background: rgba(255,150,50,0.08); }
+.ph-rig-btn.rig-btn--used, .ph-rig-btn:disabled { border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); cursor: not-allowed; text-decoration: line-through; }
+.ph-rig-lvl { font-size: 7px; opacity: 0.6; letter-spacing: 0; }
 
-.ph-cf-row {
-    display: flex;
-    font-size: 9px;
-    padding: 2px 0;
-    border-bottom: 1px solid rgba(0,255,255,0.03);
-    transition: opacity 0.2s;
-}
-
-.cf-row--flushed {
-    opacity: 0.2;
-    text-decoration: line-through;
-}
-
-.ph-cf-col { display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-cf-col--ip   { width: 108px; color: rgba(0,255,255,0.6); font-size: 8.5px; }
-.ph-cf-col--ping { width: 52px; color: rgba(0,255,255,0.4); }
-.ph-cf-col--hops { width: 30px; color: rgba(0,255,255,0.4); }
-.ph-cf-col--arp  { flex: 1; color: rgba(0,255,255,0.4); }
-
+/* ── Shared value colour helpers ─────────────────────────────────────────── */
 .cf-val--live     { color: #00ff88 !important; }
 .cf-val--degraded { color: #FFB300 !important; }
 .cf-val--dead     { color: rgba(255,68,68,0.5) !important; }
-
-/* ── Drag handle ─────────────────────────────────────────────────────────── */
-.ph-drag-handle {
-    width: 4px;
-    flex-shrink: 0;
-    cursor: col-resize;
-    background: rgba(0,255,255,0.08);
-    transition: background 0.15s;
-    position: relative;
-    z-index: 2;
-}
-.ph-drag-handle:hover {
-    background: rgba(0,255,255,0.3);
-}
-.ph-drag-handle::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 1px;
-    height: 32px;
-    background: rgba(0,255,255,0.4);
-    border-radius: 1px;
-}
-
-/* ── Phase 3 color ───────────────────────────────────────────────────────── */
-.phase--three { color: #00ff88; }
+.ph-cf-clue       { color: #FF69B4; }
 
 /* ── Auth prompt ─────────────────────────────────────────────────────────── */
 .ph-auth-prompt {
@@ -1089,66 +1040,6 @@ function lineClass(line) {
     color: #00ff88;
 }
 
-/* ── Fingerprint credentials ─────────────────────────────────────────────── */
-.ph-fp-cred {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 2px 0;
-}
-
-.ph-fp-label {
-    font-size: 8px;
-    color: rgba(0,255,255,0.3);
-    letter-spacing: 0.1em;
-    width: 36px;
-    flex-shrink: 0;
-}
-
-.ph-fp-value {
-    font-size: 9px;
-    color: rgba(0,255,255,0.55);
-    letter-spacing: 0.04em;
-    word-break: break-all;
-}
-
-.fp--complete {
-    color: #00ff88 !important;
-}
-
-/* ── Filesystem path trail ───────────────────────────────────────────────── */
-.ph-fs-path {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-top: 6px;
-}
-
-.ph-fs-path-entry {
-    font-size: 9px;
-    color: rgba(0,255,255,0.3);
-    letter-spacing: 0.04em;
-}
-
-.fs-path--current {
-    color: #00ff88;
-}
-
-/* ── Slide transition ────────────────────────────────────────────────────── */
-.ref-slide-enter-active, .ref-slide-leave-active {
-    transition: opacity 0.2s ease;
-    overflow: hidden;
-}
-.ref-slide-enter-from, .ref-slide-leave-to  { opacity: 0; }
-.ref-slide-enter-to,   .ref-slide-leave-from { opacity: 1; }
-
-/* Phase 2 ref renders directly in .ph-ref-panel — needs its own padding */
-.ph-ref-panel > .ph-ref-title,
-.ph-ref-panel > .ph-ref-phase,
-.ph-ref-panel > .ph-ref-entry,
-.ph-ref-panel > .ph-ref-note {
-    padding-left: 12px;
-    padding-right: 12px;
-}
-.ph-ref-panel > .ph-ref-title { padding-top: 10px; }
+/* ── fp--complete (used in Phase 2 top strip) ────────────────────────────── */
+.fp--complete { color: #00ff88 !important; }
 </style>

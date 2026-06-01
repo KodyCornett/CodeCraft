@@ -454,14 +454,13 @@ class PacketHijackController extends Controller
             );
 
             PacketHijackCommandResult::dispatch(
-                matchId:       $match->id,
-                playerId:      $me->id,
-                command:       $raw,
-                outputLines:   [
+                matchId:     $match->id,
+                playerId:    $me->id,
+                command:     $raw,
+                outputLines: [
                     '[VERIFYING NODE GATEWAY ROUTE...]',
                     '[SUCCESS]: TARGET IP SIGNATURE CONFIRMED. TERMINAL COMPROMISED.',
                 ],
-                phaseAdvanced: true,
             );
         } elseif (isset($result['honeypot'])) {
             // ── Honeypot hit ──────────────────────────────────────────────────
