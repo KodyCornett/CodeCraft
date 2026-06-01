@@ -23,9 +23,14 @@ class PacketHijackCommandResult implements ShouldBroadcast
         public readonly string  $playerId,
         public readonly string  $command,
         public readonly array   $outputLines,
-        public readonly ?array  $updatedPorts = null,    // Phase 2 port state after exploit
-        public readonly bool    $phaseAdvanced = false,  // true when inject succeeded
-        public readonly ?string $lockUntil = null,       // ISO-8601 if honeypot lock applied
+        public readonly ?array  $updatedPorts = null,        // Phase 2 port state after exploit/decode
+        public readonly bool    $phaseAdvanced = false,      // true when inject succeeded
+        public readonly ?string $lockUntil = null,           // ISO-8601 if honeypot lock applied
+        public readonly ?array  $updatedSuspects = null,     // full suspect board after netstat
+        public readonly ?array  $suspectUpdate = null,       // single suspect attribute reveal
+        public readonly ?array  $arpScanResult = null,       // full arp timestamp sweep
+        public readonly ?string $octetClue = null,           // sniff clue e.g. '.4.'
+        public readonly ?string $flushedIp = null,           // ip marked as flushed
     ) {}
 
     public function broadcastOn(): PrivateChannel
@@ -41,12 +46,17 @@ class PacketHijackCommandResult implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'match_id'      => $this->matchId,
-            'command'       => $this->command,
-            'output_lines'  => $this->outputLines,
-            'updated_ports' => $this->updatedPorts,
-            'phase_advanced'=> $this->phaseAdvanced,
-            'lock_until'    => $this->lockUntil,
+            'match_id'        => $this->matchId,
+            'command'         => $this->command,
+            'output_lines'    => $this->outputLines,
+            'updated_ports'   => $this->updatedPorts,
+            'phase_advanced'  => $this->phaseAdvanced,
+            'lock_until'      => $this->lockUntil,
+            'updated_suspects'=> $this->updatedSuspects,
+            'suspect_update'  => $this->suspectUpdate,
+            'arp_scan_result' => $this->arpScanResult,
+            'octet_clue'      => $this->octetClue,
+            'flushed_ip'      => $this->flushedIp,
         ];
     }
 }

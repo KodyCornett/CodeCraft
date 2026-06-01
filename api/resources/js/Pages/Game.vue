@@ -87,6 +87,10 @@
                         :role="ph.role"
                         :phase="ph.phase"
                         :command-history="ph.commandHistory"
+                        :suspects="ph.suspects"
+                        :octet-clue="ph.octetClue"
+                        :active-suspect-count="ph.activeSuspectCount"
+                        :board-ready="ph.boardReady"
                         :ports="ph.ports"
                         :target-ip="ph.targetIp"
                         :is-locked="ph.isLocked"
@@ -1561,7 +1565,7 @@ onMounted(async () => {
     if (playerId.value && window.Echo) {
         window.Echo.private(`player.${playerId.value}`)
             .listen('.packet-hijack.started', (data) => {
-                ph.init(data.match_id, data.role, data.ip_pool_sample ?? []);
+                ph.init(data.match_id, data.role);
                 activePacketHijack.value  = true;
                 awaitingChallenge.value   = false;
                 incomingChallenge.value   = null;

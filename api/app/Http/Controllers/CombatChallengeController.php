@@ -244,11 +244,18 @@ class CombatChallengeController extends Controller
 
         // challenger_target_ip = the IP the CHALLENGER must find = DEFENDER's rig
         // defender_target_ip   = the IP the DEFENDER must find   = CHALLENGER's rig
-        $challengerPool = $this->phService->generateIpPool($defenderRigIp);
-        $defenderPool   = $this->phService->generateIpPool($challengerRigIp);
-
         $challengerRig = $challenger?->rig;
         $defenderRig   = $defender?->rig;
+
+        $challengerStats = $challengerRig ? $this->rigService->effectiveStats($challengerRig, $challenger) : null;
+        $defenderStats   = $defenderRig   ? $this->rigService->effectiveStats($defenderRig,   $defender)   : null;
+        $challengerOs    = (int) ($challengerStats['os']['effective'] ?? 1);
+        $defenderOs      = (int) ($defenderStats['os']['effective']   ?? 1);
+
+        // Suspect boards: challenger hunts defenderRigIp in a board seeded by defender's OS.
+        // Defender hunts challengerRigIp in a board seeded by challenger's OS.
+        $challengerSuspects = $this->phService->generateNodeConnections($defenderRigIp,   $defenderOs);
+        $defenderSuspects   = $this->phService->generateNodeConnections($challengerRigIp, $challengerOs);
 
         $challengerPorts = ($challengerRig && $challenger)
             ? $this->phService->generatePortTopology($challengerRig, $challenger)
@@ -266,36 +273,32 @@ class CombatChallengeController extends Controller
 
         /** @var PacketHijackMatch $match */
         $match = PacketHijackMatch::create([
-            'id'                  => (string) Str::uuid(),
-            'challenger_id'       => $challenge->challenger_id,
-            'defender_id'         => $challenge->target_id,
-            'status'              => 'phase1',
-            'challenger_target_ip'=> $defenderRigIp,
-            'defender_target_ip'  => $challengerRigIp,
-            'challenger_ip_pool'  => $challengerPool,
-            'defender_ip_pool'    => $defenderPool,
-            'challenger_ports'    => $challengerPorts,
-            'defender_ports'      => $defenderPorts,
-            'challenger_phase'    => 1,
-            'defender_phase'      => 1,
-            'started_at'          => now(),
+            'id'                   => (string) Str::uuid(),
+            'challenger_id'        => $challenge->challenger_id,
+            'defender_id'          => $challenge->target_id,
+            'status'               => 'phase1',
+            'challenger_target_ip' => $defenderRigIp,
+            'defender_target_ip'   => $challengerRigIp,
+            'challenger_suspects'  => $challengerSuspects,
+            'defender_suspects'    => $defenderSuspects,
+            'challenger_ports'     => $challengerPorts,
+            'defender_ports'       => $defenderPorts,
+            'challenger_phase'     => 1,
+            'defender_phase'       => 1,
+            'started_at'           => now(),
         ]);
 
-        // ── Broadcast started events (15-item opening sample each) ────────────
-        $phService = $this->phService;
-
+        // ── Broadcast started events — blank terminal, player types netstat ───
         PacketHijackStarted::dispatch(
-            matchId:      $match->id,
-            playerId:     $challenge->challenger_id,
-            role:         'challenger',
-            ipPoolSample: $phService->commandNetstat($challengerPool),
+            matchId:  $match->id,
+            playerId: $challenge->challenger_id,
+            role:     'challenger',
         );
 
         PacketHijackStarted::dispatch(
-            matchId:      $match->id,
-            playerId:     $challenge->target_id,
-            role:         'defender',
-            ipPoolSample: $phService->commandNetstat($defenderPool),
+            matchId:  $match->id,
+            playerId: $challenge->target_id,
+            role:     'defender',
         );
 
         return response()->json([

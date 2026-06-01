@@ -116,8 +116,8 @@ class PacketHijackController extends Controller
             $currentPhase = $match->phaseOf($role);
 
             // ── Phase guard ───────────────────────────────────────────────────
-            $phase1Commands = ['netstat', 'sniff', 'isolate', 'inject'];
-            $phase2Commands = ['scan', 'exploit', 'malware'];
+            $phase1Commands = ['netstat', 'ping', 'traceroute', 'arp', 'whois', 'sniff', 'flush', 'inject'];
+            $phase2Commands = ['probe', 'exploit', 'decode', 'breach'];
 
             if ($currentPhase === 1 && in_array($command, $phase2Commands, true)) {
                 PacketHijackCommandResult::dispatch(
@@ -141,14 +141,19 @@ class PacketHijackController extends Controller
 
             // ── Dispatch to the appropriate command handler ───────────────────
             return match ($command) {
-                'netstat' => $this->handleNetstat($match, $role, $me, $data['input']),
-                'sniff'   => $this->handleSniff($match, $role, $me, $data['input']),
-                'isolate' => $this->handleIsolate($match, $role, $me, $data['input'], $args),
-                'inject'  => $this->handleInject($match, $role, $me, $data['input'], $args),
-                'scan'    => $this->handleScan($match, $role, $me, $data['input'], $args),
-                'exploit' => $this->handleExploit($match, $role, $me, $data['input'], $args),
-                'malware' => $this->handleMalware($match, $role, $me, $data['input'], $args),
-                default   => response()->json(['message' => 'Unhandled command.'], 500),
+                'netstat'    => $this->handleNetstat($match, $role, $me, $data['input']),
+                'ping'       => $this->handlePing($match, $role, $me, $data['input'], $args),
+                'traceroute' => $this->handleTraceroute($match, $role, $me, $data['input'], $args),
+                'arp'        => $this->handleArp($match, $role, $me, $data['input']),
+                'whois'      => $this->handleWhois($match, $role, $me, $data['input'], $args),
+                'sniff'      => $this->handleSniff($match, $role, $me, $data['input']),
+                'flush'      => $this->handleFlush($match, $role, $me, $data['input'], $args),
+                'inject'     => $this->handleInject($match, $role, $me, $data['input'], $args),
+                'probe'      => $this->handleProbe($match, $role, $me, $data['input'], $args),
+                'exploit'    => $this->handleExploit($match, $role, $me, $data['input'], $args),
+                'decode'     => $this->handleDecode($match, $role, $me, $data['input'], $args),
+                'breach'     => $this->handleBreach($match, $role, $me, $data['input'], $args),
+                default      => response()->json(['message' => 'Unhandled command.'], 500),
             };
         });
     }
@@ -192,24 +197,145 @@ class PacketHijackController extends Controller
 
     private function handleNetstat(PacketHijackMatch $match, string $role, Player $me, string $raw): JsonResponse
     {
-        $pool   = $match->ipPoolFor($role);
-        $sample = $this->phService->commandNetstat($pool);
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandNetstat($suspects);
 
         $lines = [
-            '[PROCESSING SCAN UTILITY...]',
-            '[SUCCESS]: INITIAL SAMPLING ISOLATED ' . count($sample) . ' RELEVANT IP TARGETS:',
+            '[SCANNING NODE FOR ACTIVE CONNECTIONS...]',
+            '[SUCCESS]: ' . count($result) . ' ACTIVE CONNECTIONS DETECTED ON THIS NODE',
+            '[CASE FILE POPULATED — INVESTIGATE SUSPECTS TO IDENTIFY TARGET]',
         ];
 
-        // Format IPs in rows of 4 for readability
-        foreach (array_chunk($sample, 4) as $row) {
-            $lines[] = implode('   ', array_map(fn($ip) => str_pad($ip, 15), $row));
+        PacketHijackCommandResult::dispatch(
+            matchId:        $match->id,
+            playerId:       $me->id,
+            command:        $raw,
+            outputLines:    $lines,
+            updatedSuspects: $match->suspectsPublicView($role),
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function handlePing(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $ip       = $args[0] ?? '';
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandPing($suspects, $ip);
+
+        if (!$result['found']) {
+            $lines = ["[ERROR]: {$result['error']}"];
+        } elseif ($result['latency_status'] === 'TIMEOUT') {
+            $lines = [
+                "[PING]: PROBING {$ip}...",
+                "[RESULT]: REQUEST TIMEOUT — HOST UNREACHABLE",
+            ];
+        } else {
+            $lines = [
+                "[PING]: PROBING {$ip}...",
+                "[RESULT]: RESPONSE {$result['latency_ms']}ms — {$result['latency_status']}",
+            ];
+        }
+
+        // Update the suspect's revealed latency in the match record
+        $key = "{$role}_suspects";
+        $updated = $suspects;
+        foreach ($updated as $i => $s) {
+            if ($s['ip'] === $ip) {
+                $updated[$i]['_ping_revealed'] = true;
+                break;
+            }
+        }
+        $match->$key = $updated;
+        $match->save();
+
+        PacketHijackCommandResult::dispatch(
+            matchId:         $match->id,
+            playerId:        $me->id,
+            command:         $raw,
+            outputLines:     $lines,
+            suspectUpdate:   ['ip' => $ip, 'latency_ms' => $result['latency_ms'] ?? null, 'latency_status' => $result['latency_status'] ?? 'TIMEOUT'],
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleTraceroute(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $ip       = $args[0] ?? '';
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandTraceroute($suspects, $ip);
+
+        if (!$result['found']) {
+            $lines = ["[ERROR]: {$result['error']}"];
+        } else {
+            $lines = [
+                "[TRACEROUTE]: MAPPING ROUTE TO {$ip}...",
+                "[RESULT]: {$result['hops']} HOP" . ($result['hops'] === 1 ? '' : 'S') . " — NETWORK RANGE: {$result['network_range']}",
+            ];
         }
 
         PacketHijackCommandResult::dispatch(
-            matchId:     $match->id,
-            playerId:    $me->id,
-            command:     $raw,
-            outputLines: $lines,
+            matchId:       $match->id,
+            playerId:      $me->id,
+            command:       $raw,
+            outputLines:   $lines,
+            suspectUpdate: $result['found'] ? ['ip' => $ip, 'hops' => $result['hops'], 'network_range' => $result['network_range']] : null,
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleArp(PacketHijackMatch $match, string $role, Player $me, string $raw): JsonResponse
+    {
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandArpScan($suspects);
+
+        $lines = ['[ARP SCAN]: QUERYING NODE ADDRESS RESOLUTION TABLE...'];
+
+        foreach ($result as $entry) {
+            $age    = $entry['last_seen_seconds'];
+            $label  = $age <= 5 ? 'JUST NOW' : ($age < 60 ? "{$age}s AGO" : floor($age / 60) . 'm AGO');
+            $lines[] = "  {$entry['ip']}  —  LAST ACTIVE: {$label}";
+        }
+
+        PacketHijackCommandResult::dispatch(
+            matchId:       $match->id,
+            playerId:      $me->id,
+            command:       $raw,
+            outputLines:   $lines,
+            arpScanResult: $result,
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function handleWhois(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $ip       = $args[0] ?? '';
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandWhois($suspects, $ip);
+
+        if (!$result['found']) {
+            $lines = ["[ERROR]: {$result['error']}"];
+        } elseif ($result['redacted']) {
+            $lines = [
+                "[WHOIS]: QUERYING REGISTRY FOR {$ip}...",
+                "[RESULT]: DATA REDACTED — OPERATOR HAS MASKED THEIR SIGNATURE",
+            ];
+        } else {
+            $lines = [
+                "[WHOIS]: QUERYING REGISTRY FOR {$ip}...",
+                "[RESULT]: NODE CLASS: {$result['class']}",
+            ];
+        }
+
+        PacketHijackCommandResult::dispatch(
+            matchId:       $match->id,
+            playerId:      $me->id,
+            command:       $raw,
+            outputLines:   $lines,
+            suspectUpdate: $result['found'] ? ['ip' => $ip, 'whois_class' => $result['class'], 'whois_redacted' => $result['redacted']] : null,
         );
 
         return response()->json(['ok' => true]);
@@ -221,9 +347,10 @@ class PacketHijackController extends Controller
         $clue     = $this->phService->commandSniff($targetIp);
 
         $lines = [
-            '[SNIFFING COMMUNICATIONS PACKETS...]',
-            '[CAPTURED]: PACKET_ID #' . str_pad((string) random_int(100, 9999), 4, '0', STR_PAD_LEFT) . ' // INBOUND FROM ACTIVE TARGET',
-            "[DIAGNOSTIC]: PACKET OCTET SEGMENT CONTAINS ELEMENT [{$clue}]",
+            '[SNIFFING LIVE PACKET STREAM...]',
+            '[CAPTURED]: PACKET_ID #' . str_pad((string) random_int(100, 9999), 4, '0', STR_PAD_LEFT) . ' // INBOUND — ACTIVE SESSION',
+            "[OCTET FRAGMENT ISOLATED]: [{$clue}]",
+            '[CROSS-REFERENCE THIS AGAINST YOUR CASE FILE]',
         ];
 
         PacketHijackCommandResult::dispatch(
@@ -231,38 +358,34 @@ class PacketHijackController extends Controller
             playerId:    $me->id,
             command:     $raw,
             outputLines: $lines,
+            octetClue:   $clue,
         );
 
         return response()->json(['ok' => true]);
     }
 
-    private function handleIsolate(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    private function handleFlush(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
-        $segment  = $args[0] ?? '';
-        $pool     = $match->ipPoolFor($role);
-        $narrowed = $this->phService->commandIsolate($pool, $segment);
+        $ip       = $args[0] ?? '';
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandFlush($suspects, $ip);
 
-        if (empty($narrowed)) {
-            $lines = [
-                '[PURGING NON-MATCHING CORES...]',
-                "[ERROR]: SEGMENT [{$segment}] PRODUCED NO MATCHES — REFINE YOUR FILTER",
-            ];
+        if (!$result['success']) {
+            $lines = ["[ERROR]: {$result['error']}"];
         } else {
-            $removed = count($pool) - count($narrowed);
-            $lines   = [
-                '[PURGING NON-MATCHING CORES...]',
-                "[RECON SUMMARY]: DETACHING {$removed} DECOYS. TARGET SCOPE NARROWED:",
-            ];
-            foreach ($narrowed as $ip) {
-                $lines[] = "-> {$ip}";
-            }
+            $key        = "{$role}_suspects";
+            $match->$key = $result['suspects'];
+            $match->save();
+
+            $lines = ["[FLUSH]: {$ip} PURGED FROM ACTIVE TRACE BUFFER"];
         }
 
         PacketHijackCommandResult::dispatch(
-            matchId:     $match->id,
-            playerId:    $me->id,
-            command:     $raw,
-            outputLines: $lines,
+            matchId:      $match->id,
+            playerId:     $me->id,
+            command:      $raw,
+            outputLines:  $lines,
+            flushedIp:    $result['success'] ? $ip : null,
         );
 
         return response()->json(['ok' => true]);
@@ -272,8 +395,8 @@ class PacketHijackController extends Controller
     {
         $attempt  = $args[0] ?? '';
         $targetIp = $match->targetIpFor($role);
-        $pool     = $match->ipPoolFor($role);
-        $result   = $this->phService->commandInject($targetIp, $attempt, $pool);
+        $suspects = $match->suspectsFor($role);
+        $result   = $this->phService->commandInject($targetIp, $attempt, $suspects);
 
         if ($result['success']) {
             // ── Phase transition ──────────────────────────────────────────────
@@ -337,7 +460,7 @@ class PacketHijackController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function handleScan(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    private function handleProbe(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
         // args: ['port', '<number>']
         $portNumber   = isset($args[1]) ? (int) $args[1] : 0;
@@ -345,15 +468,19 @@ class PacketHijackController extends Controller
         $corruptPorts = $match->corruptPortsFor($role);
         $baitPorts    = $match->baitPortsFor($role);
 
-        $result = $this->phService->commandScanPort($ports, $portNumber, $corruptPorts, $baitPorts);
+        $result = $this->phService->commandProbePort($ports, $portNumber, $corruptPorts, $baitPorts);
 
         if ($result['found']) {
-            $e     = $result['entry'];
-            $label = $e['shattered']  ? 'SHATTERED'
-                : ($e['unlocked']     ? 'UNLOCKED'
-                : ($e['bias'] <= 25   ? 'CRITICAL LOW' : 'HIGH'));
+            $e      = $result['entry'];
+            $flavor = $result['flavor'];
+            $label  = $e['shattered']  ? 'SHATTERED'
+                : ($e['unlocked']      ? 'UNLOCKED'
+                : ($e['bias'] <= 25    ? 'CRITICAL LOW' : 'HIGH'));
             $lines = [
-                "[MONITORING STATUS]: PORT {$e['port']} [{$e['service']}] -> DECRYPTION BIAS: {$label} [{$e['bias']}%]",
+                "[PROBE]: PORT {$e['port']} [{$e['service']}]",
+                "[{$flavor[0]}]",
+                "[{$flavor[1]}]",
+                "[DECRYPTION BIAS]: {$label} [{$e['bias']}%]",
             ];
         } else {
             $lines = ["[ERROR]: {$result['error']}"];
@@ -460,25 +587,56 @@ class PacketHijackController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function handleMalware(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    private function handleDecode(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
     {
-        // Expected args: ['inject', '-IP', '<ip>', 'PORT', '<port>']
-        if (count($args) < 5 || strtolower($args[0]) !== 'inject' || strtoupper($args[1]) !== '-IP' || strtoupper($args[3]) !== 'PORT') {
+        // args: ['port', '<number>']
+        $portNumber = isset($args[1]) ? (int) $args[1] : 0;
+        $ports      = $match->portsFor($role);
+        $rig        = $this->rigService->getRigForPlayer($me);
+
+        if ($rig === null) {
+            return response()->json(['message' => 'Rig not found.'], 422);
+        }
+
+        $result = $this->phService->commandDecodePort($ports, $portNumber, $rig, $me);
+
+        if ($result['success']) {
+            $portsKey        = "{$role}_ports";
+            $match->$portsKey = $result['ports'];
+            $match->save();
+
+            $lines = [
+                "[DECODE]: TARGETING PORT {$result['port']} [{$result['service']}]...",
+                "[PROGRESS]: ENCRYPTION LAYER CRACKED — BIAS REDUCED BY {$result['reduction']}%",
+                "[CURRENT BIAS]: {$result['new_bias']}%" . ($result['new_bias'] <= 25 ? ' — EXPLOITABLE' : ' — CONTINUE DECODING OR FIND ANOTHER ENTRY POINT'),
+            ];
+
+            PacketHijackCommandResult::dispatch(
+                matchId:      $match->id,
+                playerId:     $me->id,
+                command:      $raw,
+                outputLines:  $lines,
+                updatedPorts: $result['ports'],
+            );
+        } else {
             PacketHijackCommandResult::dispatch(
                 matchId:     $match->id,
                 playerId:    $me->id,
                 command:     $raw,
-                outputLines: ['[ERROR]: SYNTAX ERROR — malware inject -IP <ip> PORT <port>'],
+                outputLines: ["[ERROR]: {$result['error']}"],
             );
-            return response()->json(['ok' => true]);
         }
 
-        $inputIp   = $args[2];
-        $inputPort = (int) $args[4];
-        $ports     = $match->portsFor($role);
-        $targetIp  = $match->targetIpFor($role);
+        return response()->json(['ok' => true]);
+    }
 
-        $result = $this->phService->commandMalwareInject($ports, $targetIp, $inputIp, $inputPort);
+    private function handleBreach(PacketHijackMatch $match, string $role, Player $me, string $raw, array $args): JsonResponse
+    {
+        $inputIp  = $args[0] ?? '';
+        $ports    = $match->portsFor($role);
+        $targetIp = $match->targetIpFor($role);
+
+        $result = $this->phService->commandBreach($ports, $targetIp, $inputIp);
 
         if (!$result['success']) {
             PacketHijackCommandResult::dispatch(
@@ -490,9 +648,6 @@ class PacketHijackController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // ── MATCH COMPLETE ────────────────────────────────────────────────────
-        // Guard against both players submitting simultaneously — if already
-        // resolved, return silently (the WS event already fired).
         if ($match->status === 'complete') {
             return response()->json(['ok' => true]);
         }
@@ -705,7 +860,7 @@ class PacketHijackController extends Controller
             playerId:    $winner->id,
             command:     $raw,
             outputLines: [
-                '[TRANSMITTING MALWARE PAYLOAD PACKETS...]',
+                '[BREACH]: TRANSMITTING PAYLOAD...',
                 '[==================================================>] 100%',
                 '[BREACH COMPLETE]: NODE FULLY PURGED. CRED BUFFER ACQUIRED.',
                 '[CONNECTION TERMINATED]: YOU WIN THE MATCH.',
