@@ -215,8 +215,9 @@ class PacketHijackMatch extends Model
      */
     public function saveFingerprintFor(string $role, array $fingerprint): void
     {
-        $key        = "{$role}_fingerprint";
-        $this->$key = $fingerprint;
+        $key = "{$role}_fingerprint";
+        // Use forceFill to guarantee Eloquent marks the JSON column dirty
+        $this->forceFill([$key => $fingerprint]);
     }
 
     /**
@@ -224,8 +225,8 @@ class PacketHijackMatch extends Model
      */
     public function saveFilesystemFor(string $role, array $filesystem): void
     {
-        $key        = "{$role}_filesystem";
-        $this->$key = $filesystem;
+        $key = "{$role}_filesystem";
+        $this->forceFill([$key => $filesystem]);
     }
 
     // ── Phase 7 — Command state helpers ──────────────────────────────────────
