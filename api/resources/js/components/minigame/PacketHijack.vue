@@ -126,7 +126,7 @@
             <div class="ph-rule ph-rule--light" />
 
             <!-- ── Lower body: terminal + right panel ──────────────────────── -->
-            <div class="ph-body">
+            <div class="ph-body" @mousedown.self="refocusInput">
 
                 <!-- Left: history + input -->
                 <div class="ph-main-col">
@@ -145,7 +145,7 @@
                     </div>
 
                     <!-- Scrollable history -->
-                    <div v-else class="ph-history" ref="historyEl">
+                    <div v-else class="ph-history" ref="historyEl" @mousedown="refocusInput">
                         <div v-for="(entry, i) in commandHistory" :key="i" class="ph-history-entry">
                             <div v-if="entry.input !== 'SYSTEM'" class="ph-history-input">
                                 <span class="ph-prompt">SYS_INPUT &gt;</span> {{ entry.input }}
@@ -386,6 +386,13 @@ function onSubmit() {
     historyNavI = -1;
     emit('submit-command', val);
     inputValue.value = '';
+    nextTick(() => inputEl.value?.focus());
+}
+
+function refocusInput() {
+    if (!props.awaitingAuth && !props.isLocked && !props.isComplete) {
+        inputEl.value?.focus();
+    }
 }
 
 function historyUp() {
@@ -404,6 +411,7 @@ function historyDown() {
 watch(() => props.commandHistory, async () => {
     await nextTick();
     if (historyEl.value) historyEl.value.scrollTop = historyEl.value.scrollHeight;
+    refocusInput();
 }, { deep: true });
 
 watch(() => props.isLocked, (locked) => {
