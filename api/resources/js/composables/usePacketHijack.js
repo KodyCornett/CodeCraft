@@ -103,6 +103,7 @@ export function usePacketHijack(playerId) {
     }
 
     function _onCommandResult(data) {
+        console.log('[PH] WS command-result:', JSON.parse(JSON.stringify(data)));
         if (data.match_id !== matchId.value) return;
 
         _appendHistory(data.command, data.output_lines ?? []);
@@ -164,6 +165,7 @@ export function usePacketHijack(playerId) {
     }
 
     function _onPhaseTransition(data) {
+        console.log('[PH] WS phase-transition:', JSON.parse(JSON.stringify(data)));
         if (data.match_id !== matchId.value) return;
 
         if (data.alert_only) {
@@ -228,9 +230,13 @@ export function usePacketHijack(playerId) {
 
         busy.value = true;
         try {
-            await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
+            console.log('[PH] → POST command:', trimmed);
+            const res = await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
+            console.log('[PH] ← response ok:', res.status, res.data);
         } catch (e) {
             const status = e?.response?.status;
+            const body   = e?.response?.data;
+            console.error('[PH] ✗ command error:', { status, body, input: trimmed, error: e?.message });
             if (status === 409) {
                 _appendHistory(trimmed, ['[ERROR]: TARGET ALREADY PURGED']);
             } else if (status === 429) {
