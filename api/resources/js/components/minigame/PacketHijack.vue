@@ -37,10 +37,11 @@
                 <span class="ph-topbar-phase" :class="phase === 2 ? 'phase--two' : 'phase--one'">
                     PHASE {{ phase }}: {{ phase === 1 ? 'RECON HUNT' : 'PORT INTRUSION' }}
                 </span>
+                <button class="ph-ref-toggle" :class="{ 'ref-toggle--active': showPanel }" @click="showPanel = !showPanel">[?]</button>
             </div>
             <div class="ph-rule" />
 
-            <!-- Phase 2 port matrix (shown above history when in phase 2) -->
+            <!-- Phase 2 port matrix -->
             <div v-if="phase === 2 && ports.length" class="ph-port-matrix">
                 <div class="ph-matrix-header">[ PORT STATUS MATRIX // TARGET: {{ targetIp }} ]</div>
                 <div class="ph-matrix-row ph-matrix-header-row">
@@ -63,7 +64,7 @@
                 <div class="ph-rule ph-rule--light" />
             </div>
 
-            <!-- Rig command loadout strip (hack commands only) -->
+            <!-- Rig command strip -->
             <div v-if="hackCommands && hackCommands.length" class="ph-rig-strip">
                 <span class="ph-rig-label">RIG:</span>
                 <button
@@ -71,12 +72,11 @@
                     :key="cmd.name"
                     class="ph-rig-btn"
                     :class="{
-                        'rig-btn--used':     usedRigCommands.includes(commandSlug(cmd.name)),
-                        'rig-btn--locked':   isLocked || busy,
-                        'rig-btn--level2':   cmd.level === 2,
+                        'rig-btn--used':   usedRigCommands.includes(commandSlug(cmd.name)),
+                        'rig-btn--locked': isLocked || busy,
+                        'rig-btn--level2': cmd.level === 2,
                     }"
                     :disabled="usedRigCommands.includes(commandSlug(cmd.name)) || isLocked || busy || isComplete"
-                    :title="`${cmd.name} (L${cmd.level})`"
                     @click="$emit('use-rig-command', commandSlug(cmd.name))"
                 >
                     {{ cmd.name.toUpperCase() }}
@@ -84,57 +84,153 @@
                 </button>
             </div>
 
-            <!-- Scrollable history pane -->
-            <div class="ph-history" ref="historyEl">
-                <div v-for="(entry, i) in commandHistory" :key="i" class="ph-history-entry">
-                    <div v-if="entry.input !== 'SYSTEM'" class="ph-history-input">
-                        <span class="ph-prompt">SYS_INPUT &gt;</span> {{ entry.input }}
+            <!-- Body row: terminal col + side panel -->
+            <div class="ph-body">
+
+                <!-- Left: history + input -->
+                <div class="ph-main-col">
+
+                    <!-- Tension boot screen — shown until netstat is run -->
+                    <div v-if="!boardReady && phase === 1" class="ph-boot">
+                        <div class="ph-boot-line">[ PACKET HIJACK INITIALISED ]</div>
+                        <div class="ph-boot-line">[ NODE {{ nodeLabel }} — SHARED ACCESS DETECTED ]</div>
+                        <div class="ph-boot-gap" />
+                        <div class="ph-boot-warn">WARNING: HOSTILE OPERATOR DETECTED ON NODE</div>
+                        <div class="ph-boot-warn ph-boot-warn--indent">YOUR POSITION IS NOT YET SECURED</div>
+                        <div class="ph-boot-gap" />
+                        <div class="ph-boot-hint">TYPE <span class="ph-boot-cmd">netstat --active</span> TO BEGIN TRACE</div>
+                        <div class="ph-boot-threat">{{ threatMessage }}</div>
+                        <div class="ph-boot-cursor">▌</div>
                     </div>
-                    <div
-                        v-for="(line, j) in entry.lines"
-                        :key="j"
-                        class="ph-history-line"
-                        :class="lineClass(line)"
-                    >{{ line }}</div>
-                </div>
-            </div>
 
-            <div class="ph-rule ph-rule--light" />
+                    <!-- Scrollable history -->
+                    <div v-else class="ph-history" ref="historyEl">
+                        <div v-for="(entry, i) in commandHistory" :key="i" class="ph-history-entry">
+                            <div v-if="entry.input !== 'SYSTEM'" class="ph-history-input">
+                                <span class="ph-prompt">SYS_INPUT &gt;</span> {{ entry.input }}
+                            </div>
+                            <div
+                                v-for="(line, j) in entry.lines"
+                                :key="j"
+                                class="ph-history-line"
+                                :class="lineClass(line)"
+                            >{{ line }}</div>
+                        </div>
+                    </div>
 
-            <!-- Input row -->
-            <div class="ph-input-row">
-                <span class="ph-prompt">SYS_INPUT &gt;</span>
-                <div v-if="isLocked" class="ph-locked">
-                    <span class="ph-lock-msg">[ INPUT LOCKED — {{ lockCountdown }}s ]</span>
+                    <div class="ph-rule ph-rule--light" />
+
+                    <!-- Input row -->
+                    <div class="ph-input-row">
+                        <span class="ph-prompt">SYS_INPUT &gt;</span>
+                        <div v-if="isLocked" class="ph-locked">
+                            <span class="ph-lock-msg">[ INPUT LOCKED — {{ lockCountdown }}s ]</span>
+                        </div>
+                        <input
+                            v-else
+                            ref="inputEl"
+                            v-model="inputValue"
+                            class="ph-input"
+                            type="text"
+                            spellcheck="false"
+                            autocomplete="off"
+                            :disabled="busy || isComplete"
+                            @keydown.enter.prevent="onSubmit"
+                            @keydown.up.prevent="historyUp"
+                            @keydown.down.prevent="historyDown"
+                        />
+                        <span class="ph-cursor" :class="{ 'cursor--blink': !isLocked }">█</span>
+                    </div>
                 </div>
-                <input
-                    v-else
-                    ref="inputEl"
-                    v-model="inputValue"
-                    class="ph-input"
-                    type="text"
-                    spellcheck="false"
-                    autocomplete="off"
-                    :disabled="busy || isComplete"
-                    @keydown.enter.prevent="onSubmit"
-                    @keydown.up.prevent="historyUp"
-                    @keydown.down.prevent="historyDown"
-                />
-                <span class="ph-cursor" :class="{ 'cursor--blink': !isLocked }">█</span>
-            </div>
+
+                <!-- Right: case file (Phase 1) or command ref (Phase 2) -->
+                <Transition name="ref-slide">
+                    <div v-if="showPanel" class="ph-ref-panel">
+
+                        <!-- Phase 1: live case file -->
+                        <template v-if="phase === 1">
+                            <div class="ph-ref-title">CASE FILE</div>
+                            <div class="ph-ref-phase">// NODE SUSPECTS</div>
+
+                            <div v-if="!boardReady" class="ph-ref-empty">
+                                RUN netstat --active TO POPULATE
+                            </div>
+
+                            <template v-else>
+                                <div class="ph-cf-stats">
+                                    ACTIVE: {{ activeSuspectCount }} / {{ suspects.length }}
+                                    <span v-if="octetClue" class="ph-cf-clue"> // OCTET: {{ octetClue }}</span>
+                                </div>
+                                <div class="ph-cf-header">
+                                    <span class="ph-cf-col ph-cf-col--ip">IP</span>
+                                    <span class="ph-cf-col ph-cf-col--ping">PING</span>
+                                    <span class="ph-cf-col ph-cf-col--hops">HOPS</span>
+                                    <span class="ph-cf-col ph-cf-col--arp">ARP</span>
+                                </div>
+                                <div
+                                    v-for="s in suspects"
+                                    :key="s.ip"
+                                    class="ph-cf-row"
+                                    :class="{ 'cf-row--flushed': s.flushed }"
+                                >
+                                    <span class="ph-cf-col ph-cf-col--ip">{{ s.ip }}</span>
+                                    <span class="ph-cf-col ph-cf-col--ping" :class="pingClass(s)">
+                                        {{ pingDisplay(s) }}
+                                    </span>
+                                    <span class="ph-cf-col ph-cf-col--hops">
+                                        {{ s.hops !== undefined ? s.hops : '???' }}
+                                    </span>
+                                    <span class="ph-cf-col ph-cf-col--arp" :class="arpClass(s)">
+                                        {{ arpDisplay(s) }}
+                                    </span>
+                                </div>
+                            </template>
+                        </template>
+
+                        <!-- Phase 2: command quick ref -->
+                        <template v-else>
+                            <div class="ph-ref-title">CMD REF</div>
+                            <div class="ph-ref-phase">// PHASE 2 — INTRUSION</div>
+                            <div class="ph-ref-entry">
+                                <div class="ph-ref-cmd">probe port &lt;n&gt;</div>
+                                <div class="ph-ref-desc">Analyse a port's service and encryption bias</div>
+                            </div>
+                            <div class="ph-ref-entry">
+                                <div class="ph-ref-cmd">decode port &lt;n&gt;</div>
+                                <div class="ph-ref-desc">Manually chip away at bias — works on any port</div>
+                            </div>
+                            <div class="ph-ref-entry">
+                                <div class="ph-ref-cmd">exploit port &lt;n&gt;</div>
+                                <div class="ph-ref-desc">Shatter port if bias ≤ 25%. Cascades remaining.</div>
+                            </div>
+                            <div class="ph-ref-entry ph-ref-entry--commit">
+                                <div class="ph-ref-cmd">breach &lt;ip&gt;</div>
+                                <div class="ph-ref-desc">Deploy final payload once exfil port unlocks.</div>
+                            </div>
+                            <div class="ph-ref-note">EXFIL UNLOCKS AFTER ALL GATES SHATTERED</div>
+                        </template>
+
+                    </div>
+                </Transition>
+
+            </div><!-- end ph-body -->
         </div>
 
     </div>
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
 
 const props = defineProps({
     matchId:             { type: String,  required: true },
     role:                { type: String,  required: true },
     phase:               { type: Number,  required: true },
     commandHistory:      { type: Array,   required: true },
+    suspects:            { type: Array,   default: () => [] },
+    octetClue:           { type: String,  default: null },
+    activeSuspectCount:  { type: Number,  default: 0 },
+    boardReady:          { type: Boolean, default: false },
     ports:               { type: Array,   default: () => [] },
     targetIp:            { type: String,  default: null },
     isLocked:            { type: Boolean, default: false },
@@ -143,29 +239,37 @@ const props = defineProps({
     matchResult:         { type: Object,  default: null },
     isComplete:          { type: Boolean, default: false },
     busy:                { type: Boolean, default: false },
-    hackCommands:        { type: Array,   default: () => [] },  // equipped hack-context commands
-    usedRigCommands:     { type: Array,   default: () => [] },  // slugs spent this match
+    hackCommands:        { type: Array,   default: () => [] },
+    usedRigCommands:     { type: Array,   default: () => [] },
 });
 
 const emit = defineEmits(['submit-command', 'match-complete', 'use-rig-command']);
 
-const inputEl   = ref(null);
-const historyEl = ref(null);
+const inputEl    = ref(null);
+const historyEl  = ref(null);
 const inputValue = ref('');
+const showPanel  = ref(true);
 
-// Command history navigation (up/down arrow)
 let historyNav  = [];
 let historyNavI = -1;
+
+// Random threat message — rotates per match open
+const threatMessages = [
+    'YOUR OPPONENT MAY ALREADY BE HUNTING',
+    'HOSTILE TRACE ACTIVITY DETECTED — UNCONFIRMED',
+    'UNKNOWN OPERATOR ACTIVE ON THIS NODE',
+    'YOU ARE NOT ALONE ON THIS NETWORK',
+];
+const threatMessage = threatMessages[Math.floor(Math.random() * threatMessages.length)];
+const nodeLabel     = props.matchId?.slice(0, 6).toUpperCase() ?? '??????';
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 
 function onSubmit() {
     const val = inputValue.value.trim();
     if (!val || props.busy || props.isLocked) return;
-
     historyNav.unshift(val);
     historyNavI = -1;
-
     emit('submit-command', val);
     inputValue.value = '';
 }
@@ -182,43 +286,64 @@ function historyDown() {
 }
 
 // ── Auto-scroll history ───────────────────────────────────────────────────────
-// Deep watch so we also scroll when typewriter lines are pushed into entries.
 
 watch(() => props.commandHistory, async () => {
     await nextTick();
-    if (historyEl.value) {
-        historyEl.value.scrollTop = historyEl.value.scrollHeight;
-    }
+    if (historyEl.value) historyEl.value.scrollTop = historyEl.value.scrollHeight;
 }, { deep: true });
 
-// ── Re-focus input after lock releases ───────────────────────────────────────
-
 watch(() => props.isLocked, (locked) => {
-    if (!locked) {
-        nextTick(() => inputEl.value?.focus());
-    }
+    if (!locked) nextTick(() => inputEl.value?.focus());
 });
 
-onMounted(() => {
-    nextTick(() => inputEl.value?.focus());
-});
+onMounted(() => nextTick(() => inputEl.value?.focus()));
 
-// ── CSS helpers ───────────────────────────────────────────────────────────────
+// ── Case file display helpers ─────────────────────────────────────────────────
+
+function pingDisplay(s) {
+    if (s.latency_ms === undefined) return '???';
+    if (s.latency_status === 'TIMEOUT') return 'TIMEOUT';
+    return `${s.latency_ms}ms`;
+}
+
+function pingClass(s) {
+    if (s.latency_status === 'TIMEOUT') return 'cf-val--dead';
+    if (s.latency_ms !== undefined && s.latency_ms <= 20) return 'cf-val--live';
+    if (s.latency_status === 'DEGRADED') return 'cf-val--degraded';
+    return '';
+}
+
+function arpDisplay(s) {
+    if (s._arp_revealed === undefined && s.last_seen_seconds === undefined) return '???';
+    const sec = s.last_seen_seconds;
+    if (sec <= 5) return 'JUST NOW';
+    if (sec < 60) return `${sec}s AGO`;
+    return `${Math.floor(sec / 60)}m AGO`;
+}
+
+function arpClass(s) {
+    if (s.last_seen_seconds === undefined) return '';
+    if (s.last_seen_seconds <= 5) return 'cf-val--live';
+    if (s.last_seen_seconds > 60) return 'cf-val--dead';
+    return 'cf-val--degraded';
+}
+
+// ── Port matrix helpers ───────────────────────────────────────────────────────
 
 function portRowClass(entry) {
-    if (entry.shattered)               return 'port--shattered';
-    if (entry.port === 8080 && entry.unlocked) return 'port--exfil';
-    if (entry.port === 8080)           return 'port--locked';
-    if (entry.bias <= 25)              return 'port--low';
+    if (entry.shattered)                          return 'port--shattered';
+    if (entry.port === 8080 && entry.unlocked)    return 'port--exfil';
+    if (entry.port === 8080)                      return 'port--locked';
+    if (entry.bias <= 25)                         return 'port--low';
     return 'port--high';
 }
 
 function portStatus(entry) {
-    if (entry.shattered)                        return 'SHATTERED';
-    if (entry.port === 8080 && entry.unlocked)  return 'UNLOCKED';
-    if (entry.port === 8080)                    return 'LOCKED';
-    if (entry.bias <= 10)                       return 'CRITICAL LOW';
-    if (entry.bias <= 25)                       return 'LOW';
+    if (entry.shattered)                          return 'SHATTERED';
+    if (entry.port === 8080 && entry.unlocked)    return 'UNLOCKED';
+    if (entry.port === 8080)                      return 'LOCKED';
+    if (entry.bias <= 10)                         return 'CRITICAL LOW';
+    if (entry.bias <= 25)                         return 'LOW';
     return 'HIGH';
 }
 
@@ -229,10 +354,11 @@ function commandSlug(name) {
 function lineClass(line) {
     if (line.startsWith('[SUCCESS]') || line.startsWith('[BREACH'))  return 'line--success';
     if (line.startsWith('[ERROR]'))                                   return 'line--error';
-    if (line.startsWith('[ALERT]') || line.startsWith('[CRITICAL'))  return 'line--alert';
-    if (line.startsWith('[CAPTURED]') || line.startsWith('[DIAG'))   return 'line--clue';
-    if (line.startsWith('->'))                                        return 'line--candidate';
+    if (line.startsWith('[ALERT]') || line.startsWith('[WARNING'))   return 'line--alert';
+    if (line.startsWith('[OCTET') || line.startsWith('[CAPTURED]'))  return 'line--clue';
+    if (line.startsWith('[RESULT]'))                                  return 'line--result';
     if (line.startsWith('[='))                                        return 'line--progress';
+    if (line.startsWith('  ') && line.includes('—'))                 return 'line--arp';
     return 'line--default';
 }
 </script>
@@ -251,12 +377,10 @@ function lineClass(line) {
     font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 
-/* ── Defender alert banner ───────────────────────────────────────────────── */
+/* ── Defender alert ──────────────────────────────────────────────────────── */
 .ph-alert-banner {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     z-index: 9100;
     padding: 12px 0;
     text-align: center;
@@ -270,8 +394,8 @@ function lineClass(line) {
 }
 
 @keyframes alert-pulse {
-    from { color: #FF4444; background: rgba(255, 30, 30, 0.10); }
-    to   { color: #FF8888; background: rgba(255, 30, 30, 0.25); }
+    from { color: #FF4444; background: rgba(255,30,30,0.10); }
+    to   { color: #FF8888; background: rgba(255,30,30,0.25); }
 }
 
 .alert-fade-enter-active, .alert-fade-leave-active { transition: opacity 0.4s; }
@@ -287,45 +411,26 @@ function lineClass(line) {
 }
 
 .ph-complete-box {
-    border: 1px solid rgba(0, 255, 255, 0.3);
+    border: 1px solid rgba(0,255,255,0.3);
     padding: 40px 56px;
     text-align: center;
     min-width: 380px;
-    background: rgba(8, 8, 15, 0.95);
+    background: rgba(8,8,15,0.95);
 }
 
-.complete--win  { border-color: rgba(0, 255, 136, 0.5); }
-.complete--loss { border-color: rgba(255, 50, 50, 0.4); }
+.complete--win  { border-color: rgba(0,255,136,0.5); }
+.complete--loss { border-color: rgba(255,50,50,0.4); }
 
-.ph-complete-title {
-    font-size: 20px;
-    letter-spacing: 0.2em;
-    color: #00ff88;
-    margin-bottom: 16px;
-}
-
+.ph-complete-title       { font-size: 20px; letter-spacing: 0.2em; color: #00ff88; margin-bottom: 16px; }
 .ph-complete-title--loss { color: #FF4444; }
-
-.ph-complete-line {
-    font-size: 11px;
-    color: rgba(0, 255, 255, 0.6);
-    letter-spacing: 0.1em;
-    margin-bottom: 12px;
-}
-
-.ph-complete-creds {
-    font-size: 16px;
-    color: #00ff88;
-    letter-spacing: 0.12em;
-    margin-bottom: 28px;
-}
-
+.ph-complete-line        { font-size: 11px; color: rgba(0,255,255,0.6); letter-spacing: 0.1em; margin-bottom: 12px; }
+.ph-complete-creds       { font-size: 16px; color: #00ff88; letter-spacing: 0.12em; margin-bottom: 28px; }
 .ph-complete-creds--loss { color: #FF4444; }
 
 .ph-complete-btn {
     background: transparent;
-    border: 1px solid rgba(0, 255, 255, 0.4);
-    color: rgba(0, 255, 255, 0.8);
+    border: 1px solid rgba(0,255,255,0.4);
+    color: rgba(0,255,255,0.8);
     font-family: inherit;
     font-size: 11px;
     letter-spacing: 0.15em;
@@ -333,64 +438,80 @@ function lineClass(line) {
     cursor: pointer;
     transition: border-color 0.2s, color 0.2s;
 }
-.ph-complete-btn:hover {
-    border-color: rgba(0, 255, 255, 0.9);
-    color: #00FFFF;
-}
+.ph-complete-btn:hover { border-color: rgba(0,255,255,0.9); color: #00FFFF; }
 
-/* ── Terminal ────────────────────────────────────────────────────────────── */
+/* ── Terminal shell ──────────────────────────────────────────────────────── */
 .ph-terminal {
-    width: min(860px, 96vw);
-    height: min(620px, 90vh);
+    position: relative;
+    width: min(960px, 96vw);
+    height: min(640px, 92vh);
     background: #08080f;
-    border: 1px solid rgba(0, 255, 255, 0.18);
+    border: 1px solid rgba(0,255,255,0.18);
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
+.ph-terminal::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.09) 3px, rgba(0,0,0,0.09) 4px);
+    z-index: 10;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
 .ph-topbar {
     display: flex;
     gap: 24px;
     padding: 8px 14px;
     font-size: 10px;
     letter-spacing: 0.12em;
-    color: rgba(0, 255, 255, 0.45);
-    background: rgba(0, 255, 255, 0.03);
+    color: rgba(0,255,255,0.45);
+    background: rgba(0,255,255,0.03);
     flex-shrink: 0;
+    align-items: center;
 }
 
 .ph-topbar-phase { margin-left: auto; }
-.phase--one { color: rgba(0, 255, 255, 0.55); }
+.phase--one { color: rgba(0,255,255,0.55); }
 .phase--two { color: #FFB300; }
-
 .ph-role-val { color: #FF69B4; }
 
-.ph-rule       { height: 1px; background: rgba(0,255,255,0.18); flex-shrink: 0; }
+.ph-rule        { height: 1px; background: rgba(0,255,255,0.18); flex-shrink: 0; }
 .ph-rule--light { height: 1px; background: rgba(0,255,255,0.07); flex-shrink: 0; }
+
+/* ── Ref toggle button ───────────────────────────────────────────────────── */
+.ph-ref-toggle {
+    background: transparent;
+    border: 1px solid rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.4);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    padding: 2px 7px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.ph-ref-toggle:hover,
+.ph-ref-toggle.ref-toggle--active {
+    border-color: rgba(0,255,255,0.6);
+    color: rgba(0,255,255,0.9);
+}
 
 /* ── Port matrix ─────────────────────────────────────────────────────────── */
 .ph-port-matrix {
     flex-shrink: 0;
     padding: 8px 14px 6px;
-    background: rgba(0, 255, 255, 0.02);
+    background: rgba(0,255,255,0.02);
     font-size: 11px;
 }
 
-.ph-matrix-header {
-    color: rgba(255, 179, 0, 0.7);
-    letter-spacing: 0.1em;
-    font-size: 10px;
-    margin-bottom: 6px;
-}
+.ph-matrix-header { color: rgba(255,179,0,0.7); letter-spacing: 0.1em; font-size: 10px; margin-bottom: 6px; }
 
-.ph-matrix-row {
-    display: flex;
-    gap: 0;
-    padding: 2px 0;
-    font-size: 11px;
-}
-
+.ph-matrix-row { display: flex; padding: 2px 0; font-size: 11px; }
 .ph-matrix-header-row {
     color: rgba(0,255,255,0.3);
     font-size: 9px;
@@ -400,10 +521,10 @@ function lineClass(line) {
 }
 
 .ph-matrix-col { display: inline-block; }
-.ph-matrix-col--port  { width: 70px;  color: rgba(0,255,255,0.7); }
-.ph-matrix-col--svc   { width: 110px; color: rgba(0,255,255,0.5); }
-.ph-matrix-col--bias  { width: 80px;  }
-.ph-matrix-col--status{ flex: 1; }
+.ph-matrix-col--port   { width: 70px;  color: rgba(0,255,255,0.7); }
+.ph-matrix-col--svc    { width: 110px; color: rgba(0,255,255,0.5); }
+.ph-matrix-col--bias   { width: 80px; }
+.ph-matrix-col--status { flex: 1; }
 
 .port--high     .ph-matrix-col--bias   { color: #FF4444; }
 .port--high     .ph-matrix-col--status { color: rgba(255,68,68,0.7); }
@@ -414,9 +535,108 @@ function lineClass(line) {
 .port--exfil     .ph-matrix-col--status { color: #00ff88; animation: exfil-pulse 0.8s ease-in-out infinite; }
 .port--locked    .ph-matrix-col        { color: rgba(0,255,255,0.2); }
 
-@keyframes exfil-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
+@keyframes exfil-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+/* ── Rig strip ───────────────────────────────────────────────────────────── */
+.ph-rig-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    background: rgba(255,105,180,0.04);
+    border-bottom: 1px solid rgba(255,105,180,0.1);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.ph-rig-label { font-size: 9px; letter-spacing: 0.15em; color: rgba(255,105,180,0.5); flex-shrink: 0; margin-right: 2px; }
+
+.ph-rig-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid rgba(255,105,180,0.35);
+    color: rgba(255,105,180,0.85);
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+.ph-rig-btn:hover:not(:disabled) { border-color: rgba(255,105,180,0.8); color: #FF69B4; background: rgba(255,105,180,0.08); }
+.ph-rig-btn.rig-btn--level2 { border-color: rgba(255,150,50,0.4); color: rgba(255,150,50,0.85); }
+.ph-rig-btn.rig-btn--level2:hover:not(:disabled) { border-color: rgba(255,150,50,0.9); color: #FF9632; background: rgba(255,150,50,0.08); }
+.ph-rig-btn.rig-btn--used, .ph-rig-btn:disabled { border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); cursor: not-allowed; text-decoration: line-through; }
+.ph-rig-lvl { font-size: 7px; opacity: 0.6; letter-spacing: 0; }
+
+/* ── Body row ────────────────────────────────────────────────────────────── */
+.ph-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.ph-main-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Tension boot screen ─────────────────────────────────────────────────── */
+.ph-boot {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 28px 20px;
+    gap: 4px;
+}
+
+.ph-boot-line {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: rgba(0,255,255,0.5);
+}
+
+.ph-boot-gap { height: 14px; }
+
+.ph-boot-warn {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #FFB300;
+}
+
+.ph-boot-warn--indent { padding-left: 24px; }
+
+.ph-boot-hint {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: rgba(0,255,255,0.5);
+    margin-top: 14px;
+}
+
+.ph-boot-cmd {
+    color: #00FFFF;
+    font-weight: bold;
+}
+
+.ph-boot-threat {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #FF4444;
+    margin-top: 4px;
+    animation: alert-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.ph-boot-cursor {
+    font-size: 14px;
+    color: rgba(0,255,255,0.6);
+    margin-top: 12px;
+    animation: blink 1s step-start infinite;
 }
 
 /* ── History ─────────────────────────────────────────────────────────────── */
@@ -448,13 +668,14 @@ function lineClass(line) {
     word-break: break-all;
 }
 
-.line--default   { color: rgba(0,255,255,0.7); }
-.line--success   { color: #00ff88; }
-.line--error     { color: #FF4444; }
-.line--alert     { color: #FFB300; }
-.line--clue      { color: #FF69B4; }
-.line--candidate { color: #00FFFF; padding-left: 12px; }
-.line--progress  { color: #00ff88; letter-spacing: 0.02em; }
+.line--default  { color: rgba(0,255,255,0.7); }
+.line--success  { color: #00ff88; }
+.line--error    { color: #FF4444; }
+.line--alert    { color: #FFB300; }
+.line--clue     { color: #FF69B4; }
+.line--result   { color: rgba(0,255,255,0.9); }
+.line--progress { color: #00ff88; letter-spacing: 0.02em; }
+.line--arp      { color: rgba(0,255,255,0.6); font-size: 10px; }
 
 /* ── Input row ───────────────────────────────────────────────────────────── */
 .ph-input-row {
@@ -466,13 +687,7 @@ function lineClass(line) {
     background: rgba(0,255,255,0.02);
 }
 
-.ph-prompt {
-    font-size: 11px;
-    color: rgba(0,255,255,0.5);
-    letter-spacing: 0.08em;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
+.ph-prompt { font-size: 11px; color: rgba(0,255,255,0.5); letter-spacing: 0.08em; white-space: nowrap; flex-shrink: 0; }
 
 .ph-input {
     flex: 1;
@@ -483,119 +698,89 @@ function lineClass(line) {
     font-size: 12px;
     color: #00FFFF;
     letter-spacing: 0.06em;
-    caret-color: transparent; /* custom cursor below */
+    caret-color: transparent;
 }
 
-.ph-cursor {
-    font-size: 12px;
-    color: #00FFFF;
-    flex-shrink: 0;
-}
-
+.ph-cursor { font-size: 12px; color: #00FFFF; flex-shrink: 0; }
 .cursor--blink { animation: blink 1s step-start infinite; }
 
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
-}
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
 
-.ph-locked {
-    flex: 1;
-    display: flex;
-    align-items: center;
-}
+.ph-locked { flex: 1; display: flex; align-items: center; }
+.ph-lock-msg { font-size: 11px; color: #FF4444; letter-spacing: 0.1em; animation: alert-pulse 0.4s ease-in-out infinite alternate; }
 
-.ph-lock-msg {
-    font-size: 11px;
-    color: #FF4444;
-    letter-spacing: 0.1em;
-    animation: alert-pulse 0.4s ease-in-out infinite alternate;
-}
-
-/* ── CRT scanline overlay ────────────────────────────────────────────────── */
-.ph-terminal {
-    position: relative; /* required for ::after */
-}
-
-.ph-terminal::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0, 0, 0, 0.09) 3px,
-        rgba(0, 0, 0, 0.09) 4px
-    );
-    z-index: 10;
-}
-
-/* ── Rig command strip ───────────────────────────────────────────────────── */
-.ph-rig-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 14px;
-    background: rgba(255, 105, 180, 0.04);
-    border-bottom: 1px solid rgba(255, 105, 180, 0.1);
+/* ── Side panel ──────────────────────────────────────────────────────────── */
+.ph-ref-panel {
+    width: 260px;
     flex-shrink: 0;
-    flex-wrap: wrap;
-}
-
-.ph-rig-label {
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    color: rgba(255, 105, 180, 0.5);
-    flex-shrink: 0;
-    margin-right: 2px;
-}
-
-.ph-rig-btn {
+    border-left: 1px solid rgba(0,255,255,0.1);
+    background: rgba(0,255,255,0.015);
+    padding: 10px 12px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,255,255,0.1) transparent;
     display: flex;
-    align-items: center;
-    gap: 4px;
-    background: transparent;
-    border: 1px solid rgba(255, 105, 180, 0.35);
-    color: rgba(255, 105, 180, 0.85);
-    font-family: inherit;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ph-ref-title  { font-size: 9px; letter-spacing: 0.2em; color: rgba(0,255,255,0.35); margin-bottom: 2px; }
+.ph-ref-phase  { font-size: 9px; letter-spacing: 0.08em; color: #FFB300; margin-bottom: 8px; opacity: 0.75; }
+.ph-ref-empty  { font-size: 9px; color: rgba(0,255,255,0.25); letter-spacing: 0.06em; margin-top: 8px; }
+.ph-ref-entry  { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-bottom: 1px solid rgba(0,255,255,0.05); }
+.ph-ref-entry--commit .ph-ref-cmd { color: #00ff88; }
+.ph-ref-cmd    { font-size: 10px; color: rgba(0,255,255,0.75); letter-spacing: 0.04em; word-break: break-all; }
+.ph-ref-desc   { font-size: 9px; color: rgba(0,255,255,0.35); letter-spacing: 0.03em; line-height: 1.4; }
+.ph-ref-note   { font-size: 8px; color: rgba(255,179,0,0.45); letter-spacing: 0.08em; margin-top: 8px; line-height: 1.5; }
+
+/* ── Case file grid ──────────────────────────────────────────────────────── */
+.ph-cf-stats {
     font-size: 9px;
-    letter-spacing: 0.12em;
-    padding: 3px 8px;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-    white-space: nowrap;
+    color: rgba(0,255,255,0.4);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
 }
 
-.ph-rig-btn:hover:not(:disabled) {
-    border-color: rgba(255, 105, 180, 0.8);
-    color: #FF69B4;
-    background: rgba(255, 105, 180, 0.08);
+.ph-cf-clue { color: #FF69B4; }
+
+.ph-cf-header {
+    display: flex;
+    font-size: 8px;
+    color: rgba(0,255,255,0.25);
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(0,255,255,0.08);
+    padding-bottom: 3px;
+    margin-bottom: 2px;
 }
 
-.ph-rig-btn.rig-btn--level2 {
-    border-color: rgba(255, 150, 50, 0.4);
-    color: rgba(255, 150, 50, 0.85);
+.ph-cf-row {
+    display: flex;
+    font-size: 9px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(0,255,255,0.03);
+    transition: opacity 0.2s;
 }
 
-.ph-rig-btn.rig-btn--level2:hover:not(:disabled) {
-    border-color: rgba(255, 150, 50, 0.9);
-    color: #FF9632;
-    background: rgba(255, 150, 50, 0.08);
-}
-
-.ph-rig-btn.rig-btn--used,
-.ph-rig-btn:disabled {
-    border-color: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.2);
-    cursor: not-allowed;
+.cf-row--flushed {
+    opacity: 0.2;
     text-decoration: line-through;
 }
 
-.ph-rig-lvl {
-    font-size: 7px;
-    opacity: 0.6;
-    letter-spacing: 0;
+.ph-cf-col { display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-cf-col--ip   { width: 108px; color: rgba(0,255,255,0.6); font-size: 8.5px; }
+.ph-cf-col--ping { width: 52px; color: rgba(0,255,255,0.4); }
+.ph-cf-col--hops { width: 30px; color: rgba(0,255,255,0.4); }
+.ph-cf-col--arp  { flex: 1; color: rgba(0,255,255,0.4); }
+
+.cf-val--live     { color: #00ff88 !important; }
+.cf-val--degraded { color: #FFB300 !important; }
+.cf-val--dead     { color: rgba(255,68,68,0.5) !important; }
+
+/* ── Slide transition ────────────────────────────────────────────────────── */
+.ref-slide-enter-active, .ref-slide-leave-active {
+    transition: width 0.2s ease, opacity 0.2s ease;
+    overflow: hidden;
 }
+.ref-slide-enter-from, .ref-slide-leave-to  { width: 0; opacity: 0; }
+.ref-slide-enter-to,   .ref-slide-leave-from { width: 260px; opacity: 1; }
 </style>

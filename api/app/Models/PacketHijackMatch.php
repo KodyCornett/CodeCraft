@@ -18,7 +18,9 @@ class PacketHijackMatch extends Model
         'challenger_target_ip',
         'defender_target_ip',
         'challenger_ip_pool',
+        'challenger_suspects',
         'defender_ip_pool',
+        'defender_suspects',
         'challenger_ports',
         'defender_ports',
         'challenger_phase',
@@ -41,7 +43,9 @@ class PacketHijackMatch extends Model
 
     protected $casts = [
         'challenger_ip_pool'          => 'array',
+        'challenger_suspects'         => 'array',
         'defender_ip_pool'            => 'array',
+        'defender_suspects'           => 'array',
         'challenger_ports'            => 'array',
         'defender_ports'              => 'array',
         'challenger_phase'            => 'integer',
@@ -123,11 +127,26 @@ class PacketHijackMatch extends Model
     }
 
     /**
-     * Get the IP pool for a given role (the pool the role is searching through).
+     * Get the full suspect list for a given role (includes is_target — server only).
      */
-    public function ipPoolFor(string $role): array
+    public function suspectsFor(string $role): array
     {
-        return $role === 'challenger' ? ($this->challenger_ip_pool ?? []) : ($this->defender_ip_pool ?? []);
+        $key = "{$role}_suspects";
+        return $this->$key ?? [];
+    }
+
+    /**
+     * Get the suspect list stripped of is_target for broadcasting to the client.
+     * Only reveals attributes that have been populated — the raw object is safe
+     * to send as-is since is_target is removed here.
+     */
+    public function suspectsPublicView(string $role): array
+    {
+        return array_map(function ($s) {
+            $copy = $s;
+            unset($copy['is_target']);
+            return $copy;
+        }, $this->suspectsFor($role));
     }
 
     /**

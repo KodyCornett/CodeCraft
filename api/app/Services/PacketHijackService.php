@@ -47,14 +47,24 @@ class PacketHijackService
     /** Lock duration in seconds when a player hits a honeypot. */
     private const HONEYPOT_LOCK_SECONDS = 3;
 
-    /** How many IPs to show on the first netstat call. */
-    private const NETSTAT_SAMPLE_SIZE = 15;
+    /** Number of suspect IPs on the Phase 1 board. */
+    private const SUSPECT_COUNT = 14;
 
     /** Recognised Phase 1 commands. */
-    private const PHASE1_COMMANDS = ['netstat', 'sniff', 'isolate', 'inject'];
+    private const PHASE1_COMMANDS = ['netstat', 'ping', 'traceroute', 'arp', 'whois', 'sniff', 'flush', 'inject'];
 
     /** Recognised Phase 2 commands. */
-    private const PHASE2_COMMANDS = ['scan', 'exploit', 'malware'];
+    private const PHASE2_COMMANDS = ['probe', 'exploit', 'decode', 'breach'];
+
+    /** Port flavor text for probe command — indexed by port number. */
+    private const PORT_FLAVOR = [
+        21   => ['LEGACY FTP PROTOCOL DETECTED', 'PLAIN TEXT AUTHENTICATION — NO ENCRYPTION'],
+        22   => ['SECURE SHELL SERVICE DETECTED', 'ENCRYPTED CHANNEL — KEY EXCHANGE HANDSHAKE ACTIVE'],
+        80   => ['UNENCRYPTED HTTP SERVICE DETECTED', 'NULL AUTH HEADER PRESENT — OPEN CHANNEL'],
+        443  => ['TLS ENCRYPTED HTTPS SERVICE', 'CERTIFICATE PINNING ACTIVE — HARDENED GATE'],
+        3306 => ['MYSQL DATABASE PORT EXPOSED', 'MISCONFIGURATION DETECTED — PORT SHOULD NOT BE PUBLIC'],
+        8080 => ['EXFILTRATION CHANNEL — ALT-HTTP', 'PAYLOAD DELIVERY ROUTE — AWAITING UNLOCK'],
+    ];
 
     /**
      * Rig commands that buff the user (self-targeting).
@@ -85,45 +95,123 @@ class PacketHijackService
     }
 
     /**
-     * Generate a shuffled IP pool containing $realIp plus 50+ decoys.
-     * The pool is stored in the match; the player starts seeing a 15-item
-     * sample from it via the netstat command.
+     * Generate the Phase 1 suspect board for one player.
      *
-     * Decoys are drawn from all three RFC-1918 ranges and include deliberate
-     * near-misses (same /24 as the real IP) to reward careful analysis.
+     * Creates SUSPECT_COUNT IP objects representing active connections on the
+     * shared node. One entry is the real target; the rest are decoys. Every
+     * attribute is seeded server-side and stored — the client only sees what
+     * has been revealed through commands (is_target is NEVER sent to client).
+     *
+     * Decoy believability scales with the target's OS stat:
+     *   OS 1–2 → 0 fast decoys (target is obvious on ping alone)
+     *   OS 3–4 → 1–2 fast decoys
+     *   OS 5–6 → 3–4 fast decoys (Ghost chassis — hard to distinguish)
+     *   OS 7+  → 5+ fast decoys (near-impossible without arp + whois)
+     *
+     * Suspect object schema:
+     *   ip               string   — RFC-1918 address
+     *   latency_ms       int|null — null = timeout
+     *   latency_status   string   — LIVE | DEGRADED | TIMEOUT
+     *   hops             int      — 1–12
+     *   network_range    string   — 192.x | 10.x | 172.x
+     *   last_seen_seconds int     — seconds since last ARP activity
+     *   whois_class      string   — node type label
+     *   whois_redacted   bool     — true if target OS ≥ 6
+     *   is_target        bool     — NEVER sent to client
+     *   flushed          bool     — set true by flush command
      */
-    public function generateIpPool(string $realIp): array
+    public function generateNodeConnections(string $realIp, int $targetOs): array
     {
-        $decoys  = [];
-        $parts   = explode('.', $realIp);
-        $subnet  = "{$parts[0]}.{$parts[1]}.{$parts[2]}";
+        $suspects   = [];
+        $usedIps    = [$realIp];
+        $fastDecoys = (int) min(6, max(0, floor(($targetOs - 1) * 1.2)));
 
-        // 5 near-miss decoys in the same /24
-        for ($i = 0; $i < 5; $i++) {
-            do {
-                $candidate = $subnet . '.' . random_int(1, 254);
-            } while ($candidate === $realIp || in_array($candidate, $decoys, true));
-            $decoys[] = $candidate;
-        }
+        $whoisClasses = [
+            'STATIC NODE', 'RELAY HUB', 'PROXY ENDPOINT', 'ANONYMOUS RELAY',
+            'MESH NODE', 'DARK RELAY', 'TRANSIT HOP', 'EDGE NODE',
+        ];
 
-        // Fill remaining decoys from all three RFC-1918 ranges
         $generators = [
             fn() => '192.168.' . random_int(0, 255) . '.' . random_int(1, 254),
             fn() => '10.'      . random_int(0, 255) . '.' . random_int(0, 255) . '.' . random_int(1, 254),
             fn() => '172.'     . random_int(16, 31)  . '.' . random_int(0, 255) . '.' . random_int(1, 254),
         ];
 
-        while (count($decoys) < 52) {
-            $candidate = $generators[array_rand($generators)]();
-            if ($candidate !== $realIp && !in_array($candidate, $decoys, true)) {
-                $decoys[] = $candidate;
+        $parts        = explode('.', $realIp);
+        $targetRange  = $parts[0] === '192' ? '192.x' : ($parts[0] === '10' ? '10.x' : '172.x');
+
+        // ── Build decoys ──────────────────────────────────────────────────────
+        $decoyCount = self::SUSPECT_COUNT - 1;
+
+        for ($i = 0; $i < $decoyCount; $i++) {
+            do {
+                $ip = $generators[array_rand($generators)]();
+            } while (in_array($ip, $usedIps, true));
+            $usedIps[] = $ip;
+
+            $ipParts = explode('.', $ip);
+            $range   = $ipParts[0] === '192' ? '192.x' : ($ipParts[0] === '10' ? '10.x' : '172.x');
+
+            // Fast decoys — blend with the real target to add uncertainty
+            if ($i < $fastDecoys) {
+                $latencyMs     = random_int(2, 12);
+                $latencyStatus = 'LIVE';
+                $hops          = random_int(1, 4);
+                $lastSeen      = random_int(1, 15);
+            } else {
+                // Slow / dead decoys — easy to eliminate
+                $roll = random_int(0, 2);
+                if ($roll === 0) {
+                    $latencyMs     = null;
+                    $latencyStatus = 'TIMEOUT';
+                    $hops          = random_int(6, 12);
+                    $lastSeen      = random_int(60, 600);
+                } elseif ($roll === 1) {
+                    $latencyMs     = random_int(150, 450);
+                    $latencyStatus = 'DEGRADED';
+                    $hops          = random_int(5, 10);
+                    $lastSeen      = random_int(30, 300);
+                } else {
+                    $latencyMs     = random_int(20, 80);
+                    $latencyStatus = 'LIVE';
+                    $hops          = random_int(3, 8);
+                    $lastSeen      = random_int(10, 120);
+                }
             }
+
+            $suspects[] = [
+                'ip'                 => $ip,
+                'latency_ms'         => $latencyMs,
+                'latency_status'     => $latencyStatus,
+                'hops'               => $hops,
+                'network_range'      => $range,
+                'last_seen_seconds'  => $lastSeen,
+                'whois_class'        => $whoisClasses[array_rand($whoisClasses)],
+                'whois_redacted'     => (bool) random_int(0, 1),
+                'is_target'          => false,
+                'flushed'            => false,
+            ];
         }
 
-        $pool = array_merge($decoys, [$realIp]);
-        shuffle($pool);
+        // ── Build real target entry ───────────────────────────────────────────
+        $chassisClasses = ['MOBILE RIG', 'BREAKER UNIT', 'VAULT CHASSIS', 'GHOST FRAME'];
 
-        return $pool;
+        $suspects[] = [
+            'ip'                 => $realIp,
+            'latency_ms'         => random_int(2, 8),
+            'latency_status'     => 'LIVE',
+            'hops'               => random_int(1, 3),
+            'network_range'      => $targetRange,
+            'last_seen_seconds'  => random_int(0, 2),
+            'whois_class'        => $chassisClasses[array_rand($chassisClasses)],
+            'whois_redacted'     => $targetOs >= 6,
+            'is_target'          => true,
+            'flushed'            => false,
+        ];
+
+        shuffle($suspects);
+
+        return $suspects;
     }
 
     /**
@@ -202,39 +290,48 @@ class PacketHijackService
      *
      * Recognised patterns:
      *   netstat --active
+     *   ping <ip>
+     *   traceroute <ip>
+     *   arp --scan
+     *   whois <ip>
      *   sniff --traffic
-     *   isolate <segment>          e.g. isolate .4.
-     *   inject <ip>                e.g. inject 192.168.4.11
-     *   scan port <number>
+     *   flush <ip>
+     *   inject <ip>
+     *   probe port <number>
      *   exploit port <number>
-     *   malware inject -IP <ip> PORT <port>
+     *   decode port <number>
+     *   breach <ip>
      */
     public function parseCommand(string $raw): array
     {
-        $tokens  = preg_split('/\s+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY);
+        $tokens = preg_split('/\s+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY);
 
         if (empty($tokens)) {
             return ['valid' => false, 'error' => 'EMPTY INPUT'];
         }
 
-        $command = strtolower($tokens[0]);
+        $command     = strtolower($tokens[0]);
         $allCommands = array_merge(self::PHASE1_COMMANDS, self::PHASE2_COMMANDS);
 
         if (!in_array($command, $allCommands, true)) {
             return ['valid' => false, 'error' => "COMMAND NOT FOUND: {$tokens[0]}"];
         }
 
-        // Validate argument counts per command
         $argCount = count($tokens) - 1;
 
         $argRequirements = [
-            'netstat' => [0, 1],   // netstat --active (flag optional)
-            'sniff'   => [0, 1],   // sniff --traffic (flag optional)
-            'isolate' => [1, 1],   // isolate <segment>
-            'inject'  => [1, 1],   // inject <ip>
-            'scan'    => [2, 2],   // scan port <number>
-            'exploit' => [2, 2],   // exploit port <number>
-            'malware' => [5, 5],   // malware inject -IP <ip> PORT <port>
+            'netstat'    => [0, 1],   // netstat --active
+            'ping'       => [1, 1],   // ping <ip>
+            'traceroute' => [1, 1],   // traceroute <ip>
+            'arp'        => [0, 1],   // arp --scan
+            'whois'      => [1, 1],   // whois <ip>
+            'sniff'      => [0, 1],   // sniff --traffic
+            'flush'      => [1, 1],   // flush <ip>
+            'inject'     => [1, 1],   // inject <ip>
+            'probe'      => [2, 2],   // probe port <number>
+            'exploit'    => [2, 2],   // exploit port <number>
+            'decode'     => [2, 2],   // decode port <number>
+            'breach'     => [1, 1],   // breach <ip>
         ];
 
         [$min, $max] = $argRequirements[$command];
@@ -251,62 +348,136 @@ class PacketHijackService
     // =========================================================================
 
     /**
-     * netstat — returns a random 15-IP sample from the pool to seed the display.
-     * Called once at the start; subsequent calls reshuffle the sample (noise).
+     * netstat --active — returns the full suspect list as the initial case file.
+     * Returns suspect objects stripped of is_target (never sent to client).
+     * Only the IP addresses are revealed at this stage — all attribute columns
+     * show as unrevealed until the player runs further commands.
      */
-    public function commandNetstat(array $pool): array
+    public function commandNetstat(array $suspects): array
     {
-        $sample = $pool;
-        shuffle($sample);
-        return array_slice($sample, 0, self::NETSTAT_SAMPLE_SIZE);
+        return array_map(fn($s) => ['ip' => $s['ip'], 'flushed' => $s['flushed']], $suspects);
     }
 
     /**
-     * sniff — captures one random octet segment from the real target IP.
-     * e.g. '192.168.4.11' might yield '.168.' or '.4.' or '.11'
+     * ping <ip> — probe a specific suspect for latency.
      *
-     * Always returns a segment that uniquely helps narrow the pool, so it
-     * picks from the middle octets (indices 1 and 2) which appear in the
-     * subnet prefix, giving the most useful signal.
+     * Returns the latency_ms and latency_status for the given IP.
+     * IP must exist in the suspect list.
+     */
+    public function commandPing(array $suspects, string $ip): array
+    {
+        foreach ($suspects as $s) {
+            if ($s['ip'] === $ip) {
+                return [
+                    'found'          => true,
+                    'latency_ms'     => $s['latency_ms'],
+                    'latency_status' => $s['latency_status'],
+                ];
+            }
+        }
+        return ['found' => false, 'error' => "HOST {$ip} NOT FOUND IN TRACE BUFFER"];
+    }
+
+    /**
+     * traceroute <ip> — reveal hop count and network range for a specific suspect.
+     */
+    public function commandTraceroute(array $suspects, string $ip): array
+    {
+        foreach ($suspects as $s) {
+            if ($s['ip'] === $ip) {
+                return [
+                    'found'         => true,
+                    'hops'          => $s['hops'],
+                    'network_range' => $s['network_range'],
+                ];
+            }
+        }
+        return ['found' => false, 'error' => "ROUTE TO {$ip} UNREACHABLE"];
+    }
+
+    /**
+     * arp --scan — reveal last-seen timestamps for ALL suspects at once.
+     * Returns an array of [ip, last_seen_seconds] pairs.
+     */
+    public function commandArpScan(array $suspects): array
+    {
+        return array_map(fn($s) => [
+            'ip'                => $s['ip'],
+            'last_seen_seconds' => $s['last_seen_seconds'],
+        ], $suspects);
+    }
+
+    /**
+     * whois <ip> — reveal chassis class hint for a specific suspect.
+     * If whois_redacted is true (high OS target), returns a redacted response.
+     */
+    public function commandWhois(array $suspects, string $ip): array
+    {
+        foreach ($suspects as $s) {
+            if ($s['ip'] === $ip) {
+                return [
+                    'found'    => true,
+                    'redacted' => $s['whois_redacted'],
+                    'class'    => $s['whois_redacted'] ? 'DATA REDACTED' : $s['whois_class'],
+                ];
+            }
+        }
+        return ['found' => false, 'error' => "WHOIS RECORD NOT FOUND FOR {$ip}"];
+    }
+
+    /**
+     * sniff --traffic — intercept one octet fragment from the target's live stream.
+     * Returns a middle octet (e.g. '.4.') as a tiebreaker clue.
+     * The player cross-references this against the case file manually.
      */
     public function commandSniff(string $realIp): string
     {
-        $parts  = explode('.', $realIp);
-        // Pick one of the inner octets (indices 1 or 2) — produces .168. or .4. style clue
-        $index  = random_int(1, 2);
+        $parts = explode('.', $realIp);
+        $index = random_int(1, 2);
         return '.' . $parts[$index] . '.';
     }
 
     /**
-     * isolate — filters the current pool to IPs containing $segment.
-     * Returns the narrowed list. The pool passed in is the player's working
-     * pool (may have already been narrowed by a previous isolate call).
+     * flush <ip> — mark a suspect as eliminated from the active working set.
+     * Sets flushed = true on the matching entry. The entry stays in the case
+     * file struck-through — the player made the call, not the game.
+     *
+     * Returns ['success' => true] or ['success' => false, 'error' => string]
      */
-    public function commandIsolate(array $pool, string $segment): array
+    public function commandFlush(array $suspects, string $ip): array
     {
-        return array_values(array_filter($pool, fn($ip) => str_contains($ip, $segment)));
+        foreach ($suspects as $i => $s) {
+            if ($s['ip'] === $ip) {
+                if ($s['flushed']) {
+                    return ['success' => false, 'error' => "{$ip} ALREADY PURGED FROM TRACE BUFFER"];
+                }
+                $suspects[$i]['flushed'] = true;
+                return ['success' => true, 'suspects' => $suspects];
+            }
+        }
+        return ['success' => false, 'error' => "{$ip} NOT FOUND IN TRACE BUFFER"];
     }
 
     /**
-     * inject — attempt to mark a target IP as the opponent's rig.
+     * inject — attempt to identify the target IP and advance to Phase 2.
      *
      * Returns one of:
      *   ['success' => true]
      *   ['success' => false, 'honeypot' => true,  'lock_until' => Carbon]
-     *   ['success' => false, 'error'    => 'not_in_pool']
+     *   ['success' => false, 'error'    => 'not_in_suspects']
      */
-    public function commandInject(string $realIp, string $attempt, array $pool): array
+    public function commandInject(string $realIp, string $attempt, array $suspects): array
     {
-        // Reject attempts not even in the pool (garbage input)
-        if (!in_array($attempt, $pool, true)) {
-            return ['success' => false, 'error' => 'not_in_pool'];
+        $ips = array_column($suspects, 'ip');
+
+        if (!in_array($attempt, $ips, true)) {
+            return ['success' => false, 'error' => 'not_in_suspects'];
         }
 
         if ($attempt === $realIp) {
             return ['success' => true];
         }
 
-        // Hit a decoy — apply honeypot lock
         return [
             'success'    => false,
             'honeypot'   => true,
@@ -319,16 +490,19 @@ class PacketHijackService
     // =========================================================================
 
     /**
-     * scan port <number> — returns current port status for a single port.
+     * probe port <number> — returns rich port status with service flavor text.
      *
-     * Checks active sector-corrupt entries and bait traps; if the port has a
-     * fake bias override (not yet expired for corrupt, or permanently until
-     * triggered for bait), the fake value is returned instead of the real one.
+     * Replaces the old scan command. Same mechanic but returns service-specific
+     * flavor text explaining why the port is or isn't exploitable, making the
+     * topology feel like real infrastructure rather than abstract numbers.
      *
-     * Returns ['found' => true,  'entry' => array]
+     * Checks active sector-corrupt entries and bait traps — fake bias overrides
+     * apply here exactly as they did on scan.
+     *
+     * Returns ['found' => true,  'entry' => array, 'flavor' => array]
      *      or ['found' => false, 'error' => string]
      */
-    public function commandScanPort(
+    public function commandProbePort(
         array $ports,
         int   $portNumber,
         array $corruptPorts = [],
@@ -342,7 +516,12 @@ class PacketHijackService
                     ? array_merge($entry, ['bias' => $fakeBias])
                     : $entry;
 
-                return ['found' => true, 'entry' => $displayEntry];
+                $flavor = self::PORT_FLAVOR[$portNumber] ?? [
+                    "SERVICE DETECTED ON PORT {$portNumber}",
+                    'UNKNOWN PROTOCOL',
+                ];
+
+                return ['found' => true, 'entry' => $displayEntry, 'flavor' => $flavor];
             }
         }
 
@@ -471,30 +650,76 @@ class PacketHijackService
     }
 
     /**
-     * malware inject -IP <ip> PORT <port> — final payload execution.
+     * decode port <number> — manually chip away at a port's decryption bias.
+     *
+     * Works on any non-shattered port regardless of current bias level.
+     * Each use reduces bias by 10 + floor(attackerCPU × 2), capped at 35.
+     * Does NOT shatter the port — the player still needs exploit once bias
+     * drops below the threshold.
+     *
+     * Strategy: high-CPU rigs can decode a specific port down to exploitable
+     * range faster than waiting for cascade from another port.
+     *
+     * Returns ['success' => true, 'ports' => array, 'reduction' => int, 'new_bias' => int]
+     *      or ['success' => false, 'error' => string]
+     */
+    public function commandDecodePort(
+        array     $ports,
+        int       $portNumber,
+        PlayerRig $rig,
+        Player    $player
+    ): array {
+        $stats     = $this->rigService->effectiveStats($rig, $player);
+        $cpu       = $stats['cpu']['effective'];
+        $reduction = (int) min(35, 10 + floor($cpu * 2));
+
+        foreach ($ports as $i => $entry) {
+            if ((int) $entry['port'] !== $portNumber) {
+                continue;
+            }
+            if ($entry['shattered']) {
+                return ['success' => false, 'error' => "PORT {$portNumber} ALREADY SHATTERED — NOTHING TO DECODE"];
+            }
+            if ($portNumber === self::EXFIL_PORT) {
+                return ['success' => false, 'error' => "EXFIL PORT CANNOT BE DECODED — SHATTER ALL GATES FIRST"];
+            }
+
+            $oldBias           = (int) $entry['bias'];
+            $newBias           = max(0, $oldBias - $reduction);
+            $ports[$i]['bias'] = $newBias;
+
+            return [
+                'success'   => true,
+                'ports'     => $ports,
+                'reduction' => $reduction,
+                'old_bias'  => $oldBias,
+                'new_bias'  => $newBias,
+                'port'      => $portNumber,
+                'service'   => $entry['service'],
+            ];
+        }
+
+        return ['success' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
+    }
+
+    /**
+     * breach <ip> — simplified final payload execution.
+     *
+     * Replaces the old malware inject command. Player supplies only the target
+     * IP they identified in Phase 1 — the exfil port is implicit.
      *
      * Validates:
      *   - Supplied IP matches the real target IP exactly.
-     *   - Supplied port is 8080 (exfil port).
-     *   - The exfil port entry in the topology is marked unlocked.
+     *   - The exfil port (8080) is unlocked in the topology.
      *
      * Returns ['success' => true] or ['success' => false, 'error' => string]
      */
-    public function commandMalwareInject(
-        array  $ports,
-        string $targetIp,
-        string $inputIp,
-        int    $inputPort
-    ): array {
-        if ($inputPort !== self::EXFIL_PORT) {
-            return ['success' => false, 'error' => "INVALID EXFIL PORT — ROUTE REQUIRES PORT " . self::EXFIL_PORT];
-        }
-
+    public function commandBreach(array $ports, string $targetIp, string $inputIp): array
+    {
         if ($inputIp !== $targetIp) {
             return ['success' => false, 'error' => 'IP MISMATCH — TARGET SIGNATURE REJECTED'];
         }
 
-        // Confirm exfil port is unlocked in the topology
         foreach ($ports as $entry) {
             if ((int) $entry['port'] === self::EXFIL_PORT) {
                 if (!$entry['unlocked']) {

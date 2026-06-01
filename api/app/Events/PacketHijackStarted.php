@@ -21,7 +21,6 @@ class PacketHijackStarted implements ShouldBroadcast
         public readonly string $matchId,
         public readonly string $playerId,
         public readonly string $role,           // 'challenger' | 'defender'
-        public readonly array  $ipPoolSample,   // 15-item opening sample
     ) {}
 
     public function broadcastOn(): PrivateChannel
@@ -37,9 +36,8 @@ class PacketHijackStarted implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'match_id'       => $this->matchId,
-            'role'           => $this->role,
-            'ip_pool_sample' => $this->ipPoolSample,
+            'match_id' => $this->matchId,
+            'role'     => $this->role,
         ];
     }
 }
