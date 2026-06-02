@@ -135,6 +135,9 @@ export function usePacketHijack(playerId) {
         if (data.awaiting_auth) {
             awaitingAuth.value = true;
         }
+        if (data.auth_failed) {
+            awaitingAuth.value = false;
+        }
 
         // ── Phase 3 updates ───────────────────────────────────────────────────
         if (data.filesystem_update) {
