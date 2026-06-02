@@ -177,13 +177,17 @@ class InventoryService
             throw new RuntimeException('Player has no rig to repair.');
         }
 
-        $restored = $this->rigService->repairPartial($rig, $amount);
+        $restored = $this->rigService->repairPartial($rig, $amount, $player);
+
+        // Refresh player to get the updated is_limping value after potential save
+        $freshPlayer = $player->fresh();
 
         return [
-            'type'       => 'repair',
+            'type'        => 'repair',
             'ss_restored' => $restored,
             'current_ss'  => (int) $rig->current_ss,
             'max_ss'      => $this->rigService->maxSs($rig),
+            'is_limping'  => (bool) ($freshPlayer->is_limping ?? false),
         ];
     }
 

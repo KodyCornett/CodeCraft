@@ -91,13 +91,15 @@
                         :octet-clue="ph.octetClue"
                         :active-suspect-count="ph.activeSuspectCount"
                         :board-ready="ph.boardReady"
-                        :fingerprint="ph.fingerprint"
-                        :port-scan-result="ph.portScanResult"
+                        :port-pool="ph.portPool"
+                        :chain-confirmed="ph.chainConfirmed"
+                        :trace-attempts-left="ph.traceAttemptsLeft"
+                        :credential-state="ph.credentialState"
                         :awaiting-auth="ph.awaitingAuth"
+                        :board-scanned="ph.boardScanned"
                         :current-path="ph.currentPath"
                         :directory-entries="ph.directoryEntries"
                         :explored-paths="ph.exploredPaths"
-                        :ports="ph.ports"
                         :target-ip="ph.targetIp"
                         :is-locked="ph.isLocked"
                         :lock-countdown="ph.lockCountdown"
@@ -1490,12 +1492,13 @@ function onPacketHijackMatchComplete(result) {
         player.value.isLimping   = true;
     }
 
-    // Sync full state from the server to pick up bounty escalation and SS changes
+    // Sync full state from the server to pick up bounty escalation, SS changes, and limp flag
     axios.get('/api/player/me').then(res => {
         if (res.data?.player) {
             player.value.bountyLevel      = res.data.player.bounty_level      ?? player.value.bountyLevel;
             player.value.bountyMultiplier = res.data.player.bounty_multiplier ?? player.value.bountyMultiplier;
             player.value.isOpenSeason     = res.data.player.is_open_season    ?? player.value.isOpenSeason;
+            player.value.isLimping        = res.data.player.is_limping        ?? player.value.isLimping;
         }
         if (res.data?.rig) {
             player.value.currentSS = res.data.rig.current_ss ?? player.value.currentSS;

@@ -128,11 +128,18 @@ class RigService
     /**
      * Restore a rig's current_ss to its maximum value.
      * Optionally clear the is_damaged flag on all of the player's peripherals.
+     * Always clears is_limping on both the rig and the player when SS is fully restored.
      */
     public function repair(PlayerRig $rig, Player $player, bool $repairPeripherals = false): PlayerRig
     {
         $rig->current_ss = $this->maxSs($rig);
+        $rig->is_limping = false;
         $rig->save();
+
+        if ($player->is_limping) {
+            $player->is_limping = false;
+            $player->save();
+        }
 
         if ($repairPeripherals) {
             PlayerPeripheral::where('player_id', $player->id)
@@ -344,9 +351,10 @@ class RigService
 
     /**
      * Restore up to $amount points of SS from a consumable repair kit.
-     * Caps at maxSs. Returns the number of SS points actually restored.
+     * Caps at maxSs. Clears is_limping on both rig and player when SS reaches max.
+     * Returns the number of SS points actually restored.
      */
-    public function repairPartial(PlayerRig $rig, int $amount): int
+    public function repairPartial(PlayerRig $rig, int $amount, ?Player $player = null): int
     {
         $max      = $this->maxSs($rig);
         $before   = (int) $rig->current_ss;
@@ -354,6 +362,17 @@ class RigService
 
         if ($restored > 0) {
             $rig->current_ss = $before + $restored;
+
+            // Clear limp flag as soon as SS is fully restored
+            if ($rig->current_ss >= $max) {
+                $rig->is_limping = false;
+
+                if ($player !== null && $player->is_limping) {
+                    $player->is_limping = false;
+                    $player->save();
+                }
+            }
+
             $rig->save();
         }
 

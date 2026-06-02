@@ -28,7 +28,7 @@
         </div>
 
         <!-- ── Main terminal ─────────────────────────────────────────────────── -->
-        <div v-else class="ph-terminal" tabindex="-1" @click="refocusInput" @keydown="onTerminalKeydown">
+        <div v-else class="ph-terminal" tabindex="-1" @click="refocusInput">
 
             <!-- Top bar -->
             <div class="ph-topbar">
@@ -59,51 +59,91 @@
                             class="ph-suspect-card"
                             :class="{ 'suspect-card--flushed': s.flushed }"
                         >
-                            <span class="psc-ip">{{ s.ip }}</span>
-                            <span class="psc-sep">//</span>
-                            <span class="psc-label">PNG</span>
-                            <span class="psc-val" :class="pingClass(s)">{{ pingDisplay(s) }}</span>
-                            <span class="psc-sep">|</span>
-                            <span class="psc-label">HPS</span>
-                            <span class="psc-val">{{ s.hops !== undefined ? s.hops : '???' }}</span>
-                            <span class="psc-sep">|</span>
-                            <span class="psc-label">ARP</span>
-                            <span class="psc-val" :class="arpClass(s)">{{ arpDisplay(s) }}</span>
+                            <!-- Row 1: IP address -->
+                            <div class="psc-row psc-row--ip">
+                                <span class="psc-ip">{{ s.ip }}</span>
+                                <span v-if="s.network_range" class="psc-range">{{ s.network_range }}</span>
+                                <span v-if="s.flushed" class="psc-flushed-badge">PURGED</span>
+                            </div>
+                            <!-- Row 2: revealed attributes -->
+                            <div class="psc-row psc-row--attrs">
+                                <span class="psc-attr">
+                                    <span class="psc-label">PNG</span>
+                                    <span class="psc-val" :class="pingClass(s)">{{ pingDisplay(s) }}</span>
+                                </span>
+                                <span class="psc-dot">·</span>
+                                <span class="psc-attr">
+                                    <span class="psc-label">HPS</span>
+                                    <span class="psc-val">{{ s.hops !== undefined ? s.hops : '???' }}</span>
+                                </span>
+                                <span class="psc-dot">·</span>
+                                <span class="psc-attr">
+                                    <span class="psc-label">ARP</span>
+                                    <span class="psc-val" :class="arpClass(s)">{{ arpDisplay(s) }}</span>
+                                </span>
+                                <span class="psc-dot">·</span>
+                                <span class="psc-attr">
+                                    <span class="psc-label">CLASS</span>
+                                    <span class="psc-val" :class="s.whois_redacted ? 'psc-val--redacted' : ''">
+                                        {{ s.whois_class ? (s.whois_redacted ? 'REDACTED' : s.whois_class) : '???' }}
+                                    </span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </template>
             </div>
 
-            <!-- Phase 2: fingerprint strip -->
+            <!-- Phase 2: exploit chain board -->
             <div v-else-if="phase === 2" class="ph-data-zone ph-data-zone--p2">
-                <div v-if="!fingerprint || !fingerprint.ports" class="ph-data-empty">
-                    RUN <span class="ph-boot-cmd">scan {{ targetIp || '&lt;ip&gt;' }}</span> TO INITIALISE FINGERPRINT
+                <div v-if="!boardScanned" class="ph-data-empty">
+                    RUN <span class="ph-boot-cmd">scan {{ targetIp || '&lt;ip&gt;' }}</span> TO INITIALISE PORT BOARD
                 </div>
                 <template v-else>
-                    <div class="ph-fp-strip">
-                        <div class="ph-fp-strip-cred">
-                            <span class="ph-fp-strip-label">OS</span>
-                            <span class="ph-fp-strip-val" :class="fingerprint.os?.display === fingerprint.os?.full ? 'fp--complete' : ''">
-                                {{ fingerprint.os?.display || (fingerprint.os?.tier1 + '-????-???') }}
+                    <!-- Credential strip — fills as chain ports are exploited -->
+                    <div class="ph-cred-strip">
+                        <div class="ph-cred-item">
+                            <span class="ph-cred-label">HOST</span>
+                            <span class="ph-cred-val" :class="credentialState.hostname && !credentialState.hostname.includes('????') ? 'cred--complete' : ''">
+                                {{ credentialState.hostname || '???-????-????' }}
                             </span>
                         </div>
-                        <div class="ph-fp-strip-divider" />
-                        <div class="ph-fp-strip-cred">
-                            <span class="ph-fp-strip-label">HOST</span>
-                            <span class="ph-fp-strip-val" :class="fingerprint.hostname?.display === fingerprint.hostname?.full ? 'fp--complete' : ''">
-                                {{ fingerprint.hostname?.display || (fingerprint.hostname?.tier1 + '-????-????') }}
+                        <div class="ph-cred-divider" />
+                        <div class="ph-cred-item">
+                            <span class="ph-cred-label">OS</span>
+                            <span class="ph-cred-val" :class="credentialState.os && !credentialState.os.includes('???') ? 'cred--complete' : ''">
+                                {{ credentialState.os || '???-???-???' }}
                             </span>
                         </div>
-                        <div class="ph-fp-strip-divider" />
-                        <div class="ph-fp-ports">
-                            <div v-for="p in fingerprint.ports" :key="p.port"
-                                class="ph-fp-port-card"
-                                :class="{ 'fp-port--shattered': p.shattered }"
-                            >
-                                <span class="fpp-port">:{{ p.port }}</span>
-                                <span class="fpp-svc">{{ p.service }}</span>
-                                <span class="fpp-exp" :class="exposureClass(p.exposure)">{{ p.probed ? p.exposure : '???' }}</span>
-                            </div>
+                        <div class="ph-cred-divider" />
+                        <div class="ph-trace-counter" :class="traceAttemptsLeft === 0 ? 'trace--depleted' : traceAttemptsLeft <= 2 ? 'trace--low' : ''">
+                            <span class="ph-trace-label">TRACE</span>
+                            <span class="ph-trace-val">{{ traceAttemptsLeft }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Port board -->
+                    <div class="ph-port-board">
+                        <div
+                            v-for="p in portPool"
+                            :key="p.port"
+                            class="ph-port-card"
+                            :class="{
+                                'port-card--shattered': p.shattered,
+                                'port-card--probed':    p.probed && !p.shattered,
+                                'port-card--chain':     chainConfirmed[p.port],
+                                'port-card--exfil':     p.is_exfil,
+                            }"
+                        >
+                            <span class="ppc-port">:{{ p.port }}</span>
+                            <span class="ppc-svc">{{ p.service }}</span>
+                            <span class="ppc-status">
+                                <template v-if="p.shattered">████ SHATTERED</template>
+                                <template v-else-if="chainConfirmed[p.port]">CHAIN ✓</template>
+                                <template v-else-if="p.probed">PROBED</template>
+                                <template v-else-if="p.is_exfil">LOCKED</template>
+                                <template v-else>———</template>
+                            </span>
                         </div>
                     </div>
                 </template>
@@ -238,30 +278,26 @@
                     <!-- CMD REF — Phase 2 -->
                     <div v-else-if="phase === 2" class="ph-cmd-ref-section">
                         <div class="ph-ref-title">CMD REF</div>
-                        <div class="ph-ref-phase">// PHASE 2 — FINGERPRINT</div>
+                        <div class="ph-ref-phase">// PHASE 2 — EXPLOIT CHAIN</div>
                         <div class="ph-ref-entry">
                             <div class="ph-ref-cmd">scan &lt;ip&gt;</div>
-                            <div class="ph-ref-desc">Discover open ports on target.</div>
+                            <div class="ph-ref-desc">Populate the port board.</div>
                         </div>
                         <div class="ph-ref-entry">
                             <div class="ph-ref-cmd">probe &lt;port&gt;</div>
-                            <div class="ph-ref-desc">Read banner — credential fragments hidden inside.</div>
+                            <div class="ph-ref-desc">Read banner. Anomaly at the bottom is the clue.</div>
                         </div>
                         <div class="ph-ref-entry">
-                            <div class="ph-ref-cmd">validate &lt;string&gt;</div>
-                            <div class="ph-ref-desc">Confirm a string is a valid credential fragment.</div>
-                        </div>
-                        <div class="ph-ref-entry">
-                            <div class="ph-ref-cmd">decode &lt;port&gt;</div>
-                            <div class="ph-ref-desc">Weaken MODERATE / LOW ports before exploit.</div>
+                            <div class="ph-ref-cmd">trace &lt;p1&gt; &lt;p2&gt;</div>
+                            <div class="ph-ref-desc">Test a chain hypothesis. Consumes one attempt.</div>
                         </div>
                         <div class="ph-ref-entry">
                             <div class="ph-ref-cmd">exploit &lt;port&gt;</div>
-                            <div class="ph-ref-desc">Shatter a port. CRITICAL/HIGH direct.</div>
+                            <div class="ph-ref-desc">Hit the chain in order. Wrong order fails.</div>
                         </div>
                         <div class="ph-ref-entry ph-ref-entry--commit">
-                            <div class="ph-ref-cmd">breach &lt;ip&gt; &lt;port&gt;</div>
-                            <div class="ph-ref-desc">Fingerprint complete + port shattered = breach.</div>
+                            <div class="ph-ref-cmd">breach &lt;ip&gt;</div>
+                            <div class="ph-ref-desc">Chain complete — initiate connection.</div>
                         </div>
                     </div>
 
@@ -316,7 +352,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 
 const props = defineProps({
     matchId:             { type: String,  required: true },
@@ -328,16 +364,17 @@ const props = defineProps({
     octetClue:           { type: String,  default: null },
     activeSuspectCount:  { type: Number,  default: 0 },
     boardReady:          { type: Boolean, default: false },
-    // Phase 2
-    fingerprint:         { type: Object,  default: null },
-    portScanResult:      { type: Array,   default: () => [] },
+    // Phase 2 (redesigned)
+    portPool:            { type: Array,   default: () => [] },
+    chainConfirmed:      { type: Object,  default: () => ({}) },
+    traceAttemptsLeft:   { type: Number,  default: 0 },
+    credentialState:     { type: Object,  default: () => ({ hostname: null, os: null }) },
     awaitingAuth:        { type: Boolean, default: false },
+    boardScanned:        { type: Boolean, default: false },
     // Phase 3
     currentPath:         { type: String,  default: '/' },
     directoryEntries:    { type: Array,   default: () => [] },
     exploredPaths:       { type: Array,   default: () => [] },
-    // Legacy
-    ports:               { type: Array,   default: () => [] },
     targetIp:            { type: String,  default: null },
     isLocked:            { type: Boolean, default: false },
     lockCountdown:       { type: Number,  default: 0 },
@@ -395,18 +432,78 @@ function refocusInput() {
     }
 }
 
-// Route any keystroke on the terminal to the input so the player never
-// has to click the field. Ignores modifier-only keys and lets auth inputs
-// handle themselves.
-function onTerminalKeydown(e) {
-    if (props.awaitingAuth || props.isLocked || props.isComplete) return;
+// ── Document-level keyboard capture ──────────────────────────────────────────
+//
+// Attaches to the document so every keystroke is caught regardless of where
+// browser focus currently sits. This means the player never has to click into
+// the input — they can just start typing immediately.
+//
+// When a key arrives and the input isn't focused:
+//   • Printable characters: injected directly into inputValue so the char
+//     isn't lost (focus() alone can't recover the triggering event).
+//   • Enter: submits if there's content.
+//   • Backspace: removes last character.
+//   • ArrowUp / ArrowDown: history navigation.
+//   • Everything else: ignored (modifier keys, F-keys, etc.).
+//
+// If focus is already on the terminal input, or on an auth field, or the
+// input is locked / complete, the handler steps aside.
+
+const SKIP_KEYS = new Set([
+    'Tab', 'Escape', 'Meta', 'Control', 'Alt', 'Shift',
+    'CapsLock', 'NumLock', 'ScrollLock', 'Pause', 'ContextMenu',
+    'Home', 'End', 'PageUp', 'PageDown', 'Insert', 'Dead',
+]);
+
+function _onDocumentKeydown(e) {
+    // Let the overlay handle its own close / escape
+    if (e.key === 'Escape') return;
+
+    // Don't interfere while locked, auth prompt open, or match over
+    if (props.isLocked || props.isComplete) return;
+    if (props.awaitingAuth) return;
+
     if (!inputEl.value) return;
+
+    // Already on the terminal input — let its own handlers run normally
     if (document.activeElement === inputEl.value) return;
-    // Don't steal focus for pure modifier keys, tab, escape, or function keys
-    const skip = ['Tab', 'Escape', 'Meta', 'Control', 'Alt', 'Shift',
-                  'CapsLock', 'NumLock', 'ScrollLock', 'Pause', 'ContextMenu'];
-    if (skip.includes(e.key) || e.key.startsWith('F')) return;
-    // Redirect: focus the input and let the event re-fire there naturally
+
+    // Don't steal focus from auth inputs, buttons, or other real inputs
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    // Ignore modifier-only, function, and navigation keys
+    if (SKIP_KEYS.has(e.key) || e.key.startsWith('F')) return;
+
+    // -- Steal focus and inject the key --
+
+    // Special keys handled before focusing so they can preventDefault cleanly
+    if (e.key === 'ArrowUp')   { historyUp();   e.preventDefault(); inputEl.value.focus(); return; }
+    if (e.key === 'ArrowDown') { historyDown(); e.preventDefault(); inputEl.value.focus(); return; }
+
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        inputEl.value.focus();
+        if (inputValue.value.trim()) onSubmit();
+        return;
+    }
+
+    if (e.key === 'Backspace') {
+        e.preventDefault();
+        inputValue.value = inputValue.value.slice(0, -1);
+        inputEl.value.focus();
+        return;
+    }
+
+    // Printable single character — inject it so the char isn't lost on focus transfer
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        inputValue.value += e.key;
+        inputEl.value.focus();
+        return;
+    }
+
+    // For anything else (ctrl+a, etc.) just steal focus; let the input handle it
     inputEl.value.focus();
 }
 
@@ -433,7 +530,26 @@ watch(() => props.isLocked, (locked) => {
     if (!locked) nextTick(() => inputEl.value?.focus());
 });
 
-onMounted(() => nextTick(() => inputEl.value?.focus()));
+watch(() => props.awaitingAuth, (auth) => {
+    if (!auth) nextTick(() => inputEl.value?.focus());
+});
+
+watch(() => props.phase, () => {
+    nextTick(() => inputEl.value?.focus());
+});
+
+watch(() => props.busy, (b) => {
+    if (!b) nextTick(() => inputEl.value?.focus());
+});
+
+onMounted(() => {
+    document.addEventListener('keydown', _onDocumentKeydown);
+    nextTick(() => inputEl.value?.focus());
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', _onDocumentKeydown);
+});
 
 // ── Case file display helpers ─────────────────────────────────────────────────
 
@@ -465,45 +581,23 @@ function arpClass(s) {
     return 'cf-val--degraded';
 }
 
-// ── Port matrix helpers ───────────────────────────────────────────────────────
-
-function portRowClass(entry) {
-    if (entry.shattered)                          return 'port--shattered';
-    if (entry.port === 8080 && entry.unlocked)    return 'port--exfil';
-    if (entry.port === 8080)                      return 'port--locked';
-    if (entry.bias <= 25)                         return 'port--low';
-    return 'port--high';
-}
-
-function portStatus(entry) {
-    if (entry.shattered)                          return 'SHATTERED';
-    if (entry.port === 8080 && entry.unlocked)    return 'UNLOCKED';
-    if (entry.port === 8080)                      return 'LOCKED';
-    if (entry.bias <= 10)                         return 'CRITICAL LOW';
-    if (entry.bias <= 25)                         return 'LOW';
-    return 'HIGH';
-}
-
 function commandSlug(name) {
     return name.toLowerCase().replace(/ /g, '_');
 }
 
-function exposureClass(exposure) {
-    if (!exposure || exposure === '???') return '';
-    if (exposure === 'CRITICAL') return 'cf-val--live';
-    if (exposure === 'HIGH')     return 'cf-val--degraded';
-    if (exposure === 'MODERATE') return 'cf-val--degraded';
-    return 'cf-val--dead';
-}
-
 function lineClass(line) {
-    if (line.startsWith('[SUCCESS]') || line.startsWith('[BREACH'))  return 'line--success';
-    if (line.startsWith('[ERROR]'))                                   return 'line--error';
-    if (line.startsWith('[ALERT]') || line.startsWith('[WARNING'))   return 'line--alert';
-    if (line.startsWith('[OCTET') || line.startsWith('[CAPTURED]'))  return 'line--clue';
-    if (line.startsWith('[RESULT]'))                                  return 'line--result';
-    if (line.startsWith('[='))                                        return 'line--progress';
-    if (line.startsWith('  ') && line.includes('—'))                 return 'line--arp';
+    if (!line) return 'line--default';
+    if (line.startsWith('[SUCCESS]') || line.startsWith('[BREACH') || line.startsWith('[===='))  return 'line--success';
+    if (line.startsWith('[CREDENTIAL') || line.startsWith('  HOSTNAME') || line.startsWith('  OS'))  return 'line--clue';
+    if (line.startsWith('[CONFIRMED]') || line.startsWith('[VECTOR]'))  return 'line--success';
+    if (line.startsWith('[ERROR]') || line.startsWith('[GATE HOLDING]') || line.startsWith('[FAILED]')) return 'line--error';
+    if (line.startsWith('[ALERT]') || line.startsWith('[WARNING') || line.startsWith('[EXFIL LOCKED]')) return 'line--alert';
+    if (line.startsWith('[TRACE]') || line.startsWith('[RESULT]') || line.startsWith('[HINT]'))  return 'line--result';
+    if (line.startsWith('[EXPLOIT]') || line.startsWith('[CASCADE]'))   return 'line--result';
+    if (line.startsWith('[PROBE]') || line.startsWith('ANOMALY:'))      return 'line--clue';
+    if (line.startsWith('[OCTET') || line.startsWith('[CAPTURED]'))     return 'line--clue';
+    if (line.startsWith('[='))                                           return 'line--progress';
+    if (line.startsWith('  ') && line.includes('—'))                    return 'line--arp';
     return 'line--default';
 }
 </script>
@@ -645,6 +739,16 @@ function lineClass(line) {
 }
 
 /* Phase 1 — 3×5 suspect grid */
+.ph-data-zone--p1 {
+    max-height: 210px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,255,255,0.15) transparent;
+}
+.ph-data-zone--p1::-webkit-scrollbar        { width: 3px; }
+.ph-data-zone--p1::-webkit-scrollbar-thumb  { background: rgba(0,255,255,0.15); border-radius: 2px; }
+.ph-data-zone--p1::-webkit-scrollbar-track  { background: transparent; }
+
 .ph-suspect-meta {
     font-size: 9px;
     color: rgba(0,255,255,0.35);
@@ -654,93 +758,210 @@ function lineClass(line) {
 
 .ph-suspect-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 3px 6px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 4px 6px;
 }
 
 .ph-suspect-card {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: clamp(8px, 0.85vw, 9.5px);
-    padding: 3px 6px;
-    border: 1px solid rgba(0,255,255,0.07);
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 8px;
+    border: 1px solid rgba(0,255,255,0.08);
     background: rgba(0,255,255,0.02);
-    white-space: nowrap;
-    overflow: hidden;
     transition: opacity 0.2s;
     min-width: 0;
 }
 
 .suspect-card--flushed {
-    opacity: 0.2;
+    opacity: 0.18;
+}
+.suspect-card--flushed .psc-ip {
     text-decoration: line-through;
 }
 
-.psc-ip    { color: rgba(0,255,255,0.65); font-size: clamp(7.5px, 0.8vw, 9px); flex-shrink: 0; }
-.psc-sep   { color: rgba(0,255,255,0.15); flex-shrink: 0; }
-.psc-label { color: rgba(0,255,255,0.25); font-size: clamp(7px, 0.7vw, 8px); letter-spacing: 0.04em; flex-shrink: 0; }
-.psc-val   { color: rgba(0,255,255,0.5);  font-size: clamp(7.5px, 0.8vw, 9px); flex-shrink: 0; min-width: 36px; }
-
-/* Phase 2 — fingerprint horizontal strip */
-.ph-fp-strip {
+/* Row layouts */
+.psc-row {
     display: flex;
-    align-items: flex-start;
-    gap: 0;
-    height: 100%;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
 }
 
-.ph-fp-strip-cred {
+.psc-row--ip {
+    justify-content: space-between;
+}
+
+.psc-row--attrs {
+    flex-wrap: nowrap;
+    gap: 3px;
+}
+
+/* IP + range */
+.psc-ip {
+    color: rgba(0,255,255,0.75);
+    font-size: clamp(8.5px, 0.85vw, 10px);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.psc-range {
+    color: rgba(0,255,255,0.25);
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.psc-flushed-badge {
+    font-size: 7px;
+    color: rgba(255, 80, 80, 0.5);
+    letter-spacing: 0.1em;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Attribute pairs */
+.psc-attr {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.psc-dot {
+    color: rgba(0,255,255,0.1);
+    font-size: 8px;
+    flex-shrink: 0;
+}
+
+.psc-label {
+    color: rgba(0,255,255,0.22);
+    font-size: 7px;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+}
+
+.psc-val {
+    color: rgba(0,255,255,0.55);
+    font-size: clamp(7.5px, 0.8vw, 9px);
+    flex-shrink: 0;
+}
+
+.psc-val--redacted {
+    color: rgba(255, 160, 0, 0.4);
+    font-style: italic;
+}
+
+/* Phase 2 — fingerprint horizontal strip */
+/* ── Phase 2 redesign — credential strip ─────────────────────────────────── */
+
+.ph-cred-strip {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+    margin-bottom: 8px;
+}
+
+.ph-cred-item {
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding-right: 16px;
-    flex-shrink: 0;
 }
 
-.ph-fp-strip-label {
+.ph-cred-label {
     font-size: 8px;
     color: rgba(0,255,255,0.3);
     letter-spacing: 0.12em;
 }
 
-.ph-fp-strip-val {
-    font-size: 10px;
+.ph-cred-val {
+    font-size: 11px;
     color: rgba(0,255,255,0.6);
-    letter-spacing: 0.05em;
-    word-break: break-all;
+    letter-spacing: 0.06em;
+    font-family: inherit;
+    transition: color 0.3s;
 }
+.cred--complete { color: #0ff; text-shadow: 0 0 6px rgba(0,255,255,0.6); }
 
-.ph-fp-strip-divider {
+.ph-cred-divider {
     width: 1px;
-    background: rgba(0,255,255,0.1);
-    align-self: stretch;
+    height: 28px;
+    background: rgba(0,255,255,0.12);
     margin: 0 16px 0 0;
     flex-shrink: 0;
 }
 
-.ph-fp-ports {
+.ph-trace-counter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 10px;
+    border: 1px solid rgba(0,255,255,0.15);
+    background: rgba(0,255,255,0.03);
+}
+.ph-trace-label { font-size: 7px; color: rgba(0,255,255,0.3); letter-spacing: 0.12em; }
+.ph-trace-val   { font-size: 14px; color: rgba(0,255,255,0.7); }
+.trace--low     .ph-trace-val { color: #f80; }
+.trace--depleted .ph-trace-val { color: #f44; }
+
+/* ── Phase 2 — port board ────────────────────────────────────────────────── */
+
+.ph-data-zone--p2 {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 6px 14px;
+}
+
+.ph-port-board {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
     align-content: flex-start;
 }
 
-.ph-fp-port-card {
+.ph-port-card {
     display: flex;
-    flex-direction: column;
-    gap: 1px;
-    padding: 3px 8px;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
     border: 1px solid rgba(0,255,255,0.1);
     background: rgba(0,255,255,0.02);
-    min-width: 74px;
+    min-width: 120px;
+    transition: border-color 0.2s, background 0.2s;
 }
 
-.fp-port--shattered { opacity: 0.25; text-decoration: line-through; }
+.port-card--probed {
+    border-color: rgba(0,255,255,0.25);
+    background: rgba(0,255,255,0.04);
+}
 
-.fpp-port { font-size: 10px; color: rgba(0,255,255,0.7); letter-spacing: 0.04em; }
-.fpp-svc  { font-size: 8px;  color: rgba(0,255,255,0.4); letter-spacing: 0.04em; }
-.fpp-exp  { font-size: 8px;  letter-spacing: 0.06em; margin-top: 1px; }
+.port-card--chain {
+    border-color: rgba(0,255,255,0.55);
+    background: rgba(0,255,255,0.07);
+}
+
+.port-card--shattered {
+    opacity: 0.3;
+    border-color: rgba(0,255,255,0.06);
+}
+
+.port-card--exfil {
+    border-color: rgba(255,180,0,0.25);
+    background: rgba(255,180,0,0.03);
+}
+
+.ppc-port   { font-size: 10px; color: rgba(0,255,255,0.7); letter-spacing: 0.04em; flex-shrink: 0; }
+.ppc-svc    { font-size: 9px;  color: rgba(0,255,255,0.4); letter-spacing: 0.04em; flex: 1; }
+.ppc-status { font-size: 8px;  color: rgba(0,255,255,0.35); letter-spacing: 0.08em; }
+
+.port-card--chain    .ppc-status { color: rgba(0,255,255,0.8); }
+.port-card--shattered .ppc-status { color: rgba(0,255,255,0.2); }
+.port-card--exfil    .ppc-status { color: rgba(255,180,0,0.6); }
 
 /* Phase 3 — filesystem breadcrumb trail */
 .ph-data-zone--p3 {

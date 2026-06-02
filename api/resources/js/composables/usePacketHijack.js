@@ -2,7 +2,7 @@
  * usePacketHijack — client-side state for all three phases of Packet Hijack.
  *
  * Phase 1: Suspect investigation (netstat, ping, traceroute, arp, whois, sniff, flush, inject)
- * Phase 2: System fingerprinting (scan, probe, validate, exploit, decode, breach + auth)
+ * Phase 2: Exploit chain investigation (scan, probe, trace, exploit, breach + auth)
  * Phase 3: Filesystem extraction (ls, cd, extract)
  */
 
@@ -32,17 +32,20 @@ export function usePacketHijack(playerId) {
     const octetClue           = ref(null);
     const boardReady          = ref(false);
 
-    // ── Phase 2 state ─────────────────────────────────────────────────────────
+    // ── Phase 2 state (redesigned) ────────────────────────────────────────────
 
-    const fingerprint         = ref(null);   // full fingerprint public view
-    const portScanResult      = ref([]);     // port list from scan command
-    const awaitingAuth        = ref(false);  // true after successful breach
+    const portPool            = ref([]);       // array of { port, service, probed, shattered, is_exfil }
+    const chainConfirmed      = ref({});       // map of port number → true when trace confirmed as chain link
+    const traceAttemptsLeft   = ref(0);        // remaining trace attempts
+    const credentialState     = ref({ hostname: null, os: null });  // fills as chain progresses
+    const awaitingAuth        = ref(false);    // true after successful breach
+    const boardScanned        = ref(false);    // true after first scan command
 
     // ── Phase 3 state ─────────────────────────────────────────────────────────
 
     const currentPath         = ref('/');
-    const directoryEntries    = ref([]);     // current ls entries
-    const exploredPaths       = ref([]);     // breadcrumb trail
+    const directoryEntries    = ref([]);
+    const exploredPaths       = ref([]);
 
     let lockTimer = null;
 
@@ -61,9 +64,12 @@ export function usePacketHijack(playerId) {
         suspects.value            = [];
         octetClue.value           = null;
         boardReady.value          = false;
-        fingerprint.value         = null;
-        portScanResult.value      = [];
+        portPool.value            = [];
+        chainConfirmed.value      = {};
+        traceAttemptsLeft.value   = 0;
+        credentialState.value     = { hostname: null, os: null };
         awaitingAuth.value        = false;
+        boardScanned.value        = false;
         currentPath.value         = '/';
         directoryEntries.value    = [];
         exploredPaths.value       = [];
@@ -103,7 +109,6 @@ export function usePacketHijack(playerId) {
     }
 
     function _onCommandResult(data) {
-        console.log('[PH] WS command-result:', JSON.parse(JSON.stringify(data)));
         if (data.match_id !== matchId.value) return;
 
         _appendHistory(data.command, data.output_lines ?? []);
@@ -123,27 +128,52 @@ export function usePacketHijack(playerId) {
         }
 
         // ── Phase 2 updates ───────────────────────────────────────────────────
+
+        // scan: populate the port board
         if (data.port_scan_result) {
-            portScanResult.value = data.port_scan_result;
-            // Initialise fingerprint panel with bare port list
-            fingerprint.value = fingerprint.value ?? {};
-            fingerprint.value = { ...fingerprint.value, ports: data.port_scan_result };
+            portPool.value  = data.port_scan_result;
+            boardScanned.value = true;
         }
-        if (data.fingerprint_update) {
-            fingerprint.value = data.fingerprint_update;
+
+        // probe: mark a port as probed in the local pool
+        if (data.port_probed != null) {
+            portPool.value = portPool.value.map(p =>
+                p.port === data.port_probed ? { ...p, probed: true } : p
+            );
         }
-        if (data.awaiting_auth) {
-            awaitingAuth.value = true;
+
+        // trace: update chain confirmed map + trace attempt counter
+        // trace_confirmed = [port1, port2] means port1 → port2 is a confirmed chain link
+        // mark both ports as confirmed chain members
+        if (data.trace_confirmed) {
+            const [p1, p2] = data.trace_confirmed;
+            chainConfirmed.value = { ...chainConfirmed.value, [p1]: true, [p2]: true };
         }
-        if (data.auth_failed) {
-            awaitingAuth.value = false;
+        if (data.trace_attempts != null) {
+            traceAttemptsLeft.value = data.trace_attempts;
         }
+
+        // exploit: mark port shattered + update credential strip
+        if (data.port_shattered != null) {
+            portPool.value = portPool.value.map(p =>
+                p.port === data.port_shattered ? { ...p, shattered: true } : p
+            );
+        }
+        if (data.credential_state) {
+            credentialState.value = {
+                hostname: data.credential_state.hostname ?? credentialState.value.hostname,
+                os:       data.credential_state.os       ?? credentialState.value.os,
+            };
+        }
+
+        // breach: open auth prompt
+        if (data.awaiting_auth) awaitingAuth.value = true;
+        if (data.auth_failed)   awaitingAuth.value = false;
 
         // ── Phase 3 updates ───────────────────────────────────────────────────
         if (data.filesystem_update) {
             if (data.filesystem_update.current_path !== undefined) {
                 currentPath.value = data.filesystem_update.current_path;
-                // Track explored paths for breadcrumb
                 if (!exploredPaths.value.includes(data.filesystem_update.current_path)) {
                     exploredPaths.value.push(data.filesystem_update.current_path);
                 }
@@ -154,13 +184,7 @@ export function usePacketHijack(playerId) {
         }
 
         // ── Common ────────────────────────────────────────────────────────────
-        if (data.updated_ports) {
-            // Legacy port matrix still used by rig commands
-            if (fingerprint.value) {
-                fingerprint.value = { ...fingerprint.value, legacy_ports: data.updated_ports };
-            }
-        }
-        if (data.lock_until) _applyLock(new Date(data.lock_until));
+        if (data.lock_until)    _applyLock(new Date(data.lock_until));
         if (data.phase_advanced) {
             phase.value++;
             awaitingAuth.value = false;
@@ -168,7 +192,6 @@ export function usePacketHijack(playerId) {
     }
 
     function _onPhaseTransition(data) {
-        console.log('[PH] WS phase-transition:', JSON.parse(JSON.stringify(data)));
         if (data.match_id !== matchId.value) return;
 
         if (data.alert_only) {
@@ -176,9 +199,15 @@ export function usePacketHijack(playerId) {
             setTimeout(() => { defenderAlertActive.value = false; }, 6000);
         } else {
             phase.value = 2;
+            // Seed the port board from the transition payload if provided
+            if (data.ports && data.ports.length) {
+                portPool.value = data.ports;
+                boardScanned.value = true;
+            }
             _appendHistory('SYSTEM', [
-                '[ALERT]: RECON COMPLETE — PIVOTING TO TARGET DEFENSIVE TOPOLOGY',
-                '[TYPE: scan ' + (data.target_ip ?? '<target-ip>') + ' TO BEGIN]',
+                '[ALERT]: RECON COMPLETE — TARGET TERMINAL COMPROMISED',
+                '[PIVOTING TO PHASE 2: EXPLOIT CHAIN INVESTIGATION]',
+                '[TYPE: scan ' + (data.target_ip ?? '<target-ip>') + ' TO INITIALISE PORT BOARD]',
             ]);
         }
     }
@@ -217,11 +246,8 @@ export function usePacketHijack(playerId) {
         if (!trimmed) return;
 
         const knownCommands = [
-            // Phase 1
             'netstat', 'ping', 'traceroute', 'arp', 'whois', 'sniff', 'flush', 'inject',
-            // Phase 2
-            'scan', 'probe', 'validate', 'exploit', 'decode', 'breach',
-            // Phase 3
+            'scan', 'probe', 'trace', 'exploit', 'breach',
             'ls', 'cd', 'extract',
         ];
 
@@ -233,13 +259,9 @@ export function usePacketHijack(playerId) {
 
         busy.value = true;
         try {
-            console.log('[PH] → POST command:', trimmed);
-            const res = await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
-            console.log('[PH] ← response ok:', res.status, res.data);
+            await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
         } catch (e) {
             const status = e?.response?.status;
-            const body   = e?.response?.data;
-            console.error('[PH] ✗ command error:', { status, body, input: trimmed, error: e?.message });
             if (status === 409) {
                 _appendHistory(trimmed, ['[ERROR]: TARGET ALREADY PURGED']);
             } else if (status === 429) {
@@ -253,12 +275,8 @@ export function usePacketHijack(playerId) {
         }
     }
 
-    /**
-     * Submit auth credentials after a successful breach.
-     */
     async function submitAuth(username, password) {
         if (!matchId.value || busy.value) return;
-
         busy.value = true;
         try {
             await axios.post(`/api/packet-hijack/${matchId.value}/command`, {
@@ -324,7 +342,11 @@ export function usePacketHijack(playerId) {
     function _appendHistory(input, lines) {
         const entry = { input, lines: [], ts: Date.now() };
         commandHistory.value.push(entry);
-        _streamLines(entry, lines ?? []);
+        // Use the reactive proxy from the array, not the raw object.
+        // _streamLines mutates entry.lines via setTimeout — if we pass the raw
+        // object those pushes bypass Vue's Proxy and never trigger re-renders.
+        // The item at the tail of commandHistory.value IS the reactive proxy.
+        _streamLines(commandHistory.value[commandHistory.value.length - 1], lines ?? []);
     }
 
     function _streamLines(entry, lines) {
@@ -363,9 +385,12 @@ export function usePacketHijack(playerId) {
         boardReady,
         activeSuspectCount,
         // Phase 2
-        fingerprint,
-        portScanResult,
+        portPool,
+        chainConfirmed,
+        traceAttemptsLeft,
+        credentialState,
         awaitingAuth,
+        boardScanned,
         // Phase 3
         currentPath,
         directoryEntries,

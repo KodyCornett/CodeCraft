@@ -8,6 +8,294 @@ Mark each item `[x]` as it is completed. Never skip a phase — later phases dep
 
 ---
 
+## GAME PHASE 2 REDESIGN — Exploit Chain Investigation
+> **Status:** Design confirmed — not yet implemented. Supersedes the original bias/decode/validate system entirely.
+> **Scope:** `PacketHijackService.php`, `PacketHijackController.php`, `PacketHijack.vue`, `usePacketHijack.js`, one new migration for schema changes.
+
+---
+
+### Philosophy
+
+The original Phase 2 was a recipe: probe each port, read the exposure rating, decode N times (told by the error message), exploit. No deduction. No uncertainty. The player followed instructions rather than investigated a system.
+
+The redesign makes the exploit path the puzzle. The player knows there is a correct sequence of ports to crack in order — they don't know what it is. They gather evidence through probing, form hypotheses, test them, and deduce the chain from what the system tells them. Fragment collection (credentials needed for auth) is a byproduct of working the chain correctly — not a separate scavenger hunt.
+
+**Removed entirely:** bias values, exposure ratings, `decode` command, `validate` command, port bias thresholds, cascade math.
+
+---
+
+### Port Pool
+
+#### Expanded Catalogue
+
+Phase 2 now draws from a larger port catalogue. 8–10 ports are shown per match (up from 5). The correct exploit chain is 2–3 ports. The rest are noise — dead ends or red herrings.
+
+| Port  | Service    | Notes                          |
+|-------|------------|--------------------------------|
+| 21    | FTP        |                                |
+| 22    | SSH        |                                |
+| 25    | SMTP       |                                |
+| 53    | DNS        |                                |
+| 80    | HTTP       |                                |
+| 443   | HTTPS      |                                |
+| 3306  | MySQL      |                                |
+| 5432  | Postgres   |                                |
+| 6379  | Redis      |                                |
+| 8080  | Alt-HTTP   | Exfil port — always present, always the final exploit target |
+| 27017 | MongoDB    |                                |
+| 3389  | RDP        |                                |
+
+Match generation selects 7–9 ports from the catalogue (excluding 8080), then appends 8080. Total visible ports: 8–10.
+
+Port count scales with target's **Firewall** stat:
+- FW 1–3 → 8 ports (chain easier to isolate)
+- FW 4–6 → 9 ports
+- FW 7+  → 10 ports
+
+#### Three Port Categories
+
+Every port in a match falls into exactly one category. Category is assigned at match generation and never changes.
+
+**Chain ports** — 2–3 ports that form the correct exploit sequence. Each has an anomaly that accurately describes its relationship to the next port in the chain. `trace` between connected chain ports confirms the link. Exploiting them in the correct order is the win condition for Phase 2.
+
+**Dead ends** — ports with a generic anomaly or no anomaly at all. They look like real services. `trace` with any other port returns no correlation. They exist to pad the board and force probing investment.
+
+**Red herrings** — ports with a specific, relational-sounding anomaly that leads nowhere. `trace` always returns no correlation regardless of what the player pairs them with. They are designed to look like chain ports. The target's **OS stat** controls how convincing they are:
+- OS 1–3 → anomaly is vague and easy to dismiss (`MISCONFIGURATION DETECTED — NON-STANDARD CONFIG`)
+- OS 4–6 → anomaly sounds relational but generic (`UPSTREAM DEPENDENCY SUSPECTED — NO SIGNATURE MATCH`)
+- OS 7+  → anomaly closely mimics real chain language, nearly indistinguishable without `trace` confirmation
+
+---
+
+### Chain Generation
+
+At match start `generateExploitChain()` builds the exploit sequence for each player's side independently.
+
+**Structure:** `[entry_port → ... → 8080]`
+
+A 2-port chain: `SSH → 8080`
+A 3-port chain: `Redis → MySQL → 8080`
+
+Port 8080 (exfil) is always the terminal node. The player must exploit all chain ports in sequence before 8080 becomes accessible.
+
+**Chain rules:**
+- No port appears twice in a chain
+- Entry port is never 8080
+- Chain length: 2 (FW 1–4) or 3 (FW 5+)
+- Chain ports are seeded into the port pool alongside dead ends and red herrings before the match is stored
+
+**Anomaly seeding:** Each chain port receives an anomaly that references the next port in the chain by service type (not port number) — keeping it deductive rather than explicit. Example for `Redis → MySQL`:
+
+Redis anomaly: `VOLATILE KEYSPACE — ACTIVE AUTH HANDSHAKE PATTERN — DOWNSTREAM DATABASE DEPENDENCY SUSPECTED`
+
+MySQL anomaly: `AUTH PLUGIN MISMATCH — SESSION TOKEN BLEED FROM IN-MEMORY CACHE — UPSTREAM RELAY DETECTED`
+
+The player reads both, forms the hypothesis, confirms with `trace 6379 3306`.
+
+---
+
+### Commands
+
+#### `scan <ip>`
+Opens Phase 2. Returns port numbers and service names only. No exposure, no anomaly, no banner. Same role as `netstat` in Phase 1 — populates the board, nothing more.
+
+```
+> scan 192.168.4.17
+
+PORT SCAN COMPLETE — 9 SERVICES DETECTED
+:22    SSH
+:25    SMTP
+:53    DNS
+:80    HTTP
+:443   HTTPS
+:3306  MySQL
+:6379  Redis
+:3389  RDP
+:8080  Alt-HTTP  [EXFIL — LOCKED]
+```
+
+---
+
+#### `probe <port>`
+Fingerprints a specific port. Returns a multi-line service banner (flare data) followed by the anomaly line. Marks the port as probed. Probing a port is required before `trace` or `exploit` can reference it.
+
+Banner content is flare — process stats, session counts, version strings, memory usage — realistic noise that makes the system feel alive. The anomaly is always the last line, prefixed `ANOMALY:`. For dead ends the anomaly is absent or generic. For red herrings and chain ports it is specific and relational.
+
+Players must read through the flare to reach the anomaly. High-OS targets generate longer banners (more lines of noise before the anomaly).
+
+```
+> probe 6379
+
+Redis 6.2.6 — In-Memory Data Store
+Uptime             : 14d 3h 22m
+Connected clients  : 4
+Used memory        : 1.24MB
+Keyspace hits      : 31,047 / misses: 203
+Last save          : 47s ago
+Blocked clients    : 0
+Active channels    : RELAY-NODE-07, SESSION-BROKER-02
+Persistence        : RDB + AOF
+
+ANOMALY: VOLATILE KEYSPACE — ACTIVE AUTH HANDSHAKE PATTERN — DOWNSTREAM DATABASE DEPENDENCY SUSPECTED
+```
+
+---
+
+#### `trace <port1> <port2>`
+Tests a hypothesized relationship between two probed ports. Both ports must have been probed first.
+
+If the two ports are adjacent in the exploit chain → confirms the link and reveals the directionality:
+
+```
+> trace 6379 3306
+
+CROSS-REFERENCE: REDIS SESSION TOKEN → MYSQL AUTH LAYER — DEPENDENCY CONFIRMED
+CHAIN VECTOR: EXPLOIT 6379 FIRST — COLLAPSE WILL PROPAGATE TO 3306
+```
+
+If the ports have no real relationship (dead end or red herring pairing) → returns no correlation:
+
+```
+> trace 25 443
+
+NO CORRELATED ANOMALY BETWEEN SMTP:25 AND HTTPS:443
+SERVICES OPERATE INDEPENDENTLY
+```
+
+**Trace attempts are limited** and governed by the attacker's **CPU stat**:
+- CPU 1–3 → 4 trace attempts
+- CPU 4–6 → 6 trace attempts
+- CPU 7+  → 8 trace attempts
+
+Attempts are consumed on both confirmed and failed traces. Running out does not lock the player out — they can still exploit based on their current deductions, but blind. The attempt counter is visible in the UI.
+
+---
+
+#### `exploit <port>`
+Attempt to shatter a port. The port must have been probed first.
+
+**Correct chain order:** If the port is the current head of the chain (i.e. no unshattered chain ports precede it), the exploit succeeds. A credential fragment for the auth step is revealed as output.
+
+```
+> exploit 6379
+
+BREACHING REDIS SESSION LAYER...
+[============================] GATE COLLAPSED
+
+CREDENTIAL FRAGMENT EXTRACTED:
+  HOSTNAME : CORE-????-????  →  CORE-RELAY-????
+  OS       : PROC-????-???   →  (LOCKED — CONTINUE CHAIN)
+```
+
+**Wrong order or non-chain port:** Fails with an informative but cryptic response that reinforces the investigation rather than spelling out the answer:
+
+```
+> exploit 3306
+
+BREACH ATTEMPT — GATE HOLDING
+AUTH LAYER UNRESPONSIVE — NO UPSTREAM SIGNAL DETECTED
+HINT: THIS SERVICE MAY REQUIRE A PRIOR DEPENDENCY TO BE CLEARED
+```
+
+```
+> exploit 25
+
+BREACH ATTEMPT — GATE HOLDING
+SMTP SERVICE INTEGRITY HIGH — NO KNOWN VECTOR
+```
+
+The player learns from the failure. "No upstream signal" confirms this port has a dependency. "No known vector" suggests it may be a dead end.
+
+**Exfil port 8080:** Only exploitable after all chain ports are shattered in sequence. Attempting it early:
+
+```
+> exploit 8080
+
+EXFIL PORT LOCKED — CHAIN INCOMPLETE
+CLEAR ALL CASCADE DEPENDENCIES FIRST
+```
+
+---
+
+#### `breach <ip>`
+Final Phase 2 command. Fired after the full chain is shattered (all chain ports exploited in order, 8080 shattered last). Validates the IP from Phase 1 and opens the auth prompt.
+
+```
+> breach 192.168.4.17
+
+IP SIGNATURE MATCHED — INITIATING CONNECTION...
+SYSTEM LOGIN REQUIRED
+```
+
+Auth prompt opens. Player types the assembled hostname and OS credentials (built up from fragment reveals during correct exploit steps). Correct credentials → Phase 3. Wrong credentials → 1–2 fragments corrupt (same penalty as before) and the player must re-derive them from the banner data.
+
+---
+
+### Fragment Collection
+
+Fragments are no longer hidden in banner text for the player to spot and copy. They are **revealed automatically as rewards for correct chain exploitation.**
+
+Each successful `exploit` on a chain port (in correct order) drops one segment of the credential pair. The top strip updates in real time:
+
+| Chain step | Hostname display    | OS display       |
+|------------|---------------------|------------------|
+| Start       | `CORE-????-????`   | `PROC-????-???`  |
+| Exploit port 1 | `CORE-RELAY-????` | `PROC-????-???` |
+| Exploit port 2 | `CORE-RELAY-????` | `PROC-4.2-???`  |
+| Exploit 8080   | `CORE-RELAY-A3F2` | `PROC-4.2-B91`  |
+
+The credential is complete when the chain is complete. No `validate` step. No manual reading and copying. The banner flare data still contains the fragment strings embedded in noise — but only as a secondary reference if the player wants to double-check before typing auth. The primary delivery mechanism is chain exploitation.
+
+**Auth failure + corruption** still applies: if the player misremembers or misreads a fragment at the auth step, 1–3 segments corrupt and they must re-derive from the banner they already probed. This keeps the banners meaningful as reference material without making them the primary gameplay loop.
+
+---
+
+### Stat Expression in Phase 2
+
+| Stat | Effect |
+|---|---|
+| Target **Firewall** | Controls port count (8–10) and chain length (2–3). Higher FW = more noise to sift through. |
+| Target **OS** | Controls red herring quality. High OS = red herrings that closely mimic chain anomaly language. |
+| Attacker **CPU** | Controls trace attempt budget (4–8). High CPU = more hypotheses testable before going blind. |
+| Attacker **OS** | No direct effect in Phase 2. Expression is in Phase 1 ping evasion. |
+
+---
+
+### UI Changes — Phase 2 Data Zone
+
+The port matrix in the top strip changes:
+
+**Before (old):** Port | Service | Exposure rating (CRITICAL/LOW/etc.)
+
+**After (new):** Port | Service | Probed indicator | Shattered indicator | Chain confirmed indicator
+
+```
+:22   SSH     [PROBED]  [CHAIN ✓]  [SHATTERED]
+:6379 Redis   [PROBED]  [CHAIN ✓]  [SHATTERED]
+:3306 MySQL   [PROBED]  [CHAIN ✓]  [         ]  ← current target
+:25   SMTP    [PROBED]  [       ]  [         ]
+:443  HTTPS   [       ]  [       ]  [         ]
+:8080 Alt-HTTP[LOCKED UNTIL CHAIN COMPLETE    ]
+```
+
+Chain confirmation indicator only lights when `trace` has confirmed that port as part of the chain. This gives the player a visual record of their confirmed deductions without giving away ports they haven't traced yet.
+
+Credential strip persists at top right — fragments fill in as chain ports are exploited.
+
+---
+
+### Files to Change When Implementation Begins
+
+| File | Change |
+|---|---|
+| `PacketHijackService.php` | Remove `generatePortTopology`, `commandExploitPort`, `commandDecodePort`, `commandProbePort`, `commandValidate`, `biasToExposure`, bias/cascade math. Add `generateExploitChain`, `generatePortPool`, `commandTrace`, revised `commandProbe`, revised `commandExploit`, `commandBreach` (IP-only). |
+| `PacketHijackController.php` | Update command routing to remove decode/validate handlers, add trace handler. |
+| `PacketHijack.vue` | Replace port matrix exposure labels with probed/chain/shattered indicators. Add trace attempt counter. Remove validate UI. Update credential strip to fill progressively. |
+| `usePacketHijack.js` | Remove decode/validate state. Add `traceAttemptsRemaining`, `chainConfirmed` port flags, progressive credential state. |
+| Migration | New column: `challenger_exploit_chain` JSON, `defender_exploit_chain` JSON, `challenger_trace_attempts` TINYINT, `defender_trace_attempts` TINYINT. Remove or repurpose bias columns if no longer needed. |
+
+---
+
 ## PHASE 0 — Laravel Reverb Installation & WebSocket Foundation
 > **Prerequisite for everything.** `useWebSocket.js` is currently a silent stub. Reverb must be live before any real-time game events can fire.
 

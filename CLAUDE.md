@@ -316,3 +316,26 @@ Sanctum's `EnsureFrontendRequestsAreStateful` middleware is prepended to the API
 10. **One migration per change.** Never alter existing migration files — always add a new one.
 11. **Surgical edits only — never touch what wasn't asked.** When making a change, edit only the exact lines required to fulfil the request. Do not reformat surrounding code, remove unrelated sections, reorder template blocks, or "clean up" anything that wasn't explicitly broken. If a file must be read first, read the smallest slice needed. Before saving any edit, verify that every line outside the requested change is byte-for-byte identical to what was there before.
 12. **Stat changes require explicit confirmation before implementation.** Any modification to stat roles, formulas, degradation tiers, GridBreach effects, or new mechanic assignments must be discussed and confirmed by the user before any code is written. Present the full impact (numbers, affected files, gameplay consequences) and wait for a go-ahead.
+
+---
+
+## Phase 2 Redesign — Exploit Chain Implementation Checklist
+
+> Replaces the bias/decode/validate system. Full design spec in `PACKET_HIJACK_BUILD_PLAN.md`.
+
+- [x] **1. Migration** — add `challenger_exploit_chain`, `defender_exploit_chain` (JSON), `challenger_trace_attempts`, `defender_trace_attempts` (TINYINT) to `packet_hijack_matches`
+- [x] **2. `PacketHijackService` — remove old Phase 2 methods** — deleted `EXPLOIT_THRESHOLD`, `OVERCLOCK_THRESHOLD`, bias/cascade constants; old probe/decode/validate/biasToExposure methods remain in file but are no longer routed
+- [x] **3. `PacketHijackService` — expand port catalogue** — SMTP(25), DNS(53), RDP(3389), Postgres(5432), Redis(6379), MongoDB(27017) added; `PORT_FLARE`, `CHAIN_ANOMALIES`, `REDHERRING_ANOMALIES` pools added for all ports
+- [x] **4. `PacketHijackService` — `generateExploitChain()`** — builds 2–3 port chain ending at 8080; chain length driven by target FW stat
+- [x] **5. `PacketHijackService` — `generatePortPool()`** — selects 7–9 ports, seeds chain/red-herring/dead-end categories, assigns anomalies and flare lines per port
+- [x] **6. `PacketHijackService` — anomaly generation** — chain ports get relational anomalies from `CHAIN_ANOMALIES`; red herrings get OS-tier-scaled anomalies; dead ends get null anomaly
+- [x] **7. `PacketHijackService` — `commandProbePort()`** — returns flare banner + anomaly line; banner length scales with target OS stat
+- [x] **8. `PacketHijackService` — `commandTrace()`** — validates two-port hypothesis; consumes one attempt; confirms adjacency or returns no-correlation
+- [x] **9. `PacketHijackService` — `commandExploitPort()`** — chain-order enforcement; credential fragment reveal on success; informative failure for wrong order / non-chain
+- [x] **10. `PacketHijackService` — `commandBreachChain()`** — IP-only validation; all chain ports must be shattered; opens auth prompt
+- [x] **11. Migration / service — trace attempt + chain initialisation** — seeded at inject→phase2 transition in controller from attacker CPU stat; `challenger_chain_progress`, `challenger_credential_state` columns added
+- [x] **12. `PacketHijackController`** — `trace` handler added; `probe`/`exploit`/`breach` updated; `decode`/`validate` handlers removed; `handleInject` seeds chain+pool+attempts at phase transition
+- [x] **13. `usePacketHijack.js`** — removed decode/validate/fingerprint state; added `portPool`, `chainConfirmed`, `traceAttemptsLeft`, `credentialState`, `boardScanned`; WS handlers updated for new event keys
+- [x] **14. `PacketHijack.vue` — port board** — new port cards with probed/chain-confirmed/shattered indicators; old exposure labels removed
+- [x] **15. `PacketHijack.vue` — credential strip** — fills progressively as chain ports exploited; trace attempt counter with colour states (normal/low/depleted)
+- [x] **16. `PacketHijack.vue` — remove decode/validate UI** — CMD REF updated to new command set; old port matrix helpers removed; `Game.vue` props updated to new state shape
