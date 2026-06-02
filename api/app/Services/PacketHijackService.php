@@ -662,9 +662,9 @@ class PacketHijackService
             'decode'     => [1, 1],   // decode <port>
             'breach'     => [2, 2],   // breach <ip> <port>
             // Phase 3
-            'ls'         => [0, 0],   // ls
+            'ls'         => [0, 1],   // ls (optional arg ignored)
             'cd'         => [1, 1],   // cd <dir> or cd ..
-            'extract'    => [0, 0],   // extract
+            'extract'    => [0, 1],   // extract (optional target arg ignored)
         ];
 
         [$min, $max] = $argRequirements[$command];
@@ -1188,8 +1188,14 @@ class PacketHijackService
         }
 
         // Navigate forward
-        $targetPath = rtrim($currentPath, '/') . '/' . $dir;
+        $targetPath = rtrim($currentPath, '/') . '/' . ltrim($dir, '/');
         $node       = $this->navigateToPath($filesystem['tree'], $targetPath);
+
+        // Special case: wallet is a file (null), not a directory
+        $currentNode = $this->navigateToPath($filesystem['tree'], $currentPath);
+        if ($currentNode !== null && array_key_exists($dir, $currentNode) && $currentNode[$dir] === null) {
+            return ['success' => false, 'error' => "{$dir} IS A FILE — RUN: extract"];
+        }
 
         if ($node === null) {
             return ['success' => false, 'error' => "DIRECTORY NOT FOUND: {$dir}"];

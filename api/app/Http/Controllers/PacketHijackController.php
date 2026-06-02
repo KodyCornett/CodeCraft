@@ -765,10 +765,18 @@ class PacketHijackController extends Controller
             return response()->json(['ok' => true]);
         }
 
+        $walletFound = false;
         $lines = ["[{$result['path']}]"];
         foreach ($result['entries'] as $entry) {
-            $suffix = $entry['is_wallet'] ? '  ← TARGET' : ($entry['is_dir'] ? '/' : '');
-            $lines[] = "  {$entry['name']}{$suffix}";
+            if ($entry['is_wallet']) {
+                $lines[] = "  {$entry['name']}  ← TARGET WALLET";
+                $walletFound = true;
+            } else {
+                $lines[] = "  {$entry['name']}" . ($entry['is_dir'] ? '/' : '');
+            }
+        }
+        if ($walletFound) {
+            $lines[] = '[WALLET DETECTED — RUN: extract]';
         }
 
         PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw, outputLines: $lines,
