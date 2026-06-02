@@ -208,6 +208,9 @@ export function useGameState() {
 
             if (result.type === 'repair') {
                 player.value.currentSS = result.current_ss;
+                if (result.is_limping !== undefined) {
+                    player.value.isLimping = result.is_limping;
+                }
             }
 
             // Decrement quantity or remove from local inventory list

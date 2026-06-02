@@ -23,19 +23,29 @@ class PacketHijackCommandResult implements ShouldBroadcast
         public readonly string  $playerId,
         public readonly string  $command,
         public readonly array   $outputLines,
-        public readonly ?array  $updatedPorts = null,        // Phase 2 port state after exploit/decode
-        public readonly bool    $phaseAdvanced = false,      // true when inject succeeded
+        // Common
+        public readonly bool    $phaseAdvanced = false,      // true when phase advances (inject, auth success)
         public readonly ?string $lockUntil = null,           // ISO-8601 if honeypot lock applied
-        public readonly ?array  $updatedSuspects = null,       // full suspect board after netstat
-        public readonly ?array  $suspectUpdate = null,        // single suspect attribute reveal
-        public readonly ?array  $arpScanResult = null,        // full arp timestamp sweep
-        public readonly ?string $octetClue = null,            // sniff clue e.g. '.4.'
-        public readonly ?string $flushedIp = null,            // ip marked as flushed
-        public readonly ?array  $fingerprintUpdate = null,    // Phase 2 fingerprint state
-        public readonly ?array  $portScanResult = null,       // Phase 2 scan result (port list)
-        public readonly bool    $awaitingAuth = false,        // breach succeeded, show auth prompt
-        public readonly bool    $authFailed = false,          // auth rejected, dismiss prompt + return to terminal
-        public readonly ?array  $filesystemUpdate = null,     // Phase 3 filesystem state
+        // Phase 1
+        public readonly ?array  $updatedSuspects = null,     // full suspect board after netstat
+        public readonly ?array  $suspectUpdate = null,       // single suspect attribute reveal
+        public readonly ?array  $arpScanResult = null,       // full arp timestamp sweep
+        public readonly ?string $octetClue = null,           // sniff clue e.g. '.4.'
+        public readonly ?string $flushedIp = null,           // ip marked as flushed
+        // Phase 2 — redesigned exploit chain
+        public readonly ?array  $portScanResult = null,      // scan: full port board (public view)
+        public readonly ?int    $portProbed = null,          // probe: port number now marked probed
+        public readonly ?array  $traceConfirmed = null,      // trace: [port1, port2] if chain link confirmed; null if no correlation
+        public readonly ?int    $traceAttempts = null,       // trace: remaining attempt count after this command
+        public readonly ?int    $portShattered = null,       // exploit: port number now shattered
+        public readonly ?array  $credentialState = null,     // exploit/auth-fail: updated { hostname, os } display
+        public readonly bool    $awaitingAuth = false,       // breach: open auth prompt
+        public readonly bool    $authFailed = false,         // auth: rejected — dismiss prompt
+        // Phase 2 legacy / rig commands
+        public readonly ?array  $updatedPorts = null,        // rig commands that mutate opponent port state
+        public readonly ?array  $fingerprintUpdate = null,   // kept for rig-command compat (phase_shift etc.)
+        // Phase 3
+        public readonly ?array  $filesystemUpdate = null,    // Phase 3 filesystem state
     ) {}
 
     public function broadcastOn(): PrivateChannel
@@ -51,21 +61,31 @@ class PacketHijackCommandResult implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'match_id'        => $this->matchId,
-            'command'         => $this->command,
-            'output_lines'    => $this->outputLines,
-            'updated_ports'   => $this->updatedPorts,
-            'phase_advanced'  => $this->phaseAdvanced,
-            'lock_until'      => $this->lockUntil,
+            'match_id'          => $this->matchId,
+            'command'           => $this->command,
+            'output_lines'      => $this->outputLines,
+            // Common
+            'phase_advanced'    => $this->phaseAdvanced,
+            'lock_until'        => $this->lockUntil,
+            // Phase 1
             'updated_suspects'  => $this->updatedSuspects,
             'suspect_update'    => $this->suspectUpdate,
             'arp_scan_result'   => $this->arpScanResult,
             'octet_clue'        => $this->octetClue,
             'flushed_ip'        => $this->flushedIp,
-            'fingerprint_update'=> $this->fingerprintUpdate,
+            // Phase 2 — redesigned
             'port_scan_result'  => $this->portScanResult,
+            'port_probed'       => $this->portProbed,
+            'trace_confirmed'   => $this->traceConfirmed,
+            'trace_attempts'    => $this->traceAttempts,
+            'port_shattered'    => $this->portShattered,
+            'credential_state'  => $this->credentialState,
             'awaiting_auth'     => $this->awaitingAuth,
             'auth_failed'       => $this->authFailed,
+            // Phase 2 legacy / rig commands
+            'updated_ports'     => $this->updatedPorts,
+            'fingerprint_update'=> $this->fingerprintUpdate,
+            // Phase 3
             'filesystem_update' => $this->filesystemUpdate,
         ];
     }

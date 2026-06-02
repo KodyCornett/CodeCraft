@@ -41,6 +41,14 @@ class PacketHijackMatch extends Model
         'defender_bait_ports',
         'challenger_used_commands',
         'defender_used_commands',
+        'challenger_exploit_chain',
+        'defender_exploit_chain',
+        'challenger_trace_attempts',
+        'defender_trace_attempts',
+        'challenger_chain_progress',
+        'defender_chain_progress',
+        'challenger_credential_state',
+        'defender_credential_state',
         'started_at',
         'completed_at',
     ];
@@ -70,6 +78,14 @@ class PacketHijackMatch extends Model
         'defender_bait_ports'         => 'array',
         'challenger_used_commands'    => 'array',
         'defender_used_commands'      => 'array',
+        'challenger_exploit_chain'    => 'array',
+        'defender_exploit_chain'      => 'array',
+        'challenger_trace_attempts'   => 'integer',
+        'defender_trace_attempts'     => 'integer',
+        'challenger_chain_progress'   => 'integer',
+        'defender_chain_progress'     => 'integer',
+        'challenger_credential_state' => 'array',
+        'defender_credential_state'   => 'array',
         'started_at'                  => 'datetime',
         'completed_at'                => 'datetime',
     ];
@@ -273,5 +289,65 @@ class PacketHijackMatch extends Model
     {
         $key = "{$role}_used_commands";
         return $this->$key ?? [];
+    }
+
+    // ── Phase 2 redesign — Exploit chain helpers ──────────────────────────────
+
+    /**
+     * The ordered exploit chain for a given role (port numbers, ending with 8080).
+     */
+    public function exploitChainFor(string $role): array
+    {
+        $key = "{$role}_exploit_chain";
+        return $this->$key ?? [];
+    }
+
+    /**
+     * How many chain ports have been shattered so far (0-indexed progress counter).
+     */
+    public function chainProgressFor(string $role): int
+    {
+        $key = "{$role}_chain_progress";
+        return (int) ($this->$key ?? 0);
+    }
+
+    /**
+     * The next port number the player must exploit in the chain.
+     * Returns null if the chain is fully complete.
+     */
+    public function nextChainPortFor(string $role): ?int
+    {
+        $chain    = $this->exploitChainFor($role);
+        $progress = $this->chainProgressFor($role);
+        return $chain[$progress] ?? null;
+    }
+
+    /**
+     * Whether all chain ports (including 8080) have been shattered for a role.
+     */
+    public function chainCompleteFor(string $role): bool
+    {
+        $chain    = $this->exploitChainFor($role);
+        $progress = $this->chainProgressFor($role);
+        return !empty($chain) && $progress >= count($chain);
+    }
+
+    /**
+     * Remaining trace attempts for a given role.
+     */
+    public function traceAttemptsFor(string $role): int
+    {
+        $key = "{$role}_trace_attempts";
+        return (int) ($this->$key ?? 0);
+    }
+
+    /**
+     * The assembled credential state for a given role.
+     * Schema: { hostname: string, os: string } — fills progressively.
+     */
+    public function credentialStateFor(string $role): array
+    {
+        $key = "{$role}_credential_state";
+        return $this->$key ?? ['hostname' => null, 'os' => null];
     }
 }

@@ -22,27 +22,27 @@ class PacketHijackService
 {
     // ── Port catalogue ────────────────────────────────────────────────────────
 
-    /** Ports available for Phase 2 topology. Service name keyed by port number. */
+    /**
+     * Full port catalogue. Service name keyed by port number.
+     * 8080 is always the exfil terminal — never selected as a chain entry point.
+     */
     private const PORT_CATALOGUE = [
-        21   => 'FTP',
-        22   => 'SSH',
-        80   => 'HTTP',
-        443  => 'HTTPS',
-        3306 => 'MySQL',
-        8080 => 'Alt-HTTP',
+        21    => 'FTP',
+        22    => 'SSH',
+        25    => 'SMTP',
+        53    => 'DNS',
+        80    => 'HTTP',
+        443   => 'HTTPS',
+        3306  => 'MySQL',
+        3389  => 'RDP',
+        5432  => 'Postgres',
+        6379  => 'Redis',
+        27017 => 'MongoDB',
+        8080  => 'Alt-HTTP',
     ];
 
-    /** The exfil port that unlocks after all catalogue ports are shattered. */
+    /** The exfil port — always the final link in the exploit chain. */
     private const EXFIL_PORT = 8080;
-
-    /** Bias threshold: a port must be AT OR BELOW this value to be exploitable. */
-    private const EXPLOIT_THRESHOLD = 25;
-
-    /**
-     * Overclock exploit threshold — replaces EXPLOIT_THRESHOLD for the next
-     * exploit command when the player has overclock_active.
-     */
-    private const OVERCLOCK_THRESHOLD = 45;
 
     /** Lock duration in seconds when a player hits a honeypot. */
     private const HONEYPOT_LOCK_SECONDS = 3;
@@ -53,8 +53,8 @@ class PacketHijackService
     /** Recognised Phase 1 commands. */
     private const PHASE1_COMMANDS = ['netstat', 'ping', 'traceroute', 'arp', 'whois', 'sniff', 'flush', 'inject'];
 
-    /** Recognised Phase 2 commands. */
-    private const PHASE2_COMMANDS = ['scan', 'probe', 'validate', 'exploit', 'decode', 'breach'];
+    /** Recognised Phase 2 commands — decode and validate removed. */
+    private const PHASE2_COMMANDS = ['scan', 'probe', 'trace', 'exploit', 'breach'];
 
     /** Recognised Phase 3 commands. */
     private const PHASE3_COMMANDS = ['ls', 'cd', 'extract'];
@@ -85,11 +85,259 @@ class PacketHijackService
 
     /** Port service + version strings for banner generation */
     private const PORT_SERVICES = [
-        21   => ['service' => 'FTP',   'versions' => ['vsftpd 3.0.3', 'ProFTPD 1.3.5', 'Pure-FTPd 1.0.47']],
-        22   => ['service' => 'SSH',   'versions' => ['OpenSSH 7.2p1', 'OpenSSH 6.9', 'Dropbear 2019.78']],
-        80   => ['service' => 'HTTP',  'versions' => ['Apache 2.4.49', 'nginx 1.18.0', 'Apache 2.2.34']],
-        443  => ['service' => 'HTTPS', 'versions' => ['TLS 1.3 / nginx', 'TLS 1.2 / Apache', 'TLS 1.3 / Caddy']],
-        3306 => ['service' => 'MySQL', 'versions' => ['MySQL 5.6.0', 'MySQL 5.7.32', 'MariaDB 10.3.27']],
+        21    => ['service' => 'FTP',      'versions' => ['vsftpd 3.0.3', 'ProFTPD 1.3.5', 'Pure-FTPd 1.0.47']],
+        22    => ['service' => 'SSH',      'versions' => ['OpenSSH 7.2p1', 'OpenSSH 6.9', 'Dropbear 2019.78']],
+        25    => ['service' => 'SMTP',     'versions' => ['Postfix 3.4.13', 'Sendmail 8.15.2', 'Exim 4.92']],
+        53    => ['service' => 'DNS',      'versions' => ['BIND 9.16.1', 'Unbound 1.9.4', 'dnsmasq 2.80']],
+        80    => ['service' => 'HTTP',     'versions' => ['Apache 2.4.49', 'nginx 1.18.0', 'Apache 2.2.34']],
+        443   => ['service' => 'HTTPS',    'versions' => ['TLS 1.3 / nginx', 'TLS 1.2 / Apache', 'TLS 1.3 / Caddy']],
+        3306  => ['service' => 'MySQL',    'versions' => ['MySQL 5.6.0', 'MySQL 5.7.32', 'MariaDB 10.3.27']],
+        3389  => ['service' => 'RDP',      'versions' => ['RDP 10.0', 'RDP 8.1', 'FreeRDP 2.0']],
+        5432  => ['service' => 'Postgres', 'versions' => ['PostgreSQL 13.3', 'PostgreSQL 12.7', 'PostgreSQL 14.1']],
+        6379  => ['service' => 'Redis',    'versions' => ['Redis 6.2.6', 'Redis 5.0.14', 'Redis 7.0.0']],
+        27017 => ['service' => 'MongoDB',  'versions' => ['MongoDB 4.4.6', 'MongoDB 5.0.3', 'MongoDB 6.0.1']],
+    ];
+
+    /**
+     * Relational anomaly templates for chain ports.
+     * Keyed by [from_service][to_service] — describes the dependency relationship.
+     * {next} is replaced with the next service name at generation time.
+     */
+    private const CHAIN_ANOMALIES = [
+        'FTP'      => [
+            'SSH'      => 'PLAIN-TEXT CREDENTIAL BLEED — SHARED AUTH TOKEN PATTERN MATCHES ENCRYPTED CHANNEL UPSTREAM',
+            'HTTP'     => 'PASSIVE MODE RELAY DETECTED — TRANSFER STREAM CORRELATED WITH HTTP SESSION HANDLER',
+            'MySQL'    => 'ANONYMOUS LOGIN PATH EXPOSES DATABASE STAGING AREA — DOWNSTREAM DB RELAY SUSPECTED',
+            'Redis'    => 'FILE TRANSFER SESSION TAG CORRELATES WITH IN-MEMORY CACHE ENTRY — UPSTREAM RELAY DETECTED',
+            'Postgres' => 'CREDENTIAL STAGING FILE DETECTED — DOWNSTREAM DATABASE AUTH DEPENDENCY SUSPECTED',
+            'SMTP'     => 'BOUNCE RELAY PATTERN — MAIL HANDLER SHARES SESSION NAMESPACE WITH FTP DAEMON',
+        ],
+        'SSH'      => [
+            'MySQL'    => 'KEY EXCHANGE DOWNGRADE PATTERN — SESSION CREDENTIAL BLEED TO DATABASE AUTH LAYER SUSPECTED',
+            'Redis'    => 'TUNNELLED SESSION DETECTED — FORWARDED PORT CORRELATES WITH IN-MEMORY BROKER',
+            'HTTP'     => 'AUTHORIZED KEYS FILE EXPOSES WEB SESSION NAMESPACE — CROSS-SERVICE DEPENDENCY',
+            'Postgres' => 'PUBKEY AUTH PLUGIN SHARES CREDENTIAL STORE WITH DOWNSTREAM DATABASE — BLEED VECTOR ACTIVE',
+            'FTP'      => 'HOST KEY MISMATCH — DOWNGRADE PATH CORRELATES WITH LEGACY FILE TRANSFER SERVICE',
+            'SMTP'     => 'AGENT FORWARDING ACTIVE — MAIL RELAY SESSION SHARES SSH NAMESPACE',
+        ],
+        'HTTP'     => [
+            'MySQL'    => 'SESSION COOKIE NAMESPACE LEAKS INTO DATABASE QUERY HANDLER — UPSTREAM DEPENDENCY DETECTED',
+            'Redis'    => 'FASTCGI SESSION BROKER SHARES KEYSPACE WITH IN-MEMORY CACHE — RELAY VECTOR ACTIVE',
+            'SSH'      => 'REVERSE PROXY CONFIG EXPOSES BACKEND SHELL — ENCRYPTED CHANNEL DEPENDENCY DETECTED',
+            'Postgres' => 'ORM SESSION POOL LEAKS CREDENTIAL HASH — DOWNSTREAM DB AUTH BLEED SUSPECTED',
+            'SMTP'     => 'FORM HANDLER SHARES MAIL RELAY NAMESPACE — SESSION TOKEN CORRELATION DETECTED',
+            'DNS'      => 'VIRTUAL HOST RESOLUTION MISMATCH — DNS REBINDING PATTERN DETECTED UPSTREAM',
+        ],
+        'HTTPS'    => [
+            'MySQL'    => 'TLS SESSION TICKET REUSE — DATABASE AUTH HANDLER SHARES RESUMPTION KEY',
+            'Redis'    => 'TLS CERT PIN MISMATCH — CACHE BROKER SESSION ID BLEEDS THROUGH ENCRYPTED LAYER',
+            'HTTP'     => 'CERTIFICATE DOWNGRADE NEGOTIATED — PLAIN HTTP FALLBACK CHANNEL ACTIVE DOWNSTREAM',
+            'DNS'      => 'CERT TRANSPARENCY LOG ANOMALY — DNS RESOLVER DEPENDENCY IN VALIDATION CHAIN',
+            'SSH'      => 'CLIENT CERT ISSUER MATCHES SSH HOST KEY AUTHORITY — SHARED PKI DEPENDENCY',
+        ],
+        'MySQL'    => [
+            'Redis'    => 'QUERY CACHE ENTRIES LEAK INTO VOLATILE KEYSPACE — IN-MEMORY RELAY DEPENDENCY ACTIVE',
+            'HTTP'     => 'STORED PROCEDURE EXPOSES SESSION NAMESPACE SHARED WITH WEB HANDLER',
+            'FTP'      => 'DATABASE EXPORT STAGING PATH OVERLAPS WITH FILE TRANSFER DAEMON ROOT',
+            'Postgres' => 'CROSS-DATABASE CREDENTIAL SHARE — REPLICATION LINK BRIDGES AUTH STORES',
+            'SMTP'     => 'TRIGGER EVENT FIRES MAIL RELAY — SESSION TOKEN CARRIED IN NOTIFICATION PAYLOAD',
+        ],
+        'Redis'    => [
+            'MySQL'    => 'VOLATILE KEYSPACE PATTERN — ACTIVE AUTH HANDSHAKE SESSION RELAYED TO DATABASE LAYER',
+            'HTTP'     => 'SESSION BROKER CACHE FEEDS WEB HANDLER — TOKEN REUSE ACROSS SERVICE BOUNDARY',
+            'SSH'      => 'PUBSUB CHANNEL LEAKS TUNNEL SESSION KEY — ENCRYPTED SHELL DEPENDENCY UPSTREAM',
+            'MongoDB'  => 'KEYSPACE NOTIFICATION PATTERN MATCHES DOCUMENT STORE EVENT STREAM — RELAY ACTIVE',
+            'Postgres' => 'CACHE INVALIDATION TIED TO DATABASE WRITE CYCLE — CREDENTIAL WINDOW EXPOSED',
+        ],
+        'SMTP'     => [
+            'DNS'      => 'MX RECORD RESOLUTION ANOMALY — MAIL EXCHANGER CHAINS THROUGH RESOLVER — UPSTREAM DEPENDENCY',
+            'HTTP'     => 'RELAY AGENT EXPOSES FORM-HANDLER SESSION — WEB LAYER DEPENDENCY DETECTED',
+            'Redis'    => 'DELIVERY QUEUE SERIALISED INTO CACHE LAYER — SESSION TOKEN PRESENT IN PAYLOAD',
+            'MySQL'    => 'BOUNCE TABLE SHARES DATABASE AUTH NAMESPACE — DOWNSTREAM DB RELAY SUSPECTED',
+        ],
+        'DNS'      => [
+            'HTTP'     => 'REBINDING ATTACK PATTERN — LOCAL RESOLVER MAPS EXTERNAL HOST TO WEB HANDLER INTERNAL IP',
+            'HTTPS'    => 'DNSSEC VALIDATION FAILURE — CERT CHAIN DEPENDENCY ON RESOLVER INTEGRITY BROKEN',
+            'SMTP'     => 'PTR RECORD MISMATCH — MAIL RELAY DEPENDS ON RESOLVER STATE FOR AUTH HANDSHAKE',
+            'Redis'    => 'DYNAMIC RECORD INJECTION DETECTED — CACHE POISONING VECTOR TO IN-MEMORY BROKER',
+        ],
+        'Postgres' => [
+            'Redis'    => 'LISTEN/NOTIFY CHANNEL PUSHES SESSION EVENTS TO CACHE BROKER — RELAY DEPENDENCY ACTIVE',
+            'HTTP'     => 'STORED PROCEDURE EXPOSES WEB SESSION CREDENTIAL — CROSS-LAYER BLEED DETECTED',
+            'MySQL'    => 'FOREIGN DATA WRAPPER BRIDGES AUTH STORES — CREDENTIAL REUSE ACROSS DATABASES',
+            'SMTP'     => 'DATABASE TRIGGER FIRES MAIL RELAY — SESSION TOKEN EXPOSED IN NOTIFICATION BODY',
+        ],
+        'MongoDB'  => [
+            'Redis'    => 'DOCUMENT CHANGE STREAM FEEDS CACHE BROKER — EVENT PAYLOAD CONTAINS SESSION TOKEN',
+            'HTTP'     => 'AGGREGATION PIPELINE LEAKS SESSION NAMESPACE INTO WEB REQUEST HANDLER',
+            'MySQL'    => 'CROSS-STORE SYNC JOB SHARES CREDENTIAL FILE — AUTH BLEED BETWEEN DATABASES',
+            'Postgres' => 'OPLOG REPLAY EXPOSES WRITE OPERATIONS — DOWNSTREAM DB AUTH DEPENDENCY DETECTED',
+        ],
+        'RDP'      => [
+            'SSH'      => 'DESKTOP SESSION CREDENTIAL FORWARDING — OVERLAPPING AUTH STORE WITH SHELL SERVICE',
+            'MySQL'    => 'REMOTE APPLICATION SHARES DATABASE CREDENTIAL FILE — DOWNSTREAM DB RELAY DETECTED',
+            'HTTP'     => 'SESSION TOKEN REUSED ACROSS REMOTE DESKTOP AND WEB HANDLER — CROSS-SERVICE BLEED',
+        ],
+    ];
+
+    /**
+     * Red herring anomaly pools keyed by OS tier.
+     * OS 1–3 → tier 'low' (obviously vague)
+     * OS 4–6 → tier 'mid' (sounds relational but generic)
+     * OS 7+  → tier 'high' (closely mimics chain language)
+     */
+    private const REDHERRING_ANOMALIES = [
+        'low' => [
+            'MISCONFIGURATION DETECTED — NON-STANDARD PORT CONFIGURATION',
+            'SERVICE RUNNING OUTSIDE EXPECTED PARAMETERS',
+            'UNUSUAL PROCESS BINDING — NOT EXPLOITABLE',
+            'LEGACY PROTOCOL IN USE — NO KNOWN ACTIVE VECTOR',
+            'CONFIGURATION DRIFT DETECTED — ISOLATED SERVICE',
+        ],
+        'mid' => [
+            'UPSTREAM DEPENDENCY SUSPECTED — NO ACTIVE SIGNATURE MATCH',
+            'INTER-SERVICE COMMUNICATION PATTERN — CORRELATION INCONCLUSIVE',
+            'SESSION NAMESPACE OVERLAP — INDEPENDENT SERVICES',
+            'AUTH HANDSHAKE ANOMALY — SOURCE UNRESOLVABLE',
+            'RELAY PATTERN DETECTED — NO DOWNSTREAM DEPENDENCY CONFIRMED',
+            'TOKEN REUSE SUSPECTED — CROSS-SERVICE ORIGIN UNCLEAR',
+        ],
+        'high' => [
+            'CREDENTIAL BLEED PATTERN — SESSION TOKEN ORIGIN AMBIGUOUS — FURTHER CORRELATION REQUIRED',
+            'VOLATILE KEYSPACE ACTIVITY — UPSTREAM RELAY POSSIBLE — NO CONFIRMED DEPENDENCY',
+            'AUTH PLUGIN MISMATCH — DOWNSTREAM SERVICE UNIDENTIFIED — TRACE TO CONFIRM',
+            'SESSION FORWARDING ACTIVE — TARGET SERVICE INDETERMINATE — CROSS-REFERENCE REQUIRED',
+            'CERTIFICATE CHAIN ANOMALY — DEPENDENCY VECTOR PRESENT — UNRESOLVED SOURCE',
+            'TUNNELLED SESSION DETECTED — DESTINATION ENDPOINT UNCONFIRMED — FURTHER RECON NEEDED',
+        ],
+    ];
+
+    /**
+     * Flare data pools — realistic noise lines per service type for probe banners.
+     * Mixed in around the anomaly to make the system feel alive.
+     */
+    private const PORT_FLARE = [
+        21    => [
+            'Transfer-Mode: BINARY',
+            'Auth-Mode: PLAIN',
+            'Passive-Mode: ENABLED',
+            'Max-Connections: 50',
+            'Idle-Timeout: 300s',
+            'Session-Count: {n}',
+            'Last-Transfer: {ts}s ago',
+            'Bytes-In: {kb}K / Bytes-Out: {kb2}K',
+            'Failed-Logins: {n}',
+        ],
+        22    => [
+            'Key-Exchange: diffie-hellman-group14-sha256',
+            'Auth-Methods: publickey,password',
+            'Cipher: aes128-ctr',
+            'Active-Sessions: {n}',
+            'Failed-Auth: {n}',
+            'Banner-Exchange: ENABLED',
+            'Keep-Alive: 60s',
+            'Host-Key-Type: RSA-4096',
+            'Compression: none',
+        ],
+        25    => [
+            'Queue-Size: {n} messages',
+            'Relay-Status: OPEN',
+            'TLS-Required: NO',
+            'Auth-Methods: PLAIN LOGIN',
+            'Bounce-Rate: {n}%',
+            'Active-Connections: {n}',
+            'Last-Delivery: {ts}s ago',
+            'Max-Message-Size: 10MB',
+            'Accepted-Domains: {n}',
+        ],
+        53    => [
+            'Recursion: ENABLED',
+            'DNSSEC: DISABLED',
+            'Query-Rate: {n}/s',
+            'Cache-Size: {kb}K entries',
+            'Upstream-Resolvers: 2',
+            'Response-Time: {n}ms avg',
+            'Zone-Transfers: ALLOWED',
+            'AXFR-Restricted: NO',
+            'Negative-Cache-TTL: 30s',
+        ],
+        80    => [
+            'Server: {ver}',
+            'X-Powered-By: FastCGI',
+            'Keep-Alive: timeout=5, max=100',
+            'Content-Type: text/html',
+            'Active-Connections: {n}',
+            'Request-Rate: {n}/min',
+            'Cache-Control: no-store',
+            'Worker-Processes: {n}',
+            'Upstream-Timeout: 30s',
+        ],
+        443   => [
+            'Cipher-Suite: TLS_AES_256_GCM_SHA384',
+            'OCSP-Status: GOOD',
+            'Active-Sessions: {n}',
+            'Session-Resumption: ENABLED',
+            'HSTS: max-age=31536000',
+            'Certificate-Expiry: {n} days',
+            'Cert-Transparency: ENABLED',
+            'Perfect-Forward-Secrecy: YES',
+            'Renegotiation: DISABLED',
+        ],
+        3306  => [
+            'Auth-Plugin: caching_sha2_password',
+            'Charset: utf8mb4',
+            'Status: AUTOCOMMIT',
+            'Active-Connections: {n}',
+            'Query-Cache: DISABLED',
+            'Max-Allowed-Packet: 64MB',
+            'Slow-Query-Log: ENABLED',
+            'Uptime: {ts}s',
+            'Open-Tables: {n}',
+        ],
+        3389  => [
+            'RDP-Protocol: v10',
+            'NLA-Required: NO',
+            'Active-Sessions: {n}',
+            'Clipboard-Redirect: ENABLED',
+            'Drive-Redirect: ENABLED',
+            'Encryption: 128-bit RC4',
+            'Color-Depth: 32bpp',
+            'Idle-Timeout: 900s',
+            'Session-Broker: STANDALONE',
+        ],
+        5432  => [
+            'Auth-Method: md5',
+            'Max-Connections: 100',
+            'Active-Connections: {n}',
+            'Shared-Buffers: 128MB',
+            'WAL-Level: REPLICA',
+            'Logging: ENABLED',
+            'SSL: OFF',
+            'Extensions: uuid-ossp, pg_stat_statements',
+            'Uptime: {ts}s',
+        ],
+        6379  => [
+            'Connected-Clients: {n}',
+            'Used-Memory: {kb}K',
+            'Keyspace-Hits: {n} / Misses: {n2}',
+            'Last-Save: {ts}s ago',
+            'Blocked-Clients: 0',
+            'Active-Channels: {n}',
+            'Persistence: RDB + AOF',
+            'Eviction-Policy: allkeys-lru',
+            'Uptime: {ts}s',
+        ],
+        27017 => [
+            'Auth: DISABLED',
+            'Active-Connections: {n}',
+            'Collections: {n}',
+            'Storage-Engine: WiredTiger',
+            'Oplog-Size: 512MB',
+            'Replication: STANDALONE',
+            'Journaling: ENABLED',
+            'Cache-Size: {kb}MB',
+            'Network-Compression: DISABLED',
+        ],
     ];
 
     /** Filesystem wallet locations — path segments */
@@ -604,6 +852,657 @@ class PacketHijackService
     }
 
     // =========================================================================
+    // Phase 2 Redesign — Exploit Chain Generation
+    // =========================================================================
+
+    /**
+     * Generate the ordered exploit chain for one player's Phase 2.
+     *
+     * The chain is a sequence of port numbers the attacker must exploit in order,
+     * always ending with the exfil port 8080. Chain length:
+     *   FW 1–4 → 2 ports (entry + 8080)
+     *   FW 5+  → 3 ports (entry → mid → 8080)
+     *
+     * Returns an ordered array: e.g. [6379, 3306, 8080]
+     */
+    public function generateExploitChain(int $targetFirewall): array
+    {
+        $chainLength = $targetFirewall >= 5 ? 3 : 2;
+
+        // Eligible entry/mid ports — everything except exfil
+        $eligible = array_keys(array_filter(
+            self::PORT_CATALOGUE,
+            fn($service, $port) => $port !== self::EXFIL_PORT,
+            ARRAY_FILTER_USE_BOTH
+        ));
+
+        shuffle($eligible);
+        $chain = array_slice($eligible, 0, $chainLength - 1);
+        $chain[] = self::EXFIL_PORT;
+
+        return $chain;
+    }
+
+    /**
+     * Generate the full port pool for one player's Phase 2 board.
+     *
+     * Selects 7–9 non-exfil ports from the catalogue (count driven by target FW),
+     * ensures all chain ports are included, fills remaining slots with non-chain
+     * ports as noise, then appends 8080.
+     *
+     * Assigns each port a category: 'chain' | 'dead_end' | 'red_herring'.
+     * Anomaly is seeded per category and OS tier.
+     *
+     * Returns an array of port objects:
+     *   port, service, category, probed, shattered, anomaly, flare_lines
+     *
+     * Note: anomaly and flare_lines are server-side only — the public view
+     * strips anomaly until the port is probed.
+     */
+    public function generatePortPool(array $chain, int $targetFirewall, int $targetOs): array
+    {
+        // Total visible non-exfil ports (8 / 9 / 10 based on FW)
+        $totalNonExfil = match (true) {
+            $targetFirewall >= 7 => 9,
+            $targetFirewall >= 4 => 8,
+            default              => 7,
+        };
+
+        $chainNonExfil = array_filter($chain, fn($p) => $p !== self::EXFIL_PORT);
+        $chainNonExfil = array_values($chainNonExfil);
+
+        // Pool of eligible filler ports (non-chain, non-exfil)
+        $eligible = array_keys(array_filter(
+            self::PORT_CATALOGUE,
+            fn($service, $port) => $port !== self::EXFIL_PORT && !in_array($port, $chainNonExfil, true),
+            ARRAY_FILTER_USE_BOTH
+        ));
+        shuffle($eligible);
+
+        $fillerCount = $totalNonExfil - count($chainNonExfil);
+        $fillers     = array_slice($eligible, 0, $fillerCount);
+
+        // Decide red herring vs dead end (roughly half red herrings)
+        $redHerringCount = (int) ceil($fillerCount / 2);
+        $redHerringPorts = array_slice($fillers, 0, $redHerringCount);
+        $deadEndPorts    = array_slice($fillers, $redHerringCount);
+
+        $osTier = $targetOs >= 7 ? 'high' : ($targetOs >= 4 ? 'mid' : 'low');
+
+        $ports = [];
+
+        // ── Chain ports ───────────────────────────────────────────────────────
+        foreach ($chainNonExfil as $i => $port) {
+            $nextPort    = $chain[$i + 1] ?? self::EXFIL_PORT;
+            $nextService = self::PORT_CATALOGUE[$nextPort] ?? 'Alt-HTTP';
+            $service     = self::PORT_CATALOGUE[$port];
+            $anomaly     = $this->pickChainAnomaly($service, $nextService);
+
+            $ports[] = [
+                'port'        => $port,
+                'service'     => $service,
+                'category'    => 'chain',
+                'probed'      => false,
+                'shattered'   => false,
+                'anomaly'     => $anomaly,
+                'flare_lines' => $this->generateFlareLines($port),
+            ];
+        }
+
+        // ── Red herring ports ─────────────────────────────────────────────────
+        foreach ($redHerringPorts as $port) {
+            $service = self::PORT_CATALOGUE[$port];
+            $pool    = self::REDHERRING_ANOMALIES[$osTier];
+            $anomaly = $pool[array_rand($pool)];
+
+            $ports[] = [
+                'port'        => $port,
+                'service'     => $service,
+                'category'    => 'red_herring',
+                'probed'      => false,
+                'shattered'   => false,
+                'anomaly'     => $anomaly,
+                'flare_lines' => $this->generateFlareLines($port),
+            ];
+        }
+
+        // ── Dead end ports ────────────────────────────────────────────────────
+        foreach ($deadEndPorts as $port) {
+            $service = self::PORT_CATALOGUE[$port];
+
+            $ports[] = [
+                'port'        => $port,
+                'service'     => $service,
+                'category'    => 'dead_end',
+                'probed'      => false,
+                'shattered'   => false,
+                'anomaly'     => null,
+                'flare_lines' => $this->generateFlareLines($port),
+            ];
+        }
+
+        // ── Exfil port (always last) ──────────────────────────────────────────
+        $ports[] = [
+            'port'        => self::EXFIL_PORT,
+            'service'     => self::PORT_CATALOGUE[self::EXFIL_PORT],
+            'category'    => 'chain',
+            'probed'      => false,
+            'shattered'   => false,
+            'anomaly'     => 'EXFILTRATION CHANNEL — LOCKED UNTIL CASCADE COMPLETE',
+            'flare_lines' => ['PAYLOAD DELIVERY ROUTE — AWAITING CHAIN UNLOCK'],
+        ];
+
+        shuffle($ports);
+
+        // Re-sort so exfil is always visually last (cosmetic only)
+        usort($ports, fn($a, $b) => ($a['port'] === self::EXFIL_PORT ? 1 : 0) - ($b['port'] === self::EXFIL_PORT ? 1 : 0));
+
+        return $ports;
+    }
+
+    /**
+     * Pick a chain anomaly for a port given its service and the next service in chain.
+     * Falls back to a generic relational anomaly if no specific template exists.
+     */
+    private function pickChainAnomaly(string $service, string $nextService): string
+    {
+        $templates = self::CHAIN_ANOMALIES[$service] ?? [];
+
+        if (isset($templates[$nextService])) {
+            return $templates[$nextService];
+        }
+
+        // Generic fallback
+        return "SERVICE INTERDEPENDENCY DETECTED — {$nextService} LAYER SHOWS UPSTREAM CORRELATION — TRACE TO CONFIRM";
+    }
+
+    /**
+     * Generate flare lines for a port banner — realistic noise around the anomaly.
+     * Fills in placeholders: {n}, {n2}, {kb}, {kb2}, {ts}, {ver}
+     */
+    private function generateFlareLines(int $port): array
+    {
+        $pool = self::PORT_FLARE[$port] ?? [
+            'Protocol: UNKNOWN',
+            'Status: ACTIVE',
+            'Connections: {n}',
+        ];
+
+        shuffle($pool);
+        $selected = array_slice($pool, 0, min(6, count($pool)));
+
+        $svcData  = self::PORT_SERVICES[$port] ?? ['versions' => ['1.0']];
+        $ver      = $svcData['versions'][array_rand($svcData['versions'])];
+
+        return array_map(function (string $line) use ($ver) {
+            $line = str_replace('{n}',   (string) random_int(1, 24),    $line);
+            $line = str_replace('{n2}',  (string) random_int(100, 999), $line);
+            $line = str_replace('{kb}',  (string) random_int(128, 9999),$line);
+            $line = str_replace('{kb2}', (string) random_int(128, 9999),$line);
+            $line = str_replace('{ts}',  (string) random_int(4, 7200),  $line);
+            $line = str_replace('{ver}', $ver,                           $line);
+            return $line;
+        }, $selected);
+    }
+
+    /**
+     * Initialise trace attempt count for a given attacker CPU stat.
+     */
+    public function initialTraceAttempts(int $attackerCpu): int
+    {
+        return match (true) {
+            $attackerCpu >= 7 => 8,
+            $attackerCpu >= 4 => 6,
+            default           => 4,
+        };
+    }
+
+    /**
+     * Initialise the credential state for Phase 2 auth.
+     * Built from the fingerprint generated earlier — we reuse the existing
+     * hostname/OS tier structure so auth still works at the end of the chain.
+     *
+     * Returns: { hostname: 'PREFIX-????-????', os: 'PREFIX-????-???' }
+     */
+    public function initialCredentialState(array $fingerprint): array
+    {
+        $h = $fingerprint['hostname'] ?? [];
+        $o = $fingerprint['os']       ?? [];
+
+        return [
+            'hostname' => ($h['tier1'] ?? 'SYS')  . '-????-????',
+            'os'       => ($o['tier1'] ?? 'OS')   . '-????-???',
+            // Store full values server-side for fragment reveal logic
+            '_hostname_full' => $h['full'] ?? '',
+            '_os_full'       => $o['full'] ?? '',
+            '_hostname_tier2'=> $h['tier2'] ?? '',
+            '_hostname_tier3'=> $h['tier3'] ?? '',
+            '_os_tier2'      => $o['tier2'] ?? '',
+            '_os_tier3'      => $o['tier3'] ?? '',
+            '_tier1'         => $h['tier1'] ?? 'SYS',
+            '_os_tier1'      => $o['tier1'] ?? 'OS',
+        ];
+    }
+
+    /**
+     * Reveal credential fragments progressively based on chain progress.
+     * Called after each successful exploit in the chain.
+     *
+     * chainProgress = 1 → first non-exfil port shattered → reveal hostname tier2
+     * chainProgress = 2 → second non-exfil port shattered → reveal os tier2
+     * chainProgress = chainLength (8080 shattered) → reveal remaining tiers
+     *
+     * Returns updated credential state.
+     */
+    public function revealCredentialFragment(array $credState, int $chainProgress, int $chainLength): array
+    {
+        $t1h  = $credState['_tier1']          ?? 'SYS';
+        $t1o  = $credState['_os_tier1']       ?? 'OS';
+        $t2h  = $credState['_hostname_tier2'] ?? '????';
+        $t3h  = $credState['_hostname_tier3'] ?? '????';
+        $t2o  = $credState['_os_tier2']       ?? '???';
+        $t3o  = $credState['_os_tier3']       ?? '???';
+
+        // Determine what to reveal based on progress
+        // We spread 4 fragments (hostname t2, hostname t3, os t2, os t3) across chain steps
+        $hostnameT2Revealed = $chainProgress >= 1;
+        $osTier2Revealed    = $chainProgress >= 2;
+        $hostnameT3Revealed = $chainProgress >= max(2, $chainLength - 1);
+        $osTier3Revealed    = $chainProgress >= $chainLength;
+
+        $hostnameDisplay = $t1h
+            . '-' . ($hostnameT2Revealed ? $t2h : '????')
+            . '-' . ($hostnameT3Revealed ? $t3h : '????');
+
+        $osDisplay = $t1o
+            . '-' . ($osTier2Revealed ? $t2o : '???')
+            . '-' . ($osTier3Revealed ? $t3o : '???');
+
+        return array_merge($credState, [
+            'hostname'           => $hostnameDisplay,
+            'os'                 => $osDisplay,
+            'hostname_t2_shown'  => $hostnameT2Revealed,
+            'hostname_t3_shown'  => $hostnameT3Revealed,
+            'os_t2_shown'        => $osTier2Revealed,
+            'os_t3_shown'        => $osTier3Revealed,
+        ]);
+    }
+
+    // =========================================================================
+    // Phase 2 Redesign — Commands
+    // =========================================================================
+
+    /**
+     * scan <ip> — opens Phase 2.
+     * Returns port numbers and service names only — no anomaly, no probed state.
+     * Same role as netstat in Phase 1: populate the board, nothing more.
+     */
+    public function commandScanPorts(array $portPool): array
+    {
+        return array_map(fn($p) => [
+            'port'      => $p['port'],
+            'service'   => $p['service'],
+            'probed'    => $p['probed'],
+            'shattered' => $p['shattered'],
+            'is_exfil'  => $p['port'] === self::EXFIL_PORT,
+        ], $portPool);
+    }
+
+    /**
+     * probe <port> — fingerprint a specific port.
+     *
+     * Returns the flare banner + anomaly line. Marks port as probed.
+     * Banner line count scales with target OS: higher OS = more noise lines.
+     * Anomaly is always the final line, prefixed 'ANOMALY:'.
+     * Dead end ports with null anomaly get a generic non-relational closing line.
+     *
+     * Returns ['found' => true, 'port' => int, 'service' => string, 'lines' => array]
+     *      or ['found' => false, 'error' => string]
+     */
+    public function commandProbePort(array &$portPool, int $portNumber, int $targetOs): array
+    {
+        foreach ($portPool as $i => $p) {
+            if ((int) $p['port'] !== $portNumber) continue;
+
+            $portPool[$i]['probed'] = true;
+
+            $svcData = self::PORT_SERVICES[$portNumber] ?? ['service' => 'UNKNOWN', 'versions' => ['1.0']];
+            $ver     = $svcData['versions'][array_rand($svcData['versions'])];
+
+            // Header line
+            $lines = ["{$svcData['service']} — {$ver}"];
+
+            // Flare body — OS stat controls how many noise lines precede the anomaly
+            $flareCount = match (true) {
+                $targetOs >= 7 => 7,
+                $targetOs >= 4 => 5,
+                default        => 3,
+            };
+            $flare = array_slice($p['flare_lines'], 0, $flareCount);
+            foreach ($flare as $line) {
+                $lines[] = $line;
+            }
+
+            // Anomaly closer
+            if ($p['anomaly'] !== null) {
+                $lines[] = '';
+                $lines[] = 'ANOMALY: ' . $p['anomaly'];
+            } else {
+                $lines[] = '';
+                $lines[] = 'STATUS: NO ANOMALOUS ACTIVITY DETECTED — SERVICE NOMINAL';
+            }
+
+            return [
+                'found'   => true,
+                'port'    => $portNumber,
+                'service' => $p['service'],
+                'lines'   => $lines,
+            ];
+        }
+
+        return ['found' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
+    }
+
+    /**
+     * trace <port1> <port2> — test a hypothesized chain relationship.
+     *
+     * Both ports must be probed first.
+     * If the two ports are adjacent in the exploit chain (port1 → port2), confirms
+     * the link and reveals directionality.
+     * Otherwise returns no-correlation.
+     * Always consumes one trace attempt regardless of result.
+     *
+     * Returns [
+     *   'confirmed'   => bool,
+     *   'lines'       => array,   — terminal output
+     *   'attempts_left' => int,
+     * ]
+     */
+    public function commandTrace(
+        array $portPool,
+        array $chain,
+        int   $port1Number,
+        int   $port2Number,
+        int   $traceAttemptsRemaining
+    ): array {
+        // Both ports must be probed
+        $p1 = $this->findPort($portPool, $port1Number);
+        $p2 = $this->findPort($portPool, $port2Number);
+
+        if ($p1 === null) {
+            return ['error' => "PORT {$port1Number} NOT IN TARGET TOPOLOGY — PROBE FIRST"];
+        }
+        if ($p2 === null) {
+            return ['error' => "PORT {$port2Number} NOT IN TARGET TOPOLOGY — PROBE FIRST"];
+        }
+        if (!$p1['probed']) {
+            return ['error' => "PORT {$port1Number} NOT PROBED — RUN probe {$port1Number} FIRST"];
+        }
+        if (!$p2['probed']) {
+            return ['error' => "PORT {$port2Number} NOT PROBED — RUN probe {$port2Number} FIRST"];
+        }
+        if ($port1Number === $port2Number) {
+            return ['error' => "CANNOT TRACE A PORT AGAINST ITSELF"];
+        }
+
+        $attemptsLeft = max(0, $traceAttemptsRemaining - 1);
+
+        // Check adjacency in chain: port1 immediately precedes port2
+        $confirmed = false;
+        for ($i = 0; $i < count($chain) - 1; $i++) {
+            if ((int) $chain[$i] === $port1Number && (int) $chain[$i + 1] === $port2Number) {
+                $confirmed = true;
+                break;
+            }
+        }
+
+        if ($confirmed) {
+            $s1 = $p1['service'];
+            $s2 = $p2['service'];
+            return [
+                'confirmed'     => true,
+                'attempts_left' => $attemptsLeft,
+                'lines'         => [
+                    "[TRACE]: CROSS-REFERENCING {$s1}:{$port1Number} → {$s2}:{$port2Number}...",
+                    "[CONFIRMED]: DEPENDENCY CHAIN VERIFIED",
+                    "[VECTOR]: EXPLOIT {$port1Number} FIRST — CASCADE PROPAGATES TO {$port2Number}",
+                    "[TRACE ATTEMPTS REMAINING]: {$attemptsLeft}",
+                ],
+            ];
+        }
+
+        $s1 = $p1['service'];
+        $s2 = $p2['service'];
+        return [
+            'confirmed'     => false,
+            'attempts_left' => $attemptsLeft,
+            'lines'         => [
+                "[TRACE]: CROSS-REFERENCING {$s1}:{$port1Number} → {$s2}:{$port2Number}...",
+                "[RESULT]: NO CORRELATED ANOMALY — SERVICES OPERATE INDEPENDENTLY",
+                "[TRACE ATTEMPTS REMAINING]: {$attemptsLeft}",
+            ],
+        ];
+    }
+
+    /**
+     * exploit <port> — attempt to shatter a port in the chain.
+     *
+     * Rules:
+     *   - Port must be probed first.
+     *   - For chain ports: the port must be the current head of the chain
+     *     (i.e. all preceding chain ports already shattered).
+     *   - Exfil port 8080: only when all other chain ports are shattered.
+     *   - Non-chain ports (dead ends / red herrings): always fails with a clue.
+     *   - On success: marks port shattered, advances chain progress,
+     *     returns credential fragment reveal data.
+     *
+     * Returns [
+     *   'success'          => bool,
+     *   'port'             => int,
+     *   'lines'            => array,
+     *   'new_progress'     => int,      — updated chain_progress (on success)
+     *   'credential_state' => array,    — updated credential state (on success)
+     *   'chain_complete'   => bool,     — true if 8080 just shattered
+     * ]
+     */
+    public function commandExploitPort(
+        array &$portPool,
+        array  $chain,
+        int    $portNumber,
+        int    $chainProgress,
+        array  $credentialState,
+        array  $baitPorts = []
+    ): array {
+        // Bait check
+        foreach ($baitPorts as $bait) {
+            if ((int) $bait['port'] === $portNumber) {
+                return [
+                    'success'      => false,
+                    'baited'       => true,
+                    'lock_seconds' => (float) $bait['lock_seconds'],
+                    'lines'        => [
+                        "[EXPLOIT]: TARGETING PORT {$portNumber}...",
+                        "[ALERT]: HONEYPOT TRIGGERED — INPUT LOCKED FOR {$bait['lock_seconds']}s",
+                    ],
+                ];
+            }
+        }
+
+        $portEntry = $this->findPort($portPool, $portNumber);
+
+        if ($portEntry === null) {
+            return ['success' => false, 'error' => "PORT {$portNumber} NOT IN TARGET TOPOLOGY"];
+        }
+
+        if (!$portEntry['probed']) {
+            return [
+                'success' => false,
+                'lines'   => [
+                    "[EXPLOIT]: TARGETING PORT {$portNumber}...",
+                    "[FAILED]: PORT NOT PROBED — RUN probe {$portNumber} FIRST",
+                ],
+            ];
+        }
+
+        if ($portEntry['shattered']) {
+            return [
+                'success' => false,
+                'lines'   => ["[EXPLOIT]: PORT {$portNumber} ALREADY SHATTERED"],
+            ];
+        }
+
+        $service    = $portEntry['service'];
+        $category   = $portEntry['category'];
+        $chainLength = count($chain);
+
+        // ── Non-chain port ────────────────────────────────────────────────────
+        if ($category !== 'chain') {
+            $hint = $category === 'red_herring'
+                ? 'NO UPSTREAM SIGNAL DETECTED — THIS SERVICE MAY REQUIRE A PRIOR DEPENDENCY'
+                : 'SERVICE INTEGRITY HIGH — NO KNOWN ATTACK VECTOR';
+
+            return [
+                'success' => false,
+                'lines'   => [
+                    "[EXPLOIT]: TARGETING {$service}:{$portNumber}...",
+                    "[GATE HOLDING]: AUTH LAYER UNRESPONSIVE",
+                    "[HINT]: {$hint}",
+                ],
+            ];
+        }
+
+        // ── Exfil port check ──────────────────────────────────────────────────
+        if ($portNumber === self::EXFIL_PORT) {
+            $nonExfilChain = array_filter($chain, fn($p) => $p !== self::EXFIL_PORT);
+            $allShattered  = true;
+            foreach ($nonExfilChain as $cp) {
+                $cpEntry = $this->findPort($portPool, $cp);
+                if ($cpEntry === null || !$cpEntry['shattered']) {
+                    $allShattered = false;
+                    break;
+                }
+            }
+
+            if (!$allShattered) {
+                return [
+                    'success' => false,
+                    'lines'   => [
+                        "[EXPLOIT]: TARGETING ALT-HTTP:8080...",
+                        "[EXFIL LOCKED]: CHAIN INCOMPLETE — CLEAR ALL CASCADE DEPENDENCIES FIRST",
+                    ],
+                ];
+            }
+        }
+
+        // ── Chain order check ─────────────────────────────────────────────────
+        $expectedPort = $chain[$chainProgress] ?? null;
+
+        if ((int) ($expectedPort ?? 0) !== $portNumber) {
+            // Chain port but wrong order
+            $nextExpectedService = isset($chain[$chainProgress])
+                ? (self::PORT_CATALOGUE[$chain[$chainProgress]] ?? 'UNKNOWN')
+                : 'UNKNOWN';
+
+            return [
+                'success' => false,
+                'lines'   => [
+                    "[EXPLOIT]: TARGETING {$service}:{$portNumber}...",
+                    "[GATE HOLDING]: AUTH LAYER UNRESPONSIVE — NO UPSTREAM SIGNAL DETECTED",
+                    "[HINT]: THIS SERVICE MAY REQUIRE A PRIOR DEPENDENCY TO BE CLEARED",
+                ],
+            ];
+        }
+
+        // ── SUCCESS ───────────────────────────────────────────────────────────
+        // Mark shattered in pool
+        foreach ($portPool as $i => $p) {
+            if ((int) $p['port'] === $portNumber) {
+                $portPool[$i]['shattered'] = true;
+                break;
+            }
+        }
+
+        $newProgress     = $chainProgress + 1;
+        $newCredState    = $this->revealCredentialFragment($credentialState, $newProgress, $chainLength);
+        $chainComplete   = $portNumber === self::EXFIL_PORT;
+
+        $lines = [
+            "[EXPLOIT]: TARGETING {$service}:{$portNumber}...",
+            "[============================] GATE COLLAPSED",
+            "",
+            "[CREDENTIAL FRAGMENT EXTRACTED]:",
+            "  HOSTNAME : {$newCredState['hostname']}",
+            "  OS       : {$newCredState['os']}",
+        ];
+
+        if ($chainComplete) {
+            $lines[] = '';
+            $lines[] = '[EXFIL CHANNEL OPEN] — RUN breach <ip> TO INITIATE CONNECTION';
+        } else {
+            $nextPort    = $chain[$newProgress] ?? null;
+            $nextService = $nextPort ? (self::PORT_CATALOGUE[$nextPort] ?? 'UNKNOWN') : 'UNKNOWN';
+            $lines[] = '';
+            $lines[] = "[CASCADE]: NEXT DEPENDENCY — {$nextService}:{$nextPort}";
+        }
+
+        return [
+            'success'          => true,
+            'port'             => $portNumber,
+            'new_progress'     => $newProgress,
+            'credential_state' => $newCredState,
+            'chain_complete'   => $chainComplete,
+            'lines'            => $lines,
+        ];
+    }
+
+    /**
+     * breach <ip> — final Phase 2 command.
+     *
+     * Validates the IP matches the Phase 1 target and the full chain is shattered.
+     * On success, opens the auth prompt.
+     */
+    public function commandBreachChain(array $portPool, array $chain, string $targetIp, string $inputIp): array
+    {
+        if ($inputIp !== $targetIp) {
+            return [
+                'success' => false,
+                'lines'   => ['[BREACH]: IP MISMATCH — TARGET SIGNATURE REJECTED'],
+            ];
+        }
+
+        // Verify chain complete
+        foreach ($chain as $port) {
+            $entry = $this->findPort($portPool, $port);
+            if ($entry === null || !$entry['shattered']) {
+                return [
+                    'success' => false,
+                    'lines'   => ['[BREACH]: CHAIN INCOMPLETE — CLEAR ALL DEPENDENCIES FIRST'],
+                ];
+            }
+        }
+
+        return [
+            'success'         => true,
+            'awaiting_auth'   => true,
+            'lines'           => [
+                "[BREACH]: IP SIGNATURE MATCHED — INITIATING CONNECTION...",
+                "[SYSTEM LOGIN REQUIRED]: ENTER CREDENTIALS TO COMPLETE BREACH",
+            ],
+        ];
+    }
+
+    /**
+     * Helper — find a port entry in the pool by port number.
+     */
+    private function findPort(array $portPool, int $portNumber): ?array
+    {
+        foreach ($portPool as $p) {
+            if ((int) $p['port'] === $portNumber) return $p;
+        }
+        return null;
+    }
+
+    // =========================================================================
     // Command Parser
     // =========================================================================
 
@@ -647,24 +1546,23 @@ class PacketHijackService
         $argRequirements = [
             // Phase 1
             'netstat'    => [0, 1],   // netstat --active
-            'ping'       => [1, 1],   // ping <ip or partial>
+            'ping'       => [1, 1],   // ping <ip>
             'traceroute' => [1, 1],   // traceroute <ip>
             'arp'        => [0, 1],   // arp --scan
             'whois'      => [1, 1],   // whois <ip>
             'sniff'      => [0, 1],   // sniff --traffic
             'flush'      => [1, 1],   // flush <ip>
             'inject'     => [1, 1],   // inject <ip>
-            // Phase 2
+            // Phase 2 — redesigned
             'scan'       => [1, 1],   // scan <ip>
             'probe'      => [1, 1],   // probe <port>
-            'validate'   => [1, 1],   // validate <string>
+            'trace'      => [2, 2],   // trace <port1> <port2>
             'exploit'    => [1, 1],   // exploit <port>
-            'decode'     => [1, 1],   // decode <port>
-            'breach'     => [2, 2],   // breach <ip> <port>
+            'breach'     => [1, 1],   // breach <ip>
             // Phase 3
-            'ls'         => [0, 1],   // ls (optional arg ignored)
+            'ls'         => [0, 1],   // ls
             'cd'         => [1, 1],   // cd <dir> or cd ..
-            'extract'    => [0, 1],   // extract (optional target arg ignored)
+            'extract'    => [0, 1],   // extract
         ];
 
         [$min, $max] = $argRequirements[$command];
@@ -973,17 +1871,23 @@ class PacketHijackService
             $exposure  = $p['exposure'];
             $threshold = $overclocked ? 'MODERATE' : 'HIGH';
 
+            $decodes = (int) ($p['decode_count'] ?? 0);
+
             $exploitable = match ($exposure) {
                 'CRITICAL' => true,
                 'HIGH'     => true,
-                'MODERATE' => $overclocked || ($p['decode_count'] ?? 0) >= 1,
-                'LOW'      => $overclocked || ($p['decode_count'] ?? 0) >= 2,
-                'MINIMAL'  => $overclocked,
+                'MODERATE' => $overclocked || $decodes >= 1,
+                'LOW'      => $overclocked || $decodes >= 2,
+                'MINIMAL'  => $overclocked || $decodes >= 3,
                 default    => false,
             };
 
             if (!$exploitable) {
-                $hint = in_array($exposure, ['MODERATE', 'LOW']) ? ' — USE decode FIRST' : ' — PORT TOO HARDENED';
+                $needed = match ($exposure) {
+                    'MODERATE' => 1, 'LOW' => 2, 'MINIMAL' => 3, default => 99,
+                };
+                $remaining = $needed - $decodes;
+                $hint = " — RUN decode {$portNumber} {$remaining} MORE TIME" . ($remaining > 1 ? 'S' : '');
                 return ['success' => false, 'error' => "EXPLOIT FAILED: {$exposure} EXPOSURE{$hint}"];
             }
 
@@ -1243,10 +2147,10 @@ class PacketHijackService
     }
 
     /**
-     * probe port <number> — OLD method kept for rig command compatibility.
-     * New fingerprint-based probe is commandProbe() above.
+     * @deprecated Replaced by commandProbePort() above (chain-based probe).
+     * Renamed to avoid PHP duplicate-method fatal. Not called anywhere.
      */
-    public function commandProbePort(
+    private function _legacyProbePort(
         array $ports,
         int   $portNumber,
         array $corruptPorts = [],
@@ -1280,8 +2184,10 @@ class PacketHijackService
      *   ['success' => true,  'ports' => array, 'cascade_log' => array, 'exfil_unlocked' => bool]
      *   ['success' => false, 'baited' => true, 'lock_seconds' => float]
      *   ['success' => false, 'error' => string]
+     *
+     * @deprecated Replaced by commandExploitPort() above (chain-based). Renamed to avoid PHP fatal.
      */
-    public function commandExploitPort(
+    private function _legacyExploitPort(
         array     $ports,
         int       $portNumber,
         PlayerRig $rig,
