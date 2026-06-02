@@ -1245,9 +1245,7 @@ class PacketHijackService
             return ['error' => "CANNOT TRACE A PORT AGAINST ITSELF"];
         }
 
-        $attemptsLeft = max(0, $traceAttemptsRemaining - 1);
-
-        // Check adjacency in chain: port1 immediately precedes port2
+        // Check adjacency in chain: correct direction (port1 → port2)
         $confirmed = false;
         for ($i = 0; $i < count($chain) - 1; $i++) {
             if ((int) $chain[$i] === $port1Number && (int) $chain[$i + 1] === $port2Number) {
@@ -1261,20 +1259,47 @@ class PacketHijackService
             $s2 = $p2['service'];
             return [
                 'confirmed'     => true,
-                'attempts_left' => $attemptsLeft,
+                'attempts_left' => $traceAttemptsRemaining,
                 'lines'         => [
                     "[TRACE]: CROSS-REFERENCING {$s1}:{$port1Number} → {$s2}:{$port2Number}...",
                     "[CONFIRMED]: DEPENDENCY CHAIN VERIFIED",
                     "[VECTOR]: EXPLOIT {$port1Number} FIRST — CASCADE PROPAGATES TO {$port2Number}",
-                    "[TRACE ATTEMPTS REMAINING]: {$attemptsLeft}",
+                    "[TRACE ATTEMPTS REMAINING]: {$traceAttemptsRemaining}",
                 ],
             ];
         }
 
+        // Check reverse direction (port2 → port1 exists in chain) — partial signal, no attempt consumed
+        $reversed = false;
+        for ($i = 0; $i < count($chain) - 1; $i++) {
+            if ((int) $chain[$i] === $port2Number && (int) $chain[$i + 1] === $port1Number) {
+                $reversed = true;
+                break;
+            }
+        }
+
+        if ($reversed) {
+            $s1 = $p1['service'];
+            $s2 = $p2['service'];
+            return [
+                'confirmed'     => false,
+                'partial'       => true,
+                'attempts_left' => $traceAttemptsRemaining,
+                'lines'         => [
+                    "[TRACE]: CROSS-REFERENCING {$s1}:{$port1Number} → {$s2}:{$port2Number}...",
+                    "[PARTIAL]: SIGNAL DETECTED — REFINE PORT DIRECTION",
+                    "[TRACE ATTEMPTS REMAINING]: {$traceAttemptsRemaining}",
+                ],
+            ];
+        }
+
+        // No link — consume one attempt
+        $attemptsLeft = max(0, $traceAttemptsRemaining - 1);
         $s1 = $p1['service'];
         $s2 = $p2['service'];
         return [
             'confirmed'     => false,
+            'partial'       => false,
             'attempts_left' => $attemptsLeft,
             'lines'         => [
                 "[TRACE]: CROSS-REFERENCING {$s1}:{$port1Number} → {$s2}:{$port2Number}...",

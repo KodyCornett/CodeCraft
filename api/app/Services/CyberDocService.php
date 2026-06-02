@@ -151,11 +151,6 @@ class CyberDocService
             }
 
             $this->rigService->repair($rig, $player, repairPeripherals: false);
-
-            if ($player->is_limping) {
-                $player->is_limping = false;
-                $player->save();
-            }
         });
     }
 

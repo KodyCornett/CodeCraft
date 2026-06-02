@@ -619,11 +619,8 @@ class PacketHijackController extends Controller
         $traceKey      = "{$role}_trace_attempts";
         $attemptsLeft  = $match->traceAttemptsFor($role);
 
-        if ($attemptsLeft <= 0) {
-            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
-                outputLines: ['[TRACE]: NO ATTEMPTS REMAINING — PROCEED WITH DEDUCTION']);
-            return response()->json(['ok' => true]);
-        }
+        // Only block if attempts are exhausted AND this trace would cost one (i.e. not a free confirmed/partial).
+        // We let the service run first so confirmed/partial traces always resolve regardless of attempt count.
 
         if (empty($chain)) {
             PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
@@ -639,7 +636,14 @@ class PacketHijackController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // Consume one trace attempt
+        // If no attempts remain and this was a wrong-pair (would cost one), block it
+        if ($attemptsLeft <= 0 && $result['attempts_left'] < $attemptsLeft) {
+            PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
+                outputLines: ['[TRACE]: NO ATTEMPTS REMAINING — PROCEED WITH DEDUCTION']);
+            return response()->json(['ok' => true]);
+        }
+
+        // Persist updated attempt count (unchanged on confirmed/partial, decremented on wrong pair)
         $match->$traceKey = $result['attempts_left'];
         $match->save();
 

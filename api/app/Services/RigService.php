@@ -136,10 +136,8 @@ class RigService
         $rig->is_limping = false;
         $rig->save();
 
-        if ($player->is_limping) {
-            $player->is_limping = false;
-            $player->save();
-        }
+        $player->is_limping = false;
+        $player->save();
 
         if ($repairPeripherals) {
             PlayerPeripheral::where('player_id', $player->id)
@@ -363,11 +361,13 @@ class RigService
         if ($restored > 0) {
             $rig->current_ss = $before + $restored;
 
-            // Clear limp flag as soon as SS is fully restored
+            // Clear limp flag as soon as SS is fully restored.
+            // Unconditional write — guards against stale in-memory state where
+            // $player->is_limping is false but the DB still holds true.
             if ($rig->current_ss >= $max) {
                 $rig->is_limping = false;
 
-                if ($player !== null && $player->is_limping) {
+                if ($player !== null) {
                     $player->is_limping = false;
                     $player->save();
                 }
