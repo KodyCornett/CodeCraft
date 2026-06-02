@@ -636,8 +636,8 @@ class PacketHijackController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // If no attempts remain and this was a wrong-pair (would cost one), block it
-        if ($attemptsLeft <= 0 && $result['attempts_left'] < $attemptsLeft) {
+        // If no attempts remain and this was a wrong-pair, block it — confirmed/partial are always free so pass through
+        if ($attemptsLeft <= 0 && !($result['confirmed'] ?? false) && !($result['partial'] ?? false)) {
             PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
                 outputLines: ['[TRACE]: NO ATTEMPTS REMAINING — PROCEED WITH DEDUCTION']);
             return response()->json(['ok' => true]);
