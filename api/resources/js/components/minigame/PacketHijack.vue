@@ -166,11 +166,11 @@
                         <div class="ph-auth-title">[ SYSTEM LOGIN // ENTER CREDENTIALS ]</div>
                         <div class="ph-auth-row">
                             <span class="ph-auth-label">USERNAME &gt;</span>
-                            <input v-model="authUser" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER OS CREDENTIAL" @keydown.enter="onSubmitAuth" />
+                            <input v-model="authUser" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER HOSTNAME CREDENTIAL" @keydown.enter="onSubmitAuth" />
                         </div>
                         <div class="ph-auth-row">
                             <span class="ph-auth-label">PASSWORD &gt;</span>
-                            <input v-model="authPass" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER HOSTNAME CREDENTIAL" @keydown.enter="onSubmitAuth" />
+                            <input v-model="authPass" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER OS CREDENTIAL" @keydown.enter="onSubmitAuth" />
                         </div>
                         <button class="ph-auth-submit" @click="onSubmitAuth">AUTHENTICATE</button>
                     </div>

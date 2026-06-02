@@ -97,8 +97,11 @@ class PacketHijackController extends Controller
                 ], 429);
             }
 
-            // ── Auth path — submitted after breach connection established ────────
+            // ── Auth path — only valid during Phase 2 (post-breach login) ────────
             if (!empty($data['auth_user']) || !empty($data['auth_pass'])) {
+                if ($match->phaseOf($role) !== 2) {
+                    return response()->json(['ok' => true]); // silently ignore out-of-phase auth
+                }
                 return $this->handleAuth($match, $role, $me, $data['auth_user'] ?? '', $data['auth_pass'] ?? '');
             }
 
@@ -743,6 +746,7 @@ class PacketHijackController extends Controller
                     '[REBUILD REQUIRED — RE-PROBE AFFECTED VECTORS]',
                 ],
                 fingerprintUpdate: $match->fingerprintPublicView($role),
+                authFailed:        true,
             );
         }
         return response()->json(['ok' => true]);

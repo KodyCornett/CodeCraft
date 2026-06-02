@@ -34,6 +34,7 @@ class PacketHijackCommandResult implements ShouldBroadcast
         public readonly ?array  $fingerprintUpdate = null,    // Phase 2 fingerprint state
         public readonly ?array  $portScanResult = null,       // Phase 2 scan result (port list)
         public readonly bool    $awaitingAuth = false,        // breach succeeded, show auth prompt
+        public readonly bool    $authFailed = false,          // auth rejected, dismiss prompt + return to terminal
         public readonly ?array  $filesystemUpdate = null,     // Phase 3 filesystem state
     ) {}
 
@@ -64,6 +65,7 @@ class PacketHijackCommandResult implements ShouldBroadcast
             'fingerprint_update'=> $this->fingerprintUpdate,
             'port_scan_result'  => $this->portScanResult,
             'awaiting_auth'     => $this->awaitingAuth,
+            'auth_failed'       => $this->authFailed,
             'filesystem_update' => $this->filesystemUpdate,
         ];
     }
