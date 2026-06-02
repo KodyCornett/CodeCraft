@@ -4,7 +4,7 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  * The opponent never sees raw command output — only the phase-transition
  * alert and the match-complete event.
  */
-class PacketHijackCommandResult implements ShouldBroadcast
+class PacketHijackCommandResult implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -61,32 +61,4 @@ class PacketHijackCommandResult implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'match_id'          => $this->matchId,
-            'command'           => $this->command,
-            'output_lines'      => $this->outputLines,
-            // Common
-            'phase_advanced'    => $this->phaseAdvanced,
-            'lock_until'        => $this->lockUntil,
-            // Phase 1
-            'updated_suspects'  => $this->updatedSuspects,
-            'suspect_update'    => $this->suspectUpdate,
-            'arp_scan_result'   => $this->arpScanResult,
-            'octet_clue'        => $this->octetClue,
-            'flushed_ip'        => $this->flushedIp,
-            // Phase 2 — redesigned
-            'port_scan_result'  => $this->portScanResult,
-            'port_probed'       => $this->portProbed,
-            'trace_confirmed'   => $this->traceConfirmed,
-            'trace_attempts'    => $this->traceAttempts,
-            'port_shattered'    => $this->portShattered,
-            'credential_state'  => $this->credentialState,
-            'awaiting_auth'     => $this->awaitingAuth,
-            'auth_failed'       => $this->authFailed,
-            // Phase 2 legacy / rig commands
-            'updated_ports'     => $this->updatedPorts,
-            'fingerprint_update'=> $this->fingerprintUpdate,
-            // Phase 3
-            'filesystem_update' => $this->filesystemUpdate,
-        ];
-    }
-}
+      

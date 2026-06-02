@@ -6,7 +6,7 @@ use App\Models\CombatChallenge;
 use App\Services\RigService;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -15,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
  * Broadcasts on the target player's private channel so they receive the
  * incoming challenge overlay instantly — replacing the 2s pending poll.
  */
-class CombatChallengeReceived implements ShouldBroadcast
+class CombatChallengeReceived implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -59,8 +59,4 @@ class CombatChallengeReceived implements ShouldBroadcast
                     'effective_firewall' => $effectiveFirewall,
                 ],
                 'node_canvas_id' => $this->challenge->node_canvas_id,
-                'expires_at'     => $this->challenge->expires_at->toIso8601String(),
-            ],
-        ];
-    }
-}
+                'expires_at'     => $this->challenge->

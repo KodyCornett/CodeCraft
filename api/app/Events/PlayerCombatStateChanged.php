@@ -4,7 +4,7 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -17,7 +17,7 @@ use Illuminate\Queue\SerializesModels;
  *   in_combat: true  — from CombatChallengeController::accept() for both players
  *   in_combat: false — from CombatController::resolve() for both players
  */
-class PlayerCombatStateChanged implements ShouldBroadcast
+class PlayerCombatStateChanged implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -41,7 +41,4 @@ class PlayerCombatStateChanged implements ShouldBroadcast
     {
         return [
             'player_id' => $this->playerId,
-            'in_combat' => $this->inCombat,
-        ];
-    }
-}
+            'in_combat' => $this->inCom
