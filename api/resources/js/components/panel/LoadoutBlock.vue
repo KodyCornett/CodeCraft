@@ -142,19 +142,19 @@ const ssPct = computed(() => {
     return Math.round((props.currentSS / props.maxSS) * 100);
 });
 const ssBarClass = computed(() => {
-    if (props.isLimping)  return 'ss-fill--limp';
-    if (ssPct.value <= 0) return 'ss-fill--dead';
+    if (ssPct.value <= 0)  return 'ss-fill--dead';
+    if (ssPct.value < 25)  return 'ss-fill--limp';
     if (ssPct.value <= 25) return 'ss-fill--crit';
     if (ssPct.value <= 50) return 'ss-fill--low';
     return 'ss-fill--ok';
 });
 const ssValClass = computed(() => {
-    if (props.isLimping)   return 'ss-val--limp';
+    if (ssPct.value < 25) return 'ss-val--limp';
     if (ssPct.value <= 25) return 'ss-val--crit';
     return '';
 });
 const ssSectionClass = computed(() => {
-    if (props.isLimping || ssPct.value <= 25) return 'lb-ss--crit';
+    if (ssPct.value < 25) return 'lb-ss--crit';
     if (ssPct.value <= 50) return 'lb-ss--warn';
     return '';
 });
