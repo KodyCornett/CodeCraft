@@ -61,4 +61,28 @@ class PacketHijackCommandResult implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-      
+            'match_id'           => $this->matchId,
+            'player_id'          => $this->playerId,
+            'command'            => $this->command,
+            'output_lines'       => $this->outputLines,
+            'phase_advanced'     => $this->phaseAdvanced,
+            'lock_until'         => $this->lockUntil,
+            'updated_suspects'   => $this->updatedSuspects,
+            'suspect_update'     => $this->suspectUpdate,
+            'arp_scan_result'    => $this->arpScanResult,
+            'octet_clue'         => $this->octetClue,
+            'flushed_ip'         => $this->flushedIp,
+            'port_scan_result'   => $this->portScanResult,
+            'port_probed'        => $this->portProbed,
+            'trace_confirmed'    => $this->traceConfirmed,
+            'trace_attempts'     => $this->traceAttempts,
+            'port_shattered'     => $this->portShattered,
+            'credential_state'   => $this->credentialState,
+            'awaiting_auth'      => $this->awaitingAuth,
+            'auth_failed'        => $this->authFailed,
+            'updated_ports'      => $this->updatedPorts,
+            'fingerprint_update' => $this->fingerprintUpdate,
+            'filesystem_update'  => $this->filesystemUpdate,
+        ];
+    }
+}

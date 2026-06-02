@@ -41,4 +41,7 @@ class PlayerCombatStateChanged implements ShouldBroadcastNow
     {
         return [
             'player_id' => $this->playerId,
-            'in_combat' => $this->inCom
+            'in_combat' => $this->inCombat,
+        ];
+    }
+}
