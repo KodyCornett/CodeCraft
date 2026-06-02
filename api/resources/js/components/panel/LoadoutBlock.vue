@@ -109,7 +109,7 @@
             </div>
             <div class="lb-ss-footer-row">
                 <span class="lb-ss-pct" :class="ssValClass">{{ ssPct }}%</span>
-                <span v-if="isLimping" class="lb-limp-badge">LIMP MODE</span>
+                <span v-if="ssPct < 25" class="lb-limp-badge">LIMP MODE</span>
             </div>
         </div>
     </PanelBlock>
