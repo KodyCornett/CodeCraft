@@ -10,11 +10,6 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Fired the moment a PvP challenge is created.
- * Broadcasts on the target player's private channel so they receive the
- * incoming challenge overlay instantly — replacing the 2s pending poll.
- */
 class CombatChallengeReceived implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -36,7 +31,6 @@ class CombatChallengeReceived implements ShouldBroadcastNow
         $challenger = $this->challenge->challenger()->with(['rig.chassis', 'playerPeripherals.peripheral'])->first();
 
         if ($challenger === null) {
-            // Challenger record missing — suppress payload so the frontend sees null
             return ['challenge' => null];
         }
 
@@ -59,4 +53,8 @@ class CombatChallengeReceived implements ShouldBroadcastNow
                     'effective_firewall' => $effectiveFirewall,
                 ],
                 'node_canvas_id' => $this->challenge->node_canvas_id,
-                'expires_at'     => $this->challenge->
+                'expires_at'     => $this->challenge->expires_at->toIso8601String(),
+            ],
+        ];
+    }
+}
