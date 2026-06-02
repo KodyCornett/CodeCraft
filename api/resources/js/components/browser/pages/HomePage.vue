@@ -53,6 +53,12 @@
                     <span class="tile-desc">How to run breaches — grid, sequences, row modifiers, stats &amp; PvP</span>
                     <span class="tile-url">sys.local/guide/gridbreach</span>
                 </button>
+                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.PACKET_HIJACK_GUIDE)">
+                    <span class="tile-icon tile-icon--hijack">◈</span>
+                    <span class="tile-title">PACKET HIJACK MANUAL</span>
+                    <span class="tile-desc">Three-phase PvP intrusion — recon, exploit chain &amp; filesystem extraction</span>
+                    <span class="tile-url">sys.local/guide/packethijack</span>
+                </button>
             </div>
         </div>
 
@@ -168,6 +174,7 @@ onUnmounted(() => clearInterval(timer));
 .tile-icon--cmd    { color: #FFB300; }
 .tile-icon--stat   { color: #7DF9FF; }
 .tile-icon--breach { color: #FF3333; }
+.tile-icon--hijack { color: #FFB300; }
 .tile-title { font-size: 11px; color: #00FFFF; letter-spacing: 0.1em; }
 .tile-desc  { font-size: 8px;  color: rgba(255, 255, 255, 0.35); letter-spacing: 0.04em; line-height: 1.6; }
 .tile-url   { font-size: 8px;  color: rgba(0, 255, 255, 0.25); letter-spacing: 0.08em; margin-top: 4px; }
