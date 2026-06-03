@@ -319,6 +319,7 @@ class NodeController extends Controller
                 'current_uplink'        => $currentUplink,
                 'nodes_hacked_this_run' => $player->nodes_hacked_this_run,
                 'bounty_level'          => $player->bounty_level,
+                'bounty_multiplier'     => (float) $player->bounty_multiplier,
                 'is_open_season'        => $player->is_open_season,
             ] : null,
             'bounty_event' => $bountyEvent,

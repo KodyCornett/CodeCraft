@@ -54,6 +54,17 @@ class BountyService
         10 => 1,   // ★
     ];
 
+    // ── Base reward multiplier per star tier ─────────────────────────────────
+    // bounty_multiplier must always be >= the tier base. PvP wins push it higher.
+    private const TIER_BASE_MULTIPLIERS = [
+        5 => 2.25,
+        4 => 2.00,
+        3 => 1.75,
+        2 => 1.50,
+        1 => 1.25,
+        0 => 1.00,
+    ];
+
     // ── Multiplier ────────────────────────────────────────────────────────────
     public const MULTIPLIER_PER_PVP_WIN = 0.15;
     public const MULTIPLIER_CAP         = 5.00;
@@ -84,6 +95,13 @@ class BountyService
         $player->nodes_hacked_this_run++;
         // bounty_level stores the 0–5 star tier; nodes_hacked_this_run is the raw counter
         $player->bounty_level = $this->hackCountToStarLevel($player->nodes_hacked_this_run);
+
+        // Ensure bounty_multiplier is at least the tier's base value.
+        // PvP wins push it above the base — never lower it below what they earned.
+        $tierBase = self::TIER_BASE_MULTIPLIERS[$player->bounty_level] ?? 1.00;
+        if ((float) ($player->bounty_multiplier ?? 1.0) < $tierBase) {
+            $player->bounty_multiplier = $tierBase;
+        }
 
         $event = BountyEvent::none();
 

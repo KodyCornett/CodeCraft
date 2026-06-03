@@ -1013,8 +1013,26 @@ async function onHackComplete({ resource, amount }) {
             if (patch.player?.tech_points !== undefined) {
                 player.value.techPoints = patch.player.tech_points;
             }
+            if (patch.player?.pocket_creds !== undefined) {
+                player.value.pocketCreds = patch.player.pocket_creds;
+            }
             if (patch.currentUplink != null) {
                 player.value.uplink = patch.currentUplink;
+            }
+            // Sync server-authoritative bounty state so STATUS page stays accurate
+            // (client-side checkBountyEscalation handles UI alerts; server is truth)
+            if (patch.player?.bounty_level !== undefined) {
+                player.value.bountyLevel = patch.player.bounty_level;
+            }
+            if (patch.player?.bounty_multiplier !== undefined) {
+                player.value.bountyMultiplier = patch.player.bounty_multiplier;
+            }
+            if (patch.player?.is_open_season !== undefined) {
+                player.value.isOpenSeason = patch.player.is_open_season;
+            }
+            if (patch.player?.nodes_hacked_this_run !== undefined) {
+                hackCount.value = patch.player.nodes_hacked_this_run;
+                player.value.nodesHackedThisRun = patch.player.nodes_hacked_this_run;
             }
             // Surface bounty escalation from the server (if any)
             if (patch.bountyEvent?.type === 'bounty_marked') {
