@@ -162,7 +162,6 @@ import { getNodeIdentity } from '@/composables/useNodeIdentity.js';
 const props = defineProps({
     node:        { type: Object,  default: null },
     isOnNode:    { type: Boolean, default: false },
-    isAdjacent:  { type: Boolean, default: false },
     nodePlayers: { type: Array,   default: () => [] },
     // Active hack traces left on this node — see useNodeTraces composable
     traces:      { type: Array,   default: () => [] },
@@ -176,7 +175,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['hack', 'open-store', 'hack-player', 'move']);
+defineEmits(['hack', 'open-store', 'hack-player']);
 
 // Render seconds_remaining as M:SS
 function formatTimer(seconds) {

@@ -37,6 +37,8 @@ function toCanvasNode(apiNode) {
         movementDepleted:   apiNode.movement_resource_depleted,
         credValueBase:      apiNode.cred_value_base     ?? 100,
         credLastHackedAt:   apiNode.cred_last_hacked_at ?? null,
+        zoneType:           apiNode.zone_type  ?? 'netlink',
+        zoneGroup:          apiNode.zone_group ?? null,
     };
 }
 

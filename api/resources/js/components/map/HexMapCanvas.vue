@@ -75,7 +75,7 @@
                 </template>
                 <!-- CyberDoc hub — vertex-positioned yellow node, traversable like action nodes -->
                 <g class="node-clickable" @click="onNodeClick(d.hub.id)" @mouseenter="onNodeHover(d.hub.id)" @mouseleave="onNodeLeave">
-                    <circle v-if="reachableNames.has(d.hub.id)" :cx="d.hub.x" :cy="d.hub.y" r="20" class="reachable-ring" :class="{ 'reachable-ring--locked': ssCritical }" />
+                    <circle v-if="reachableNames.has(d.hub.id)" :cx="d.hub.x" :cy="d.hub.y" r="20" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted || ssCritical }" />
                     <circle :cx="d.hub.x" :cy="d.hub.y" r="20" class="node-hit-area" />
                     <circle :cx="d.hub.x" :cy="d.hub.y" r="6" class="district-yellow-hub" />
                 </g>
@@ -119,7 +119,7 @@
                     @mouseenter="onNodeHover(pt.id)"
                     @mouseleave="onNodeLeave"
                 >
-                    <circle v-if="reachableNames.has(pt.id)" :cx="pt.x" :cy="pt.y" r="20" class="reachable-ring" />
+                    <circle v-if="reachableNames.has(pt.id)" :cx="pt.x" :cy="pt.y" r="20" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
                     <circle :cx="pt.x" :cy="pt.y" r="20" class="node-hit-area" />
                     <circle :cx="pt.x" :cy="pt.y" r="4" class="route-node" />
                 </g>
@@ -218,10 +218,10 @@
                     ICE {{ hoveredDbNode.ice ?? '?' }}  T{{ hoveredDbNode.tier ?? '?' }}
                 </text>
                 <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y + 14" class="tooltip-line tooltip-line--dim">
-                    {{ hoveredDbNode.zone_type ?? 'netlink' }}
+                    {{ hoveredDbNode.zoneType ?? 'netlink' }}
                 </text>
                 <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--creds">
-                    ₡ {{ hoveredDbNode.cred_value_base ?? '?' }}
+                    ₡ {{ hoveredDbNode.credValueBase ?? '?' }}
                 </text>
             </g>
 
@@ -279,13 +279,14 @@ function onPanEnd() {
 
 // ─── Props (kept for Game.vue compatibility — not rendered yet) ───────────────
 const props = defineProps({
-    nodes:         { type: Array,  default: () => [] },
-    links:         { type: Array,  default: () => [] },
-    pings:         { type: Array,  default: () => [] },
-    crashMines:    { type: Array,  default: () => [] },
-    currentNodeId: { type: String, default: null     },
-    playerUplink:  { type: Number, default: 3        },
-    playerSs:      { type: Number, default: 100      },
+    nodes:         { type: Array,   default: () => [] },
+    links:         { type: Array,   default: () => [] },
+    pings:         { type: Array,   default: () => [] },
+    crashMines:    { type: Array,   default: () => [] },
+    currentNodeId: { type: String,  default: null     },
+    playerUplink:  { type: Number,  default: 3        },
+    playerSs:      { type: Number,  default: 100      },
+    targetMode:    { type: Boolean, default: false    },
 });
 const emit = defineEmits(['node-clicked', 'player-moved', 'move-blocked']);
 
@@ -1106,10 +1107,12 @@ const dbNodeMap = computed(() => {
 const reachableNames = computed(() => {
     const currentId = playerToken.value.id;
     const db        = dbNodeMap.value.get(currentId);
-    const zoneType  = db?.zone_type ?? 'netlink';
+    const zoneType  = db?.zoneType ?? 'netlink';
     const maxSteps  = zoneType === 'district'     ? 1
                     : zoneType === 'neighborhood'  ? 2
-                    : Math.max(1, props.playerUplink);
+                    : props.playerUplink;  // netlink: 0 uplink → empty set
+
+    if (maxSteps <= 0) return new Set();
 
     const reachable = new Set();
     let frontier    = [currentId];
@@ -1154,6 +1157,18 @@ const hoveredDbNode = computed(() => {
 // ─── Node click — move if reachable, ignore if not ───────────────────────────
 function onNodeClick(nodeId) {
     if (hasDragged) return;   // suppress click if this was a pan gesture
+
+    // In targeting mode (e.g. crash mine placement) emit inspect event with
+    // real 1-step adjacency so Game.vue can validate the target — never move.
+    if (props.targetMode) {
+        const node = ALL_NODES.get(nodeId);
+        if (!node) return;
+        const adj        = NODE_ADJACENCY.get(playerToken.value.id) ?? new Set();
+        const isAdjacent = adj.has(nodeId);
+        emit('node-clicked', { node: { ...node }, isAdjacent });
+        return;
+    }
+
     if (!reachableNames.value.has(nodeId)) return;  // out of range — do nothing
 
     // Reachable: commit the move immediately (no Jack In confirmation needed)
@@ -1179,7 +1194,8 @@ function commitMove(nodeId) {
 
     playerToken.value = createPlayerToken(node);
     emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
-    // Keep the right panel anchored to the new current node
+    // Keep the right panel anchored to the new current node.
+    // isAdjacent is false — the player IS on this node, not adjacent to it.
     emit('node-clicked', { node: { ...node }, isAdjacent: false });
 }
 

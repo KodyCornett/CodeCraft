@@ -12,11 +12,13 @@
                 <!-- Hex node map -->
                 <HexMapCanvas
                     ref="mapCanvasRef"
+                    :nodes="nodes"
                     :pings="pings"
                     :crash-mines="crashMines"
                     :current-node-id="currentNodeId"
                     :player-uplink="player.uplink"
                     :player-ss="player.currentSS"
+                    :target-mode="!!crashTargetMode"
                     @node-clicked="handleNodeClicked"
                     @player-moved="handlePlayerMoved"
                     @move-blocked="onMoveBlocked"
@@ -202,7 +204,6 @@
             <SidePanel
                 :node="selectedNode"
                 :is-on-node="selectedNode?.canvasId === currentNodeId"
-                :is-adjacent="selectedNodeIsAdjacent"
                 :resources="nodeResources"
                 :commands="commands"
                 :current-s-s="player.currentSS"
@@ -304,7 +305,7 @@ const {
 } = useGameState();
 
 // ── Map data (API) ────────────────────────────────────────────────────────────
-const { loading: mapLoading, fetchAll, getSpawnNode, updateNodeState, updateNodeResources, getByCanvasId, getNodesNear } = useMapData();
+const { loading: mapLoading, fetchAll, getSpawnNode, updateNodeState, updateNodeResources, getByCanvasId, getNodesNear, nodes } = useMapData();
 
 // ── Deplete — fires after every successful hack ───────────────────────────────
 const { deplete } = useDepletion(playerId);
