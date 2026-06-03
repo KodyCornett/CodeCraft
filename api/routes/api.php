@@ -92,9 +92,10 @@ Route::middleware('auth:sanctum')->group(function () {
 // ---------------------------------------------------------------------------
 
     // command: 120/min — generous to cover fast typing; blocks scripted flooding
-    Route::post('/packet-hijack/{match}/command', [PacketHijackController::class, 'command'])
+    Route::post('/packet-hijack/{match}/command',  [PacketHijackController::class, 'command'])
         ->middleware('throttle:120,1');
-    Route::get('/packet-hijack/{match}/state',   [PacketHijackController::class, 'state']);
+    Route::post('/packet-hijack/{match}/transfer', [PacketHijackController::class, 'transfer']);
+    Route::get('/packet-hijack/{match}/state',     [PacketHijackController::class, 'state']);
 
 // ---------------------------------------------------------------------------
 // Leaderboards

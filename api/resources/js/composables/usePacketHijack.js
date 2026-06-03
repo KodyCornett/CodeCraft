@@ -42,7 +42,13 @@ export function usePacketHijack(playerId) {
     const boardScanned        = ref(false);    // true after first scan command
     const targetIp            = ref(null);     // locked target IP revealed at phase 1 → 2 transition
 
-    // ── Phase 3 state ─────────────────────────────────────────────────────────
+    // ── Phase 3 — bank screen state ───────────────────────────────────────────
+
+    const bankAccess          = ref(false);   // true once auth succeeds and bank screen opens
+    const bankBalance         = ref(0);       // opponent's pocket_creds snapshot
+    const transferring        = ref(false);   // true while xfer API call is in flight
+
+    // ── Phase 3 — filesystem state (legacy, kept for compat) ─────────────────
 
     const currentPath         = ref('/');
     const directoryEntries    = ref([]);
@@ -71,6 +77,9 @@ export function usePacketHijack(playerId) {
         credentialState.value     = { hostname: null, os: null };
         awaitingAuth.value        = false;
         boardScanned.value        = false;
+        bankAccess.value          = false;
+        bankBalance.value         = 0;
+        transferring.value        = false;
         currentPath.value         = '/';
         directoryEntries.value    = [];
         exploredPaths.value       = [];
@@ -179,6 +188,12 @@ export function usePacketHijack(playerId) {
         // breach: open auth prompt
         if (data.awaiting_auth) awaitingAuth.value = true;
         if (data.auth_failed)   awaitingAuth.value = false;
+
+        // auth success → bank screen
+        if (data.bank_access) {
+            bankAccess.value  = true;
+            bankBalance.value = data.bank_balance ?? 0;
+        }
 
         // ── Phase 3 updates ───────────────────────────────────────────────────
         if (data.filesystem_update) {
@@ -301,6 +316,22 @@ export function usePacketHijack(playerId) {
         }
     }
 
+    async function submitTransfer() {
+        if (!matchId.value || transferring.value) return;
+        transferring.value = true;
+        try {
+            await axios.post(`/api/packet-hijack/${matchId.value}/transfer`);
+        } catch (e) {
+            const status = e?.response?.status;
+            if (status === 409) {
+                // Match already resolved — matchResult will arrive via WS
+            } else {
+                _appendHistory('[XFER]', ['[SYSTEM ERROR]: TRANSFER CONNECTION INTERRUPTED']);
+                transferring.value = false;
+            }
+        }
+    }
+
     async function submitRigCommand(slug) {
         if (!matchId.value || busy.value || isLocked.value) return;
         if (usedRigCommands.value.includes(slug)) return;
@@ -403,7 +434,11 @@ export function usePacketHijack(playerId) {
         awaitingAuth,
         boardScanned,
         targetIp,
-        // Phase 3
+        // Phase 3 — bank screen
+        bankAccess,
+        bankBalance,
+        transferring,
+        // Phase 3 — filesystem (legacy)
         currentPath,
         directoryEntries,
         exploredPaths,
@@ -412,6 +447,7 @@ export function usePacketHijack(playerId) {
         submitCommand,
         submitAuth,
         submitRigCommand,
+        submitTransfer,
         destroy,
     });
 }

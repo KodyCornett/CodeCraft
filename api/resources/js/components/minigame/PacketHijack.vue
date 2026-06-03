@@ -27,6 +27,41 @@
             </div>
         </div>
 
+        <!-- ── Bank screen (Phase 3) ────────────────────────────────────────── -->
+        <div v-else-if="bankAccess" class="ph-bank-screen">
+            <div class="ph-bank-box">
+                <div class="ph-bank-header">
+                    <span class="ph-bank-header-label">NEXUS FINANCIAL NETWORK</span>
+                    <span class="ph-bank-header-sub">UNAUTHORIZED ACCESS — SESSION ACTIVE</span>
+                </div>
+                <div class="ph-bank-rule" />
+                <div class="ph-bank-acct">
+                    <span class="ph-bank-acct-label">ACCT REF</span>
+                    <span class="ph-bank-acct-num">{{ matchId?.slice(0, 16).toUpperCase() }}</span>
+                </div>
+                <div class="ph-bank-balance-row">
+                    <span class="ph-bank-balance-label">AVAILABLE BALANCE</span>
+                    <span class="ph-bank-balance-val">{{ bankBalance.toLocaleString() }} ₡</span>
+                </div>
+                <div class="ph-bank-rule" />
+                <template v-if="!transferring">
+                    <button class="ph-bank-xfer-btn" @click="$emit('submit-transfer')">
+                        [ XFER FUNDS ]
+                    </button>
+                </template>
+                <template v-else>
+                    <div class="ph-bank-transfer-anim">
+                        <div class="ph-bank-node ph-bank-node--src">TARGET</div>
+                        <div class="ph-bank-flow">
+                            <div class="ph-bank-packet" />
+                        </div>
+                        <div class="ph-bank-node ph-bank-node--dst">YOU</div>
+                    </div>
+                    <div class="ph-bank-xfer-status">TRANSFERRING...</div>
+                </template>
+            </div>
+        </div>
+
         <!-- ── Main terminal ─────────────────────────────────────────────────── -->
         <div v-else class="ph-terminal" tabindex="-1" @click="refocusInput">
 
@@ -156,18 +191,9 @@
                 </template>
             </div>
 
-            <!-- Phase 3: filesystem trail -->
+            <!-- Phase 3: bank screen is shown above the terminal shell — no data zone needed -->
             <div v-else-if="phase === 3" class="ph-data-zone ph-data-zone--p3">
-                <span class="ph-fs-label">PATH</span>
-                <div class="ph-fs-trail">
-                    <span
-                        v-for="p in exploredPaths"
-                        :key="p"
-                        class="ph-fs-crumb"
-                        :class="{ 'fs-crumb--current': p === currentPath }"
-                    >{{ p }}</span>
-                </div>
-                <span class="ph-fs-hint">// WALLET HIDDEN IN FILESYSTEM — USE ls / cd / extract</span>
+                <span class="ph-fs-hint">// SYSTEM BREACHED — BANK INTERFACE LOADING...</span>
             </div>
 
             <div class="ph-rule ph-rule--light" />
@@ -308,23 +334,11 @@
                         </div>
                     </div>
 
-                    <!-- CMD REF — Phase 3 -->
+                    <!-- CMD REF — Phase 3 (bank screen) -->
                     <div v-else-if="phase === 3" class="ph-cmd-ref-section">
-                        <div class="ph-ref-title">CMD REF</div>
-                        <div class="ph-ref-phase">// PHASE 3 — EXTRACTION</div>
-                        <div class="ph-ref-entry">
-                            <div class="ph-ref-cmd">ls</div>
-                            <div class="ph-ref-desc">List contents of current directory.</div>
-                        </div>
-                        <div class="ph-ref-entry">
-                            <div class="ph-ref-cmd">cd &lt;dir&gt;</div>
-                            <div class="ph-ref-desc">Navigate into a directory. cd .. to go back.</div>
-                        </div>
-                        <div class="ph-ref-entry ph-ref-entry--commit">
-                            <div class="ph-ref-cmd">extract</div>
-                            <div class="ph-ref-desc">Steal the wallet. Wins the match.</div>
-                        </div>
-                        <div class="ph-ref-note">WALLET IS HIDDEN — SEARCH THE FILESYSTEM</div>
+                        <div class="ph-ref-title">STATUS</div>
+                        <div class="ph-ref-phase">// PHASE 3 — BANK ACCESS</div>
+                        <div class="ph-ref-note">SYSTEM FULLY COMPROMISED. BANK INTERFACE ACTIVE. HIT XFER FUNDS BEFORE YOUR OPPONENT REACHES THEIRS.</div>
                     </div>
 
                     <!-- Rig commands stub -->
@@ -378,7 +392,11 @@ const props = defineProps({
     credentialState:     { type: Object,  default: () => ({ hostname: null, os: null }) },
     awaitingAuth:        { type: Boolean, default: false },
     boardScanned:        { type: Boolean, default: false },
-    // Phase 3
+    // Phase 3 — bank screen
+    bankAccess:          { type: Boolean, default: false },
+    bankBalance:         { type: Number,  default: 0 },
+    transferring:        { type: Boolean, default: false },
+    // Phase 3 — filesystem (legacy)
     currentPath:         { type: String,  default: '/' },
     directoryEntries:    { type: Array,   default: () => [] },
     exploredPaths:       { type: Array,   default: () => [] },
@@ -393,7 +411,7 @@ const props = defineProps({
     usedRigCommands:     { type: Array,   default: () => [] },
 });
 
-const emit = defineEmits(['submit-command', 'submit-auth', 'match-complete', 'use-rig-command']);
+const emit = defineEmits(['submit-command', 'submit-auth', 'submit-transfer', 'match-complete', 'use-rig-command']);
 
 const inputEl    = ref(null);
 const historyEl  = ref(null);
@@ -1324,4 +1342,157 @@ function lineClass(line) {
 
 /* ── fp--complete (used in Phase 2 top strip) ────────────────────────────── */
 .fp--complete { color: #00ff88 !important; }
+
+/* ── Bank screen (Phase 3) ───────────────────────────────────────────────── */
+.ph-bank-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #04060d;
+}
+
+.ph-bank-box {
+    width: clamp(280px, 44vw, 480px);
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    background: rgba(4, 10, 18, 0.98);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.ph-bank-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px 20px 14px;
+    background: rgba(0, 255, 136, 0.04);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.12);
+}
+
+.ph-bank-header-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(0, 255, 136, 0.6);
+}
+
+.ph-bank-header-sub {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: rgba(255, 68, 68, 0.55);
+}
+
+.ph-bank-rule {
+    height: 1px;
+    background: rgba(0, 255, 136, 0.1);
+}
+
+.ph-bank-acct {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px 8px;
+}
+
+.ph-bank-acct-label {
+    font-size: 8px;
+    color: rgba(0, 255, 136, 0.3);
+    letter-spacing: 0.15em;
+    flex-shrink: 0;
+}
+
+.ph-bank-acct-num {
+    font-size: 10px;
+    color: rgba(0, 255, 136, 0.5);
+    letter-spacing: 0.06em;
+}
+
+.ph-bank-balance-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 20px 20px;
+}
+
+.ph-bank-balance-label {
+    font-size: 9px;
+    color: rgba(0, 255, 136, 0.35);
+    letter-spacing: 0.15em;
+}
+
+.ph-bank-balance-val {
+    font-size: 28px;
+    color: #00ff88;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+}
+
+.ph-bank-xfer-btn {
+    margin: 20px;
+    padding: 12px 0;
+    background: transparent;
+    border: 1px solid rgba(0, 255, 136, 0.5);
+    color: #00ff88;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ph-bank-xfer-btn:hover {
+    border-color: #00ff88;
+    background: rgba(0, 255, 136, 0.08);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+.ph-bank-transfer-anim {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 24px 20px 16px;
+}
+
+.ph-bank-node {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    padding: 5px 10px;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    flex-shrink: 0;
+}
+
+.ph-bank-node--src { color: rgba(255, 68, 68, 0.7); border-color: rgba(255, 68, 68, 0.3); }
+.ph-bank-node--dst { color: rgba(0, 255, 136, 0.8); border-color: rgba(0, 255, 136, 0.4); }
+
+.ph-bank-flow {
+    flex: 1;
+    height: 2px;
+    background: rgba(0, 255, 136, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.ph-bank-packet {
+    position: absolute;
+    top: -3px;
+    width: 14px;
+    height: 8px;
+    background: #00ff88;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+    animation: packet-flow 0.7s linear infinite;
+}
+
+@keyframes packet-flow {
+    from { left: -14px; }
+    to   { left: 100%;  }
+}
+
+.ph-bank-xfer-status {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: rgba(0, 255, 136, 0.5);
+    padding-bottom: 20px;
+    animation: alert-pulse 0.6s ease-in-out infinite alternate;
+}
 </style>

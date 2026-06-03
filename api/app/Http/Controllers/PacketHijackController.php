@@ -741,19 +741,26 @@ class PacketHijackController extends Controller
         $result      = $this->phService->commandAuthenticate($fingerprint, $username, $password);
 
         if ($result['success']) {
+            // Snapshot opponent's pocket_creds for the bank screen
+            $opponentId  = $match->opponentIdOf($me->id);
+            $opponent    = $opponentId ? Player::find($opponentId) : null;
+            $bankBalance = (int) ($opponent?->pocket_creds ?? 0);
+
+            $bankKey         = "{$role}_bank_balance";
             $phaseKey        = "{$role}_phase";
+            $match->$bankKey  = $bankBalance;
             $match->$phaseKey = 3;
             $match->save();
 
-            $filesystem = $match->filesystemFor($role);
             PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: '[AUTH]',
                 outputLines: [
                     '[AUTHENTICATION SUCCESSFUL]',
                     '[ACCESS GRANTED — SYSTEM BREACHED]',
-                    '[NAVIGATING FILESYSTEM — LOCATE AND EXTRACT TARGET WALLET]',
+                    '[BANK INTERFACE LOADING...]',
                 ],
-                phaseAdvanced:    true,
-                filesystemUpdate: ['current_path' => '/', 'entries' => $this->getDirectoryEntries($filesystem['tree'], '/')],
+                phaseAdvanced: true,
+                bankAccess:    true,
+                bankBalance:   $bankBalance,
             );
         } else {
             // Auth failure — corrupt 1–3 credential segments directly from credentialState.
@@ -1024,6 +1031,48 @@ class PacketHijackController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    // =========================================================================
+    // POST /api/packet-hijack/{match}/transfer
+    // =========================================================================
+
+    /**
+     * Execute the fund transfer — called when the player clicks [XFER FUNDS]
+     * on the bank screen (Phase 3). Validates the player has reached Phase 3
+     * and the match is still active, then resolves the match.
+     */
+    public function transfer(Request $request, string $matchId): JsonResponse
+    {
+        $me = Player::where('user_id', $request->user()->id)->first();
+        if ($me === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        return DB::transaction(function () use ($me, $matchId) {
+
+            /** @var PacketHijackMatch|null $match */
+            $match = PacketHijackMatch::lockForUpdate()->find($matchId);
+
+            if ($match === null) {
+                return response()->json(['message' => 'Match not found.'], 404);
+            }
+
+            $role = $match->roleOf($me->id);
+            if ($role === null) {
+                return response()->json(['message' => 'Not your match.'], 403);
+            }
+
+            if ($match->status === 'complete') {
+                return response()->json(['message' => 'Match already complete.'], 409);
+            }
+
+            if ($match->phaseOf($role) !== 3) {
+                return response()->json(['message' => 'Bank screen not yet reached.'], 409);
+            }
+
+            return $this->resolveMatch($match, $me, $role, '[XFER FUNDS]');
+        });
     }
 
     // =========================================================================

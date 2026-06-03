@@ -49,6 +49,8 @@ class PacketHijackMatch extends Model
         'defender_chain_progress',
         'challenger_credential_state',
         'defender_credential_state',
+        'challenger_bank_balance',
+        'defender_bank_balance',
         'started_at',
         'completed_at',
     ];
@@ -86,6 +88,8 @@ class PacketHijackMatch extends Model
         'defender_chain_progress'     => 'integer',
         'challenger_credential_state' => 'array',
         'defender_credential_state'   => 'array',
+        'challenger_bank_balance'     => 'integer',
+        'defender_bank_balance'       => 'integer',
         'started_at'                  => 'datetime',
         'completed_at'                => 'datetime',
     ];
@@ -349,5 +353,15 @@ class PacketHijackMatch extends Model
     {
         $key = "{$role}_credential_state";
         return $this->$key ?? ['hostname' => null, 'os' => null];
+    }
+
+    /**
+     * The opponent's pocket_creds snapshot taken at the moment of successful auth.
+     * Displayed on the bank screen as the available balance.
+     */
+    public function bankBalanceFor(string $role): int
+    {
+        $key = "{$role}_bank_balance";
+        return (int) ($this->$key ?? 0);
     }
 }

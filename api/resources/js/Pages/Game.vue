@@ -99,6 +99,9 @@
                         :credential-state="ph.credentialState"
                         :awaiting-auth="ph.awaitingAuth"
                         :board-scanned="ph.boardScanned"
+                        :bank-access="ph.bankAccess"
+                        :bank-balance="ph.bankBalance"
+                        :transferring="ph.transferring"
                         :current-path="ph.currentPath"
                         :directory-entries="ph.directoryEntries"
                         :explored-paths="ph.exploredPaths"
@@ -113,6 +116,7 @@
                         :used-rig-commands="ph.usedRigCommands"
                         @submit-command="ph.submitCommand"
                         @submit-auth="ph.submitAuth"
+                        @submit-transfer="ph.submitTransfer"
                         @use-rig-command="ph.submitRigCommand"
                         @match-complete="onPacketHijackMatchComplete"
                     />

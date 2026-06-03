@@ -45,8 +45,10 @@ class PacketHijackCommandResult implements ShouldBroadcastNow
         // Phase 2 legacy / rig commands
         public readonly ?array  $updatedPorts = null,        // rig commands that mutate opponent port state
         public readonly ?array  $fingerprintUpdate = null,   // kept for rig-command compat (phase_shift etc.)
-        // Phase 3
-        public readonly ?array  $filesystemUpdate = null,    // Phase 3 filesystem state
+        // Phase 3 — bank screen
+        public readonly bool    $bankAccess = false,         // auth success: open bank screen
+        public readonly ?int    $bankBalance = null,         // opponent's pocket_creds snapshot
+        public readonly ?array  $filesystemUpdate = null,    // kept for compat
     ) {}
 
     public function broadcastOn(): PrivateChannel
@@ -84,6 +86,8 @@ class PacketHijackCommandResult implements ShouldBroadcastNow
             'auth_failed'        => $this->authFailed,
             'updated_ports'      => $this->updatedPorts,
             'fingerprint_update' => $this->fingerprintUpdate,
+            'bank_access'        => $this->bankAccess,
+            'bank_balance'       => $this->bankBalance,
             'filesystem_update'  => $this->filesystemUpdate,
         ];
     }
