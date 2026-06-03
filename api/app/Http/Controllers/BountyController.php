@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Node;
 use App\Models\Player;
 use App\Services\BountyService;
 use App\Services\CyberDocService;
@@ -24,12 +25,18 @@ class BountyController extends Controller
     {
         $board = $this->bountyService->getBountyLeaderboard();
 
+        // Resolve canvas_ids for all players in one query so pings can be placed precisely.
+        $nodeIds   = $board->pluck('current_node_id')->filter()->unique()->values();
+        $canvasMap = Node::whereIn('id', $nodeIds)
+            ->pluck('canvas_id', 'id');   // keyed by node id
+
         return response()->json([
             'leaderboard' => $board->map(fn ($p) => [
                 'player_id'               => $p->id,
                 'handle'                  => $p->handle,
                 'bounty_level'            => $p->bounty_level,
                 'current_district'        => $p->bounty_district_snapshot,
+                'canvas_node_id'          => $canvasMap[$p->current_node_id] ?? null,
                 'nodes_hacked'            => $p->nodes_hacked_this_run,
                 'pvp_wins_this_run'       => $p->pvp_wins_this_run,
                 'bounty_multiplier'       => $p->bounty_multiplier,

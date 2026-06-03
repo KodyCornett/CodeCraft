@@ -283,6 +283,7 @@ class BountyService
                 'id', 'handle', 'bounty_level', 'bounty_district_snapshot',
                 'nodes_hacked_this_run', 'pvp_wins_this_run',
                 'bounty_multiplier', 'is_open_season', 'pocket_creds',
+                'current_node_id',
             ]);
     }
 

@@ -480,16 +480,22 @@ function checkBountyEscalation(nodeIce = null) {
 //
 const PING_BASE_RANGE      = 8;
 const PING_TTL_MS          = 30_000;
-// Max radius (in abstract "node hops") per bounty star level
-const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 1];   // index = bountyLevel (0–5)
+// Max radius (in abstract "node hops") per bounty star level.
+// ★4–5 (Open Season) caps at 2 — high-bounty players can't escape to within 2 nodes.
+const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 2];   // index = bountyLevel (0–5)
 // SVG pixel radius per node-hop — roughly matches hex node spacing on the canvas
 const PING_PX_PER_HOP      = 38;
 const PING_MIN_RADIUS_PX   = 18;   // tight ring for a range-0 exact ping
 
+// OS dampening by star level — at ★4–5 the bounty signal overwhelms evasion,
+// making high OS builds unable to stay hidden. Full OS at ★0–3; halved at ★4; quartered at ★5.
+const OS_WEIGHT = [1.0, 1.0, 1.0, 1.0, 0.5, 0.25];
+
 function calcPingRange(nodeIce, playerOs, bountyLevel) {
     const lvl          = Math.min(bountyLevel, 5);
     const effectiveIce = nodeIce * (1 + lvl);
-    const raw          = PING_BASE_RANGE + playerOs - effectiveIce;
+    const effectiveOs  = Math.floor(playerOs * OS_WEIGHT[lvl]);
+    const raw          = PING_BASE_RANGE + effectiveOs - effectiveIce;
     const cap          = PING_MAX_RANGE[lvl] ?? 1;
     return Math.max(0, Math.min(cap, raw));
 }
@@ -599,7 +605,6 @@ function fireFalsePing(targetNode) {
 //   ★2–3  — ping every other move
 //   ★4–5  — ping every move
 //
-let _movePingCounter = 0;
 function handlePlayerMoved(event) {
     onPlayerMoved(event);   // update currentNode, uplink, district
 
@@ -648,20 +653,7 @@ function handlePlayerMoved(event) {
         }
     }
 
-    // ── Movement pings ────────────────────────────────────────────────────────
-    // Ghost Protocol and Dark Mode both suppress movement pings.
-    const ghostActive = (activeEffects.value.ghost_protocol ?? 0) > 0;
-    const darkActive  = (activeEffects.value.dark_mode      ?? 0) > 0;
-
-    const lvl = player.value.bountyLevel;
-    if (lvl < 2 || ghostActive || darkActive) return;
-
-    _movePingCounter++;
-    const pingEvery = (lvl >= 4) ? 1 : 2;
-    if (_movePingCounter % pingEvery === 0) {
-        // Tick fires after onPlayerMoved sets currentNode
-        setTimeout(() => firePing('movement'), 0);
-    }
+    // Pings are hack-triggered only — no movement pings.
 }
 
 // ── Node click — intercepts crash targeting mode before normal selection ───────
@@ -779,6 +771,56 @@ const { nodePlayers } = useNodePresence(currentNodeId, playerId);
 // pop in without waiting for the 10s poll.
 const selectedCanvasId = computed(() => selectedNode.value?.canvasId ?? null);
 const { traces: nodeTraces, refreshNow: refreshTraces } = useNodeTraces(selectedCanvasId, playerId);
+
+// ── Opponent bounty pings ─────────────────────────────────────────────────────
+//
+// For every Open Season (★4+) player on the bounty board, fire a red ping ring
+// at their last known canvas node so hunters can see where they are.
+//
+// Since Reverb is still a stub, we approximate by re-firing on every board
+// refresh (up to every 30s) and re-firing on a 20s interval so the 30s TTL
+// ring never fully expires between refreshes.
+//
+// Opponent pings use the target's bounty level and default OS 2 (minimum),
+// which at ★4–5 always clamps to range 0–1 — a tight, nearly exact ring.
+//
+// Fire a ping ring for each Open Season (★4–5) opponent whenever the bounty
+// board refreshes. The board position updates after every hack (via updatePosition),
+// so this fires close to when the target hacked — matching the hack-only ping rule.
+// OS 2 (base minimum) is used for the target so the ring is always tight (≤2 nodes).
+function fireOpponentPings() {
+    const targets = bounties.value.filter(b => b.isOpenSeason && b.canvasNodeId);
+    for (const target of targets) {
+        const node = getByCanvasId(target.canvasNodeId);
+        if (!node?.x && !node?.y) continue;
+
+        const ice    = node.ice ?? 3;
+        const lvl    = Math.min(target.stars, 5);
+        const range  = calcPingRange(ice, 2, lvl);
+        const pingId = Math.random().toString(36).slice(2);
+
+        pings.value.push({
+            pingId,
+            canvasId:     target.canvasNodeId,
+            x:            node.x,
+            y:            node.y,
+            range,
+            radiusPx:     pingRadiusPx(range),
+            isOpenSeason: true,
+            type:         'real',
+            handle:       target.handle,
+        });
+
+        setTimeout(() => {
+            pings.value = pings.value.filter(p => p.pingId !== pingId);
+        }, PING_TTL_MS);
+    }
+}
+
+// Trigger on every board refresh — no interval needed since pings are hack-driven.
+watch(bounties, () => {
+    fireOpponentPings();
+}, { deep: true });
 
 // ── Browser state ─────────────────────────────────────────────────────────────
 const { activeBrowserUrl, onLaunch, onCloseBrowser } = useBrowserState();
@@ -1094,7 +1136,6 @@ async function bankCreds() {
         hackCount.value   = 0;
         bountyAlert.value = null;
         pings.value        = [];
-        _movePingCounter    = 0;
         _falsePingIds       = [];
         _falsePingMovesLeft = 0;
 

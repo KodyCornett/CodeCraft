@@ -58,6 +58,7 @@ function toEntry(api) {
         bonusPct:     Math.round((multiplier - 1.0) * 100),
         district:     api.current_district ?? 'UNKNOWN',
         lastPing:     api.current_district ?? null,
+        canvasNodeId: api.canvas_node_id ?? null,
         isOpenSeason: os,
     };
 }
