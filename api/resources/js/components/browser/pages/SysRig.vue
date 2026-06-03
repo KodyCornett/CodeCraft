@@ -6,7 +6,7 @@
             <div class="rig-header-left">
                 <span class="rig-icon">⬡</span>
                 <div class="rig-title-stack">
-                    <span class="rig-chassis">{{ rig.chassis ?? 'UNKNOWN' }}</span>
+                    <span class="rig-chassis">{{ chassisDisplayName }}</span>
                     <span class="rig-sub">RIG.MANIFEST // SYSTEM READ-OUT</span>
                 </div>
             </div>
@@ -200,6 +200,17 @@ const player = gameState?.player ?? ref({ uplink:3, maxUplink:3 });
 // ── Tier label ────────────────────────────────────────────────────────────────
 const TIER_LABELS = ['', 'I', 'II', 'III', 'IV', 'V'];
 const tierLabel = computed(() => TIER_LABELS[rig.value.tier ?? 1] ?? 'I');
+
+// ── Chassis display name with live version suffix ─────────────────────────────
+// Strips the static version suffix baked into the DB name (e.g. " v1.0") and
+// replaces it with a live label: tier.totalInvestedPoints (e.g. "BlackHat v1.3").
+const chassisDisplayName = computed(() => {
+    const base = (rig.value.chassis ?? 'UNKNOWN').replace(/\s+v\d+\.\d+$/, '');
+    const ip   = rig.value.investedPoints ?? {};
+    const pts  = Object.values(ip).reduce((s, v) => s + (v ?? 0), 0);
+    const tier = rig.value.tier ?? 1;
+    return `${base} v${tier}.${pts}`;
+});
 
 // ── Point allocation ──────────────────────────────────────────────────────────
 const pointsSpent = computed(() => {
