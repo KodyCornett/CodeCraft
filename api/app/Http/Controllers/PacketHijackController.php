@@ -650,6 +650,7 @@ class PacketHijackController extends Controller
         PacketHijackCommandResult::dispatch(matchId: $match->id, playerId: $me->id, command: $raw,
             outputLines:    $result['lines'],
             traceConfirmed: $result['confirmed'] ? [$port1, $port2] : null,
+            tracePartial:   (!$result['confirmed'] && ($result['partial'] ?? false)) ? [$port1, $port2] : null,
             traceAttempts:  $result['attempts_left'],
         );
         return response()->json(['ok' => true]);

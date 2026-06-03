@@ -868,9 +868,7 @@ class PacketHijackService
      */
     public function generateExploitChain(int $targetFirewall): array
     {
-        $chainLength = $targetFirewall >= 5 ? 3 : 2;
-
-        // Eligible entry/mid ports — everything except exfil
+        // Always 3 non-exfil ports + 8080 — chain length is fixed regardless of FW
         $eligible = array_keys(array_filter(
             self::PORT_CATALOGUE,
             fn($service, $port) => $port !== self::EXFIL_PORT,
@@ -878,7 +876,7 @@ class PacketHijackService
         ));
 
         shuffle($eligible);
-        $chain = array_slice($eligible, 0, $chainLength - 1);
+        $chain = array_slice($eligible, 0, 3);
         $chain[] = self::EXFIL_PORT;
 
         return $chain;

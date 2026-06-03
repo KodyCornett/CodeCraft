@@ -40,6 +40,7 @@ export function usePacketHijack(playerId) {
     const credentialState     = ref({ hostname: null, os: null });  // fills as chain progresses
     const awaitingAuth        = ref(false);    // true after successful breach
     const boardScanned        = ref(false);    // true after first scan command
+    const targetIp            = ref(null);     // locked target IP revealed at phase 1 → 2 transition
 
     // ── Phase 3 state ─────────────────────────────────────────────────────────
 
@@ -144,10 +145,19 @@ export function usePacketHijack(playerId) {
 
         // trace: update chain confirmed map + trace attempt counter
         // trace_confirmed = [port1, port2] means port1 → port2 is a confirmed chain link
-        // mark both ports as confirmed chain members
+        // trace_partial   = [port1, port2] means the pair is adjacent but order is reversed (flip them)
         if (data.trace_confirmed) {
             const [p1, p2] = data.trace_confirmed;
             chainConfirmed.value = { ...chainConfirmed.value, [p1]: true, [p2]: true };
+        }
+        if (data.trace_partial) {
+            const [p1, p2] = data.trace_partial;
+            // Only set 'partial' if not already fully confirmed
+            chainConfirmed.value = {
+                ...chainConfirmed.value,
+                [p1]: chainConfirmed.value[p1] || 'partial',
+                [p2]: chainConfirmed.value[p2] || 'partial',
+            };
         }
         if (data.trace_attempts != null) {
             traceAttemptsLeft.value = data.trace_attempts;
@@ -199,6 +209,7 @@ export function usePacketHijack(playerId) {
             setTimeout(() => { defenderAlertActive.value = false; }, 6000);
         } else {
             phase.value = 2;
+            if (data.target_ip) targetIp.value = data.target_ip;
             // Seed the port board from the transition payload if provided
             if (data.ports && data.ports.length) {
                 portPool.value = data.ports;
@@ -391,6 +402,7 @@ export function usePacketHijack(playerId) {
         credentialState,
         awaitingAuth,
         boardScanned,
+        targetIp,
         // Phase 3
         currentPath,
         directoryEntries,

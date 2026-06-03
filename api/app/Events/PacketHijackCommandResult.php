@@ -36,6 +36,7 @@ class PacketHijackCommandResult implements ShouldBroadcastNow
         public readonly ?array  $portScanResult = null,      // scan: full port board (public view)
         public readonly ?int    $portProbed = null,          // probe: port number now marked probed
         public readonly ?array  $traceConfirmed = null,      // trace: [port1, port2] if chain link confirmed; null if no correlation
+        public readonly ?array  $tracePartial = null,        // trace: [port1, port2] if adjacent but reversed — hint to flip order
         public readonly ?int    $traceAttempts = null,       // trace: remaining attempt count after this command
         public readonly ?int    $portShattered = null,       // exploit: port number now shattered
         public readonly ?array  $credentialState = null,     // exploit/auth-fail: updated { hostname, os } display
@@ -75,6 +76,7 @@ class PacketHijackCommandResult implements ShouldBroadcastNow
             'port_scan_result'   => $this->portScanResult,
             'port_probed'        => $this->portProbed,
             'trace_confirmed'    => $this->traceConfirmed,
+            'trace_partial'      => $this->tracePartial,
             'trace_attempts'     => $this->traceAttempts,
             'port_shattered'     => $this->portShattered,
             'credential_state'   => $this->credentialState,

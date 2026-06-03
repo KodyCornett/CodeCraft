@@ -979,8 +979,9 @@ async function onHackComplete({ resource, amount }) {
     }
 
     // Increment session hack counter then check for bounty level-up.
-    // Pass nodeIce so the threshold ping is calibrated to the node that triggered it.
+    // Mirror into nodesHackedThisRun so the STATUS page stays live.
     hackCount.value += 1;
+    player.value.nodesHackedThisRun = hackCount.value;
     checkBountyEscalation(nodeIce);
 
     // Fire a hack ping — suppressed by Ghost Protocol and Dark Mode
@@ -1063,12 +1064,14 @@ async function onHackFailed({ resource, amount }) {
                 const cf = res.data.critical_failure ?? {};
 
                 // Wipe pocket + bounty state
-                player.value.pocketCreds      = 0;
-                player.value.bountyLevel      = 0;
-                player.value.bountyMultiplier = 1.0;
-                player.value.isOpenSeason     = false;
-                player.value.isLimping        = false;
-                hackCount.value               = 0;
+                player.value.pocketCreds         = 0;
+                player.value.bountyLevel         = 0;
+                player.value.bountyMultiplier    = 1.0;
+                player.value.isOpenSeason        = false;
+                player.value.isLimping           = false;
+                hackCount.value                  = 0;
+                player.value.nodesHackedThisRun  = 0;
+                player.value.pvpWinsThisRun      = 0;
 
                 // Teleport to spawn node
                 if (cf.respawn_canvas_id) {
@@ -1133,7 +1136,9 @@ async function bankCreds() {
         player.value.isOpenSeason     = result.player?.is_open_season     ?? false;
 
         // Reset session counters
-        hackCount.value   = 0;
+        hackCount.value                  = 0;
+        player.value.nodesHackedThisRun  = 0;
+        player.value.pvpWinsThisRun      = 0;
         bountyAlert.value = null;
         pings.value        = [];
         _falsePingIds       = [];
@@ -1388,10 +1393,12 @@ async function onDeclineChallenge() {
         }
 
         if (result.critical_failure) {
-            player.value.bountyLevel      = 0;
-            player.value.bountyMultiplier = 1.0;
-            player.value.isOpenSeason     = false;
-            hackCount.value               = 0;
+            player.value.bountyLevel         = 0;
+            player.value.bountyMultiplier    = 1.0;
+            player.value.isOpenSeason        = false;
+            hackCount.value                  = 0;
+            player.value.nodesHackedThisRun  = 0;
+            player.value.pvpWinsThisRun      = 0;
             pings.value                   = [];
             if (result.critical_failure.respawn_canvas_id) {
                 currentNodeId.value = result.critical_failure.respawn_canvas_id;
@@ -1469,28 +1476,31 @@ function applyPvpResult(result, opponentHandle) {
     const won = result.winner_id === player.value.id;
 
     if (won) {
-        const stolen = result.loot?.stolen ?? 0;
-        if (stolen > 0) {
-            player.value.pocketCreds = (player.value.pocketCreds ?? 0) + stolen;
-        }
+        // Use the server-authoritative pocket balance rather than adding stolen
+        // locally — avoids compounding any drift in the local state.
+        player.value.pocketCreds      = result.winner?.pocket_creds      ?? player.value.pocketCreds;
         player.value.bountyLevel      = result.winner?.bounty_level      ?? player.value.bountyLevel;
         player.value.bountyMultiplier = result.winner?.bounty_multiplier ?? player.value.bountyMultiplier;
         player.value.isOpenSeason     = result.winner?.is_open_season    ?? player.value.isOpenSeason;
+        // PvP win increments the run counter server-side — mirror it locally.
+        player.value.pvpWinsThisRun   = (player.value.pvpWinsThisRun ?? 0) + 1;
     } else {
-        // Lost — pocket zeroed, limping flag set.
-        // Bounty/run state is preserved on a survivable loss — it only resets
-        // at the CyberDoc (extract) or on Critical System Failure (SS = 0).
-        player.value.pocketCreds  = 0;
+        // Use the server-authoritative loser pocket:
+        //   survivable loss → loser keeps (pocket_before − stolen), ICE seizes nothing
+        //   elimination     → loser zeroed (handled inside critical_failure block below)
+        player.value.pocketCreds  = result.loser?.pocket_creds ?? 0;
         player.value.isLimping    = result.loser?.is_limping ?? true;
 
         const cf = result.loser?.critical_failure ?? null;
         if (cf) {
             // SS hit 0 during combat — bounty and run are wiped server-side.
-            player.value.bountyLevel      = 0;
-            player.value.bountyMultiplier = 1.0;
-            player.value.isOpenSeason     = false;
-            hackCount.value               = 0;
-            pings.value                   = [];
+            player.value.bountyLevel         = 0;
+            player.value.bountyMultiplier    = 1.0;
+            player.value.isOpenSeason        = false;
+            hackCount.value                  = 0;
+            player.value.nodesHackedThisRun  = 0;
+            player.value.pvpWinsThisRun      = 0;
+            pings.value                      = [];
 
             // Teleport to spawn node
             if (cf.respawn_canvas_id) {

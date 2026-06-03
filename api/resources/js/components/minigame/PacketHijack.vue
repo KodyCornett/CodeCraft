@@ -96,6 +96,11 @@
 
             <!-- Phase 2: exploit chain board -->
             <div v-else-if="phase === 2" class="ph-data-zone ph-data-zone--p2">
+                <!-- Locked target IP tag — always visible once phase 2 starts -->
+                <div v-if="targetIp" class="ph-target-tag">
+                    <span class="ph-target-label">TARGET</span>
+                    <span class="ph-target-ip">{{ targetIp }}</span>
+                </div>
                 <div v-if="!boardScanned" class="ph-data-empty">
                     RUN <span class="ph-boot-cmd">scan {{ targetIp || '&lt;ip&gt;' }}</span> TO INITIALISE PORT BOARD
                 </div>
@@ -131,7 +136,8 @@
                             :class="{
                                 'port-card--shattered': p.shattered,
                                 'port-card--probed':    p.probed && !p.shattered,
-                                'port-card--chain':     chainConfirmed[p.port],
+                                'port-card--chain':     chainConfirmed[p.port] === true,
+                                'port-card--partial':   chainConfirmed[p.port] === 'partial',
                                 'port-card--exfil':     p.is_exfil,
                             }"
                         >
@@ -139,7 +145,8 @@
                             <span class="ppc-svc">{{ p.service }}</span>
                             <span class="ppc-status">
                                 <template v-if="p.shattered">████ SHATTERED</template>
-                                <template v-else-if="chainConfirmed[p.port]">CHAIN ✓</template>
+                                <template v-else-if="chainConfirmed[p.port] === true">CHAIN ✓</template>
+                                <template v-else-if="chainConfirmed[p.port] === 'partial'">CHAIN ~ INV</template>
                                 <template v-else-if="p.probed">PROBED</template>
                                 <template v-else-if="p.is_exfil">LOCKED</template>
                                 <template v-else>———</template>
@@ -910,6 +917,28 @@ function lineClass(line) {
 
 /* ── Phase 2 — port board ────────────────────────────────────────────────── */
 
+.ph-target-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 10px;
+    margin-bottom: 6px;
+    border: 1px solid rgba(0,255,255,0.3);
+    background: rgba(0,255,255,0.05);
+    border-radius: 2px;
+    align-self: flex-start;
+}
+.ph-target-label {
+    font-size: 9px;
+    color: rgba(0,255,255,0.4);
+    letter-spacing: 0.12em;
+}
+.ph-target-ip {
+    font-size: 11px;
+    color: rgba(0,255,255,0.9);
+    letter-spacing: 0.08em;
+}
+
 .ph-data-zone--p2 {
     display: flex;
     flex-direction: column;
@@ -944,6 +973,13 @@ function lineClass(line) {
     border-color: rgba(0,255,255,0.55);
     background: rgba(0,255,255,0.07);
 }
+
+.port-card--partial {
+    border-color: rgba(255,180,0,0.45);
+    background: rgba(255,180,0,0.06);
+}
+
+.port-card--partial .ppc-status { color: rgba(255,180,0,0.75); }
 
 .port-card--shattered {
     opacity: 0.3;
