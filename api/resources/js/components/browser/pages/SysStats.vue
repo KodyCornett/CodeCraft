@@ -101,7 +101,7 @@
                     :class="i <= (player.bountyLevel ?? 0) ? 'ss-star--on' : 'ss-star--off'"
                 >★</span>
                 <span class="ss-threat-mult" v-if="(player.bountyLevel ?? 0) > 0">
-                    ×{{ (player.bountyMultiplier ?? 1).toFixed(2) }}
+                    +{{ multiplierBonusPct }}%
                 </span>
                 <span class="ss-threat-clean" v-else>CLEAN</span>
             </div>
@@ -164,6 +164,11 @@ const uplinkClass = computed(() => {
     if (pct > 0)    return 'ss-uplink-low';
     return 'ss-uplink-crit';
 });
+
+// Multiplier bonus as a percentage — matches HUD "+25%" format
+const multiplierBonusPct = computed(() =>
+    Math.round(((player.value.bountyMultiplier ?? 1.0) - 1.0) * 100)
+);
 
 // Threat / heat bar
 const heatPct = computed(() => ((player.value.bountyLevel ?? 0) / 5) * 100);
@@ -395,13 +400,14 @@ const heatLabel = computed(() => {
     flex-shrink: 0;
     width: 74px;
     text-align: right;
+    color: rgba(0,255,255,0.6);
 }
 
-/* heat colour variants */
-.heat-none { background: rgba(0,255,136,0.2); color: rgba(0,255,136,0.6); }
-.heat-low  { background: #FFB300;              color: #FFB300; }
-.heat-mid  { background: #FF6B00;              color: #FF6B00; }
-.heat-high { background: #FF3333;              color: #FF3333; box-shadow: 0 0 8px rgba(255,51,51,0.4); }
+/* heat colour variants — applied to the fill bar only */
+.heat-none { background: rgba(0,255,136,0.2); }
+.heat-low  { background: #FFB300; }
+.heat-mid  { background: #FF6B00; }
+.heat-high { background: #FF3333; box-shadow: 0 0 8px rgba(255,51,51,0.4); }
 
 /* Open Season banner */
 .ss-os-banner {
