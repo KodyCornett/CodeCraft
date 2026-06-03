@@ -1663,6 +1663,7 @@ onMounted(async () => {
     if (startCanvasId) {
         mapCanvasRef.value?.setPlayerNode(startCanvasId);
         currentNodeId.value = startCanvasId;
+        onNodeClicked({ node: { id: startCanvasId, x: 0, y: 0 }, isAdjacent: false });
         if (savedCanvasId) {
             console.log('[BOOT] Position restored at', savedCanvasId);
         } else {
