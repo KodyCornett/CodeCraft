@@ -65,14 +65,18 @@
                         v-if="node.type === 'action'"
                         class="node-clickable"
                         @click="onNodeClick(node.id)"
+                        @mouseenter="onNodeHover(node.id)"
+                        @mouseleave="onNodeLeave"
                     >
-                        <circle v-if="reachableNames.has(node.id)" :cx="node.x" :cy="node.y" r="12" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
+                        <circle v-if="reachableNames.has(node.id)" :cx="node.x" :cy="node.y" r="20" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
+                        <circle :cx="node.x" :cy="node.y" r="20" class="node-hit-area" />
                         <circle :cx="node.x" :cy="node.y" r="4" class="cluster-shared-node" />
                     </g>
                 </template>
                 <!-- CyberDoc hub — vertex-positioned yellow node, traversable like action nodes -->
-                <g class="node-clickable" @click="onNodeClick(d.hub.id)">
-                    <circle v-if="reachableNames.has(d.hub.id)" :cx="d.hub.x" :cy="d.hub.y" r="12" class="reachable-ring" :class="{ 'reachable-ring--locked': ssCritical }" />
+                <g class="node-clickable" @click="onNodeClick(d.hub.id)" @mouseenter="onNodeHover(d.hub.id)" @mouseleave="onNodeLeave">
+                    <circle v-if="reachableNames.has(d.hub.id)" :cx="d.hub.x" :cy="d.hub.y" r="20" class="reachable-ring" :class="{ 'reachable-ring--locked': ssCritical }" />
+                    <circle :cx="d.hub.x" :cy="d.hub.y" r="20" class="node-hit-area" />
                     <circle :cx="d.hub.x" :cy="d.hub.y" r="6" class="district-yellow-hub" />
                 </g>
                 <text :x="d.labelX" :y="d.labelY" class="district-name">{{ d.name.toUpperCase() }}</text>
@@ -87,8 +91,11 @@
                     :key="`nb-${i}-n${j}`"
                     class="node-clickable"
                     @click="onNodeClick(node.id)"
+                    @mouseenter="onNodeHover(node.id)"
+                    @mouseleave="onNodeLeave"
                 >
-                    <circle v-if="reachableNames.has(node.id)" :cx="node.x" :cy="node.y" r="12" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
+                    <circle v-if="reachableNames.has(node.id)" :cx="node.x" :cy="node.y" r="20" class="reachable-ring" :class="{ 'reachable-ring--locked': uplinkDepleted }" />
+                    <circle :cx="node.x" :cy="node.y" r="20" class="node-hit-area" />
                     <circle :cx="node.x" :cy="node.y" r="4" class="cluster-shared-node" />
                 </g>
             </g>
@@ -109,8 +116,11 @@
                     :key="`link-${li}-pt-${i}`"
                     class="node-clickable"
                     @click="onNodeClick(pt.id)"
+                    @mouseenter="onNodeHover(pt.id)"
+                    @mouseleave="onNodeLeave"
                 >
-                    <circle v-if="reachableNames.has(pt.id)" :cx="pt.x" :cy="pt.y" r="12" class="reachable-ring" />
+                    <circle v-if="reachableNames.has(pt.id)" :cx="pt.x" :cy="pt.y" r="20" class="reachable-ring" />
+                    <circle :cx="pt.x" :cy="pt.y" r="20" class="node-hit-area" />
                     <circle :cx="pt.x" :cy="pt.y" r="4" class="route-node" />
                 </g>
             </g>
@@ -193,6 +203,26 @@
                     r="16"
                     class="player-ring"
                 />
+            </g>
+
+            <!-- Hover tooltip — appears near hovered node, shows key recon data -->
+            <g v-if="hoveredDbNode" class="node-tooltip" pointer-events="none">
+                <rect
+                    :x="tooltipSvgPos.x - 2"
+                    :y="tooltipSvgPos.y - 14"
+                    width="88"
+                    height="44"
+                    class="tooltip-bg"
+                />
+                <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y" class="tooltip-line">
+                    ICE {{ hoveredDbNode.ice ?? '?' }}  T{{ hoveredDbNode.tier ?? '?' }}
+                </text>
+                <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y + 14" class="tooltip-line tooltip-line--dim">
+                    {{ hoveredDbNode.zone_type ?? 'netlink' }}
+                </text>
+                <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--creds">
+                    ₡ {{ hoveredDbNode.cred_value_base ?? '?' }}
+                </text>
             </g>
 
             </g><!-- end pan group -->
@@ -1055,28 +1085,79 @@ function createPlayerToken(node) {
 
 const startNode      = findStartNode();
 const playerToken    = ref(createPlayerToken(startNode));
-const reachableNames  = computed(() => NODE_ADJACENCY.get(playerToken.value.id) ?? new Set());
 const uplinkDepleted  = computed(() => props.playerUplink <= 0);
 const ssCritical      = computed(() => props.playerSs <= 0);
 
-// ─── Node click — inspect only, never auto-move ──────────────────────────────
+// ── DB node lookup ────────────────────────────────────────────────────────────
+// Build a canvasId → DB node map from the nodes prop for zone_type lookups.
+const dbNodeMap = computed(() => {
+    const m = new Map();
+    for (const n of props.nodes) {
+        if (n.canvasId) m.set(n.canvasId, n);
+    }
+    return m;
+});
+
+// ── BFS reachable set ─────────────────────────────────────────────────────────
+// Range is determined by the zone_type of the player's current node:
+//   district     → 1 step
+//   neighborhood → 2 steps
+//   netlink      → full uplink value
+const reachableNames = computed(() => {
+    const currentId = playerToken.value.id;
+    const db        = dbNodeMap.value.get(currentId);
+    const zoneType  = db?.zone_type ?? 'netlink';
+    const maxSteps  = zoneType === 'district'     ? 1
+                    : zoneType === 'neighborhood'  ? 2
+                    : Math.max(1, props.playerUplink);
+
+    const reachable = new Set();
+    let frontier    = [currentId];
+    const visited   = new Set([currentId]);
+
+    for (let step = 0; step < maxSteps; step++) {
+        const next = [];
+        for (const id of frontier) {
+            for (const nb of (NODE_ADJACENCY.get(id) ?? [])) {
+                if (!visited.has(nb)) {
+                    visited.add(nb);
+                    reachable.add(nb);
+                    next.push(nb);
+                }
+            }
+        }
+        frontier = next;
+        if (frontier.length === 0) break;
+    }
+    return reachable;
+});
+
+// ── Hover tooltip ─────────────────────────────────────────────────────────────
+const hoveredNodeId  = ref(null);
+const tooltipSvgPos  = ref({ x: 0, y: 0 });
+
+function onNodeHover(nodeId) {
+    hoveredNodeId.value = nodeId;
+    const node = ALL_NODES.get(nodeId);
+    if (node) tooltipSvgPos.value = { x: node.x + 16, y: node.y - 28 };
+}
+
+function onNodeLeave() {
+    hoveredNodeId.value = null;
+}
+
+const hoveredDbNode = computed(() => {
+    if (!hoveredNodeId.value) return null;
+    return dbNodeMap.value.get(hoveredNodeId.value) ?? null;
+});
+
+// ─── Node click — move if reachable, ignore if not ───────────────────────────
 function onNodeClick(nodeId) {
     if (hasDragged) return;   // suppress click if this was a pan gesture
-    const node = ALL_NODES.get(nodeId);
-    if (!node) return;
+    if (!reachableNames.value.has(nodeId)) return;  // out of range — do nothing
 
-    // Determine adjacency so NodeInfoBlock can show the JACK IN button
-    const adj        = NODE_ADJACENCY.get(playerToken.value.id);
-    const isAdjacent = !!(adj && adj.has(nodeId));
-
-    // Always open the NodeWindow so the player can inspect node info
-    const pos = getNodeScreenPos(nodeId);
-    emit('node-clicked', {
-        node:       { ...node },
-        screenX:    pos?.x ?? 200,
-        screenY:    pos?.y ?? 200,
-        isAdjacent,
-    });
+    // Reachable: commit the move immediately (no Jack In confirmation needed)
+    commitMove(nodeId);
 }
 
 // ─── Commit move — called by Game.vue when player confirms via JACK IN ────────
@@ -1093,12 +1174,13 @@ function commitMove(nodeId) {
         return;
     }
 
-    // Only allow moving to an adjacent node
-    const adj = NODE_ADJACENCY.get(playerToken.value.id);
-    if (!adj || !adj.has(nodeId)) return;
+    // Only allow moving to a reachable node
+    if (!reachableNames.value.has(nodeId)) return;
 
     playerToken.value = createPlayerToken(node);
     emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
+    // Keep the right panel anchored to the new current node
+    emit('node-clicked', { node: { ...node }, isAdjacent: false });
 }
 
 // ─── Helpers exposed to Game.vue ─────────────────────────────────────────────
@@ -1285,6 +1367,34 @@ defineExpose({
 
 .node-clickable {
     cursor: pointer;
+}
+
+/* Invisible hit area — same radius as the cyan reachable ring for easy clicking */
+.node-hit-area {
+    fill: transparent;
+    stroke: none;
+}
+
+/* Hover tooltip */
+.tooltip-bg {
+    fill: rgba(5, 5, 10, 0.88);
+    stroke: rgba(0, 255, 255, 0.35);
+    stroke-width: 0.75;
+    rx: 3;
+    ry: 3;
+}
+.tooltip-line {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: rgba(0, 255, 255, 0.9);
+    letter-spacing: 0.06em;
+}
+.tooltip-line--dim {
+    fill: rgba(0, 255, 255, 0.5);
+    font-size: 8px;
+}
+.tooltip-line--creds {
+    fill: rgba(255, 179, 0, 0.85);
 }
 
 .district-yellow-hub {

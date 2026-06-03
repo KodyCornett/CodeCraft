@@ -218,7 +218,6 @@
                 @open-store="onOpenStore"
                 @use-command="onUseCommand"
                 @hack-player="onHackPlayer"
-                @move="onMoveToSelected"
             />
 
         </div>
@@ -662,12 +661,6 @@ function handlePlayerMoved(event) {
         // Tick fires after onPlayerMoved sets currentNode
         setTimeout(() => firePing('movement'), 0);
     }
-}
-
-// ── JACK IN — confirmed move from NodeInfoBlock JACK IN button ────────────────
-function onMoveToSelected() {
-    if (!selectedNode.value?.canvasId) return;
-    mapCanvasRef.value?.commitMove(selectedNode.value.canvasId);
 }
 
 // ── Node click — intercepts crash targeting mode before normal selection ───────

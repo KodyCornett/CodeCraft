@@ -147,7 +147,6 @@
             <!-- Footer -->
             <div class="ni-footer">
                 <span v-if="isOnNode" class="ni-connected">◉ CONNECTED</span>
-                <button v-else-if="isAdjacent" class="ni-jackin-btn" @click="$emit('move')">[ JACK IN ]</button>
                 <span v-else class="ni-remote">○ REMOTE NODE</span>
             </div>
 

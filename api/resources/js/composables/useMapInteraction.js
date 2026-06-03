@@ -68,6 +68,11 @@ export function useMapInteraction(player, getByCanvasId = null) {
             y: y ?? 0,
         };
 
+        // Right panel always reflects the node the player is standing on
+        const canvasNode = { id: nodeId, x: x ?? 0, y: y ?? 0, district };
+        selectedNode.value          = enrichNode(canvasNode);
+        selectedNodeIsAdjacent.value = false;
+
         if (district != null) {
             player.value.district = district.toUpperCase();
         }
