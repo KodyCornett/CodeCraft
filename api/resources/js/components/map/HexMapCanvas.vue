@@ -1175,6 +1175,26 @@ function onNodeClick(nodeId) {
     commitMove(nodeId);
 }
 
+// ─── BFS shortest-path distance between two node IDs ─────────────────────────
+function bfsDistance(fromId, toId) {
+    if (fromId === toId) return 0;
+    const visited  = new Set([fromId]);
+    let   frontier = [fromId];
+    let   dist     = 0;
+    while (frontier.length > 0) {
+        dist++;
+        const next = [];
+        for (const id of frontier) {
+            for (const nb of (NODE_ADJACENCY.get(id) ?? [])) {
+                if (nb === toId) return dist;
+                if (!visited.has(nb)) { visited.add(nb); next.push(nb); }
+            }
+        }
+        frontier = next;
+    }
+    return dist; // unreachable — shouldn't happen for a valid move
+}
+
 // ─── Commit move — called by Game.vue when player confirms via JACK IN ────────
 function commitMove(nodeId) {
     const node = ALL_NODES.get(nodeId);
@@ -1192,8 +1212,11 @@ function commitMove(nodeId) {
     // Only allow moving to a reachable node
     if (!reachableNames.value.has(nodeId)) return;
 
+    // Calculate actual hop cost so uplink is decremented correctly for multi-hop moves
+    const uplinkCost = bfsDistance(playerToken.value.id, nodeId);
+
     playerToken.value = createPlayerToken(node);
-    emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
+    emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y, uplinkCost });
     // Keep the right panel anchored to the new current node.
     // isAdjacent is false — the player IS on this node, not adjacent to it.
     emit('node-clicked', { node: { ...node }, isAdjacent: false });

@@ -52,6 +52,7 @@ class NodeController extends Controller
                 'movement_last_hacked_at'    => $node->movement_last_hacked_at,
                 'is_spawn'                   => $node->is_spawn,
                 'is_safe_zone'               => $node->is_safe_zone,
+                'zone_type'                  => $node->zone_type ?? 'netlink',
                 'npc_handle'                 => $node->npc_handle,
                 // Adjacent node IDs as UUIDs (for DB ops) and canvas_ids (for map matching)
                 'adjacent_node_ids'          => $node->adjacentNodes->pluck('id'),

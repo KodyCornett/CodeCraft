@@ -16,7 +16,7 @@ export function usePosition(playerId) {
 
     let _debounceTimer = null;
 
-    async function updatePosition(canvasNodeId, district = null, onSuccess = null) {
+    async function updatePosition(canvasNodeId, district = null, onSuccess = null, uplinkCost = 1) {
         const pid = typeof playerId === 'object' ? playerId.value : playerId;
         if (!pid || !canvasNodeId) return;
 
@@ -27,6 +27,7 @@ export function usePosition(playerId) {
                 const res = await axios.post('/api/player/position', {
                     canvas_node_id: canvasNodeId,
                     district:       district ?? null,
+                    uplink_cost:    uplinkCost,
                 });
                 // Notify caller with server-authoritative remaining uplink
                 if (onSuccess && res.data.remaining_uplink != null) {

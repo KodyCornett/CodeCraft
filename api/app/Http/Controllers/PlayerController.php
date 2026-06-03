@@ -219,6 +219,7 @@ class PlayerController extends Controller
         $data = $request->validate([
             'canvas_node_id' => ['required', 'string'],
             'district'       => ['nullable', 'string'],
+            'uplink_cost'    => ['nullable', 'integer', 'min:1', 'max:10'],
         ]);
 
         $player = Player::where('user_id', $request->user()->id)->first();
@@ -232,26 +233,16 @@ class PlayerController extends Controller
             return response()->json(['message' => 'Unknown node.'], 422);
         }
 
-        // ── 2. Adjacency check ────────────────────────────────────────────────
+        // ── 2. Spawn / first-move guard ───────────────────────────────────────
         if ($player->current_node_id === null) {
-            // First move of a new account or post-CF respawn before server writes
-            // current_node_id — only allow landing on a designated spawn node.
+            // First move of a new account or post-CF respawn — must land on a spawn node.
             if (!$node->is_spawn) {
                 return response()->json(['message' => 'First move must be to a spawn node.'], 422);
-            }
-        } else {
-            // All subsequent moves: destination must be a direct neighbour.
-            $isAdjacent = Node::find($player->current_node_id)
-                ?->adjacentNodes()
-                ->where('nodes.id', $node->id)
-                ->exists();
-
-            if (!$isAdjacent) {
-                return response()->json(['message' => 'Destination node is not adjacent to your current position.'], 422);
             }
         }
 
         // ── 3. Uplink check ───────────────────────────────────────────────────
+        $uplinkCost = (int) ($data['uplink_cost'] ?? 1);
         $rig = $player->rig()->with('chassis')->first();
         if ($rig !== null) {
             $effectiveMax = (int) ($rig->chassis->base_uplink ?? 3)
@@ -259,6 +250,9 @@ class PlayerController extends Controller
             $curUplink    = $rig->current_uplink ?? $effectiveMax;
             if ($curUplink <= 0) {
                 return response()->json(['message' => 'No uplink remaining — bank your run at a Street Doc first.'], 422);
+            }
+            if ($uplinkCost > $curUplink) {
+                return response()->json(['message' => 'Not enough uplink remaining for this move.'], 422);
             }
         }
 
@@ -282,13 +276,12 @@ class PlayerController extends Controller
 
         $player->save();
 
-        // Decrement persisted uplink by 1 each move (floor 0).
-        // $rig is already loaded from the uplink guard above.
-        // $effectiveMax is already computed — use it as the null fallback here too.
+        // Decrement persisted uplink by the actual hop cost (floor 0).
+        // $rig and $effectiveMax are already computed above.
         $remainingUplink = null;
         if ($rig !== null) {
             $current             = $rig->current_uplink ?? $effectiveMax;
-            $rig->current_uplink = max(0, $current - 1);
+            $rig->current_uplink = max(0, $current - $uplinkCost);
             $rig->save();
             $remainingUplink = $rig->current_uplink;
         }

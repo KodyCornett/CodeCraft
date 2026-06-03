@@ -610,7 +610,7 @@ function handlePlayerMoved(event) {
         if (data.remaining_uplink != null) {
             player.value.uplink = data.remaining_uplink;
         }
-    });
+    }, event.uplinkCost ?? 1);
 
     // ── Decrement active command effects ──────────────────────────────────────
     // Mirror the server-side decrement in position() so the client stays in sync.
