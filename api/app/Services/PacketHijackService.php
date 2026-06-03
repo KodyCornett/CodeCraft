@@ -369,7 +369,7 @@ class PacketHijackService
      * Rig commands that buff the user (self-targeting).
      * Mirror protocol reflects these to the mirror holder (opponent).
      */
-    private const SELF_BUFF_COMMANDS = ['trace_route', 'overclock', 'mirror_protocol', 'data_spike'];
+    private const SELF_BUFF_COMMANDS = ['trace_route', 'overclock', 'mirror_protocol'];
 
     public function __construct(private readonly RigService $rigService) {}
 
@@ -1335,7 +1335,8 @@ class PacketHijackService
         int    $portNumber,
         int    $chainProgress,
         array  $credentialState,
-        array  $baitPorts = []
+        array  $baitPorts = [],
+        bool   $overclockActive = false
     ): array {
         // Bait check
         foreach ($baitPorts as $bait) {
@@ -1422,19 +1423,30 @@ class PacketHijackService
         $expectedPort = $chain[$chainProgress] ?? null;
 
         if ((int) ($expectedPort ?? 0) !== $portNumber) {
-            // Chain port but wrong order
-            $nextExpectedService = isset($chain[$chainProgress])
-                ? (self::PORT_CATALOGUE[$chain[$chainProgress]] ?? 'UNKNOWN')
-                : 'UNKNOWN';
-
-            return [
-                'success' => false,
-                'lines'   => [
-                    "[EXPLOIT]: TARGETING {$service}:{$portNumber}...",
-                    "[GATE HOLDING]: AUTH LAYER UNRESPONSIVE — NO UPSTREAM SIGNAL DETECTED",
-                    "[HINT]: THIS SERVICE MAY REQUIRE A PRIOR DEPENDENCY TO BE CLEARED",
-                ],
-            ];
+            // Overclock active — bypass chain order for this hit
+            if ($overclockActive) {
+                // Verify the port IS somewhere in the remaining chain (not already past)
+                $remainingChain = array_slice($chain, $chainProgress);
+                if (!in_array($portNumber, $remainingChain, false)) {
+                    return [
+                        'success' => false,
+                        'lines'   => [
+                            "[EXPLOIT]: TARGETING {$service}:{$portNumber}...",
+                            "[OVERCLOCK]: CHAIN SKIP ACTIVE — PORT NOT IN REMAINING CASCADE",
+                        ],
+                    ];
+                }
+                // Allow — fall through to success block (overclock consumed in controller)
+            } else {
+                return [
+                    'success' => false,
+                    'lines'   => [
+                        "[EXPLOIT]: TARGETING {$service}:{$portNumber}...",
+                        "[GATE HOLDING]: AUTH LAYER UNRESPONSIVE — NO UPSTREAM SIGNAL DETECTED",
+                        "[HINT]: THIS SERVICE MAY REQUIRE A PRIOR DEPENDENCY TO BE CLEARED",
+                    ],
+                ];
+            }
         }
 
         // ── SUCCESS ───────────────────────────────────────────────────────────
@@ -2437,12 +2449,10 @@ class PacketHijackService
 
         // ── Dispatch to command handler ───────────────────────────────────────
         $result = match ($commandSlug) {
-            'ghost_protocol'  => $this->rigCommandGhostProtocol($match, $opponentRole),
-            'signal_noise'    => $this->rigCommandSignalNoise($match, $opponentRole),
-            'trace_route'     => $this->rigCommandTraceRoute($match, $userRole),
+            'trace_route'     => $this->rigCommandTraceRoute($match, $userRole, $level === 1 ? 1 : 2),
             'overclock'       => $this->rigCommandOverclock($match, $userRole),
             'mirror_protocol' => $this->rigCommandMirrorProtocol($match, $userRole),
-            'data_spike'      => $this->rigCommandDataSpike($match, $userRole),
+            'data_spike'      => $this->rigCommandDataSpike($match, $opponentRole, $level === 1 ? 1 : 2),
             'phase_shift'     => $this->rigCommandPhaseShift($match, $opponentRole),
             'hardlock'        => $this->rigCommandHardlock($match, $opponentRole, $level === 1 ? 2.5 : 3.5),
             'null_byte'       => $this->rigCommandNullByte($match, $opponentRole, $level === 1 ? 1 : 2),
@@ -2503,11 +2513,9 @@ class PacketHijackService
         int               $level
     ): array {
         return match ($slug) {
-            'ghost_protocol' => $this->rigCommandGhostProtocol($match, $mirrorTarget),
-            'signal_noise'   => $this->rigCommandSignalNoise($match, $mirrorTarget),
-            'trace_route'    => $this->rigCommandTraceRoute($match, $mirrorTarget),
+            'trace_route'    => $this->rigCommandTraceRoute($match, $mirrorTarget, $level === 1 ? 1 : 2),
             'overclock'      => $this->rigCommandOverclock($match, $mirrorTarget),
-            'data_spike'     => $this->rigCommandDataSpike($match, $mirrorTarget),
+            'data_spike'     => $this->rigCommandDataSpike($match, $mirrorTarget, $level === 1 ? 1 : 2),
             'phase_shift'    => $this->rigCommandPhaseShift($match, $mirrorTarget),
             'hardlock'       => $this->rigCommandHardlock($match, $mirrorTarget, $level === 1 ? 2.5 : 3.5),
             'null_byte'      => $this->rigCommandNullByte($match, $mirrorTarget, $level === 1 ? 1 : 2),
@@ -2523,19 +2531,92 @@ class PacketHijackService
     // ── Self-buff commands ────────────────────────────────────────────────────
 
     /**
-     * Trace Route — reveals the first octet of the target IP, narrowing
-     * Phase 1 search to one RFC-1918 range without giving away the subnet.
+     * Trace Route — dual-phase command.
+     *
+     * Phase 1: Reveals the first octet of the target IP, narrowing the search
+     *          to one RFC-1918 range without giving away the subnet.
+     *
+     * Phase 2: Auto-confirms 1 (L1) or 2 (L2) random chain adjacencies — outputs
+     *          confirmed port pairs to terminal without consuming trace attempts.
+     *
+     * The $level is not passed directly into this method; the caller in
+     * applyRigCommand passes $userRole. Level is accessed via the match context
+     * by the caller — here we read the level from the method signature via
+     * an injected parameter approach. To keep the private handler simple, we
+     * accept an optional $adjacencies count (default 1).
      */
-    private function rigCommandTraceRoute(PacketHijackMatch $match, string $userRole): array
+    private function rigCommandTraceRoute(PacketHijackMatch $match, string $userRole, int $adjacencies = 1): array
     {
+        $phase = $match->phaseOf($userRole);
+
+        // ── Phase 2: auto-confirm chain adjacencies ───────────────────────────
+        if ($phase === 2) {
+            $chain    = $match->exploitChainFor($userRole);
+            $portsKey = "{$userRole}_ports";
+            $ports    = $match->$portsKey ?? [];
+
+            if (empty($chain) || count($chain) < 2) {
+                return [
+                    'success'        => true,
+                    'effect'         => 'trace_route',
+                    'output_lines'   => [
+                        '[TRACE ROUTE]: MAPPING EXPLOIT PATH...',
+                        '[RESULT]: CHAIN NOT INITIALISED — RUN scan FIRST',
+                    ],
+                    'opponent_lines' => [],
+                ];
+            }
+
+            // Build all valid adjacency pairs from the chain
+            $allPairs = [];
+            for ($i = 0; $i < count($chain) - 1; $i++) {
+                $allPairs[] = [$chain[$i], $chain[$i + 1]];
+            }
+
+            shuffle($allPairs);
+            $toReveal = array_slice($allPairs, 0, min($adjacencies, count($allPairs)));
+
+            $outputLines   = ['[TRACE ROUTE]: MAPPING EXPLOIT PATH...'];
+            $confirmedPairs = [];
+
+            foreach ($toReveal as [$p1, $p2]) {
+                $svc1 = self::PORT_CATALOGUE[$p1] ?? "PORT {$p1}";
+                $svc2 = self::PORT_CATALOGUE[$p2] ?? "PORT {$p2}";
+                $outputLines[]   = "[CONFIRMED LINK]: {$p1} [{$svc1}] → {$p2} [{$svc2}]";
+                $confirmedPairs[] = [$p1, $p2];
+            }
+
+            return [
+                'success'          => true,
+                'effect'           => 'trace_route',
+                'output_lines'     => $outputLines,
+                'opponent_lines'   => ['[ALERT]: OPPONENT DEPLOYED TRACE ROUTE — CHAIN PATH ANALYSIS ACTIVE'],
+                'confirmed_pairs'  => $confirmedPairs,
+            ];
+        }
+
+        // ── Phase 1: first-octet IP reveal ────────────────────────────────────
         $targetIpKey = "{$userRole}_target_ip";
         $targetIp    = $match->$targetIpKey;
-        $firstOctet  = explode('.', $targetIp)[0];
+
+        if (empty($targetIp)) {
+            return [
+                'success'        => true,
+                'effect'         => 'trace_route',
+                'output_lines'   => [
+                    '[TRACE ROUTE]: ROUTING PROBE DISPATCHED...',
+                    '[RESULT]: NO TARGET LOCKED — COMPLETE RECON FIRST',
+                ],
+                'opponent_lines' => [],
+            ];
+        }
+
+        $firstOctet = explode('.', $targetIp)[0];
 
         return [
-            'success'      => true,
-            'effect'       => 'trace_route',
-            'output_lines' => [
+            'success'        => true,
+            'effect'         => 'trace_route',
+            'output_lines'   => [
                 '[TRACE ROUTE]: ROUTING PROBE DISPATCHED...',
                 "[RESULT]: ORIGIN NETWORK BLOCK RESOLVED — {$firstOctet}.x.x.x",
             ],
@@ -2546,19 +2627,20 @@ class PacketHijackService
     }
 
     /**
-     * Overclock — raises the exploit threshold from 25% → 45% for the next
-     * exploit command only. Consumed on successful exploit.
+     * Overclock — grants a chain-skip for the next exploit command.
+     * When active, exploit can target ANY chain port regardless of order
+     * (bypasses chain-head enforcement for one hit). Consumed on use.
      */
     private function rigCommandOverclock(PacketHijackMatch $match, string $userRole): array
     {
-        $key        = "{$userRole}_overclock_active";
+        $key         = "{$userRole}_overclock_active";
         $match->$key = true;
 
         return [
             'success'        => true,
             'effect'         => 'overclock',
             'output_lines'   => [
-                '[OVERCLOCK]: EXPLOIT MODULE OVERCLOCKED — THRESHOLD RAISED TO 45% FOR NEXT EXPLOIT',
+                '[OVERCLOCK]: EXPLOIT MODULE OVERCLOCKED — NEXT EXPLOIT BYPASSES CHAIN ORDER',
             ],
             'opponent_lines' => [],
         ];
@@ -2585,114 +2667,140 @@ class PacketHijackService
     }
 
     /**
-     * Data Spike — auto-scans the lowest-bias non-shattered port in the
-     * player's own topology, returning the same output as a manual scan port
-     * command without spending the input window.
+     * Data Spike — offensive, phase-aware attack on the opponent.
+     *
+     * Phase 1 (opponent in recon): Injects 1–2 fresh decoy IPs into the
+     *   opponent's active suspect list, forcing them to investigate more entries.
+     *
+     * Phase 2 (opponent in exploit chain): Injects 1–2 red-herring ports into
+     *   the opponent's port pool, expanding their topology with dead ends.
+     *
+     * L1: 1 injection / L2: 2 injections.
      */
-    private function rigCommandDataSpike(PacketHijackMatch $match, string $userRole): array
+    private function rigCommandDataSpike(PacketHijackMatch $match, string $targetRole, int $count = 1): array
     {
-        $portsKey = "{$userRole}_ports";
-        $ports    = $match->$portsKey ?? [];
+        $opponentPhase = $match->phaseOf($targetRole);
 
-        // Find the lowest-bias non-shattered, non-exfil port
-        $candidate = null;
-        foreach ($ports as $entry) {
-            if ($entry['shattered'] || (int) $entry['port'] === self::EXFIL_PORT) {
-                continue;
-            }
-            if ($candidate === null || (int) $entry['bias'] < (int) $candidate['bias']) {
-                $candidate = $entry;
-            }
-        }
+        // ── Phase 2: inject red-herring ports ────────────────────────────────
+        if ($opponentPhase === 2) {
+            $portsKey     = "{$targetRole}_ports";
+            $ports        = $match->$portsKey ?? [];
+            $presentPorts = array_map('intval', array_column($ports, 'port'));
 
-        if ($candidate === null) {
+            $available = array_values(array_filter(
+                array_keys(self::PORT_CATALOGUE),
+                fn($p) => $p !== self::EXFIL_PORT && !in_array($p, $presentPorts, true)
+            ));
+
+            if (empty($available)) {
+                return [
+                    'success'        => true,
+                    'effect'         => 'data_spike',
+                    'output_lines'   => ['[DATA SPIKE]: TOPOLOGY SATURATED — NO PORTS AVAILABLE TO INJECT'],
+                    'opponent_lines' => [],
+                ];
+            }
+
+            shuffle($available);
+            $toAdd     = array_slice($available, 0, min($count, count($available)));
+            $exfilIdx  = null;
+
+            foreach ($ports as $i => $entry) {
+                if ((int) $entry['port'] === self::EXFIL_PORT) { $exfilIdx = $i; break; }
+            }
+
+            $addedLabels = [];
+            foreach ($toAdd as $port) {
+                $entry = [
+                    'port'         => $port,
+                    'service'      => self::PORT_CATALOGUE[$port],
+                    'bias'         => random_int(30, 65),
+                    'category'     => 'dead_end',
+                    'shattered'    => false,
+                    'shattered_at' => null,
+                    'probed'       => false,
+                    'unlocked'     => false,
+                    'anomaly'      => null,
+                    'flare_lines'  => [],
+                ];
+
+                if ($exfilIdx !== null) {
+                    array_splice($ports, $exfilIdx, 0, [$entry]);
+                    $exfilIdx++;
+                } else {
+                    $ports[] = $entry;
+                }
+
+                $addedLabels[] = "{$port} [{$entry['service']}]";
+            }
+
+            $match->$portsKey = $ports;
+
+            $countLabel = count($addedLabels) === 1 ? '1 PORT' : count($addedLabels) . ' PORTS';
+            $portList   = implode(', ', $addedLabels);
+
             return [
-                'success'        => true,
-                'effect'         => 'data_spike',
-                'output_lines'   => [
-                    '[DATA SPIKE]: SCANNING PORT TOPOLOGY...',
-                    '[RESULT]: NO ACTIVE PORTS DETECTED — ALL GATES ALREADY CLEARED',
-                ],
-                'opponent_lines' => [],
+                'success'                => true,
+                'effect'                 => 'data_spike',
+                'output_lines'           => ["[DATA SPIKE]: {$countLabel} INJECTED INTO OPPONENT CASCADE — {$portList}"],
+                'opponent_lines'         => ["[ALERT]: DATA SPIKE — {$countLabel} ADDED TO YOUR PORT TOPOLOGY: {$portList}"],
+                'opponent_ports_updated' => true,
             ];
         }
 
-        $label = (int) $candidate['bias'] <= self::EXPLOIT_THRESHOLD ? 'CRITICAL LOW' : 'HIGH';
+        // ── Phase 1: inject decoy suspects ────────────────────────────────────
+        $suspectsKey = "{$targetRole}_suspects";
+        $suspects    = $match->$suspectsKey ?? [];
+        $existingIps = array_column($suspects, 'ip');
+
+        $whoisClasses = [
+            'STATIC NODE', 'RELAY HUB', 'PROXY ENDPOINT', 'ANONYMOUS RELAY',
+            'MESH NODE', 'DARK RELAY', 'TRANSIT HOP', 'EDGE NODE',
+        ];
+        $generators = [
+            fn() => '192.168.' . random_int(0, 255) . '.' . random_int(1, 254),
+            fn() => '10.'      . random_int(0, 255) . '.' . random_int(0, 255) . '.' . random_int(1, 254),
+            fn() => '172.'     . random_int(16, 31)  . '.' . random_int(0, 255) . '.' . random_int(1, 254),
+        ];
+
+        $added = 0; $attempts = 0;
+        while ($added < $count && $attempts < 50) {
+            $attempts++;
+            $ip = $generators[array_rand($generators)]();
+            if (in_array($ip, $existingIps, true)) continue;
+
+            $ipParts    = explode('.', $ip);
+            $range      = $ipParts[0] === '192' ? '192.x' : ($ipParts[0] === '10' ? '10.x' : '172.x');
+            $suspects[] = [
+                'ip'                => $ip,
+                'latency_ms'        => random_int(5, 60),
+                'latency_status'    => 'LIVE',
+                'hops'              => random_int(1, 5),
+                'network_range'     => $range,
+                'last_seen_seconds' => random_int(5, 60),
+                'whois_class'       => $whoisClasses[array_rand($whoisClasses)],
+                'whois_redacted'    => (bool) random_int(0, 1),
+                'is_target'         => false,
+                'flushed'           => false,
+            ];
+            $existingIps[] = $ip;
+            $added++;
+        }
+
+        $match->$suspectsKey = $suspects;
+
+        $countLabel = $added === 1 ? '1 DECOY' : "{$added} DECOYS";
 
         return [
-            'success'        => true,
-            'effect'         => 'data_spike',
-            'output_lines'   => [
-                '[DATA SPIKE]: SCANNING PORT TOPOLOGY...',
-                "[RESULT]: PORT {$candidate['port']} [{$candidate['service']}] FLAGGED — DECRYPTION BIAS: {$label} [{$candidate['bias']}%]",
-            ],
-            'opponent_lines' => [
-                '[ALERT]: OPPONENT DEPLOYED DATA SPIKE — PORT TOPOLOGY SCANNED',
-            ],
+            'success'                    => true,
+            'effect'                     => 'data_spike',
+            'output_lines'               => ["[DATA SPIKE]: {$countLabel} INJECTED INTO OPPONENT CASE FILE"],
+            'opponent_lines'             => ["[ALERT]: DATA SPIKE — {$countLabel} ADDED TO YOUR SUSPECT LIST"],
+            'opponent_suspects_updated'  => true,
         ];
     }
 
     // ── Attack commands ───────────────────────────────────────────────────────
-
-    /**
-     * Ghost Protocol — inject 8 fresh decoy IPs into the opponent's pool,
-     * making Phase 1 isolation harder.
-     */
-    private function rigCommandGhostProtocol(PacketHijackMatch $match, string $targetRole): array
-    {
-        $poolKey = "{$targetRole}_ip_pool";
-        $pool    = $match->$poolKey ?? [];
-
-        $newDecoys = [];
-        while (count($newDecoys) < 8) {
-            $candidate = $this->generateRigIp();
-            if (!in_array($candidate, $pool, true) && !in_array($candidate, $newDecoys, true)) {
-                $newDecoys[] = $candidate;
-            }
-        }
-
-        $pool            = array_merge($pool, $newDecoys);
-        shuffle($pool);
-        $match->$poolKey = $pool;
-
-        return [
-            'success'        => true,
-            'effect'         => 'ghost_protocol',
-            'output_lines'   => [
-                '[GHOST PROTOCOL]: 8 DECOYS INJECTED INTO OPPONENT TRACE BUFFER',
-            ],
-            'opponent_lines' => [
-                '[ALERT]: GHOST PROTOCOL DEPLOYED — RECON GRID POISONED',
-            ],
-        ];
-    }
-
-    /**
-     * Signal Noise — lock the opponent's input for 4 seconds.
-     * Stacks with an active honeypot lock (takes whichever is longer).
-     */
-    private function rigCommandSignalNoise(PacketHijackMatch $match, string $targetRole): array
-    {
-        $lockKey    = "{$targetRole}_locked_until";
-        $newLock    = Carbon::now()->addSeconds(4);
-        $existing   = $match->$lockKey;
-
-        if ($existing === null || $existing->isPast() || $newLock->gt($existing)) {
-            $match->$lockKey = $newLock;
-        }
-
-        return [
-            'success'             => true,
-            'effect'              => 'signal_noise',
-            'output_lines'        => [
-                '[SIGNAL NOISE]: OPPONENT INPUT JAMMED FOR 4.0s',
-            ],
-            'opponent_lines'      => [
-                '[SIGNAL NOISE]: INPUT JAMMED — 4.0s',
-            ],
-            'opponent_lock_until' => $match->$lockKey->toIso8601String(),
-        ];
-    }
 
     /**
      * Phase Shift — un-shatters the opponent's most recently shattered port
@@ -2800,7 +2908,9 @@ class PacketHijackService
     }
 
     /**
-     * Null Byte — re-inject decoy IPs into the opponent's Phase 1 pool.
+     * Null Byte — inject fresh decoy IPs directly into the opponent's active
+     * suspect list. They appear as uninvestigated entries the opponent must
+     * work through before they can safely identify the real target.
      * L1: 1 decoy / L2: 2 decoys.
      */
     private function rigCommandNullByte(
@@ -2808,32 +2918,65 @@ class PacketHijackService
         string            $targetRole,
         int               $decoys
     ): array {
-        $poolKey = "{$targetRole}_ip_pool";
-        $pool    = $match->$poolKey ?? [];
+        $suspectsKey = "{$targetRole}_suspects";
+        $suspects    = $match->$suspectsKey ?? [];
 
-        $newDecoys = [];
-        while (count($newDecoys) < $decoys) {
-            $candidate = $this->generateRigIp();
-            if (!in_array($candidate, $pool, true) && !in_array($candidate, $newDecoys, true)) {
-                $newDecoys[] = $candidate;
-            }
+        $existingIps = array_column($suspects, 'ip');
+
+        $whoisClasses = [
+            'STATIC NODE', 'RELAY HUB', 'PROXY ENDPOINT', 'ANONYMOUS RELAY',
+            'MESH NODE', 'DARK RELAY', 'TRANSIT HOP', 'EDGE NODE',
+        ];
+
+        $generators = [
+            fn() => '192.168.' . random_int(0, 255) . '.' . random_int(1, 254),
+            fn() => '10.'      . random_int(0, 255) . '.' . random_int(0, 255) . '.' . random_int(1, 254),
+            fn() => '172.'     . random_int(16, 31)  . '.' . random_int(0, 255) . '.' . random_int(1, 254),
+        ];
+
+        $added = 0;
+        $attempts = 0;
+
+        while ($added < $decoys && $attempts < 50) {
+            $attempts++;
+            $ip = $generators[array_rand($generators)]();
+            if (in_array($ip, $existingIps, true)) continue;
+
+            $ipParts = explode('.', $ip);
+            $range   = $ipParts[0] === '192' ? '192.x' : ($ipParts[0] === '10' ? '10.x' : '172.x');
+            $roll    = random_int(0, 1);
+
+            $suspects[] = [
+                'ip'                => $ip,
+                'latency_ms'        => $roll === 0 ? random_int(2, 12) : random_int(20, 80),
+                'latency_status'    => $roll === 0 ? 'LIVE' : 'LIVE',
+                'hops'              => random_int(1, 6),
+                'network_range'     => $range,
+                'last_seen_seconds' => random_int(2, 30),
+                'whois_class'       => $whoisClasses[array_rand($whoisClasses)],
+                'whois_redacted'    => (bool) random_int(0, 1),
+                'is_target'         => false,
+                'flushed'           => false,
+            ];
+
+            $existingIps[] = $ip;
+            $added++;
         }
 
-        $pool            = array_merge($pool, $newDecoys);
-        shuffle($pool);
-        $match->$poolKey = $pool;
+        $match->$suspectsKey = $suspects;
 
         $decoyLabel = $decoys === 1 ? '1 DECOY' : "{$decoys} DECOYS";
 
         return [
-            'success'        => true,
-            'effect'         => 'null_byte',
-            'output_lines'   => [
+            'success'          => true,
+            'effect'           => 'null_byte',
+            'output_lines'     => [
                 "[NULL BYTE]: {$decoyLabel} INJECTED INTO OPPONENT TRACE BUFFER",
             ],
-            'opponent_lines' => [
-                '[ALERT]: NULL BYTE DETECTED — TRACE BUFFER CORRUPTED',
+            'opponent_lines'   => [
+                '[ALERT]: NULL BYTE DETECTED — NEW SUSPECT ENTRIES APPEARED IN YOUR CASE FILE',
             ],
+            'opponent_suspects_updated' => true,
         ];
     }
 
@@ -2969,130 +3112,127 @@ class PacketHijackService
     }
 
     /**
-     * Sector Purge — re-randomise all non-shattered port bias values in the
-     * opponent's topology, making any scan data the attacker collected stale.
-     * L1: re-randomise to 50–95% / L2: re-randomise to 70–95% (more punishing).
+     * Sector Purge — resets up to 2 of the opponent's probed ports back to
+     * unprobed, forcing them to re-probe before they can exploit.
+     * L1: resets 1 port / L2: resets 2 ports.
      */
     private function rigCommandSectorPurge(
         PacketHijackMatch $match,
         string            $targetRole,
         int               $level
     ): array {
-        $portsKey = "{$targetRole}_ports";
-        $ports    = $match->$portsKey ?? [];
-        $minBias  = $level >= 2 ? 70 : 50;
-        $purged   = 0;
+        $portsKey  = "{$targetRole}_ports";
+        $ports     = $match->$portsKey ?? [];
+        $resetCount = $level >= 2 ? 2 : 1;
 
+        // Find probed, non-shattered, non-exfil ports
+        $candidates = [];
         foreach ($ports as $i => $entry) {
-            if ($entry['shattered'] || (int) $entry['port'] === self::EXFIL_PORT) {
-                continue;
+            if ($entry['probed'] && !$entry['shattered'] && (int) $entry['port'] !== self::EXFIL_PORT) {
+                $candidates[] = $i;
             }
-            $ports[$i]['bias'] = random_int($minBias, 95);
-            $purged++;
         }
 
-        $match->$portsKey = $ports;
-
-        if ($purged === 0) {
+        if (empty($candidates)) {
             return [
                 'success'        => true,
                 'effect'         => 'sector_purge',
                 'output_lines'   => [
-                    '[SECTOR PURGE]: NO ACTIVE PORTS TO PURGE',
+                    '[SECTOR PURGE]: NO PROBED PORTS TO CORRUPT',
                 ],
                 'opponent_lines' => [],
             ];
         }
 
+        shuffle($candidates);
+        $toReset  = array_slice($candidates, 0, min($resetCount, count($candidates)));
+        $resetted = [];
+
+        foreach ($toReset as $i) {
+            $ports[$i]['probed'] = false;
+            $resetted[]          = $ports[$i]['port'];
+        }
+
+        $match->$portsKey = $ports;
+
+        $portList   = implode(', ', $resetted);
+        $countLabel = count($resetted) === 1 ? '1 PORT' : count($resetted) . ' PORTS';
+
         return [
-            'success'             => true,
-            'effect'              => 'sector_purge',
-            'output_lines'        => [
-                "[SECTOR PURGE]: {$purged} PORT BIAS VALUES RANDOMISED — OPPONENT SCAN DATA IS NOW STALE",
+            'success'                => true,
+            'effect'                 => 'sector_purge',
+            'output_lines'           => [
+                "[SECTOR PURGE]: {$countLabel} WIPED FROM OPPONENT PROBE LOG — {$portList}",
             ],
-            'opponent_lines'      => [
-                '[ALERT]: SECTOR PURGE DETECTED — ALL PORT SCAN DATA INVALIDATED',
+            'opponent_lines'         => [
+                "[ALERT]: SECTOR PURGE — {$countLabel} PROBE DATA DESTROYED: {$portList} — RE-PROBE REQUIRED",
             ],
             'opponent_ports_updated' => true,
         ];
     }
 
     /**
-     * Sector Corrupt — inject false bias readings into N ports in the opponent's
-     * topology for 10 seconds. Scan commands will show the fake value instead of
-     * the real bias. The fake is inverted: low-bias ports look high, high-bias
-     * ports look low — always misleading.
-     * L1: 1 port / L2: 2 ports.
+     * Sector Corrupt — wipes revealed intel from up to 3 suspect IPs in the
+     * opponent's Phase 1 case file. Affected suspects revert to uninvestigated
+     * state — ping, arp, traceroute, and whois data are all cleared.
+     * L1: wipes 2 suspects / L2: wipes 3 suspects.
      */
     private function rigCommandSectorCorrupt(
         PacketHijackMatch $match,
         string            $targetRole,
-        int               $numPorts
+        int               $numSuspects
     ): array {
-        $portsKey      = "{$targetRole}_ports";
-        $corruptKey    = "{$targetRole}_corrupt_ports";
-        $ports         = $match->$portsKey ?? [];
-        $currentCorrupt = $match->$corruptKey ?? [];
+        $suspectsKey = "{$targetRole}_suspects";
+        $suspects    = $match->$suspectsKey ?? [];
 
-        // Prune any entries that have already expired
-        $now            = now();
-        $currentCorrupt = array_values(array_filter(
-            $currentCorrupt,
-            fn($e) => Carbon::parse($e['expires_at'])->isFuture()
-        ));
+        // Only target suspects that have at least one piece of revealed intel
+        // and haven't been flushed (still active in the case file).
+        $candidates = [];
+        foreach ($suspects as $i => $s) {
+            if ($s['flushed']) continue;
+            $hasIntel = ($s['_ping_revealed'] ?? false)
+                || ($s['_arp_revealed'] ?? false)
+                || isset($s['hops'])
+                || isset($s['whois_class']);
+            if ($hasIntel) $candidates[] = $i;
+        }
 
-        $alreadyCorrupted = array_map('intval', array_column($currentCorrupt, 'port'));
-
-        // Pick non-shattered, non-exfil ports that aren't already corrupted
-        $candidates = array_values(array_filter($ports, function ($e) use ($alreadyCorrupted) {
-            return !$e['shattered']
-                && (int) $e['port'] !== self::EXFIL_PORT
-                && !in_array((int) $e['port'], $alreadyCorrupted, true);
-        }));
-
-        shuffle($candidates);
-        $toCorrupt = array_slice($candidates, 0, min($numPorts, count($candidates)));
-
-        if (empty($toCorrupt)) {
+        if (empty($candidates)) {
             return [
                 'success'        => true,
                 'effect'         => 'sector_corrupt',
                 'output_lines'   => [
-                    '[SECTOR CORRUPT]: NO ELIGIBLE PORTS — CORRUPTION SKIPPED',
+                    '[SECTOR CORRUPT]: NO INVESTIGATED SUSPECTS FOUND — NOTHING TO WIPE',
                 ],
                 'opponent_lines' => [],
             ];
         }
 
-        $expiresAt = $now->copy()->addSeconds(10)->toIso8601String();
+        shuffle($candidates);
+        $toWipe = array_slice($candidates, 0, min($numSuspects, count($candidates)));
 
-        foreach ($toCorrupt as $entry) {
-            $realBias = (int) $entry['bias'];
-            // Invert perceived state: low appears high, high appears low
-            $fakeBias = $realBias <= 30
-                ? random_int(65, 90)
-                : random_int(5, 20);
-
-            $currentCorrupt[] = [
-                'port'       => (int) $entry['port'],
-                'fake_bias'  => $fakeBias,
-                'expires_at' => $expiresAt,
-            ];
+        foreach ($toWipe as $i) {
+            // Clear all revealed intel — reset to bare IP entry
+            $suspects[$i]['_ping_revealed']  = false;
+            $suspects[$i]['_arp_revealed']   = false;
+            // Keep underlying data (so commands can re-reveal it) but hide revealed flags
+            // The UI only shows data when the reveal flag is set, so this is sufficient
         }
 
-        $match->$corruptKey = $currentCorrupt;
+        $match->$suspectsKey = $suspects;
 
-        $countLabel = count($toCorrupt) === 1 ? '1 PORT' : count($toCorrupt) . ' PORTS';
+        $countLabel = count($toWipe) === 1 ? '1 SUSPECT' : count($toWipe) . ' SUSPECTS';
 
         return [
-            'success'        => true,
-            'effect'         => 'sector_corrupt',
-            'output_lines'   => [
-                "[SECTOR CORRUPT]: FALSE BIAS DATA INJECTED INTO {$countLabel} — ACTIVE FOR 10s",
+            'success'                    => true,
+            'effect'                     => 'sector_corrupt',
+            'output_lines'               => [
+                "[SECTOR CORRUPT]: INTEL WIPED ON {$countLabel} IN OPPONENT CASE FILE",
             ],
-            'opponent_lines' => [
-                '[ALERT]: SECTOR CORRUPT ACTIVE — PORT SCAN DATA IS UNRELIABLE FOR 10s',
+            'opponent_lines'             => [
+                "[ALERT]: SECTOR CORRUPT — INTEL CORRUPTED ON {$countLabel} — RE-INVESTIGATE REQUIRED",
             ],
+            'opponent_suspects_updated'  => true,
         ];
     }
 

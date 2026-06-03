@@ -324,7 +324,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Glitches one or two rows on the opponent\'s board for 10 seconds.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Glitches random rows on opponent\'s grid for 10 seconds, persisting through scrambles. L1: 1 row. L2: 2 rows.',
-                'packethijack_effect' => 'Corrupts port bias values to display false data for 10 seconds. L1: 1 port. L2: 2 ports.',
+                'packethijack_effect' => 'Wipes revealed intel (ping, arp, traceroute, whois) from up to 2 suspects in the opponent\'s active Phase 1 case file — they must re-investigate those entries. L1: wipes 2 suspects. L2: wipes 3 suspects.',
                 'level_scaling'       => [
                     '1' => ['rows' => 1, 'seconds' => 10],
                     '2' => ['rows' => 2, 'seconds' => 10],
@@ -345,7 +345,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Removes hexakeys from the opponent\'s current sequence, forcing a board reseed.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Removes hexakeys from opponent\'s current sequence, forcing a partial reseed. L1: removes 1. L2: removes 2.',
-                'packethijack_effect' => 'Re-injects decoy IPs back into the attacker\'s Phase 1 pool. L1: 1 decoy. L2: 2 decoys.',
+                'packethijack_effect' => 'Injects fresh decoy IPs directly into the opponent\'s active Phase 1 suspect list — they appear as uninvestigated entries that must be worked through. L1: 1 decoy. L2: 2 decoys.',
                 'level_scaling'       => [
                     '1' => ['hexakeys' => 1],
                     '2' => ['hexakeys' => 2],
@@ -387,7 +387,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Delays your next board scramble, protecting current sequence progress.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Delays your next board scramble, giving you more time to complete the current sequence. L1: +4 seconds. L2: +7 seconds.',
-                'packethijack_effect' => 'Reveals the first octet of the target IP (e.g. 192.x.x.x), narrowing your Phase 1 search to one RFC-1918 range without giving away the subnet.',
+                'packethijack_effect' => 'Phase 1: Reveals the first octet of the target IP (e.g. 192.x.x.x), narrowing your search to one RFC-1918 range. Phase 2: Auto-confirms 1 (L1) or 2 (L2) chain adjacencies — outputs confirmed port pairs to your terminal without consuming trace attempts.',
                 'level_scaling'       => [
                     '1' => ['delay_seconds' => 4],
                     '2' => ['delay_seconds' => 7],
@@ -429,7 +429,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Temporarily widens your hexakey input window.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Widens your input window per hexakey for the duration. L1: +35% for 5 seconds. L2: +50% for 7 seconds.',
-                'packethijack_effect' => 'Raises your exploit threshold from 25% to 45% for the next exploit command only — allows cracking ports that would normally be too well-defended. Consumed on the next successful exploit.',
+                'packethijack_effect' => 'Grants a chain-skip for your next exploit — you can shatter any remaining chain port regardless of order, bypassing chain-head enforcement. Consumed on your next exploit attempt.',
                 'level_scaling'       => [
                     '1' => ['input_boost_pct' => 35, 'seconds' => 5],
                     '2' => ['input_boost_pct' => 50, 'seconds' => 7],
@@ -461,8 +461,8 @@ class CommandSeeder extends Seeder
             [
                 'name'                => 'Data Spike',
                 'context'             => 'hack',
-                'type'                => 'defensive',
-                'target_type'         => 'self',
+                'type'                => 'offensive',
+                'target_type'         => 'player',
                 'price_creds'         => 400,
                 'price_tp'            => 3,
                 'upgrade_cost_tp'     => 3,
@@ -471,7 +471,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Highlights your next correct hexakey targets and widens the input window for those inputs.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Highlights your next correct hexakey target(s) and extends the input window for those inputs by 50%. You still have to press them. L1: 1 hexakey highlighted. L2: 2 hexakeys highlighted.',
-                'packethijack_effect' => 'Auto-scans the lowest-bias non-shattered port in your topology, returning the same output as a manual scan port command without spending an input. You still have to exploit it yourself.',
+                'packethijack_effect' => 'Offensive — phase-aware. Phase 1: injects decoy IPs into the opponent\'s active suspect list. Phase 2: injects dead-end ports into the opponent\'s port topology. L1: 1 injection. L2: 2 injections.',
                 'level_scaling'       => [
                     '1' => ['hexakeys_highlighted' => 1, 'window_boost_pct' => 50],
                     '2' => ['hexakeys_highlighted' => 2, 'window_boost_pct' => 50],
@@ -513,7 +513,7 @@ class CommandSeeder extends Seeder
                 'description'         => 'Forces rapid successive scrambles on the opponent\'s board.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => 'Triggers rapid scrambles on opponent\'s board 0.5 seconds apart, destroying any sequence progress they had built. L1: 3 scrambles. L2: 4 scrambles.',
-                'packethijack_effect' => 'Re-randomises all port bias values in rapid succession, making any scan data the attacker collected immediately stale. L1: 3 times. L2: 4 times.',
+                'packethijack_effect' => 'Resets up to 1 (L1) or 2 (L2) of the opponent\'s probed ports back to unprobed — they must re-probe those ports before they can attempt to exploit them.',
                 'level_scaling'       => [
                     '1' => ['scrambles' => 3, 'interval_seconds' => 0.5],
                     '2' => ['scrambles' => 4, 'interval_seconds' => 0.5],

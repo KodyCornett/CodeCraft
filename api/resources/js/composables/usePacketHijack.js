@@ -137,6 +137,11 @@ export function usePacketHijack(playerId) {
             );
         }
 
+        // ── Rig command: opponent port board update ───────────────────────────
+        if (data.updated_ports) {
+            portPool.value = data.updated_ports;
+        }
+
         // ── Phase 2 updates ───────────────────────────────────────────────────
 
         // scan: populate the port board

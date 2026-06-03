@@ -671,7 +671,15 @@ class PacketHijackController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        $result = $this->phService->commandExploitPort($portPool, $chain, $portNumber, $progress, $credState, $baitPorts);
+        $overclockKey    = "{$role}_overclock_active";
+        $overclockActive = (bool) ($match->$overclockKey ?? false);
+
+        $result = $this->phService->commandExploitPort($portPool, $chain, $portNumber, $progress, $credState, $baitPorts, $overclockActive);
+
+        // Consume overclock on any exploit attempt (success or chain-skip failure both count)
+        if ($overclockActive) {
+            $match->$overclockKey = false;
+        }
 
         if (isset($result['baited'])) {
             $lockKey         = "{$role}_locked_until";
@@ -932,7 +940,7 @@ class PacketHijackController extends Controller
 
         $playerCmd = $activeCommands->first(function ($pc) use ($slug) {
             $cmdSlug = strtolower(str_replace(' ', '_', $pc->command->name ?? ''));
-            return $cmdSlug === $slug && in_array($pc->command->context ?? '', ['hack', 'map'], true);
+            return $cmdSlug === $slug && ($pc->command->context ?? '') === 'hack';
         });
 
         if ($playerCmd === null) {
@@ -993,18 +1001,33 @@ class PacketHijackController extends Controller
 
         // ── Broadcast disruption notice to opponent (if applicable) ───────────
         if (!empty($result['opponent_lines']) && $opponentId !== null) {
-            // Determine if we should also send updated port state to the opponent
-            $opponentPortsUpdated = $result['opponent_ports_updated'] ?? false;
-            $opponentPorts        = $opponentPortsUpdated ? $match->portsFor($opponentRole) : null;
+            $opponentPortsUpdated     = $result['opponent_ports_updated'] ?? false;
+            $opponentPorts            = $opponentPortsUpdated ? $match->portsFor($opponentRole) : null;
+            $opponentSuspectsUpdated  = $result['opponent_suspects_updated'] ?? false;
+            $opponentSuspects         = $opponentSuspectsUpdated ? $match->suspectsPublicView($opponentRole) : null;
 
             PacketHijackCommandResult::dispatch(
-                matchId:      $match->id,
-                playerId:     $opponentId,
-                command:      '[INCOMING RIG CMD]',
-                outputLines:  $result['opponent_lines'],
-                updatedPorts: $opponentPorts,
-                lockUntil:    $result['opponent_lock_until'] ?? null,
+                matchId:          $match->id,
+                playerId:         $opponentId,
+                command:          '[INCOMING RIG CMD]',
+                outputLines:      $result['opponent_lines'],
+                updatedPorts:     $opponentPorts,
+                updatedSuspects:  $opponentSuspects,
+                lockUntil:        $result['opponent_lock_until'] ?? null,
             );
+        }
+
+        // ── Trace Route: broadcast confirmed pairs to command user ────────────
+        if (!empty($result['confirmed_pairs'])) {
+            foreach ($result['confirmed_pairs'] as [$p1, $p2]) {
+                PacketHijackCommandResult::dispatch(
+                    matchId:        $match->id,
+                    playerId:       $me->id,
+                    command:        '[TRACE ROUTE LINK]',
+                    outputLines:    [],
+                    traceConfirmed: [$p1, $p2],
+                );
+            }
         }
 
         // ── Mirror reflection broadcasts ──────────────────────────────────────
