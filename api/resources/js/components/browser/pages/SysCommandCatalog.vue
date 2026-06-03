@@ -53,9 +53,13 @@
                             </div>
 
                             <!-- Quick effect summary (always visible) -->
-                            <div class="card-summary">
-                                <span class="summary-key">{{ cmd.context === 'hack' ? 'BREACH' : 'MAP' }}</span>
-                                <span class="summary-val">{{ cmd.context === 'hack' ? cmd.gridbreachEffect : cmd.mapEffect }}</span>
+                            <div class="card-summary" :class="{ 'card-summary--ph': cmd.context === 'hack' }">
+                                <span class="summary-key" :class="{ 'summary-key--ph': cmd.context === 'hack' }">
+                                    {{ cmd.context === 'hack' ? 'PACKET HIJACK' : 'MAP' }}
+                                </span>
+                                <span class="summary-val" :class="{ 'summary-val--ph': cmd.context === 'hack' }">
+                                    {{ cmd.context === 'hack' ? cmd.packethijackEffect : cmd.mapEffect }}
+                                </span>
                             </div>
 
                             <!-- Expanded: full detail -->
@@ -65,7 +69,7 @@
                                         <span class="detail-key">MAP</span>
                                         <span class="detail-val">{{ cmd.mapEffect }}</span>
                                     </div>
-                                    <div v-if="cmd.gridbreachEffect" class="detail-row">
+                                    <div v-if="cmd.context === 'map' && cmd.gridbreachEffect" class="detail-row">
                                         <span class="detail-key">GRIDBREACH</span>
                                         <span class="detail-val">{{ cmd.gridbreachEffect }}</span>
                                     </div>
@@ -270,8 +274,10 @@ function durationLabel(d) {
     padding: 0 14px 9px;
     align-items: flex-start;
 }
-.summary-key { font-size: 6px; color: rgba(0,255,255,0.55); letter-spacing: 0.12em; width: 28px; flex-shrink: 0; padding-top: 2px; }
-.summary-val { font-size: 8px; color: rgba(0,255,255,0.75); letter-spacing: 0.03em; line-height: 1.6; }
+.summary-key     { font-size: 6px; color: rgba(0,255,255,0.55); letter-spacing: 0.12em; width: 74px; flex-shrink: 0; padding-top: 2px; }
+.summary-key--ph { color: rgba(255,100,180,0.7); }
+.summary-val     { font-size: 8px; color: rgba(0,255,255,0.75); letter-spacing: 0.03em; line-height: 1.6; }
+.summary-val--ph { color: rgba(255,100,180,0.75); }
 
 /* ── Expanded detail ────────────────────────────────────────────────────────── */
 .card-detail {

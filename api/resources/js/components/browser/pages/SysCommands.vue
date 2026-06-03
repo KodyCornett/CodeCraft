@@ -94,10 +94,6 @@
                         <Transition name="expand">
                             <div v-if="expandedId === equippedByContext('hack')[i - 1].id" class="cmd-detail">
                                 <div v-if="equippedByContext('hack')[i - 1].cooldown" class="cmd-cd-notice">⚠ ON COOLDOWN — RESET AT CYBERDOC</div>
-                                <div v-if="equippedByContext('hack')[i - 1].gridbreachEffect" class="cmd-effect-row">
-                                    <span class="effect-key">GRIDBREACH</span>
-                                    <span class="effect-val">{{ equippedByContext('hack')[i - 1].gridbreachEffect }}</span>
-                                </div>
                                 <div v-if="equippedByContext('hack')[i - 1].packethijackEffect" class="cmd-effect-row">
                                     <span class="effect-key">PACKET HIJACK</span>
                                     <span class="effect-val">{{ equippedByContext('hack')[i - 1].packethijackEffect }}</span>
@@ -143,7 +139,7 @@
                                         <span class="effect-key">MAP</span>
                                         <span class="effect-val">{{ equippedOpen[i - 1].mapEffect }}</span>
                                     </div>
-                                    <div v-if="equippedOpen[i - 1].gridbreachEffect" class="cmd-effect-row">
+                                    <div v-if="equippedOpen[i - 1].context === 'map' && equippedOpen[i - 1].gridbreachEffect" class="cmd-effect-row">
                                         <span class="effect-key">GRIDBREACH</span>
                                         <span class="effect-val">{{ equippedOpen[i - 1].gridbreachEffect }}</span>
                                     </div>

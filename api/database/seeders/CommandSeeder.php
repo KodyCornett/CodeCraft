@@ -302,7 +302,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Freezes the opponent\'s input for a short window.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Opponent cannot input any hexakeys for the duration. L1: 2.5 seconds. L2: 3.5 seconds.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Opponent\'s terminal input is fully locked for the duration. L1: 2.5 seconds. L2: 3.5 seconds.',
                 'level_scaling'       => [
                     '1' => ['seconds' => 2.5],
@@ -323,7 +323,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Glitches one or two rows on the opponent\'s board for 10 seconds.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Glitches random rows on opponent\'s grid for 10 seconds, persisting through scrambles. L1: 1 row. L2: 2 rows.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Wipes revealed intel (ping, arp, traceroute, whois) from up to 2 suspects in the opponent\'s active Phase 1 case file — they must re-investigate those entries. L1: wipes 2 suspects. L2: wipes 3 suspects.',
                 'level_scaling'       => [
                     '1' => ['rows' => 1, 'seconds' => 10],
@@ -344,7 +344,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Removes hexakeys from the opponent\'s current sequence, forcing a board reseed.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Removes hexakeys from opponent\'s current sequence, forcing a partial reseed. L1: removes 1. L2: removes 2.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Injects fresh decoy IPs directly into the opponent\'s active Phase 1 suspect list — they appear as uninvestigated entries that must be worked through. L1: 1 decoy. L2: 2 decoys.',
                 'level_scaling'       => [
                     '1' => ['hexakeys' => 1],
@@ -365,7 +365,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Inverts the opponent\'s grid colors to cause visual disorientation.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Inverts all grid cell colors on opponent\'s board — correct cells look empty, empty cells look active. L1: 2.5 seconds. L2: 3.5 seconds.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Floods the attacker\'s terminal with garbage output, obscuring all readable data. L1: 2 seconds. L2: 3 seconds.',
                 'level_scaling'       => [
                     '1' => ['seconds' => 2.5],
@@ -386,7 +386,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Delays your next board scramble, protecting current sequence progress.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Delays your next board scramble, giving you more time to complete the current sequence. L1: +4 seconds. L2: +7 seconds.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Phase 1: Reveals the first octet of the target IP (e.g. 192.x.x.x), narrowing your search to one RFC-1918 range. Phase 2: Auto-confirms 1 (L1) or 2 (L2) chain adjacencies — outputs confirmed port pairs to your terminal without consuming trace attempts.',
                 'level_scaling'       => [
                     '1' => ['delay_seconds' => 4],
@@ -407,7 +407,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Reactively breaks free from any active opponent command effect.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Immediately clears any active opponent command effect on your board. Usable while under a locked-input effect. L2: also grants 2 seconds of immunity after clearing.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Interrupts the attacker\'s active cascade, reverting their most recent successful port exploit.',
                 'level_scaling'       => [
                     '1' => ['immunity_seconds' => 0],
@@ -428,7 +428,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Temporarily widens your hexakey input window.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Widens your input window per hexakey for the duration. L1: +35% for 5 seconds. L2: +50% for 7 seconds.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Grants a chain-skip for your next exploit — you can shatter any remaining chain port regardless of order, bypassing chain-head enforcement. Consumed on your next exploit attempt.',
                 'level_scaling'       => [
                     '1' => ['input_boost_pct' => 35, 'seconds' => 5],
@@ -449,7 +449,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Auto-completes your current hexakey sequence for a free score.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Instantly completes your current sequence and counts it as a full score. L2: also delays your next scramble by 3 seconds.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Activates a mirror shield. The next opponent rig command is reflected: if it was a self-buff they used, you receive the same buff; if it was an attack against you, it also fires back on them. Consumed on first trigger.',
                 'level_scaling'       => [
                     '1' => ['scramble_delay_seconds' => 0],
@@ -470,7 +470,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Highlights your next correct hexakey targets and widens the input window for those inputs.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Highlights your next correct hexakey target(s) and extends the input window for those inputs by 50%. You still have to press them. L1: 1 hexakey highlighted. L2: 2 hexakeys highlighted.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Offensive — phase-aware. Phase 1: injects decoy IPs into the opponent\'s active suspect list. Phase 2: injects dead-end ports into the opponent\'s port topology. L1: 1 injection. L2: 2 injections.',
                 'level_scaling'       => [
                     '1' => ['hexakeys_highlighted' => 1, 'window_boost_pct' => 50],
@@ -491,7 +491,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Injects extra false steps into the opponent\'s current sequence.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Injects extra hexakey steps into opponent\'s current sequence that must be cleared before scoring. L1: 1 extra step. L2: 2 extra steps.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Adds extra ports to the attacker\'s Phase 2 cascade that must be broken before the final payload can execute. L1: 1 extra port. L2: 2 extra ports.',
                 'level_scaling'       => [
                     '1' => ['extra_steps' => 1],
@@ -512,7 +512,7 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Forces rapid successive scrambles on the opponent\'s board.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Triggers rapid scrambles on opponent\'s board 0.5 seconds apart, destroying any sequence progress they had built. L1: 3 scrambles. L2: 4 scrambles.',
+                'gridbreach_effect'   => null,
                 'packethijack_effect' => 'Resets up to 1 (L1) or 2 (L2) of the opponent\'s probed ports back to unprobed — they must re-probe those ports before they can attempt to exploit them.',
                 'level_scaling'       => [
                     '1' => ['scrambles' => 3, 'interval_seconds' => 0.5],
@@ -533,15 +533,5 @@ class CommandSeeder extends Seeder
                 'duration'            => null,
                 'description'         => 'Plants a honeypot that penalises the opponent if they target it.',
                 'map_effect'          => null,
-                'gridbreach_effect'   => 'Marks one hexakey on your board as a honeypot. If the opponent uses a reveal or trace command and it targets the honeypot, their input locks for the penalty duration. L1: 3 second lockout. L2: 5 second lockout.',
-                'packethijack_effect' => 'Marks one port with an artificially low bias reading. If the attacker runs exploit on it, their terminal locks for the penalty duration. L1: 3 second lockout. L2: 5 second lockout.',
-                'level_scaling'       => [
-                    '1' => ['lockout_seconds' => 3],
-                    '2' => ['lockout_seconds' => 5],
-                    '3' => ['lockout_seconds' => 5, 'extra_use' => true],
-                ],
-            ],
-
-        ];
-    }
-}
+                'gridbreach_effect'   => null,
+                'packethijack_effect' => 'Marks one port with an artificially low bias reading. If the attacker runs exploit on it, their terminal locks for the pen
