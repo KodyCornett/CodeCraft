@@ -411,7 +411,7 @@ const sections = [
     flex-shrink: 0;
 }
 .ph-guide-title { font-size: 12px; color: #00FFFF; letter-spacing: 0.1em; text-shadow: 0 0 10px rgba(0,255,255,0.3); }
-.ph-guide-sub   { font-size: 9px;  color: rgba(0,255,255,0.25); letter-spacing: 0.08em; }
+.ph-guide-sub   { font-size: 9px;  color: rgba(0,255,255,0.55); letter-spacing: 0.08em; }
 
 /* ── Nav ────────────────────────────────────────────────────────────────────── */
 .ph-guide-nav {
@@ -425,14 +425,14 @@ const sections = [
     background: transparent;
     border: none;
     border-right: 1px solid rgba(0,255,255,0.06);
-    color: rgba(0,255,255,0.35);
+    color: rgba(0,255,255,0.6);
     font-family: inherit;
     font-size: 9px;
     letter-spacing: 0.1em;
     cursor: pointer;
     transition: color 0.15s, background 0.15s;
 }
-.ph-nav-btn:hover  { color: rgba(0,255,255,0.7); background: rgba(0,255,255,0.03); }
+.ph-nav-btn:hover  { color: rgba(0,255,255,0.85); background: rgba(0,255,255,0.03); }
 .ph-nav-btn.active { color: #00FFFF; background: rgba(0,255,255,0.05); border-bottom: 2px solid #00FFFF; }
 
 /* ── Content ────────────────────────────────────────────────────────────────── */
@@ -454,14 +454,14 @@ const sections = [
 }
 .subsec-title {
     font-size: 10px;
-    color: rgba(0,255,255,0.6);
+    color: rgba(0,255,255,0.85);
     letter-spacing: 0.1em;
     margin: 0 0 10px;
     font-weight: normal;
 }
 .sec-body {
     font-size: 10px;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.75);
     letter-spacing: 0.04em;
     line-height: 1.85;
     margin: 0 0 14px;
@@ -478,14 +478,14 @@ const sections = [
 }
 .rule-key {
     font-size: 9px;
-    color: rgba(0,255,255,0.5);
+    color: rgba(0,255,255,0.75);
     letter-spacing: 0.1em;
     width: 160px;
     flex-shrink: 0;
 }
 .rule-val {
     font-size: 9px;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.7);
     letter-spacing: 0.04em;
     line-height: 1.6;
 }
@@ -509,11 +509,11 @@ const sections = [
 .phase-num {
     font-size: 8px;
     letter-spacing: 0.16em;
-    color: rgba(0,255,255,0.4);
+    color: rgba(0,255,255,0.65);
     flex-shrink: 0;
 }
-.phase-block--two  .phase-num   { color: rgba(255,179,0,0.5); }
-.phase-block--three .phase-num  { color: rgba(0,255,136,0.5); }
+.phase-block--two  .phase-num   { color: rgba(255,179,0,0.75); }
+.phase-block--three .phase-num  { color: rgba(0,255,136,0.75); }
 
 .phase-name {
     font-size: 11px;
@@ -525,7 +525,7 @@ const sections = [
 
 .phase-desc {
     font-size: 9px;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.7);
     letter-spacing: 0.04em;
     line-height: 1.75;
     margin: 0;
@@ -552,7 +552,7 @@ const sections = [
 .cmd-block--commit .cmd-sig { color: #00ff88; }
 .cmd-body {
     font-size: 9px;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.7);
     letter-spacing: 0.03em;
     line-height: 1.65;
     margin: 0;

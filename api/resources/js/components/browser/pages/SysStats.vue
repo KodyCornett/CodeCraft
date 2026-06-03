@@ -30,7 +30,7 @@
                 <span class="ss-stab-val" :class="ssClass">
                     {{ ssPercent }}<span class="ss-stab-max">%</span>
                 </span>
-                <span v-if="player.isLimping" class="ss-limp-tag">LIMP</span>
+                <span v-if="player.isLimping && ssPercent < 100" class="ss-limp-tag">LIMP</span>
             </div>
         </div>
 
@@ -219,15 +219,15 @@ const heatLabel = computed(() => {
 }
 @keyframes dot-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .ss-ident-handle { font-size: 10px; color: #00FFFF; letter-spacing: 0.1em; }
-.ss-ident-sep    { font-size: 8px;  color: rgba(0,255,255,0.2); }
-.ss-ident-sub    { font-size: 8px;  color: rgba(0,255,255,0.35); letter-spacing: 0.14em; }
-.ss-ident-time   { font-size: 9px;  color: rgba(0,255,255,0.3); letter-spacing: 0.1em; }
+.ss-ident-sep    { font-size: 8px;  color: rgba(0,255,255,0.35); }
+.ss-ident-sub    { font-size: 8px;  color: rgba(0,255,255,0.55); letter-spacing: 0.14em; }
+.ss-ident-time   { font-size: 9px;  color: rgba(0,255,255,0.45); letter-spacing: 0.1em; }
 
 /* ── Section wrapper ──────────────────────────────────────────────────────── */
 .ss-section { padding: 10px 16px 12px; }
 .ss-sect-head {
     font-size: 7px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.5);
     letter-spacing: 0.2em;
     margin-bottom: 10px;
 }
@@ -241,7 +241,7 @@ const heatLabel = computed(() => {
 }
 .ss-stab-key {
     font-size: 7px;
-    color: rgba(0,255,255,0.25);
+    color: rgba(0,255,255,0.55);
     letter-spacing: 0.1em;
     width: 72px;
     flex-shrink: 0;
@@ -271,7 +271,7 @@ const heatLabel = computed(() => {
     width: 46px;
     text-align: right;
 }
-.ss-stab-max { font-size: 7px; color: rgba(0,255,255,0.25); }
+.ss-stab-max { font-size: 7px; color: rgba(0,255,255,0.45); }
 .ss-limp-tag {
     font-size: 6px;
     color: #FF3333;
@@ -309,7 +309,7 @@ const heatLabel = computed(() => {
 
 .ss-cell-key {
     font-size: 7px;
-    color: rgba(0,255,255,0.25);
+    color: rgba(0,255,255,0.55);
     letter-spacing: 0.12em;
     display: flex;
     align-items: center;
@@ -317,11 +317,11 @@ const heatLabel = computed(() => {
 }
 .ss-cell-val {
     font-size: 13px;
-    color: rgba(0,255,255,0.7);
+    color: rgba(0,255,255,0.85);
     letter-spacing: 0.04em;
     line-height: 1;
 }
-.ss-unit { font-size: 8px; color: rgba(0,255,255,0.3); }
+.ss-unit { font-size: 8px; color: rgba(0,255,255,0.5); }
 
 .ss-risk-tag {
     font-size: 6px;
@@ -334,7 +334,7 @@ const heatLabel = computed(() => {
 /* value colours */
 .ss-creds       { color: #00FF88; }
 .ss-pocket      { color: #FFB300; }
-.ss-dim         { color: rgba(0,255,255,0.2); }
+.ss-dim         { color: rgba(0,255,255,0.4); }
 .ss-tech        { color: #7DF9FF; }
 .ss-district    { color: rgba(0,255,255,0.75); font-size: 11px; }
 .ss-uplink-ok   { color: #00FF88; }
@@ -360,7 +360,7 @@ const heatLabel = computed(() => {
 .ss-threat-clean {
     margin-left: 8px;
     font-size: 8px;
-    color: rgba(0,255,136,0.4);
+    color: rgba(0,255,136,0.6);
     letter-spacing: 0.12em;
 }
 
@@ -398,7 +398,7 @@ const heatLabel = computed(() => {
 }
 
 /* heat colour variants */
-.heat-none { background: rgba(0,255,136,0.2); color: rgba(0,255,136,0.35); }
+.heat-none { background: rgba(0,255,136,0.2); color: rgba(0,255,136,0.6); }
 .heat-low  { background: #FFB300;              color: #FFB300; }
 .heat-mid  { background: #FF6B00;              color: #FF6B00; }
 .heat-high { background: #FF3333;              color: #FF3333; box-shadow: 0 0 8px rgba(255,51,51,0.4); }

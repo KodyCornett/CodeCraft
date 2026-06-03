@@ -340,9 +340,9 @@ function unequipCommand(cmd) {
 .sys-header-right { display: flex; align-items: center; gap: 8px; }
 
 .sys-title    { font-size: 13px; color: #00FFFF; letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(0,255,255,0.3); }
-.sys-sub      { font-size: 9px;  color: rgba(0,255,255,0.3); letter-spacing: 0.1em; }
-.sys-slot-pip { font-size: 8px; color: rgba(0,255,255,0.45); letter-spacing: 0.1em; }
-.sys-slot-sep { font-size: 8px; color: rgba(0,255,255,0.15); margin: 0 2px; }
+.sys-sub      { font-size: 9px;  color: rgba(0,255,255,0.6); letter-spacing: 0.1em; }
+.sys-slot-pip { font-size: 8px; color: rgba(0,255,255,0.7); letter-spacing: 0.1em; }
+.sys-slot-sep { font-size: 8px; color: rgba(0,255,255,0.35); margin: 0 2px; }
 
 /* ── Body ───────────────────────────────────────────────────────────────────── */
 .sys-body    { flex: 1; overflow-y: auto; padding: 0 24px 24px; }
@@ -360,20 +360,20 @@ function unequipCommand(cmd) {
     gap: 10px;
     margin-bottom: 10px;
 }
-.section-title { font-size: 9px; color: rgba(0,255,255,0.3); letter-spacing: 0.16em; }
-.section-sub   { font-size: 8px; color: rgba(0,255,255,0.18); letter-spacing: 0.1em; }
-.section-slots { font-size: 8px; letter-spacing: 0.1em; color: rgba(0,255,255,0.4); }
+.section-title { font-size: 9px; color: rgba(0,255,255,0.6); letter-spacing: 0.16em; }
+.section-sub   { font-size: 8px; color: rgba(0,255,255,0.45); letter-spacing: 0.1em; }
+.section-slots { font-size: 8px; letter-spacing: 0.1em; color: rgba(0,255,255,0.65); }
 .slots--full   { color: #FFB300; }
 
 /* ── Slot group labels ──────────────────────────────────────────────────────── */
 .slot-group-label {
     font-size: 7px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.5);
     letter-spacing: 0.18em;
     padding: 10px 0 4px;
 }
-.slot-group-label--hack { color: rgba(255,69,69,0.25); }
-.slot-group-label--open { color: rgba(255,179,0,0.25); }
+.slot-group-label--hack { color: rgba(255,69,69,0.6); }
+.slot-group-label--open { color: rgba(255,179,0,0.6); }
 
 /* ── Command rows ───────────────────────────────────────────────────────────── */
 .cmd-row {
@@ -423,8 +423,8 @@ function unequipCommand(cmd) {
 .ctx--hack { color: rgba(255,69,69,0.75); border-color: rgba(255,69,69,0.25);  background: rgba(255,69,69,0.04); }
 
 /* Tier (kept for any legacy refs, hidden from new rows) */
-.cmd-tier       { font-size: 8px; color: rgba(0,255,255,0.3); flex-shrink: 0; }
-.tier--locked   { color: rgba(255,255,255,0.15); }
+.cmd-tier       { font-size: 8px; color: rgba(0,255,255,0.55); flex-shrink: 0; }
+.tier--locked   { color: rgba(255,255,255,0.25); }
 
 /* Type badge */
 .cmd-type-badge {
@@ -443,13 +443,13 @@ function unequipCommand(cmd) {
 
 /* Name */
 .cmd-name     { font-size: 11px; color: rgba(0,255,255,0.85); letter-spacing: 0.05em; flex: 1; }
-.cmd-name--lib { color: rgba(0,255,255,0.6); }
-.name--cd      { color: rgba(255,51,51,0.55); }
-.name--locked  { color: rgba(255,255,255,0.2); }
+.cmd-name--lib { color: rgba(0,255,255,0.75); }
+.name--cd      { color: rgba(255,51,51,0.7); }
+.name--locked  { color: rgba(255,255,255,0.35); }
 
 /* Tags */
-.cmd-cd-tag     { font-size: 7px; color: rgba(255,51,51,0.5); letter-spacing: 0.1em; flex-shrink: 0; }
-.cmd-locked-tag { font-size: 7px; color: rgba(255,255,255,0.2); letter-spacing: 0.1em; flex-shrink: 0; }
+.cmd-cd-tag     { font-size: 7px; color: rgba(255,51,51,0.7); letter-spacing: 0.1em; flex-shrink: 0; }
+.cmd-locked-tag { font-size: 7px; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; flex-shrink: 0; }
 
 /* Equip / unequip buttons */
 .cmd-equip-btn,
@@ -478,8 +478,8 @@ function unequipCommand(cmd) {
     cursor: not-allowed;
 }
 .cmd-unequip-btn {
-    border: 1px solid rgba(255,51,51,0.2);
-    color: rgba(255,51,51,0.45);
+    border: 1px solid rgba(255,51,51,0.3);
+    color: rgba(255,51,51,0.7);
 }
 .cmd-unequip-btn:hover {
     border-color: rgba(255,51,51,0.55);
@@ -490,7 +490,7 @@ function unequipCommand(cmd) {
 /* Empty slot */
 .empty-slot-label {
     font-size: 9px;
-    color: rgba(0,255,255,0.18);
+    color: rgba(0,255,255,0.4);
     letter-spacing: 0.1em;
     padding: 8px 12px;
     display: block;
@@ -499,7 +499,7 @@ function unequipCommand(cmd) {
 /* Loadout full notice */
 .loadout-full-notice {
     font-size: 8px;
-    color: rgba(255,179,0,0.5);
+    color: rgba(255,179,0,0.75);
     letter-spacing: 0.08em;
     padding: 6px 0 2px;
 }
@@ -525,7 +525,7 @@ function unequipCommand(cmd) {
 }
 .effect-key {
     font-size: 7px;
-    color: rgba(0,255,255,0.25);
+    color: rgba(0,255,255,0.55);
     letter-spacing: 0.12em;
     width: 32px;
     flex-shrink: 0;
@@ -533,7 +533,7 @@ function unequipCommand(cmd) {
 }
 .effect-val {
     font-size: 9px;
-    color: rgba(0,255,255,0.55);
+    color: rgba(0,255,255,0.8);
     letter-spacing: 0.03em;
     line-height: 1.65;
 }
@@ -549,9 +549,9 @@ function unequipCommand(cmd) {
     margin-bottom: 4px;
 }
 .tier-header--locked { opacity: 0.45; }
-.tier-label    { font-size: 8px; color: rgba(0,255,255,0.35); letter-spacing: 0.14em; }
-.tier-unlocked { font-size: 7px; color: rgba(0,255,136,0.4);  letter-spacing: 0.1em; }
-.tier-lock     { font-size: 7px; color: rgba(255,179,0,0.5);  letter-spacing: 0.06em; }
+.tier-label    { font-size: 8px; color: rgba(0,255,255,0.6);  letter-spacing: 0.14em; }
+.tier-unlocked { font-size: 7px; color: rgba(0,255,136,0.7);  letter-spacing: 0.1em; }
+.tier-lock     { font-size: 7px; color: rgba(255,179,0,0.7);  letter-spacing: 0.06em; }
 
 /* ── Expand transition ──────────────────────────────────────────────────────── */
 .expand-enter-active,

@@ -302,7 +302,7 @@ const sections = [
     flex-shrink: 0;
 }
 .gb-guide-title { font-size: 12px; color: #00FFFF; letter-spacing: 0.1em; text-shadow: 0 0 10px rgba(0,255,255,0.3); }
-.gb-guide-sub   { font-size: 9px;  color: rgba(0,255,255,0.25); letter-spacing: 0.08em; }
+.gb-guide-sub   { font-size: 9px;  color: rgba(0,255,255,0.55); letter-spacing: 0.08em; }
 
 /* ── Nav ────────────────────────────────────────────────────────────────────── */
 .gb-guide-nav {
@@ -316,14 +316,14 @@ const sections = [
     background: transparent;
     border: none;
     border-right: 1px solid rgba(0,255,255,0.06);
-    color: rgba(0,255,255,0.35);
+    color: rgba(0,255,255,0.6);
     font-family: inherit;
     font-size: 9px;
     letter-spacing: 0.1em;
     cursor: pointer;
     transition: color 0.15s, background 0.15s;
 }
-.gb-nav-btn:hover { color: rgba(0,255,255,0.7); background: rgba(0,255,255,0.03); }
+.gb-nav-btn:hover { color: rgba(0,255,255,0.85); background: rgba(0,255,255,0.03); }
 .gb-nav-btn.active { color: #00FFFF; background: rgba(0,255,255,0.05); border-bottom: 2px solid #00FFFF; }
 
 /* ── Content ────────────────────────────────────────────────────────────────── */
@@ -345,7 +345,7 @@ const sections = [
 }
 .sec-body {
     font-size: 10px;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.75);
     letter-spacing: 0.04em;
     line-height: 1.85;
     margin: 0 0 14px;
@@ -362,14 +362,14 @@ const sections = [
 }
 .rule-key {
     font-size: 9px;
-    color: rgba(0,255,255,0.5);
+    color: rgba(0,255,255,0.75);
     letter-spacing: 0.1em;
     width: 160px;
     flex-shrink: 0;
 }
 .rule-val {
     font-size: 9px;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.7);
     letter-spacing: 0.04em;
     line-height: 1.6;
 }
@@ -383,7 +383,7 @@ const sections = [
     border: 1px solid rgba(255,51,51,0.2);
     background: rgba(255,51,51,0.03);
     font-size: 9px;
-    color: rgba(255,51,51,0.6);
+    color: rgba(255,51,51,0.85);
     line-height: 1.65;
     letter-spacing: 0.04em;
     margin-top: 16px;
@@ -391,7 +391,7 @@ const sections = [
 .sec-callout--amber {
     border-color: rgba(255,179,0,0.2);
     background: rgba(255,179,0,0.03);
-    color: rgba(255,179,0,0.6);
+    color: rgba(255,179,0,0.85);
 }
 .callout-label {
     font-size: 7px;

@@ -376,7 +376,7 @@ function toggleStat(key) {
     flex-shrink: 0;
     white-space: nowrap;
 }
-.pts-sep { color: rgba(0,255,255,0.2); }
+.pts-sep { color: rgba(0,255,255,0.45); }
 
 /* Points colour states */
 .pts--low  .pts-bar-fill { background: rgba(0,255,136,0.6); }
@@ -569,7 +569,7 @@ function toggleStat(key) {
 
 .stat-arrow {
     font-size: 14px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.45);
     transition: transform 0.2s ease, color 0.15s;
     flex-shrink: 0;
     line-height: 1;
@@ -659,11 +659,11 @@ function toggleStat(key) {
 .peri-row--damaged .peri-dot { background: #FFB300; box-shadow: 0 0 5px rgba(255,179,0,0.5); }
 .peri-dot--empty  { background: transparent; border: 1px solid rgba(0,255,255,0.2); box-shadow: none; }
 
-.peri-name        { font-size: 10px; color: rgba(255,255,255,0.75); flex: 1; letter-spacing: 0.04em; }
-.peri-name--empty { color: rgba(0,255,255,0.45); }
+.peri-name        { font-size: 10px; color: rgba(255,255,255,0.88); flex: 1; letter-spacing: 0.04em; }
+.peri-name--empty { color: rgba(0,255,255,0.6); }
 .peri-boost       { font-size: 10px; color: #00FF88; flex-shrink: 0; }
 .peri-status      { font-size: 7px; letter-spacing: 0.12em; flex-shrink: 0; }
 .peri-row--active  .peri-status { color: #00FF88; }
 .peri-row--damaged .peri-status { color: #FFB300; }
-.peri-status--empty { color: rgba(0,255,255,0.25); }
+.peri-status--empty { color: rgba(0,255,255,0.5); }
 </style>

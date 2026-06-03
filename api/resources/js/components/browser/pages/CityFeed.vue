@@ -115,7 +115,7 @@ const feedItems = [
 
 .feed-clock {
     font-size: 9px;
-    color: rgba(0, 255, 255, 0.3);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 0.1em;
 }
 
@@ -124,7 +124,7 @@ const feedItems = [
     background: rgba(0, 255, 136, 0.03);
     border-bottom: 1px solid rgba(0, 255, 136, 0.08);
     font-size: 8px;
-    color: rgba(0, 255, 136, 0.55);
+    color: rgba(0, 255, 136, 0.75);
     letter-spacing: 0.07em;
     white-space: nowrap;
     overflow: hidden;
@@ -173,14 +173,14 @@ const feedItems = [
 
 .fi-time, .fi-sector {
     font-size: 8px;
-    color: rgba(0, 255, 255, 0.28);
+    color: rgba(0, 255, 255, 0.55);
     letter-spacing: 0.08em;
 }
 
 .fi-headline {
     font-size: 11px;
     font-weight: normal;
-    color: rgba(255, 255, 255, 0.82);
+    color: rgba(255, 255, 255, 0.92);
     letter-spacing: 0.05em;
     line-height: 1.4;
     margin: 0;
@@ -188,7 +188,7 @@ const feedItems = [
 
 .fi-body {
     font-size: 9px;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.65);
     letter-spacing: 0.04em;
     line-height: 1.75;
     margin: 0;

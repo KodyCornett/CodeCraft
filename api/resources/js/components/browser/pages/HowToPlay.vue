@@ -166,7 +166,7 @@ const districts = [
 
 .manual-ver {
     font-size: 9px;
-    color: rgba(0, 255, 255, 0.25);
+    color: rgba(0, 255, 255, 0.55);
     letter-spacing: 0.1em;
 }
 
@@ -181,7 +181,7 @@ const districts = [
     background: transparent;
     border: none;
     border-right: 1px solid rgba(0, 255, 255, 0.06);
-    color: rgba(0, 255, 255, 0.35);
+    color: rgba(0, 255, 255, 0.6);
     font-family: inherit;
     font-size: 9px;
     letter-spacing: 0.1em;
@@ -207,7 +207,7 @@ const districts = [
 
 .sec-body {
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.75);
     letter-spacing: 0.04em;
     line-height: 1.85;
     margin: 0 0 14px;
@@ -224,7 +224,7 @@ const districts = [
 
 .rule-key {
     font-size: 9px;
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.75);
     letter-spacing: 0.1em;
     width: 160px;
     flex-shrink: 0;
@@ -232,7 +232,7 @@ const districts = [
 
 .rule-val {
     font-size: 9px;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.7);
     letter-spacing: 0.04em;
     line-height: 1.6;
 }
@@ -248,8 +248,8 @@ const districts = [
 }
 
 .district-name { font-size: 10px; color: #00FFFF;                letter-spacing: 0.07em; }
-.district-zone { font-size: 9px;  color: rgba(0,255,136,0.6);   letter-spacing: 0.1em;  }
-.district-desc { font-size: 9px;  color: rgba(255,255,255,0.4); letter-spacing: 0.04em; line-height: 1.6; }
+.district-zone { font-size: 9px;  color: rgba(0,255,136,0.8);   letter-spacing: 0.1em;  }
+.district-desc { font-size: 9px;  color: rgba(255,255,255,0.65); letter-spacing: 0.04em; line-height: 1.6; }
 
 /* Highlight classes */
 .hl-cyan   { color: #00FFFF !important; }

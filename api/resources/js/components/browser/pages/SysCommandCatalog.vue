@@ -177,7 +177,7 @@ function durationLabel(d) {
 }
 .cat-header-left { display: flex; align-items: baseline; gap: 12px; padding-bottom: 12px; }
 .cat-title { font-size: 13px; color: #00FFFF; letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(0,255,255,0.25); }
-.cat-sub   { font-size: 9px;  color: rgba(0,255,255,0.3); letter-spacing: 0.1em; }
+.cat-sub   { font-size: 9px;  color: rgba(0,255,255,0.6); letter-spacing: 0.1em; }
 
 .cat-filters { display: flex; gap: 0; padding-bottom: 0; }
 .filter-btn {
@@ -185,14 +185,14 @@ function durationLabel(d) {
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: rgba(0,255,255,0.3);
+    color: rgba(0,255,255,0.6);
     font-family: inherit;
     font-size: 8px;
     letter-spacing: 0.12em;
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s;
 }
-.filter-btn:hover  { color: rgba(0,255,255,0.65); }
+.filter-btn:hover  { color: rgba(0,255,255,0.85); }
 .filter-btn.active { color: #00FFFF; border-bottom-color: #00FFFF; }
 
 /* ── Body ───────────────────────────────────────────────────────────────────── */
@@ -218,9 +218,9 @@ function durationLabel(d) {
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(0,255,255,0.07);
 }
-.tier-label      { font-size: 9px; color: rgba(0,255,255,0.45); letter-spacing: 0.16em; }
-.tier-ram        { font-size: 8px; color: rgba(0,255,255,0.2);  letter-spacing: 0.1em; }
-.tier-price-hint { font-size: 8px; color: rgba(255,179,0,0.35); letter-spacing: 0.08em; margin-left: auto; }
+.tier-label      { font-size: 9px; color: rgba(0,255,255,0.7);  letter-spacing: 0.16em; }
+.tier-ram        { font-size: 8px; color: rgba(0,255,255,0.5);  letter-spacing: 0.1em; }
+.tier-price-hint { font-size: 8px; color: rgba(255,179,0,0.65); letter-spacing: 0.08em; margin-left: auto; }
 
 /* ── Command cards ──────────────────────────────────────────────────────────── */
 .tier-grid { display: flex; flex-direction: column; gap: 4px; }
@@ -257,12 +257,12 @@ function durationLabel(d) {
 .type--defensive { color: rgba(0,255,136,0.8);   border-color: rgba(0,255,136,0.3);   background: rgba(0,255,136,0.05); }
 .type--offensive { color: rgba(255,69,69,0.9);   border-color: rgba(255,69,69,0.3);   background: rgba(255,69,69,0.05); }
 
-.card-name  { font-size: 11px; color: rgba(0,255,255,0.8); letter-spacing: 0.06em; flex: 1; }
+.card-name  { font-size: 11px; color: rgba(0,255,255,0.9); letter-spacing: 0.06em; flex: 1; }
 .card-owned-badge {
-    font-size: 7px; color: rgba(0,255,136,0.65);
-    border: 1px solid rgba(0,255,136,0.25); padding: 1px 6px; letter-spacing: 0.1em;
+    font-size: 7px; color: rgba(0,255,136,0.85);
+    border: 1px solid rgba(0,255,136,0.35); padding: 1px 6px; letter-spacing: 0.1em;
 }
-.card-price { font-size: 8px; color: rgba(255,179,0,0.5); letter-spacing: 0.06em; }
+.card-price { font-size: 8px; color: rgba(255,179,0,0.75); letter-spacing: 0.06em; }
 
 .card-summary {
     display: flex;
@@ -270,8 +270,8 @@ function durationLabel(d) {
     padding: 0 14px 9px;
     align-items: flex-start;
 }
-.summary-key { font-size: 6px; color: rgba(0,255,255,0.22); letter-spacing: 0.12em; width: 28px; flex-shrink: 0; padding-top: 2px; }
-.summary-val { font-size: 8px; color: rgba(0,255,255,0.45); letter-spacing: 0.03em; line-height: 1.6; }
+.summary-key { font-size: 6px; color: rgba(0,255,255,0.55); letter-spacing: 0.12em; width: 28px; flex-shrink: 0; padding-top: 2px; }
+.summary-val { font-size: 8px; color: rgba(0,255,255,0.75); letter-spacing: 0.03em; line-height: 1.6; }
 
 /* ── Expanded detail ────────────────────────────────────────────────────────── */
 .card-detail {
@@ -284,16 +284,16 @@ function durationLabel(d) {
 }
 .detail-row { display: flex; gap: 10px; align-items: flex-start; }
 .detail-key {
-    font-size: 6px; color: rgba(0,255,255,0.22); letter-spacing: 0.12em;
+    font-size: 6px; color: rgba(0,255,255,0.55); letter-spacing: 0.12em;
     width: 52px; flex-shrink: 0; padding-top: 2px;
 }
-.detail-val      { font-size: 8px; color: rgba(0,255,255,0.55); letter-spacing: 0.03em; line-height: 1.6; }
-.detail-val--meta { color: rgba(0,255,255,0.35); font-style: italic; }
+.detail-val      { font-size: 8px; color: rgba(0,255,255,0.8); letter-spacing: 0.03em; line-height: 1.6; }
+.detail-val--meta { color: rgba(0,255,255,0.55); font-style: italic; }
 
 .card-cta {
     margin-top: 4px;
     font-size: 7px;
-    color: rgba(255,179,0,0.45);
+    color: rgba(255,179,0,0.7);
     letter-spacing: 0.08em;
     border-left: 2px solid rgba(255,179,0,0.2);
     padding-left: 8px;

@@ -157,7 +157,7 @@ function clearFeedback(id) {
     flex-shrink: 0;
 }
 .sys-title { font-size: 13px; color: #00FFFF; letter-spacing: 0.1em; text-shadow: 0 0 10px rgba(0,255,255,0.3); }
-.sys-sub   { font-size: 9px;  color: rgba(0,255,255,0.3); letter-spacing: 0.1em; }
+.sys-sub   { font-size: 9px;  color: rgba(0,255,255,0.6); letter-spacing: 0.1em; }
 
 .sys-body {
     flex: 1;
@@ -170,7 +170,7 @@ function clearFeedback(id) {
 
 .inv-empty {
     font-size: 10px;
-    color: rgba(0,255,255,0.25);
+    color: rgba(0,255,255,0.5);
     letter-spacing: 0.08em;
     padding: 40px 0;
     text-align: center;
@@ -241,12 +241,12 @@ function clearFeedback(id) {
 }
 .inv-stack {
     font-size: 9px;
-    color: rgba(0,255,255,0.35);
+    color: rgba(0,255,255,0.6);
 }
 
 .inv-desc {
     font-size: 9px;
-    color: rgba(0,255,255,0.4);
+    color: rgba(0,255,255,0.65);
     letter-spacing: 0.03em;
     line-height: 1.5;
 }

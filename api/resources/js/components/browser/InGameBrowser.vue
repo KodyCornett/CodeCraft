@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, provide } from 'vue';
+import { ref, computed, watch, provide, toRef } from 'vue';
 import { useBrowser }                   from '@/composables/useBrowser.js';
 import { resolveRoute, getPageTitle, SPLICE } from './SpliceRouter.js';
 
@@ -99,6 +99,12 @@ const addressInput = ref(currentUrl.value);
 
 // Keep address bar in sync when navigation happens (tab switch, back, etc.)
 watch(currentUrl, (url) => { addressInput.value = url; });
+
+// When the taskbar launches a different page while the browser is already open,
+// navigate the active tab to the new URL instead of requiring a close + reopen.
+watch(toRef(props, 'initialUrl'), (url) => {
+    if (url && url !== currentUrl.value) navigate(url);
+});
 
 function focusInput()  { addrInputEl.value?.focus(); }
 function onAddrFocus() { addrInputEl.value?.select(); }

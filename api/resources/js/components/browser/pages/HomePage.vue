@@ -121,7 +121,7 @@ onUnmounted(() => clearInterval(timer));
 
 .home-tagline {
     font-size: 9px;
-    color: rgba(0, 255, 255, 0.28);
+    color: rgba(0, 255, 255, 0.55);
     letter-spacing: 0.18em;
 }
 
@@ -137,7 +137,7 @@ onUnmounted(() => clearInterval(timer));
 
 .home-group-label {
     font-size: 7px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.5);
     letter-spacing: 0.22em;
     align-self: flex-start;
 }
@@ -176,8 +176,8 @@ onUnmounted(() => clearInterval(timer));
 .tile-icon--breach { color: #FF3333; }
 .tile-icon--hijack { color: #FFB300; }
 .tile-title { font-size: 11px; color: #00FFFF; letter-spacing: 0.1em; }
-.tile-desc  { font-size: 8px;  color: rgba(255, 255, 255, 0.35); letter-spacing: 0.04em; line-height: 1.6; }
-.tile-url   { font-size: 8px;  color: rgba(0, 255, 255, 0.25); letter-spacing: 0.08em; margin-top: 4px; }
+.tile-desc  { font-size: 8px;  color: rgba(255, 255, 255, 0.65); letter-spacing: 0.04em; line-height: 1.6; }
+.tile-url   { font-size: 8px;  color: rgba(0, 255, 255, 0.5);  letter-spacing: 0.08em; margin-top: 4px; }
 
 /* Reference tiles — slightly more muted to visually separate from network tiles */
 .home-tile--ref {
@@ -196,7 +196,7 @@ onUnmounted(() => clearInterval(timer));
     align-items: center;
     gap: 8px;
     font-size: 8px;
-    color: rgba(0, 255, 136, 0.45);
+    color: rgba(0, 255, 136, 0.7);
     letter-spacing: 0.1em;
 }
 

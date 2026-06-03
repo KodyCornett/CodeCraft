@@ -371,7 +371,7 @@ defineProps({ url: { type: String, default: '' } });
     flex-shrink: 0;
 }
 .guide-title { font-size: 13px; color: #00FFFF; letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(0,255,255,0.25); }
-.guide-sub   { font-size: 9px;  color: rgba(0,255,255,0.28); letter-spacing: 0.1em; }
+.guide-sub   { font-size: 9px;  color: rgba(0,255,255,0.6);  letter-spacing: 0.1em; }
 
 /* ── Body ───────────────────────────────────────────────────────────────────── */
 .guide-body {
@@ -397,7 +397,7 @@ defineProps({ url: { type: String, default: '' } });
 
 .g-section-title {
     font-size: 9px;
-    color: rgba(0,255,255,0.4);
+    color: rgba(0,255,255,0.7);
     letter-spacing: 0.2em;
 }
 
@@ -429,7 +429,7 @@ defineProps({ url: { type: String, default: '' } });
     background: rgba(0,255,255,0.03);
     border-color: rgba(0,255,255,0.1);
     font-size: 8px;
-    color: rgba(0,255,255,0.3);
+    color: rgba(0,255,255,0.6);
     letter-spacing: 0.1em;
 }
 
@@ -450,7 +450,7 @@ defineProps({ url: { type: String, default: '' } });
 .g-green { color: #00FF88; }
 .g-amber { color: #FFB300; }
 .g-red   { color: #FF3333; }
-.g-dim   { color: rgba(0,255,255,0.45); }
+.g-dim   { color: rgba(0,255,255,0.6); }
 
 /* ── Formula block ──────────────────────────────────────────────────────────── */
 .g-formula {
@@ -465,7 +465,7 @@ defineProps({ url: { type: String, default: '' } });
 /* ── Prose ──────────────────────────────────────────────────────────────────── */
 .g-prose {
     font-size: 9px;
-    color: rgba(0,255,255,0.5);
+    color: rgba(0,255,255,0.75);
     letter-spacing: 0.04em;
     line-height: 1.75;
 }
@@ -474,7 +474,7 @@ defineProps({ url: { type: String, default: '' } });
 /* ── Example ────────────────────────────────────────────────────────────────── */
 .g-example {
     font-size: 8px;
-    color: rgba(0,255,255,0.3);
+    color: rgba(0,255,255,0.6);
     letter-spacing: 0.06em;
     font-style: italic;
     padding-left: 14px;
