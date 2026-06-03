@@ -208,19 +208,19 @@
             <!-- Hover tooltip — appears near hovered node, shows key recon data -->
             <g v-if="hoveredDbNode" class="node-tooltip" pointer-events="none">
                 <rect
-                    :x="tooltipSvgPos.x - 2"
-                    :y="tooltipSvgPos.y - 14"
-                    width="88"
-                    height="44"
+                    :x="tooltipSvgPos.x - 4"
+                    :y="tooltipSvgPos.y - 22"
+                    width="176"
+                    height="88"
                     class="tooltip-bg"
                 />
-                <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y" class="tooltip-line">
+                <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y" class="tooltip-line">
                     ICE {{ hoveredDbNode.ice ?? '?' }}  T{{ hoveredDbNode.tier ?? '?' }}
                 </text>
-                <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y + 14" class="tooltip-line tooltip-line--dim">
+                <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--dim">
                     {{ hoveredDbNode.zoneType ?? 'netlink' }}
                 </text>
-                <text :x="tooltipSvgPos.x + 2" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--creds">
+                <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 56" class="tooltip-line tooltip-line--creds">
                     ₡ {{ hoveredDbNode.credValueBase ?? '?' }}
                 </text>
             </g>
@@ -1401,13 +1401,13 @@ defineExpose({
 }
 .tooltip-line {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 18px;
     fill: rgba(0, 255, 255, 0.9);
     letter-spacing: 0.06em;
 }
 .tooltip-line--dim {
     fill: rgba(0, 255, 255, 0.5);
-    font-size: 8px;
+    font-size: 16px;
 }
 .tooltip-line--creds {
     fill: rgba(255, 179, 0, 0.85);
