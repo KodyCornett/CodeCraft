@@ -25,6 +25,8 @@ class Node extends Model
         'movement_resource_depleted',
         'is_spawn',
         'movement_last_hacked_at',
+        'zone_type',
+        'zone_group',
     ];
 
     protected $casts = [
