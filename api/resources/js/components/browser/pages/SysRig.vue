@@ -326,15 +326,15 @@ function toggleStat(key) {
 .rig-icon        { font-size: 18px; color: rgba(0,255,255,0.5); line-height: 1; }
 .rig-title-stack { display: flex; flex-direction: column; gap: 2px; }
 .rig-chassis     { font-size: 13px; color: #00FFFF; letter-spacing: 0.1em; text-shadow: 0 0 12px rgba(0,255,255,0.35); }
-.rig-sub         { font-size: 7px; color: rgba(0,255,255,0.25); letter-spacing: 0.18em; }
+.rig-sub         { font-size: 7px; color: rgba(0,255,255,0.5); letter-spacing: 0.18em; }
 
 .rig-tier-badge {
     font-size: 8px;
     letter-spacing: 0.2em;
-    color: rgba(0,255,255,0.5);
-    border: 1px solid rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.85);
+    border: 1px solid rgba(0,255,255,0.35);
     padding: 3px 10px;
-    background: rgba(0,255,255,0.03);
+    background: rgba(0,255,255,0.06);
 }
 
 /* ── Points strip ─────────────────────────────────────────────────────────── */
@@ -349,7 +349,7 @@ function toggleStat(key) {
 }
 .pts-label {
     font-size: 7px;
-    color: rgba(0,255,255,0.25);
+    color: rgba(0,255,255,0.6);
     letter-spacing: 0.16em;
     flex-shrink: 0;
     width: 52px;
@@ -379,10 +379,15 @@ function toggleStat(key) {
 .pts-sep { color: rgba(0,255,255,0.2); }
 
 /* Points colour states */
-.pts--low  .pts-bar-fill, .pts--low  { color: rgba(0,255,136,0.7); background: rgba(0,255,136,0.6); }
-.pts--mid  .pts-bar-fill, .pts--mid  { color: rgba(0,255,255,0.8); background: rgba(0,255,255,0.6); }
-.pts--high .pts-bar-fill, .pts--high { color: #FFB300;              background: rgba(255,179,0,0.7); }
-.pts--capped .pts-bar-fill, .pts--capped { color: #FF3333;          background: rgba(255,51,51,0.8); }
+.pts--low  .pts-bar-fill { background: rgba(0,255,136,0.6); }
+.pts--mid  .pts-bar-fill { background: rgba(0,255,255,0.6); }
+.pts--high .pts-bar-fill { background: rgba(255,179,0,0.7); }
+.pts--capped .pts-bar-fill { background: rgba(255,179,0,0.85); }
+
+.pts--low   { color: #00FF88; }
+.pts--mid   { color: rgba(0,255,255,0.9); }
+.pts--high  { color: #FFB300; }
+.pts--capped { color: #FFB300; }
 
 /* ── Scrollable body ──────────────────────────────────────────────────────── */
 .rig-page-body {
@@ -401,7 +406,7 @@ function toggleStat(key) {
 
 .section-head {
     font-size: 7px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.55);
     letter-spacing: 0.22em;
     margin-bottom: 12px;
     display: flex;
@@ -409,8 +414,8 @@ function toggleStat(key) {
     gap: 10px;
 }
 .head-tag {
-    color: rgba(0,255,255,0.35);
-    border: 1px solid rgba(0,255,255,0.12);
+    color: rgba(0,255,255,0.7);
+    border: 1px solid rgba(0,255,255,0.25);
     padding: 1px 6px;
     font-size: 7px;
     letter-spacing: 0.12em;
@@ -426,7 +431,7 @@ function toggleStat(key) {
 
 .live-key {
     font-size: 8px;
-    color: rgba(0,255,255,0.3);
+    color: rgba(0,255,255,0.65);
     letter-spacing: 0.14em;
     width: 58px;
     flex-shrink: 0;
@@ -497,7 +502,7 @@ function toggleStat(key) {
 
 .stat-key {
     font-size: 8px;
-    color: rgba(0,255,255,0.4);
+    color: rgba(0,255,255,0.75);
     letter-spacing: 0.14em;
     width: 62px;
     flex-shrink: 0;
@@ -526,7 +531,7 @@ function toggleStat(key) {
 
 .stat-num {
     font-size: 14px;
-    color: rgba(0,255,255,0.6);
+    color: rgba(0,255,255,0.9);
     letter-spacing: 0;
     width: 22px;
     text-align: right;
@@ -535,11 +540,11 @@ function toggleStat(key) {
 }
 .stat-num--boosted { color: #00FF88; text-shadow: 0 0 8px rgba(0,255,136,0.4); }
 .stat-num--capped  { color: #FFB300; }
-.stat-num--locked  { color: rgba(0,255,255,0.35); }
+.stat-num--locked  { color: rgba(0,255,255,0.6); }
 
 .stat-cap {
     font-size: 8px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.5);
     letter-spacing: 0.04em;
     flex-shrink: 0;
 }
@@ -555,8 +560,8 @@ function toggleStat(key) {
 
 .stat-locked-tag {
     font-size: 7px;
-    color: rgba(0,255,255,0.25);
-    border: 1px solid rgba(0,255,255,0.1);
+    color: rgba(0,255,255,0.55);
+    border: 1px solid rgba(0,255,255,0.25);
     padding: 1px 5px;
     letter-spacing: 0.1em;
     flex-shrink: 0;
@@ -594,16 +599,16 @@ function toggleStat(key) {
 }
 .sdg-key {
     font-size: 6px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.55);
     letter-spacing: 0.16em;
 }
-.sdg-val          { font-size: 11px; color: rgba(0,255,255,0.6); }
+.sdg-val          { font-size: 11px; color: rgba(0,255,255,0.85); }
 .sdg-val--invested { color: #00FFFF; }
 .sdg-val--boost    { color: #00FF88; }
 
 .stat-effect {
     font-size: 8px;
-    color: rgba(0,255,255,0.35);
+    color: rgba(0,255,255,0.7);
     letter-spacing: 0.03em;
     line-height: 1.55;
     border-left: 2px solid rgba(0,255,255,0.1);
@@ -612,7 +617,7 @@ function toggleStat(key) {
 
 .stat-effect-inline {
     font-size: 8px;
-    color: rgba(0,255,255,0.25);
+    color: rgba(0,255,255,0.6);
     letter-spacing: 0.03em;
     padding: 0 12px 8px;
     line-height: 1.5;
@@ -626,7 +631,7 @@ function toggleStat(key) {
 /* ── Peripheral rows ──────────────────────────────────────────────────────── */
 .peri-locked-msg {
     font-size: 8px;
-    color: rgba(0,255,255,0.2);
+    color: rgba(0,255,255,0.55);
     letter-spacing: 0.08em;
     padding: 6px 0;
 }
@@ -655,7 +660,7 @@ function toggleStat(key) {
 .peri-dot--empty  { background: transparent; border: 1px solid rgba(0,255,255,0.2); box-shadow: none; }
 
 .peri-name        { font-size: 10px; color: rgba(255,255,255,0.75); flex: 1; letter-spacing: 0.04em; }
-.peri-name--empty { color: rgba(0,255,255,0.2); }
+.peri-name--empty { color: rgba(0,255,255,0.45); }
 .peri-boost       { font-size: 10px; color: #00FF88; flex-shrink: 0; }
 .peri-status      { font-size: 7px; letter-spacing: 0.12em; flex-shrink: 0; }
 .peri-row--active  .peri-status { color: #00FF88; }
