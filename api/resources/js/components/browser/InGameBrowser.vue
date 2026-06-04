@@ -42,7 +42,7 @@
                 <button class="nav-btn" @click="navigate(SPLICE.HOME)"                 title="Home">&#8962;</button>
 
                 <div class="address-bar" @click="focusInput">
-                    <span class="addr-secure">⚿</span>
+                    <span class="addr-secure">&#9679;</span>
                     <span class="addr-scheme">splice://</span>
                     <input
                         ref="addrInputEl"
@@ -327,11 +327,9 @@ provide('spliceNavigate', navigate);
 .address-bar:focus-within { border-color: rgba(0, 255, 255, 0.4); }
 
 .addr-secure {
-    font-size: 13px;
+    font-size: 7px;
     color: #00FF88;
     flex-shrink: 0;
-    opacity: 0.7;
-    margin-right: 2px;
 }
 
 .addr-scheme {
@@ -343,7 +341,6 @@ provide('spliceNavigate', navigate);
     pointer-events: none;
 }
 
-/* Hide the static scheme prefix while the user is typing (input focused) */
 .address-bar:focus-within .addr-scheme {
     display: none;
 }
@@ -383,22 +380,6 @@ provide('spliceNavigate', navigate);
 
 /* Page components fill the content area */
 .splice-content > * {
-    position: absolute;
-    inset: 0;
-    overflow-y: auto;
-}
-
-/* ── Page transition ──────────────────────────────────────────────────────── */
-.page-fade-enter-active,
-.page-fade-leave-active {
-    transition: opacity 0.1s ease;
-}
-.page-fade-enter-from,
-.page-fade-leave-to {
-    opacity: 0;
-}
-</style>
- > * {
     position: absolute;
     inset: 0;
     overflow-y: auto;
