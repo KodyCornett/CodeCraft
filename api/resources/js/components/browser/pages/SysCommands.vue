@@ -243,6 +243,7 @@
 
 <script setup>
 import { ref, computed, inject } from 'vue';
+import axios from 'axios';
 
 defineProps({ url: { type: String, default: '' } });
 
@@ -299,16 +300,29 @@ function toggleExpand(id) {
     expandedId.value = expandedId.value === id ? null : id;
 }
 
+// Persist the current equipped set to the server.
+// Called after every equip/unequip so is_active in the DB stays in sync.
+async function saveLoadout() {
+    const activeIds = equippedCommands.value.map(c => c.id);
+    try {
+        await axios.post('/api/cyberdoc/loadout', { active_command_ids: activeIds });
+    } catch (e) {
+        console.warn('[LOADOUT] Save failed:', e?.response?.data?.message ?? e.message);
+    }
+}
+
 // Equip / unequip
 function equipCommand(cmd) {
     if (contextSlotsAvailable(cmd.context) <= 0) return;
     cmd.equipped = true;
     if (expandedId.value === cmd.id) expandedId.value = null;
+    saveLoadout();
 }
 
 function unequipCommand(cmd) {
     cmd.equipped = false;
     if (expandedId.value === cmd.id) expandedId.value = null;
+    saveLoadout();
 }
 </script>
 
