@@ -1612,6 +1612,17 @@ onMounted(async () => {
         // Single call seeds player + rig from the /api/player/me response
         hydrateFromAuth(authPlayer.value, authRig.value);
 
+        // Seed the map's currentNodeId from the server's persisted position so
+        // the player can move freely on reload regardless of which node type they
+        // are on. Without this, currentNodeId starts null and the server's
+        // "first move must be a spawn node" guard blocks anyone at a CyberDoc
+        // (e.g. after a critical-failure teleport).
+        const savedCanvasId = authPlayer.value?.current_node_canvas_id ?? null;
+        if (savedCanvasId) {
+            currentNodeId.value = savedCanvasId;
+            currentNode.value   = { canvasId: savedCanvasId, x: 0, y: 0 };
+        }
+
         // Restore active command effects from server state (survives page reload).
         // The server decrements these on every position() call so they're fresh.
         const serverEffects = authPlayer.value?.active_effects ?? {};

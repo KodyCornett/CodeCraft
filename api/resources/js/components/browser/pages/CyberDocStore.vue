@@ -64,6 +64,15 @@
             </Transition>
         </div>
 
+        <!-- ── Cooldown reset strip ────────────────────────────────────────────── -->
+        <div class="cooldown-strip">
+            <div>
+                <div class="cd-label">COMMAND COOLDOWN RESET</div>
+                <div class="cd-sub">Resets all command cooldowns. No charge. No bounty impact.</div>
+            </div>
+            <button class="cd-btn" :disabled="!atCyberDoc" @click="onResetCooldowns">[ RESET ALL ]</button>
+        </div>
+
         <!-- ── Section nav ────────────────────────────────────────────────────── -->
         <div class="store-nav">
             <button
@@ -277,14 +286,6 @@
                     <div class="smn-title">BLACKHAT FULLY UPGRADED — v1.9</div>
                     <div class="smn-sub">Visit the RIGS tab to purchase a NullTek Series 2 chassis.</div>
                 </div>
-            </div>
-
-            <div class="cooldown-strip">
-                <div>
-                    <div class="cd-label">COMMAND COOLDOWN RESET</div>
-                    <div class="cd-sub">Visiting CyberDoc resets all cooldowns. No charge.</div>
-                </div>
-                <button class="cd-btn" @click="onResetCooldowns">[ RESET ALL ]</button>
             </div>
 
         </div>

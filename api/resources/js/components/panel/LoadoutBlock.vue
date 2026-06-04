@@ -58,14 +58,17 @@
                     <span class="lb-detail-key">PACKET HIJACK</span>
                     <span class="lb-detail-val">{{ selectedCmd.packethijackEffect }}</span>
                 </div>
-                <button
-                    v-if="!selectedCmd.cooldown"
-                    class="lb-use-btn"
-                    @click="$emit('use-command', selectedCmd); selectedCmd = null"
-                >
-                    [USE ON MAP]
-                </button>
-                <div v-else class="lb-cd-notice">ON COOLDOWN — VISIT CYBERDOC TO RESET</div>
+                <template v-if="selectedCmd.context === 'map'">
+                    <button
+                        v-if="!selectedCmd.cooldown"
+                        class="lb-use-btn"
+                        @click="$emit('use-command', selectedCmd); selectedCmd = null"
+                    >
+                        [USE ON MAP]
+                    </button>
+                    <div v-else class="lb-cd-notice">ON COOLDOWN — VISIT CYBERDOC TO RESET</div>
+                </template>
+                <div v-else class="lb-ph-notice">PACKET HIJACK ONLY — equip during a Packet Hijack session</div>
             </div>
             <div v-else class="lb-hint">Select a command to view effects</div>
 
@@ -322,6 +325,14 @@ function selectCmd(cmd) {
     color: rgba(255,51,51,.72);
     letter-spacing: .08em;
     line-height: 1.6;
+}
+.lb-ph-notice {
+    margin-top: 6px;
+    font-size: 8px;
+    color: rgba(125,249,255,.55);
+    letter-spacing: .06em;
+    line-height: 1.6;
+    font-style: italic;
 }
 
 .lb-footer {
