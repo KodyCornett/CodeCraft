@@ -191,12 +191,7 @@ class CyberDocController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        $activeCommands = $player->commands()->wherePivot('is_active', true)->get(['id', 'name', 'type']);
-
-        return response()->json([
-            'message'         => 'Loadout updated.',
-            'active_commands' => $activeCommands,
-        ]);
+        return response()->json(['ok' => true]);
     }
 
     /**

@@ -310,7 +310,9 @@ function toggleExpand(id) {
 // Loadout save error — shown inline when the API rejects the change.
 // Cleared automatically after 4 seconds.
 const saveError = ref(null);
-let _saveErrTimer = null;
+let _saveErrTimer  = null;
+let _saveDebounce  = null;
+let _batchSnapshot = null; // pre-change state frozen on the first call in each debounce window
 
 function showSaveError(message) {
     clearTimeout(_saveErrTimer);
@@ -319,31 +321,46 @@ function showSaveError(message) {
 }
 
 // Persist the current equipped set to the server.
-// onRevert is called if the save fails so the UI reverts to match the DB.
-async function saveLoadout(onRevert = null) {
-    const activeIds = equippedCommands.value.map(c => c.id);
-    try {
-        await axios.post('/api/cyberdoc/loadout', { active_command_ids: activeIds });
-    } catch (e) {
-        const msg = e?.response?.data?.message ?? 'Loadout save failed.';
-        console.warn('[LOADOUT] Save failed:', msg);
-        if (onRevert) onRevert();
-        showSaveError(msg);
+// Debounced 300 ms — rapid equip/unequip collapses into one request.
+//
+// The pre-change state is frozen the first time this is called in a window.
+// Subsequent calls within the same 300 ms reuse that snapshot so a full
+// batch revert is possible if the request fails.
+function saveLoadout() {
+    // Freeze state before this batch of changes starts (first call only).
+    if (_saveDebounce === null) {
+        _batchSnapshot = commands.value.map(c => ({ cmd: c, was: c.equipped }));
     }
+    clearTimeout(_saveDebounce);
+    _saveDebounce = setTimeout(async () => {
+        _saveDebounce = null;
+        const snapshot = _batchSnapshot;
+        _batchSnapshot = null;
+        const activeIds = equippedCommands.value.map(c => c.id);
+        try {
+            await axios.post('/api/cyberdoc/loadout', { active_command_ids: activeIds });
+        } catch (e) {
+            const msg = e?.response?.data?.message ?? 'Loadout save failed.';
+            console.warn('[LOADOUT] Save failed:', msg);
+            // Roll back every change made during this batch.
+            if (snapshot) snapshot.forEach(({ cmd: c, was }) => { c.equipped = was; });
+            showSaveError(msg);
+        }
+    }, 300);
 }
 
-// Equip / unequip — revert local state if the server rejects the change.
+// Equip / unequip — mutations are local-first; saveLoadout persists the batch.
 function equipCommand(cmd) {
     if (contextSlotsAvailable(cmd.context) <= 0) return;
     cmd.equipped = true;
     if (expandedId.value === cmd.id) expandedId.value = null;
-    saveLoadout(() => { cmd.equipped = false; });
+    saveLoadout();
 }
 
 function unequipCommand(cmd) {
     cmd.equipped = false;
     if (expandedId.value === cmd.id) expandedId.value = null;
-    saveLoadout(() => { cmd.equipped = true; });
+    saveLoadout();
 }
 </script>
 

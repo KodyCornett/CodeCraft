@@ -360,8 +360,8 @@ class NodeController extends Controller
         }
 
         // Verify ownership + loadout
+        // Player::commands() already eager-loads is_active, level, loadout_slot via withPivot.
         $cmd = $player->commands()
-            ->withPivot(['is_active', 'level'])
             ->where('commands.id', $data['command_id'])
             ->first();
 
@@ -379,7 +379,7 @@ class NodeController extends Controller
         $level       = max(1, (int) $cmd->pivot->level);
         $scaling     = $cmd->level_scaling ?? [];
         $effectData  = $scaling[(string) $level] ?? ($scaling['1'] ?? []);
-        $moveTtl     = $cmd->duration['moves'] ?? 5;
+        $moveTtl     = ($cmd->duration ?? [])['moves'] ?? 5;
 
         // Prevent stacking the same command on the same node
         $existing = NodeTrap::where('placer_id', $player->id)

@@ -275,18 +275,6 @@ class PlayerController extends Controller
             $player->post_combat_silent_moves = max(0, $player->post_combat_silent_moves - 1);
         }
 
-        $player->save();
-
-        // Decrement persisted uplink by the actual hop cost (floor 0).
-        // $rig and $effectiveMax are already computed above.
-        $remainingUplink = null;
-        if ($rig !== null) {
-            $current             = $rig->current_uplink ?? $effectiveMax;
-            $rig->current_uplink = max(0, $current - $uplinkCost);
-            $rig->save();
-            $remainingUplink = $rig->current_uplink;
-        }
-
         // ── Tick the placer's own trap TTLs ───────────────────────────────────
         // Decrement placer_moves_left on every trap this player placed.
         // Traps that hit 0 moves are pruned (they will never fire now).
@@ -314,32 +302,40 @@ class PlayerController extends Controller
             $activeTrap->consumed = true;
             $activeTrap->save();
 
-            // Apply server-side effects that can be enforced immediately
-            $effect = $activeTrap->effect_data ?? [];
+            $effect   = $activeTrap->effect_data ?? [];
 
-            // Uplink drain (Crash)
-            if (isset($effect['uplink_drain']) && $rig !== null) {
-                $drain               = (int) $effect['uplink_drain'];
-                $rig->current_uplink = max(0, ($rig->current_uplink ?? 0) - $drain);
-                $rig->save();
-                $remainingUplink = $rig->current_uplink;
-            }
-
-            // Timed stat effects (OS Exploit, Buffer Overflow, RootKit)
-            // are stored in active_effects so position() enforces them per-move.
-            // Key is snake_case command name, value is moves duration.
-            $trapSlug = Str::snake($activeTrap->command_name);
+            // Timed stat effects (OS Exploit, Buffer Overflow, RootKit) — merge
+            // into active_effects before the single player save below.
             if (isset($effect['moves']) && ! isset($effect['uplink_drain'])) {
-                $currentEffects             = $player->active_effects ?? [];
-                $currentEffects[$trapSlug]  = (int) $effect['moves'];
-                $player->active_effects     = $currentEffects;
-                $player->save();
+                $trapSlug                   = Str::snake($activeTrap->command_name);
+                $effects                    = $player->active_effects ?? [];
+                $effects[$trapSlug]         = (int) $effect['moves'];
+                $player->active_effects     = $effects;
             }
 
             $trapTriggered = [
                 'command_name' => $activeTrap->command_name,
                 'effect'       => $effect,
             ];
+        }
+
+        // ── Single player save — position + effect decrements + any trap effect ─
+        $player->save();
+
+        // ── Single rig save — move uplink cost + any trap uplink drain ──────────
+        $remainingUplink = null;
+        if ($rig !== null) {
+            $current             = $rig->current_uplink ?? $effectiveMax;
+            $rig->current_uplink = max(0, $current - $uplinkCost);
+
+            // Uplink drain (Crash) applied on top of the move cost.
+            if ($activeTrap !== null && isset(($activeTrap->effect_data ?? [])['uplink_drain'])) {
+                $drain               = (int) $activeTrap->effect_data['uplink_drain'];
+                $rig->current_uplink = max(0, $rig->current_uplink - $drain);
+            }
+
+            $rig->save();
+            $remainingUplink = $rig->current_uplink;
         }
 
         return response()->json([
