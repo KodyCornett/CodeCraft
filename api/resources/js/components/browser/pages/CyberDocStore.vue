@@ -343,7 +343,7 @@
                     <div class="cmd-tier-heading">
                         <span class="cmd-tier-label">{{ ctx === 'map' ? 'MAP COMMANDS' : 'HACK COMMANDS' }}</span>
                         <span class="cmd-tier-req">
-                            {{ ctx === 'map' ? 'Used during map traversal' : 'Used inside GridBreach &amp; Packet Hijack' }}
+                            {{ ctx === 'map' ? 'Used during map traversal' : 'Used inside Packet Hijack' }}
                         </span>
                     </div>
 
@@ -370,8 +370,8 @@
                             >PURCHASE</button>
                         </div>
                         <div class="cmd-shop-effect">
-                            <span class="eff-key">{{ cmd.context === 'hack' ? 'BREACH' : 'MAP' }}</span>
-                            <span class="eff-val">{{ cmd.context === 'hack' ? cmd.gridbreachEffect : cmd.mapEffect }}</span>
+                            <span class="eff-key">{{ cmd.context === 'hack' ? 'PACKET HIJACK' : 'MAP' }}</span>
+                            <span class="eff-val">{{ cmd.context === 'hack' ? cmd.packethijackEffect : cmd.mapEffect }}</span>
                         </div>
                     </div>
                 </div>

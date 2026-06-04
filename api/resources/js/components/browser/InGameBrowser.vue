@@ -42,7 +42,8 @@
                 <button class="nav-btn" @click="navigate(SPLICE.HOME)"                 title="Home">&#8962;</button>
 
                 <div class="address-bar" @click="focusInput">
-                    <span class="addr-secure">&#9679;</span>
+                    <span class="addr-secure">⚿</span>
+                    <span class="addr-scheme">splice://</span>
                     <input
                         ref="addrInputEl"
                         class="addr-input"
@@ -317,9 +318,25 @@ provide('spliceNavigate', navigate);
 .address-bar:focus-within { border-color: rgba(0, 255, 255, 0.4); }
 
 .addr-secure {
-    font-size: 7px;
+    font-size: 13px;
     color: #00FF88;
     flex-shrink: 0;
+    opacity: 0.7;
+    margin-right: 2px;
+}
+
+.addr-scheme {
+    font-size: 10px;
+    color: rgba(0, 255, 255, 0.28);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* Hide the static scheme prefix while the user is typing (input focused) */
+.address-bar:focus-within .addr-scheme {
+    display: none;
 }
 
 .addr-input {

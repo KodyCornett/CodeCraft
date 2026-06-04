@@ -1,70 +1,57 @@
 <template>
     <div class="home-page">
 
-        <div class="home-hero">
-            <div class="home-logo">◈ SPLICE</div>
-            <div class="home-tagline">Secure Private Links In Covert Environments</div>
-        </div>
+        <!-- ── Centered content column ──────────────────────────────────────── -->
+        <div class="home-center">
 
-        <!-- Network -->
-        <div class="home-group">
-            <div class="home-group-label">NETWORK</div>
-            <div class="home-grid">
-                <button class="home-tile" @click="spliceNavigate(SPLICE.FEED)">
-                    <span class="tile-icon">◉</span>
-                    <span class="tile-title">DARKNET FEED</span>
-                    <span class="tile-desc">Live intel, bounties &amp; breach reports from around the city</span>
-                    <span class="tile-url">darknet.spk/feed</span>
-                </button>
-                <button class="home-tile" @click="spliceNavigate(SPLICE.CYBER_DOC)">
-                    <span class="tile-icon">⬡</span>
-                    <span class="tile-title">CYBERDOC</span>
-                    <span class="tile-desc">Purchase commands, hardware, software and consumables</span>
-                    <span class="tile-url">cyberdoc.net/shop</span>
+            <!-- Logo -->
+            <div class="home-logo">
+                <span class="logo-mark">◈</span>
+                <span class="logo-text">SPLICE</span>
+                <span class="logo-ver">v2.1</span>
+            </div>
+
+            <!-- Address input -->
+            <div class="home-search" @click="focusSearch">
+                <span class="hs-lock" title="Encrypted tunnel active">⚿</span>
+                <span class="hs-scheme">splice://</span>
+                <input
+                    ref="searchInput"
+                    class="hs-input"
+                    v-model="query"
+                    placeholder="enter address or search darknet…"
+                    spellcheck="false"
+                    autocomplete="off"
+                    @keydown.enter="onGo"
+                    @keydown.escape="query = ''"
+                />
+                <button class="hs-go" @click="onGo">GO</button>
+            </div>
+
+            <!-- Speed dial -->
+            <div class="speed-dial">
+                <button
+                    v-for="link in speedLinks"
+                    :key="link.url"
+                    class="sd-item"
+                    @click="spliceNavigate(link.url)"
+                    :title="link.url"
+                >
+                    <span class="sd-icon" :class="`sd-icon--${link.accent}`">{{ link.icon }}</span>
+                    <span class="sd-label">{{ link.label }}</span>
                 </button>
             </div>
+
         </div>
 
-        <!-- Reference -->
-        <div class="home-group">
-            <div class="home-group-label">REFERENCE</div>
-            <div class="home-grid">
-                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.COMMAND_CATALOG)">
-                    <span class="tile-icon tile-icon--cmd">⬡</span>
-                    <span class="tile-title">COMMAND CATALOG</span>
-                    <span class="tile-desc">Browse all 15 commands — map effects, hack effects, costs and targeting</span>
-                    <span class="tile-url">sys.local/commands/catalog</span>
-                </button>
-                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.STAT_GUIDE)">
-                    <span class="tile-icon tile-icon--stat">◈</span>
-                    <span class="tile-title">STAT REFERENCE</span>
-                    <span class="tile-desc">How CPU, RAM, OS, Firewall, Storage and Uplink interact with the game systems</span>
-                    <span class="tile-url">sys.local/guide/stats</span>
-                </button>
-                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.MANUAL)">
-                    <span class="tile-icon">◈</span>
-                    <span class="tile-title">SYSTEM MANUAL</span>
-                    <span class="tile-desc">Movement, hacking, resources and combat reference guide</span>
-                    <span class="tile-url">sys.local/manual</span>
-                </button>
-                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.GRID_BREACH_GUIDE)">
-                    <span class="tile-icon tile-icon--breach">◉</span>
-                    <span class="tile-title">GRID-BREACH MANUAL</span>
-                    <span class="tile-desc">How to run breaches — grid, sequences, row modifiers, stats &amp; PvP</span>
-                    <span class="tile-url">sys.local/guide/gridbreach</span>
-                </button>
-                <button class="home-tile home-tile--ref" @click="spliceNavigate(SPLICE.PACKET_HIJACK_GUIDE)">
-                    <span class="tile-icon tile-icon--hijack">◈</span>
-                    <span class="tile-title">PACKET HIJACK MANUAL</span>
-                    <span class="tile-desc">Three-phase PvP intrusion — recon, exploit chain &amp; filesystem extraction</span>
-                    <span class="tile-url">sys.local/guide/packethijack</span>
-                </button>
-            </div>
-        </div>
-
-        <div class="home-status">
-            <span class="hs-dot" />
-            <span>SPLICE NETWORK ONLINE // ALL NODES REACHABLE // {{ time }}</span>
+        <!-- ── Footer status bar ────────────────────────────────────────────── -->
+        <div class="home-footer">
+            <span class="hf-dot" />
+            <span class="hf-text">SPLICE NETWORK ONLINE</span>
+            <span class="hf-sep">//</span>
+            <span class="hf-text">ALL NODES REACHABLE</span>
+            <span class="hf-spacer" />
+            <span class="hf-time">{{ time }}</span>
         </div>
 
     </div>
@@ -77,9 +64,11 @@ import { SPLICE } from '@/components/browser/SpliceRouter.js';
 defineProps({ url: { type: String, default: '' } });
 
 const spliceNavigate = inject('spliceNavigate', () => {});
-
-const time = ref('');
+const searchInput    = ref(null);
+const query          = ref('');
+const time           = ref('');
 let timer;
+
 onMounted(() => {
     const tick = () => {
         time.value = new Date().toLocaleTimeString('en-US', { hour12: false });
@@ -88,6 +77,26 @@ onMounted(() => {
     timer = setInterval(tick, 1000);
 });
 onUnmounted(() => clearInterval(timer));
+
+function focusSearch() { searchInput.value?.focus(); }
+
+function onGo() {
+    let url = query.value.trim();
+    if (!url) return;
+    if (!url.includes('://')) url = 'splice://' + url;
+    spliceNavigate(url);
+    query.value = '';
+}
+
+const speedLinks = [
+    { label: 'CYBERDOC',      icon: '⬡', accent: 'amber',  url: SPLICE.CYBER_DOC        },
+    { label: 'DARKNET FEED',  icon: '◉', accent: 'cyan',   url: SPLICE.FEED             },
+    { label: 'CMD CATALOG',   icon: '⬡', accent: 'yellow', url: SPLICE.COMMAND_CATALOG  },
+    { label: 'STAT GUIDE',    icon: '◈', accent: 'blue',   url: SPLICE.STAT_GUIDE       },
+    { label: 'MANUAL',        icon: '◈', accent: 'gray',   url: SPLICE.MANUAL           },
+    { label: 'GRID-BREACH',   icon: '◉', accent: 'red',    url: SPLICE.GRID_BREACH_GUIDE},
+    { label: 'PKT HIJACK',    icon: '◈', accent: 'orange', url: SPLICE.PACKET_HIJACK_GUIDE },
+];
 </script>
 
 <style scoped>
@@ -96,116 +105,217 @@ onUnmounted(() => clearInterval(timer));
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 28px;
     height: 100%;
     background: #06060d;
     font-family: 'JetBrains Mono', monospace;
-    padding: 32px 40px;
-    overflow-y: auto;
+    overflow: hidden;
+    position: relative;
 }
 
-/* ── Hero ─────────────────────────────────────────────────────────────────── */
-.home-hero {
+/* ── Subtle grid background ───────────────────────────────────────────────── */
+.home-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+}
+
+/* ── Center column ────────────────────────────────────────────────────────── */
+.home-center {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-}
-
-.home-logo {
-    font-size: 42px;
-    color: #00FFFF;
-    letter-spacing: 0.25em;
-    text-shadow: 0 0 24px rgba(0, 255, 255, 0.45);
-}
-
-.home-tagline {
-    font-size: 9px;
-    color: rgba(0, 255, 255, 0.55);
-    letter-spacing: 0.18em;
-}
-
-/* ── Groups ───────────────────────────────────────────────────────────────── */
-.home-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
+    gap: 28px;
     width: 100%;
-    max-width: 720px;
+    max-width: 560px;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
 }
 
-.home-group-label {
-    font-size: 7px;
+/* ── Logo ─────────────────────────────────────────────────────────────────── */
+.home-logo {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.logo-mark {
+    font-size: 18px;
     color: rgba(0,255,255,0.5);
-    letter-spacing: 0.22em;
-    align-self: flex-start;
 }
 
-/* ── Quick-launch tiles ───────────────────────────────────────────────────── */
-.home-grid {
+.logo-text {
+    font-size: 26px;
+    color: rgba(0,255,255,0.85);
+    letter-spacing: 0.3em;
+}
+
+.logo-ver {
+    font-size: 9px;
+    color: rgba(0,255,255,0.25);
+    letter-spacing: 0.15em;
+    align-self: flex-end;
+    margin-bottom: 3px;
+}
+
+/* ── Address / search bar ─────────────────────────────────────────────────── */
+.home-search {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,255,255,0.18);
+    height: 38px;
+    padding: 0 0 0 12px;
+    cursor: text;
+    transition: border-color 0.15s;
+}
+
+.home-search:focus-within {
+    border-color: rgba(0,255,255,0.45);
+}
+
+.hs-lock {
+    font-size: 13px;
+    color: #00FF88;
+    flex-shrink: 0;
+    user-select: none;
+    margin-right: 2px;
+    opacity: 0.7;
+}
+
+.hs-scheme {
+    font-size: 11px;
+    color: rgba(0,255,255,0.28);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.hs-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: rgba(0,255,255,0.85);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 0 10px;
+    min-width: 0;
+}
+
+.hs-input::placeholder {
+    color: rgba(0,255,255,0.2);
+    font-style: italic;
+}
+
+.hs-go {
+    height: 100%;
+    padding: 0 16px;
+    background: rgba(0,255,255,0.07);
+    border: none;
+    border-left: 1px solid rgba(0,255,255,0.15);
+    color: rgba(0,255,255,0.5);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s, color 0.12s;
+}
+
+.hs-go:hover {
+    background: rgba(0,255,255,0.13);
+    color: #00FFFF;
+}
+
+/* ── Speed dial ───────────────────────────────────────────────────────────── */
+.speed-dial {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
     justify-content: center;
+    gap: 10px;
     width: 100%;
 }
 
-.home-tile {
+.sd-item {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 24px 28px;
-    width: 220px;
-    background: rgba(0, 255, 255, 0.025);
-    border: 1px solid rgba(0, 255, 255, 0.12);
+    align-items: center;
+    gap: 6px;
+    width: 68px;
+    padding: 12px 6px 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
     cursor: pointer;
-    text-align: left;
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-}
-.home-tile:hover {
-    background: rgba(0, 255, 255, 0.06);
-    border-color: rgba(0, 255, 255, 0.38);
-    box-shadow: 0 0 16px rgba(0, 255, 255, 0.07);
+    transition: background 0.12s, border-color 0.12s;
 }
 
-.tile-icon         { font-size: 16px; color: #00FF88; }
-.tile-icon--cmd    { color: #FFB300; }
-.tile-icon--stat   { color: #7DF9FF; }
-.tile-icon--breach { color: #FF3333; }
-.tile-icon--hijack { color: #FFB300; }
-.tile-title { font-size: 11px; color: #00FFFF; letter-spacing: 0.1em; }
-.tile-desc  { font-size: 8px;  color: rgba(255, 255, 255, 0.65); letter-spacing: 0.04em; line-height: 1.6; }
-.tile-url   { font-size: 8px;  color: rgba(0, 255, 255, 0.5);  letter-spacing: 0.08em; margin-top: 4px; }
-
-/* Reference tiles — slightly more muted to visually separate from network tiles */
-.home-tile--ref {
-    background: rgba(0, 255, 255, 0.015);
-    border-color: rgba(0, 255, 255, 0.08);
-    width: 200px;
-}
-.home-tile--ref:hover {
-    background: rgba(0, 255, 255, 0.04);
-    border-color: rgba(0, 255, 255, 0.28);
+.sd-item:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.14);
 }
 
-/* ── Status bar ───────────────────────────────────────────────────────────── */
-.home-status {
+.sd-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.sd-icon--cyan   { color: rgba(0,255,255,0.7); }
+.sd-icon--amber  { color: rgba(255,179,0,0.8); }
+.sd-icon--yellow { color: rgba(255,220,0,0.75); }
+.sd-icon--blue   { color: rgba(125,210,255,0.75); }
+.sd-icon--gray   { color: rgba(160,160,160,0.6); }
+.sd-icon--red    { color: rgba(255,80,80,0.75); }
+.sd-icon--orange { color: rgba(255,140,0,0.75); }
+
+.sd-label {
+    font-size: 7px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.08em;
+    text-align: center;
+    line-height: 1.3;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+.home-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 7px 16px;
+    border-top: 1px solid rgba(0,255,136,0.08);
+    background: rgba(0,0,0,0.3);
     font-size: 8px;
-    color: rgba(0, 255, 136, 0.7);
+    color: rgba(0,255,136,0.45);
     letter-spacing: 0.1em;
+    z-index: 1;
 }
 
-.hs-dot {
-    width: 6px;
-    height: 6px;
+.hf-dot {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: #00FF88;
-    box-shadow: 0 0 6px rgba(0, 255, 136, 0.7);
     flex-shrink: 0;
+    animation: dot-pulse 2.5s ease-in-out infinite;
 }
+
+@keyframes dot-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.35; }
+}
+
+.hf-sep     { color: rgba(0,255,136,0.2); }
+.hf-spacer  { flex: 1; }
+.hf-time    { color: rgba(0,255,255,0.3); letter-spacing: 0.12em; }
 </style>
