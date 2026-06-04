@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Command;
 use App\Models\Node;
+use App\Models\NodeTrap;
 use App\Models\Player;
 use App\Services\RigService;
 use Illuminate\Http\JsonResponse;
@@ -286,10 +287,66 @@ class PlayerController extends Controller
             $remainingUplink = $rig->current_uplink;
         }
 
+        // ── Tick the placer's own trap TTLs ───────────────────────────────────
+        // Decrement placer_moves_left on every trap this player placed.
+        // Traps that hit 0 moves are pruned (they will never fire now).
+        NodeTrap::where('placer_id', $player->id)
+            ->where('consumed', false)
+            ->where('placer_moves_left', '>', 0)
+            ->decrement('placer_moves_left');
+
+        NodeTrap::where('placer_id', $player->id)
+            ->where('placer_moves_left', '<=', 0)
+            ->delete();
+
+        // ── Check for traps at the destination node ───────────────────────────
+        // Find the first active trap placed by any OTHER player on this node.
+        // Consume it immediately so only one player triggers it.
+        $trapTriggered = null;
+        $activeTrap = NodeTrap::where('node_id', $node->id)
+            ->where('placer_id', '!=', $player->id)
+            ->where('consumed', false)
+            ->where('placer_moves_left', '>', 0)
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if ($activeTrap !== null) {
+            $activeTrap->consumed = true;
+            $activeTrap->save();
+
+            // Apply server-side effects that can be enforced immediately
+            $effect = $activeTrap->effect_data ?? [];
+
+            // Uplink drain (Crash)
+            if (isset($effect['uplink_drain']) && $rig !== null) {
+                $drain               = (int) $effect['uplink_drain'];
+                $rig->current_uplink = max(0, ($rig->current_uplink ?? 0) - $drain);
+                $rig->save();
+                $remainingUplink = $rig->current_uplink;
+            }
+
+            // Timed stat effects (OS Exploit, Buffer Overflow, RootKit)
+            // are stored in active_effects so position() enforces them per-move.
+            // Key is snake_case command name, value is moves duration.
+            $trapSlug = Str::snake($activeTrap->command_name);
+            if (isset($effect['moves']) && ! isset($effect['uplink_drain'])) {
+                $currentEffects             = $player->active_effects ?? [];
+                $currentEffects[$trapSlug]  = (int) $effect['moves'];
+                $player->active_effects     = $currentEffects;
+                $player->save();
+            }
+
+            $trapTriggered = [
+                'command_name' => $activeTrap->command_name,
+                'effect'       => $effect,
+            ];
+        }
+
         return response()->json([
             'ok'               => true,
             'active_effects'   => $player->active_effects ?? (object) [],
             'remaining_uplink' => $remainingUplink,
+            'trap_triggered'   => $trapTriggered,
         ]);
     }
 

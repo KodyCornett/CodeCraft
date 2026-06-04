@@ -14,11 +14,11 @@
                     ref="mapCanvasRef"
                     :nodes="nodes"
                     :pings="pings"
-                    :crash-mines="crashMines"
+                    :traps="myTraps"
                     :current-node-id="currentNodeId"
                     :player-uplink="player.uplink"
                     :player-ss="player.currentSS"
-                    :target-mode="!!crashTargetMode"
+                    :target-mode="!!trapTargetMode"
                     @node-clicked="handleNodeClicked"
                     @player-moved="handlePlayerMoved"
                     @move-blocked="onMoveBlocked"
@@ -45,14 +45,22 @@
                 <!-- Map loading indicator -->
                 <div v-if="mapLoading" class="map-loading">// LOADING NETWORK DATA...</div>
 
-                <!-- Crash mine targeting mode — persists until player picks a node or cancels -->
+                <!-- Trap targeting mode — persists until player picks a node or cancels -->
                 <Transition name="targeting-fade">
-                    <div v-if="crashTargetMode" class="crash-targeting-banner">
+                    <div v-if="trapTargetMode" class="crash-targeting-banner">
                         <span class="ct-icon">⚠</span>
-                        <span class="ct-text">CRASH MINE — SELECT AN ADJACENT NODE TO PLANT</span>
-                        <button class="ct-cancel" @click="cancelCrashTarget">[ CANCEL ]</button>
+                        <span class="ct-text">{{ trapTargetMode.cmd.name.toUpperCase() }} — SELECT AN ADJACENT NODE TO PLANT</span>
+                        <button class="ct-cancel" @click="cancelTrapTarget">[ CANCEL ]</button>
                     </div>
                 </Transition>
+
+                <!-- Command hit notification — shown when a trap fires on this player -->
+                <CommandHitNotification
+                    v-if="trapHitNotification"
+                    :command-name="trapHitNotification.commandName"
+                    :effect="trapHitNotification.effect"
+                    @done="trapHitNotification = null"
+                />
 
                 <!-- In-game SPLICE browser -->
                 <Transition name="browser-fade">
@@ -275,7 +283,8 @@ import HexMapCanvas  from '@/components/map/HexMapCanvas.vue';
 
 // ── Overlays ──────────────────────────────────────────────────────────────────
 import BootSequence             from '@/components/shared/BootSequence.vue';
-import OpenSeasonNotification  from '@/components/shared/OpenSeasonNotification.vue';
+import OpenSeasonNotification   from '@/components/shared/OpenSeasonNotification.vue';
+import CommandHitNotification  from '@/components/shared/CommandHitNotification.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
 import PacketHijack  from '@/components/minigame/PacketHijack.vue';
@@ -417,11 +426,13 @@ let   _alertTimer = null;
 const hudFlash        = ref('');
 let   _flashTimer     = null;
 
-// ── Crash mine state ──────────────────────────────────────────────────────────
-// crashTargetMode: set to { cmd, match } while the player is picking a target node.
-// crashMines:      client-only list of placed mines visible only to this player.
-const crashTargetMode = ref(null);
-const crashMines      = ref([]);
+// ── Trap state ────────────────────────────────────────────────────────────────
+// trapTargetMode:       set to { cmd, match } while the player is picking a target node.
+// myTraps:             server-fetched list of this player's active traps (for map rendering).
+// trapHitNotification: set when position() returns trap_triggered — drives the hit popup.
+const trapTargetMode      = ref(null);
+const myTraps             = ref([]);
+const trapHitNotification = ref(null);
 
 function showBountyAlert(message) {
     if (_alertTimer) clearTimeout(_alertTimer);
@@ -613,12 +624,25 @@ function handlePlayerMoved(event) {
     onPlayerMoved(event);   // update currentNode, uplink, district
 
     // Persist position to backend so other players can detect same-node presence.
-    // The response carries remaining_uplink — sync it so a mid-session reload
-    // always restores the correct value rather than giving the player a free refill.
+    // The response carries remaining_uplink and trap_triggered — sync both.
     updatePosition(event.nodeId, event.district ?? player.value.district, (data) => {
         if (data.remaining_uplink != null) {
             player.value.uplink = data.remaining_uplink;
         }
+        // ── Trap hit ──────────────────────────────────────────────────────────
+        // Server consumed a trap on this node and returned its effect. Merge any
+        // timed effects into activeEffects and show the Splice popup notification.
+        if (data.trap_triggered) {
+            const { command_name, effect } = data.trap_triggered;
+            // Merge server-applied timed effects (os_exploit, buffer_overflow, etc.)
+            if (data.active_effects) {
+                Object.assign(activeEffects.value, data.active_effects);
+            }
+            // Show the hit notification
+            trapHitNotification.value = { commandName: command_name, effect };
+        }
+        // Refresh our own trap list (a trap may have ticked down server-side)
+        fetchMyTraps();
     }, event.uplinkCost ?? 1);
 
     // ── Decrement active command effects ──────────────────────────────────────
@@ -640,13 +664,6 @@ function handlePlayerMoved(event) {
         }
     }
 
-    // Tick down crash mine TTLs — remove any that have expired
-    if (crashMines.value.length > 0) {
-        crashMines.value = crashMines.value
-            .map(m => ({ ...m, movesLeft: m.movesLeft - 1 }))
-            .filter(m => m.movesLeft > 0);
-    }
-
     // Tick down false ping counter (Signal Noise / Decoy planted via fireFalsePing)
     if (_falsePingIds.length > 0 && _falsePingMovesLeft > 0) {
         _falsePingMovesLeft--;
@@ -660,33 +677,58 @@ function handlePlayerMoved(event) {
     // Pings are hack-triggered only — no movement pings.
 }
 
-// ── Node click — intercepts crash targeting mode before normal selection ───────
+// ── Node click — intercepts trap targeting mode before normal selection ───────
 function handleNodeClicked(event) {
-    if (crashTargetMode.value) {
+    if (trapTargetMode.value) {
         if (!event.isAdjacent) {
             clearTimeout(_flashTimer);
-            hudFlash.value = 'OUT OF RANGE — select an adjacent node to plant the mine';
+            hudFlash.value = `OUT OF RANGE — select an adjacent node to plant ${trapTargetMode.value.cmd.name}`;
             _flashTimer = setTimeout(() => { hudFlash.value = ''; }, 3_000);
             return;
         }
-        const { cmd, match } = crashTargetMode.value;
+        const { cmd, match } = trapTargetMode.value;
         const node           = event.node;
         const ttl            = cmd.duration?.moves ?? 5;
-        crashMines.value.push({ canvasId: node.id, x: node.x, y: node.y, movesLeft: ttl });
+
+        // POST to server — trap is now persisted and will fire for any other player
+        import('axios').then(m =>
+            m.default.post(`/api/nodes/${node.id}/place-trap`, { command_id: cmd.id })
+                .then(res => {
+                    // Refresh our trap list so the mine marker appears immediately
+                    fetchMyTraps();
+                    console.log(`[TRAP] ${cmd.name} planted at ${node.id} — ${ttl} moves TTL`);
+                })
+                .catch(e => {
+                    console.warn(`[TRAP] Server placement failed:`, e?.response?.data);
+                    // Revert cooldown so the player can try again
+                    match.cooldown  = false;
+                    match.movesLeft = 0;
+                })
+        );
+
         match.cooldown  = true;
         match.movesLeft = ttl;
-        crashTargetMode.value = null;
-        console.log(`[CRASH] Mine planted at ${node.id} — ${ttl} moves TTL`);
+        trapTargetMode.value = null;
         return;
     }
     onNodeClicked(event);
 }
 
-function cancelCrashTarget() {
-    if (!crashTargetMode.value) return;
+function cancelTrapTarget() {
+    if (!trapTargetMode.value) return;
     // Revert the premature cooldown set before the switch — command stays ready.
-    crashTargetMode.value.match.cooldown = false;
-    crashTargetMode.value = null;
+    trapTargetMode.value.match.cooldown = false;
+    trapTargetMode.value = null;
+}
+
+// Fetch this player's active traps from the server (for map mine markers)
+async function fetchMyTraps() {
+    try {
+        const res = await import('axios').then(m => m.default.get('/api/player/traps'));
+        myTraps.value = res.data.traps ?? [];
+    } catch (e) {
+        // Non-critical — map markers are cosmetic only
+    }
 }
 
 // ── Resource availability ──────────────────────────────────────────────────────
@@ -1222,12 +1264,16 @@ async function onUseCommand(cmd) {
     switch (cmd.name) {
 
         case 'Crash':
-            // Node-targeted trap — revert the premature cooldown and enter
-            // targeting mode. Cooldown is applied once the player picks a node.
+        case 'Packet Flood':
+        case 'OS Exploit':
+        case 'Buffer Overflow':
+        case 'RootKit':
+            // Node-targeted traps — enter targeting mode. Cooldown is applied
+            // once the player picks a node and the server confirms placement.
             match.cooldown  = false;
             match.movesLeft = 0;
-            crashTargetMode.value = { cmd, match };
-            console.log('[CRASH] Targeting mode active — awaiting node selection.');
+            trapTargetMode.value = { cmd, match };
+            console.log(`[TRAP] ${cmd.name} targeting mode active — awaiting node selection.`);
             break;
 
         case 'Ghost Protocol':
@@ -1591,7 +1637,7 @@ provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, cu
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 function onKeyDown(e) {
-    if (e.key === 'Escape') cancelCrashTarget();
+    if (e.key === 'Escape') cancelTrapTarget();
 }
 
 onMounted(async () => {
@@ -1639,8 +1685,8 @@ onMounted(async () => {
             t => hackCount.value >= t.hacks
         )?.level ?? 0;
 
-        // Fetch commands and inventory in parallel
-        await Promise.all([fetchCommands(), fetchInventory()]);
+        // Fetch commands, inventory, and active traps in parallel
+        await Promise.all([fetchCommands(), fetchInventory(), fetchMyTraps()]);
 
         // Start presence heartbeat — stamps last_seen_at every 45s and fires
         // sendBeacon on beforeunload so ghost players are removed immediately

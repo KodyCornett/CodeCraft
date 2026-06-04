@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\BountyBoardUpdated;
 use App\Models\Node;
+use App\Models\NodeTrap;
 use App\Models\NodeTrace;
 use App\Models\Player;
 use App\Services\BountyService;
@@ -324,5 +325,122 @@ class NodeController extends Controller
             ] : null,
             'bounty_event' => $bountyEvent,
         ]);
+    }
+
+    /**
+     * POST /api/nodes/{canvasId}/place-trap
+     *
+     * Places a server-persisted trap on a node on behalf of the authenticated player.
+     * The trap fires the first time ANY other player steps on that node, applying the
+     * command's effect to them server-side and returning it in their position() response.
+     *
+     * Body:
+     *   command_id  string  UUID of the equipped trap command being activated
+     *
+     * Validation:
+     *   • Node must exist
+     *   • Command must be owned + equipped by this player
+     *   • Command must have context 'map' and type 'trap'
+     *   • Player must not already have an unconsumed trap of the same command on this node
+     */
+    public function placeTrap(Request $request, string $canvasId): JsonResponse
+    {
+        $data = $request->validate([
+            'command_id' => ['required', 'uuid'],
+        ]);
+
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $node = Node::where('canvas_id', $canvasId)->first();
+        if ($node === null) {
+            return response()->json(['message' => 'Node not found.'], 404);
+        }
+
+        // Verify ownership + loadout
+        $cmd = $player->commands()
+            ->withPivot(['is_active', 'level'])
+            ->where('commands.id', $data['command_id'])
+            ->first();
+
+        if ($cmd === null) {
+            return response()->json(['message' => 'Command not owned.'], 422);
+        }
+        if (! $cmd->pivot->is_active) {
+            return response()->json(['message' => 'Command not equipped.'], 422);
+        }
+        if ($cmd->context !== 'map' || $cmd->type !== 'trap') {
+            return response()->json(['message' => 'Not a map trap command.'], 422);
+        }
+
+        // Resolve level-scaling payload for this player's command level
+        $level       = max(1, (int) $cmd->pivot->level);
+        $scaling     = $cmd->level_scaling ?? [];
+        $effectData  = $scaling[(string) $level] ?? ($scaling['1'] ?? []);
+        $moveTtl     = $cmd->duration['moves'] ?? 5;
+
+        // Prevent stacking the same command on the same node
+        $existing = NodeTrap::where('placer_id', $player->id)
+            ->where('node_id', $node->id)
+            ->where('command_name', $cmd->name)
+            ->where('consumed', false)
+            ->where('placer_moves_left', '>', 0)
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if ($existing !== null) {
+            return response()->json(['message' => 'Trap already active on this node.'], 422);
+        }
+
+        $trap = NodeTrap::create([
+            'placer_id'         => $player->id,
+            'node_id'           => $node->id,
+            'command_name'      => $cmd->name,
+            'effect_data'       => $effectData,
+            'placer_moves_left' => $moveTtl,
+            'consumed'          => false,
+            'expires_at'        => Carbon::now()->addMinutes(NodeTrap::DEFAULT_TTL_MINUTES),
+        ]);
+
+        return response()->json([
+            'ok'      => true,
+            'trap_id' => $trap->id,
+            'node'    => $canvasId,
+            'ttl'     => ['moves' => $moveTtl, 'minutes' => NodeTrap::DEFAULT_TTL_MINUTES],
+        ]);
+    }
+
+    /**
+     * GET /api/player/traps
+     *
+     * Returns the authenticated player's own active (unconsumed, unexpired) traps
+     * so the map can render mine markers only visible to the placer.
+     */
+    public function myTraps(Request $request): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['traps' => []]);
+        }
+
+        $now   = Carbon::now();
+        $traps = NodeTrap::with('node:id,canvas_id,x,y')
+            ->where('placer_id', $player->id)
+            ->where('consumed', false)
+            ->where('placer_moves_left', '>', 0)
+            ->where('expires_at', '>', $now)
+            ->get()
+            ->map(fn (NodeTrap $t) => [
+                'id'           => $t->id,
+                'canvasId'     => $t->node->canvas_id,
+                'x'            => $t->node->x,
+                'y'            => $t->node->y,
+                'commandName'  => $t->command_name,
+                'movesLeft'    => $t->placer_moves_left,
+            ]);
+
+        return response()->json(['traps' => $traps]);
     }
 }

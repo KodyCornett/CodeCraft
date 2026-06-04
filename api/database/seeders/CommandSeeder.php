@@ -7,7 +7,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Seeds the full command catalog — 11 map commands + 12 hack commands.
+ * Seeds the full command catalog — 10 map commands + 12 hack commands.
  *
  * MAP commands are used during map traversal (trap placement, self-buffs, stealth).
  * HACK commands are used inside GridBreach or Packet Hijack PvP sessions only.
@@ -263,27 +263,6 @@ class CommandSeeder extends Seeder
                 ],
             ],
 
-            [
-                'name'                => 'Neural Spike',
-                'context'             => 'map',
-                'type'                => 'trap',
-                'target_type'         => 'node',
-                'price_creds'         => 700,
-                'price_tp'            => 6,
-                'upgrade_cost_tp'     => 6,
-                'max_level'           => 3,
-                'duration'            => ['moves' => 5, 'minutes' => 5],
-                'description'         => 'Places a trap that penalises the next visitor\'s GridBreach timer.',
-                'map_effect'          => 'The next player to visit the trapped node loses time from their next GridBreach match timer. Trap expires after 5 of your moves or 5 minutes. L1: −5 seconds. L2: −7 seconds.',
-                'gridbreach_effect'   => null,
-                'packethijack_effect' => null,
-                'level_scaling'       => [
-                    '1' => ['timer_penalty_seconds' => 5],
-                    '2' => ['timer_penalty_seconds' => 7],
-                    '3' => ['timer_penalty_seconds' => 7, 'extra_use' => true],
-                ],
-            ],
-
             // ══════════════════════════════════════════════════════════════════
             // HACK COMMANDS  (12)
             // Used inside GridBreach or Packet Hijack PvP sessions only.
@@ -534,4 +513,14 @@ class CommandSeeder extends Seeder
                 'description'         => 'Plants a honeypot that penalises the opponent if they target it.',
                 'map_effect'          => null,
                 'gridbreach_effect'   => null,
-                'packethijack_effect' => 'Marks one port with an artificially low bias reading. If the attacker runs exploit on it, their terminal locks for the pen
+                'packethijack_effect' => 'Marks one port with an artificially low bias reading. If the attacker runs exploit on it, their terminal locks for the penalty duration. L1: locks for 2 seconds. L2: locks for 3 seconds.',
+                'level_scaling'       => [
+                    '1' => ['lock_seconds' => 2],
+                    '2' => ['lock_seconds' => 3],
+                    '3' => ['lock_seconds' => 3, 'extra_use' => true],
+                ],
+            ],
+
+        ];
+    }
+}

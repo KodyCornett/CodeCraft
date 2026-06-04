@@ -180,18 +180,18 @@
                 </g>
             </g>
 
-            <!-- Crash mine markers — client-only, only visible to placing player -->
+            <!-- Trap markers — server-fetched, only visible to the placing player -->
             <g class="crash-mine-layer">
                 <g
-                    v-for="mine in props.crashMines"
-                    :key="mine.canvasId"
+                    v-for="trap in props.traps"
+                    :key="trap.id"
                     class="crash-mine"
                     pointer-events="none"
                 >
-                    <circle :cx="mine.x" :cy="mine.y" r="11" class="mine-ring" />
-                    <line :x1="mine.x - 4" :y1="mine.y - 4" :x2="mine.x + 4" :y2="mine.y + 4" class="mine-cross" />
-                    <line :x1="mine.x + 4" :y1="mine.y - 4" :x2="mine.x - 4" :y2="mine.y + 4" class="mine-cross" />
-                    <text :x="mine.x" :y="mine.y - 15" class="mine-ttl">{{ mine.movesLeft }}M</text>
+                    <circle :cx="trap.x" :cy="trap.y" r="11" class="mine-ring" />
+                    <line :x1="trap.x - 4" :y1="trap.y - 4" :x2="trap.x + 4" :y2="trap.y + 4" class="mine-cross" />
+                    <line :x1="trap.x + 4" :y1="trap.y - 4" :x2="trap.x - 4" :y2="trap.y + 4" class="mine-cross" />
+                    <text :x="trap.x" :y="trap.y - 15" class="mine-ttl">{{ trap.movesLeft }}M</text>
                 </g>
             </g>
 
@@ -282,7 +282,7 @@ const props = defineProps({
     nodes:         { type: Array,   default: () => [] },
     links:         { type: Array,   default: () => [] },
     pings:         { type: Array,   default: () => [] },
-    crashMines:    { type: Array,   default: () => [] },
+    traps:         { type: Array,   default: () => [] },
     currentNodeId: { type: String,  default: null     },
     playerUplink:  { type: Number,  default: 3        },
     playerSs:      { type: Number,  default: 100      },

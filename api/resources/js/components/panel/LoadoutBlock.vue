@@ -281,7 +281,7 @@ function selectCmd(cmd) {
     font-size: 8px;
     color: rgba(0,255,255,.62);
     letter-spacing: .1em;
-    width: 34px;
+    width: 72px;
     flex-shrink: 0;
     padding-top: 1px;
 }

@@ -24,8 +24,9 @@ export function usePosition(playerId) {
                 district:       district ?? null,
                 uplink_cost:    uplinkCost,
             });
-            // Sync server-authoritative remaining uplink back to client
-            if (onSuccess && res.data.remaining_uplink != null) {
+            // Pass the full response payload to the caller so they can sync
+            // remaining_uplink, trap_triggered, active_effects, etc.
+            if (onSuccess) {
                 onSuccess(res.data);
             }
         } catch (e) {
