@@ -27,9 +27,10 @@ class DatabaseSeeder extends Seeder
             'email' => 'test2@example.com',
         ]);
 
+        $this->call(ChassisTemplateSeeder::class); // must run before PlayerSeeder
         $this->call(PeripheralSeeder::class);
         $this->call(ConsumableSeeder::class);
-        $this->call(PlayerSeeder::class);     // must run after User factory above
+        $this->call(PlayerSeeder::class);     // must run after User factory + ChassisTemplateSeeder
         $this->call(NodeSeeder::class);
         $this->call(SpawnNodeSeeder::class);  // must run after NodeSeeder
         $this->call(CommandSeeder::class);

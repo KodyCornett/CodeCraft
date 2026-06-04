@@ -157,6 +157,7 @@ export function useGameState() {
             rig.value.pointsSpent     = authRig.points?.spent ?? 0;
             rig.value.pointsCap       = authRig.points?.cap   ?? 0;
             rig.value.peripheralSlots = authRig.peripheral_slots ?? 0;
+            rig.value.loadoutSlots    = authRig.loadout_slots    ?? null;
         }
     }
 
