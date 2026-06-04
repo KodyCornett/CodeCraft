@@ -315,6 +315,7 @@ const speedLinks = [
     50%       { opacity: 0.35; }
 }
 
+.hf-text    { color: rgba(0,255,136,0.45); letter-spacing: 0.1em; }
 .hf-sep     { color: rgba(0,255,136,0.2); }
 .hf-spacer  { flex: 1; }
 .hf-time    { color: rgba(0,255,255,0.3); letter-spacing: 0.12em; }

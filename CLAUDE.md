@@ -34,55 +34,90 @@ CodeCraft is a real-time multiplayer cyberpunk hacking game. Players move across
 ```
 api/
   app/
-    Http/Controllers/       One controller per resource. Keep controllers thin.
-      Auth/LoginController  Web session login/logout
-      AuthController        POST /api/auth/token (reserved — can be removed)
-      PlayerController      /api/player/me, /api/player/position
-      NodeController        /api/nodes, /api/nodes/{id}/players, /api/nodes/{id}/deplete
-      RigController         /api/rig CRUD
-      BountyController      /api/leaderboard/*, /api/player/{id}/extract
-      StreetDocController   /api/street-doc/*
-      CombatController      /api/combat/result
-      CombatChallengeController  PvP challenge handshake
+    Http/Controllers/            One controller per resource. Keep controllers thin.
+      Auth/LoginController       Web session login/logout (GET/POST /login, POST /logout)
+      Auth/RegisterController    New player registration (GET/POST /register)
+      AuthController             POST /api/auth/token — Bearer token for external engine only
+      PlayerController           /api/player/me, /api/player/position, /api/player/heartbeat
+      NodeController             /api/nodes, /api/nodes/{id}/players, /api/nodes/{id}/deplete
+      RigController              /api/rig CRUD + /api/rig/upgrade, /api/rig/chassis-upgrade
+      BountyController           /api/leaderboard/bounty, /api/leaderboard/open-season, /api/player/{id}/extract
+      CyberDocController         /api/cyberdoc/* — banking, repair, install, loadout, reallocate, upgrade-command
+      CombatController           /api/combat/result
+      CombatChallengeController  /api/combat/challenge/* — PvP challenge handshake
+      PacketHijackController     /api/packet-hijack/{match}/command, /api/packet-hijack/{match}/state
+      StoreController            /api/store/catalog, /api/store/purchase-*
+      InventoryController        /api/inventory, /api/inventory/use
+      TutorialController         /api/tutorial/reward
     Models/
       User                  Laravel auth user (email + password)
-      Player                Game identity — handle, economy, bounty state
+      Player                Game identity — handle, economy, bounty state, active_effects
       PlayerRig             Rig stats (invested levels, current_ss)
       ChassisTemplate       Chassis catalog — base stats + caps per tier
-      ...
+      Command               Command definition — name, context, level, duration
+      PlayerCommand         Player's owned commands + loadout_slot assignment
+      Peripheral            Peripheral definition — type, stat_boosted, price
+      PlayerPeripheral      Player's installed peripherals
+      Consumable            Consumable item definition
+      PlayerConsumable      Player's consumable inventory
+      Node                  Map node — ice, type, is_spawn, is_safe_zone, npc_handle
+      NodeConnection        Adjacency edges between nodes
+      NodeTrace             Trace markers left on nodes by players
+      CombatChallenge       Active PvP challenge record (30s TTL)
+      PacketHijackMatch     Active Packet Hijack session — phase, port pool, chain state
+      StreetDoc             Street Doc NPC locations (legacy name — maps to CyberDoc NPCs)
+      HardwareEncrypt       Encryption hardware item (status: verify active usage)
     Services/
-      RigService            All stat calculation lives here — effectiveStats(), maxSs(), etc.
-      StreetDocService      Banking pocket_creds, cache flush, bounty reset
+      RigService            All stat calculation — effectiveStats(), maxSs(), loadoutSlots(),
+                            applyDamage(), enforceRamCap(), enforceCpuCommandCap()
+      CyberDocService       Banking pocket_creds, SS repair, peripheral install, loadout management
+      BountyService         Bounty threshold evaluation, leaderboard queries
+      NodeService           Node depletion logic, reward calculation
+      InventoryService      Consumable use effects
+      PacketHijackService   Full Packet Hijack game logic — Phase 1 recon, Phase 2 exploit chain,
+                            rig commands, port pool generation, chain generation, command parsing
+    DTOs/
+      BountyEvent           Value object carrying bounty state for broadcast events
   database/
     migrations/             One file per schema change — never edit existing migrations
     seeders/
-      ChassisTemplateSeeder Chassis catalog (run this after migrations)
+      ChassisTemplateSeeder Chassis catalog (run after migrations)
       PlayerSeeder          Test player + rig
   resources/js/
     Pages/
-      Game.vue              Root game component — wires all composables together
+      Game.vue              Root game component — wires all composables together (integration layer only)
       Auth/Login.vue        Cyberpunk login page
+      Auth/Register.vue     New player registration page
     components/
-      layout/               GameScreen, HUD, NavBar, SidePanel
-      map/                  HexMapCanvas (SVG hex grid + ping layer)
+      layout/               GameScreen, HUD, NavBar, SidePanel, GameMenu
+      map/                  HexMapCanvas (SVG hex grid + ping layer), NodeWindow
       panel/                NodeInfoBlock, LoadoutBlock, BountyBlock, PanelBlock
-      browser/              InGameBrowser, SpliceRouter, pages/
-      minigame/             GridBreach
-      shared/               BootSequence
-      streetdoc/            StreetDocMenu
+      browser/              InGameBrowser, SpliceRouter.js, pages/
+      minigame/             GridBreach, PacketHijack
+      shared/               BootSequence, NeonBorder, OpenSeasonNotification, SSBar, TerminalText
     composables/
       useAuth.js            Fetches /api/player/me — session cookie handles auth
-      useMockGameState.js   Reactive player/rig/commands refs (hydrated from API on login)
+      useGameState.js       Reactive player/rig/commands/inventory refs (hydrated from API on login)
+                            Note: was useMockGameState — renamed
       useMapData.js         Fetches 228 nodes, exposes getByCanvasId(), getSpawnNode()
       useMapInteraction.js  Node selection, player movement, currentNodeId
       usePosition.js        Debounced POST /api/player/position on every move
+      useHeartbeat.js       POST /api/player/heartbeat on a keepalive interval
       useNodePresence.js    Polls /api/nodes/{id}/players every 3s (post-auth only)
+      useNodeTraces.js      Fetches + stores node trace markers for the current node
+      useNodeIdentity.js    Pure utility — getNodeIdentity(), getNetworkName(), getSpliceAddress()
       useCombat.js          PvP challenge handshake + result submission
       useBountyBoard.js     Polls /api/leaderboard/bounty every 30s
       useDepletion.js       POST /api/nodes/{id}/deplete after each hack
-      useStreetDoc.js       POST /api/street-doc/visit
-      useWebSocket.js       WS stub — will be replaced by Laravel Echo when Reverb is installed
-      useBrowserState.js    Controls which SPLICE browser URL is active
+      usePacketHijack.js    Packet Hijack WebSocket state + command dispatch
+      useUpgradeCosts.js    Client-side upgrade cost projection for store UI display only
+                            (server recomputes all actual costs via RigService)
+      useWebSocket.js       WS stub — silent no-op until Laravel Echo + Reverb is installed
+                            Do NOT add logic to this stub
+      useBrowserState.js    Controls which SPLICE panel URL is active at the Game.vue level
+      useBrowser.js         Internal navigation history inside InGameBrowser.vue
+      useAudio.js           Sound effect playback helpers
+      useTutorial.js        Tutorial quest state + POST /api/tutorial/reward
 ```
 
 ---
@@ -91,7 +126,7 @@ api/
 
 **Controllers** validate input and return JSON. No business logic. If a method is longer than ~30 lines something belongs in a Service.
 
-**Services** own all game logic (RigService, StreetDocService, etc.). No HTTP, no request objects.
+**Services** own all game logic (RigService, CyberDocService, etc.). No HTTP, no request objects.
 
 **Models** are data + relationships only. No game logic in models.
 
@@ -161,7 +196,7 @@ Slot rules:
 max_ss = 100 (flat for all rigs — chassis and OS do not affect this value)
 ```
 
-SS is the rig's health pool. PvP and PvE damage reduce it. Hitting 0 triggers Critical System Failure: pocket creds wiped, bounty reset, teleported to last Street Doc, SS stays at 0 until repaired.
+SS is the rig's health pool. PvP and PvE damage reduce it. Hitting 0 triggers Critical System Failure: pocket creds wiped, bounty reset, teleported to last CyberDoc, SS stays at 0 until repaired.
 
 ### SS Degradation
 
@@ -237,7 +272,7 @@ Caps:
 | 25 | ★4 | ×2.00 | Open Season — all players notified |
 | 30 | ★5 | ×2.25 | Max heat, pings every move |
 
-Bounty resets to 0 at Street Doc visit (banked as part of the extract).
+Bounty resets to 0 at CyberDoc visit (banked as part of the extract).
 
 ### ICE Ping Formula
 
@@ -265,8 +300,8 @@ Rings render in the SVG ping layer of HexMapCanvas. Bounty pings are amber dashe
 
 | Pool | Description |
 |---|---|
-| `wallet_creds` | Safe creds — banked at Street Doc. Spent at CyberDoc store. |
-| `pocket_creds` | At-risk creds from hacking. Lost if killed in PvP. Converted to wallet at Street Doc. |
+| `wallet_creds` | Safe creds — banked at CyberDoc. Spent at CyberDoc store. |
+| `pocket_creds` | At-risk creds from hacking. Lost if killed in PvP. Converted to wallet at CyberDoc. |
 
 Hack rewards always go to `pocket_creds`, never directly to `wallet_creds`.
 
@@ -298,7 +333,7 @@ Laravel session auth via Sanctum.
 
 Sanctum's `EnsureFrontendRequestsAreStateful` middleware is prepended to the API group so session cookies authenticate all `/api/*` requests from the SPA — no Bearer token is needed on the frontend.
 
-`useAuth.js` in the client simply calls `GET /api/player/me`. If the session is valid, it returns the player + rig snapshot used to hydrate `useMockGameState`.
+`useAuth.js` in the client simply calls `GET /api/player/me`. If the session is valid, it returns the player + rig snapshot used to hydrate `useGameState`.
 
 ---
 
@@ -308,7 +343,7 @@ Sanctum's `EnsureFrontendRequestsAreStateful` middleware is prepended to the API
 2. **All stat values come from `RigService::effectiveStats()`**. Never manually add `base_*` + `*_level` on the client.
 3. **Uplink cannot be raised by invested points.** It can only grow via chassis upgrade or Deep Link hardware peripherals.
 4. **Cache = CPU + RAM effective values.** Recompute server-side after every stat change.
-5. **Pocket vs wallet distinction is load-bearing.** Hacks → pocket. Street Doc → wallet. Store purchases → wallet only.
+5. **Pocket vs wallet distinction is load-bearing.** Hacks → pocket. CyberDoc bank → wallet. Store purchases → wallet only.
 6. **Node presence polling must not run pre-auth.** `useNodePresence` guards `fetchPresence()` with an auth token check.
 7. **WebSocket is a stub.** `useWebSocket` returns a silent no-op. It will be replaced by Laravel Echo pointed at Reverb when real-time is installed. Do not add logic to the stub.
 8. **The SPLICE browser routes are all in `SpliceRouter.js`**. Add new pages there — nothing else needs changing.
