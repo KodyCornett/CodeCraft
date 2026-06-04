@@ -382,4 +382,35 @@ provide('spliceNavigate', navigate);
 }
 
 /* Page components fill the content area */
-.splice-content
+.splice-content > * {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+}
+
+/* ── Page transition ──────────────────────────────────────────────────────── */
+.page-fade-enter-active,
+.page-fade-leave-active {
+    transition: opacity 0.1s ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+    opacity: 0;
+}
+</style>
+ > * {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+}
+
+/* ── Page transition ──────────────────────────────────────────────────────── */
+.page-fade-enter-active,
+.page-fade-leave-active {
+    transition: opacity 0.1s ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+    opacity: 0;
+}
+</style>
