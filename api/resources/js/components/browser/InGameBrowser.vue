@@ -96,10 +96,14 @@ const currentPage = computed(() => resolveRoute(currentUrl.value));
 
 // ── Address bar ───────────────────────────────────────────────────────────────
 const addrInputEl  = ref(null);
-const addressInput = ref(currentUrl.value);
+const addressInput = ref(currentUrl.value.replace(/^splice:\/\//, ''));
+
+// Strip 'splice://' prefix for the display value — the static addr-scheme span
+// renders it visually so the input only shows host+path when not focused.
+function toDisplayUrl(url) { return url.replace(/^splice:\/\//, ''); }
 
 // Keep address bar in sync when navigation happens (tab switch, back, etc.)
-watch(currentUrl, (url) => { addressInput.value = url; });
+watch(currentUrl, (url) => { addressInput.value = toDisplayUrl(url); });
 
 // When the taskbar launches a different page while the browser is already open,
 // navigate the active tab to the new URL instead of requiring a close + reopen.
@@ -108,8 +112,13 @@ watch(toRef(props, 'initialUrl'), (url) => {
 });
 
 function focusInput()  { addrInputEl.value?.focus(); }
-function onAddrFocus() { addrInputEl.value?.select(); }
-function onAddrBlur()  { addressInput.value = currentUrl.value; } // revert if not submitted
+// On focus: show the full URL so the user can edit or copy it cleanly
+function onAddrFocus() {
+    addressInput.value = currentUrl.value;
+    addrInputEl.value?.select();
+}
+// On blur: revert to display form (host+path only)
+function onAddrBlur()  { addressInput.value = toDisplayUrl(currentUrl.value); }
 
 function onNavigate() {
     let url = addressInput.value.trim();
