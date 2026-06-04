@@ -8,13 +8,17 @@ use App\Models\Node;
 use App\Models\Peripheral;
 use App\Models\Player;
 use App\Services\InventoryService;
+use App\Services\StreetDocInventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class StoreController extends Controller
 {
-    public function __construct(private readonly InventoryService $inventoryService) {}
+    public function __construct(
+        private readonly InventoryService          $inventoryService,
+        private readonly StreetDocInventoryService $streetDocInventory,
+    ) {}
 
     /**
      * Assert the player is physically at a CyberDoc node.
@@ -36,13 +40,41 @@ class StoreController extends Controller
     /**
      * GET /api/store/catalog
      *
-     * Returns the full purchasable catalog in one shot:
-     *   hardware  — peripherals (stat-boost hardware, installed in port slots)
-     *   software  — consumables with duration_moves > 0
-     *   repair    — consumables with stat = 'ss'
+     * Returns the purchasable catalog. Behaviour depends on whether a
+     * cyberdoc_canvas_id is provided:
+     *
+     *   With cyberdoc_canvas_id (e.g. 'NS-hub'):
+     *     Returns only items registered in street_doc_catalog for that terminal
+     *     — global items (repair consumables etc.) + doc-specific items.
+     *     This is the normal in-game path once the browser navigates to a doc.
+     *
+     *   Without cyberdoc_canvas_id:
+     *     Returns the full unfiltered catalog (all peripherals + all consumables).
+     *     Preserved for backward compatibility and the generic fallback store page.
+     *
+     * Query params:
+     *   cyberdoc_canvas_id  string|null  Hub canvas_id (e.g. 'NS-hub'). Optional.
      */
-    public function catalog(): JsonResponse
+    public function catalog(Request $request): JsonResponse
     {
+        $canvasId = $request->query('cyberdoc_canvas_id');
+
+        // ── Doc-filtered catalog ──────────────────────────────────────────────
+        if ($canvasId !== null) {
+            try {
+                $catalog = $this->streetDocInventory->catalogForDoc($canvasId);
+            } catch (\RuntimeException $e) {
+                // Unknown canvas_id — fall through to the global catalog rather
+                // than returning a hard error (doc may not be seeded yet in dev).
+                $catalog = null;
+            }
+
+            if ($catalog !== null) {
+                return response()->json($catalog);
+            }
+        }
+
+        // ── Global fallback catalog (original behaviour) ──────────────────────
         $hardware = Peripheral::orderBy('rarity')->orderBy('name')->get()->map(fn ($p) => [
             'id'              => $p->id,
             'category'        => 'hardware',

@@ -35,5 +35,6 @@ class DatabaseSeeder extends Seeder
         $this->call(SpawnNodeSeeder::class);  // must run after NodeSeeder
         $this->call(CommandSeeder::class);
         $this->call(StreetDocSeeder::class);
+        $this->call(StreetDocCatalogSeeder::class); // must run after StreetDocSeeder + ConsumableSeeder
     }
 }
