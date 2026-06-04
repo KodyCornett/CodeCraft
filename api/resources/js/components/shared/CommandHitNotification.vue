@@ -31,8 +31,8 @@ const label = computed(() => {
     if (e.uplink_drain)         return `${name} — −${e.uplink_drain} Uplink`;
     if (e.ss_damage)            return `${name} — −${e.ss_damage} SS damage`;
     if (e.os_reduction)         return `${name} — −${e.os_reduction} OS for ${e.moves ?? '?'} moves`;
-if (e.moves && name === 'Buffer Overflow') return `${name} — 1 command disabled for ${e.moves} moves`;
-    if (e.moves && name === 'RootKit') return `${name} — all commands locked for ${e.moves} moves`;
+    if (e.moves && name === 'Buffer Overflow') return `${name} — 1 command disabled for ${e.moves} moves`;
+    if (e.moves && name === 'RootKit')         return `${name} — all commands locked for ${e.moves} moves`;
     return `${name} — trap triggered`;
 });
 

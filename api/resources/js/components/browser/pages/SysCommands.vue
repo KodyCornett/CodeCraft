@@ -161,6 +161,13 @@
                     LOADOUT FULL — UNEQUIP A COMMAND TO SWAP
                 </div>
 
+                <!-- Save error — shown when loadout cannot be persisted -->
+                <Transition name="err-fade">
+                    <div v-if="saveError" class="loadout-error">
+                        ⚠ {{ saveError }}
+                    </div>
+                </Transition>
+
             </section>
 
             <div class="sys-divider" />
@@ -300,29 +307,43 @@ function toggleExpand(id) {
     expandedId.value = expandedId.value === id ? null : id;
 }
 
+// Loadout save error — shown inline when the API rejects the change.
+// Cleared automatically after 4 seconds.
+const saveError = ref(null);
+let _saveErrTimer = null;
+
+function showSaveError(message) {
+    clearTimeout(_saveErrTimer);
+    saveError.value = message;
+    _saveErrTimer = setTimeout(() => { saveError.value = null; }, 4000);
+}
+
 // Persist the current equipped set to the server.
-// Called after every equip/unequip so is_active in the DB stays in sync.
-async function saveLoadout() {
+// onRevert is called if the save fails so the UI reverts to match the DB.
+async function saveLoadout(onRevert = null) {
     const activeIds = equippedCommands.value.map(c => c.id);
     try {
         await axios.post('/api/cyberdoc/loadout', { active_command_ids: activeIds });
     } catch (e) {
-        console.warn('[LOADOUT] Save failed:', e?.response?.data?.message ?? e.message);
+        const msg = e?.response?.data?.message ?? 'Loadout save failed.';
+        console.warn('[LOADOUT] Save failed:', msg);
+        if (onRevert) onRevert();
+        showSaveError(msg);
     }
 }
 
-// Equip / unequip
+// Equip / unequip — revert local state if the server rejects the change.
 function equipCommand(cmd) {
     if (contextSlotsAvailable(cmd.context) <= 0) return;
     cmd.equipped = true;
     if (expandedId.value === cmd.id) expandedId.value = null;
-    saveLoadout();
+    saveLoadout(() => { cmd.equipped = false; });
 }
 
 function unequipCommand(cmd) {
     cmd.equipped = false;
     if (expandedId.value === cmd.id) expandedId.value = null;
-    saveLoadout();
+    saveLoadout(() => { cmd.equipped = true; });
 }
 </script>
 
@@ -513,6 +534,17 @@ function unequipCommand(cmd) {
     letter-spacing: 0.08em;
     padding: 6px 0 2px;
 }
+
+/* Save error */
+.loadout-error {
+    font-size: 8px;
+    color: rgba(255,51,51,0.85);
+    letter-spacing: 0.08em;
+    padding: 6px 0 2px;
+    line-height: 1.5;
+}
+.err-fade-enter-active, .err-fade-leave-active { transition: opacity 0.2s ease; }
+.err-fade-enter-from,  .err-fade-leave-to      { opacity: 0; }
 
 /* ── Expanded detail ────────────────────────────────────────────────────────── */
 .cmd-detail {

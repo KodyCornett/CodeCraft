@@ -169,6 +169,7 @@ class CyberDocController extends Controller
      * POST /api/cyberdoc/loadout
      *
      * Set the player's active command loadout.
+     * Can be called from anywhere — CyberDoc presence is only required to purchase commands.
      *
      * Body: { player_id, active_command_ids: string[] }
      */
@@ -183,8 +184,6 @@ class CyberDocController extends Controller
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
         }
-
-        if ($err = $this->assertAtCyberDoc($player)) return $err;
 
         try {
             $this->cyberDocService->setLoadout($player, $data['active_command_ids']);
