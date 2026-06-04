@@ -306,24 +306,35 @@ class PlayerController extends Controller
 
             // Timed stat effects (OS Exploit, Buffer Overflow, RootKit) — merge
             // into active_effects before the single player save below.
+            // Slug matches client-side cmdSlug(): lowercase, spaces → underscores.
+            // (Str::snake is NOT used — it mishandles abbreviations like "OS" → "o_s".)
             if (isset($effect['moves']) && ! isset($effect['uplink_drain'])) {
-                $trapSlug                   = Str::snake($activeTrap->command_name);
-                $effects                    = $player->active_effects ?? [];
-                $effects[$trapSlug]         = (int) $effect['moves'];
-                $player->active_effects     = $effects;
+                $trapSlug               = strtolower(preg_replace('/\s+/', '_', $activeTrap->command_name));
+                $effects                = $player->active_effects ?? [];
+                $effects[$trapSlug]     = (int) $effect['moves'];
+                $player->active_effects = $effects;
             }
 
             $trapTriggered = [
                 'command_name' => $activeTrap->command_name,
                 'effect'       => $effect,
             ];
+
+            // Notify the placer in real-time — their trap just fired.
+            \App\Events\TrapTriggered::dispatch(
+                $activeTrap->placer_id,
+                $activeTrap->command_name,
+                $player->handle,
+                $node->canvas_id,
+            );
         }
 
         // ── Single player save — position + effect decrements + any trap effect ─
         $player->save();
 
-        // ── Single rig save — move uplink cost + any trap uplink drain ──────────
+        // ── Single rig save — move uplink cost + any trap effects on the rig ───
         $remainingUplink = null;
+        $currentSS       = null;
         if ($rig !== null) {
             $current             = $rig->current_uplink ?? $effectiveMax;
             $rig->current_uplink = max(0, $current - $uplinkCost);
@@ -334,14 +345,23 @@ class PlayerController extends Controller
                 $rig->current_uplink = max(0, $rig->current_uplink - $drain);
             }
 
-            $rig->save();
+            // SS damage (Packet Flood) — use RigService so critical failure is handled.
+            // applyDamage() persists both rig and player; skip the generic $rig->save() below.
+            if ($activeTrap !== null && isset(($activeTrap->effect_data ?? [])['ss_damage'])) {
+                $this->rigService->applyDamage($rig, (int) $activeTrap->effect_data['ss_damage'], 'pvp', $player);
+            } else {
+                $rig->save();
+            }
+
             $remainingUplink = $rig->current_uplink;
+            $currentSS       = $rig->current_ss;
         }
 
         return response()->json([
             'ok'               => true,
             'active_effects'   => $player->active_effects ?? (object) [],
             'remaining_uplink' => $remainingUplink,
+            'current_ss'       => $currentSS,
             'trap_triggered'   => $trapTriggered,
         ]);
     }
@@ -410,6 +430,13 @@ class PlayerController extends Controller
         }
         if (! $cmd->pivot->is_active) {
             return response()->json(['message' => 'Command is not equipped in loadout.'], 422);
+        }
+
+        // RootKit trap effect — all commands locked until the move counter expires.
+        // Slug matches client cmdSlug(): lowercase, spaces → underscores.
+        $activeEffects = $player->active_effects ?? [];
+        if (($activeEffects['rootkit'] ?? 0) > 0) {
+            return response()->json(['message' => 'ROOTKIT — command systems locked.'], 422);
         }
 
         // Derive the slug from the command name ("Ghost Protocol" → "ghost_protocol")

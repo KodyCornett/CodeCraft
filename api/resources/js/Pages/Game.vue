@@ -54,12 +54,20 @@
                     </div>
                 </Transition>
 
-                <!-- Command hit notification — shown when a trap fires on this player -->
+                <!-- Command hit notification — shown when a trap fires on this player (victim) -->
                 <CommandHitNotification
                     v-if="trapHitNotification"
                     :command-name="trapHitNotification.commandName"
                     :effect="trapHitNotification.effect"
                     @done="trapHitNotification = null"
+                />
+
+                <!-- Trap fired notification — shown when this player's trap hits a victim (placer) -->
+                <TrapFiredNotification
+                    v-if="trapFiredNotification"
+                    :command-name="trapFiredNotification.commandName"
+                    :victim-handle="trapFiredNotification.victimHandle"
+                    @done="trapFiredNotification = null"
                 />
 
                 <!-- In-game SPLICE browser -->
@@ -285,6 +293,7 @@ import HexMapCanvas  from '@/components/map/HexMapCanvas.vue';
 import BootSequence             from '@/components/shared/BootSequence.vue';
 import OpenSeasonNotification   from '@/components/shared/OpenSeasonNotification.vue';
 import CommandHitNotification  from '@/components/shared/CommandHitNotification.vue';
+import TrapFiredNotification   from '@/components/shared/TrapFiredNotification.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
 import PacketHijack  from '@/components/minigame/PacketHijack.vue';
@@ -427,12 +436,14 @@ const hudFlash        = ref('');
 let   _flashTimer     = null;
 
 // ── Trap state ────────────────────────────────────────────────────────────────
-// trapTargetMode:       set to { cmd, match } while the player is picking a target node.
-// myTraps:             server-fetched list of this player's active traps (for map rendering).
-// trapHitNotification: set when position() returns trap_triggered — drives the hit popup.
-const trapTargetMode      = ref(null);
-const myTraps             = ref([]);
-const trapHitNotification = ref(null);
+// trapTargetMode:        set to { cmd, match } while the player is picking a target node.
+// myTraps:              server-fetched list of this player's active traps (for map rendering).
+// trapHitNotification:  set when position() returns trap_triggered — drives the victim hit popup.
+// trapFiredNotification: set when a WS trap.triggered event arrives — drives the placer popup.
+const trapTargetMode       = ref(null);
+const myTraps              = ref([]);
+const trapHitNotification  = ref(null);
+const trapFiredNotification = ref(null);
 
 function showBountyAlert(message) {
     if (_alertTimer) clearTimeout(_alertTimer);
@@ -575,6 +586,14 @@ const FALSE_PING_MOVE_TTL = 3;
 let   _falsePingMovesLeft  = 0;
 let   _falsePingIds        = [];   // tracks all active false pings (Signal Noise plants 2)
 
+// OS Exploit trap — magnitude of the OS reduction applied to this player so it
+// can be reversed exactly when the effect expires.
+let _osExploitReduction = 0;
+
+// Buffer Overflow trap — id of the command randomly locked by the effect so it
+// can be re-enabled when the effect expires.
+let _bufferOverflowCmdId = null;
+
 // Remove all currently tracked false pings from the pings array.
 function clearFalsePings() {
     pings.value = pings.value.filter(p => !_falsePingIds.includes(p.pingId));
@@ -634,9 +653,28 @@ function handlePlayerMoved(event) {
         // timed effects into activeEffects and show the Splice popup notification.
         if (data.trap_triggered) {
             const { command_name, effect } = data.trap_triggered;
-            // Merge server-applied timed effects (os_exploit, buffer_overflow, etc.)
+            // Merge server-applied timed effects (os_exploit, buffer_overflow, rootkit)
             if (data.active_effects) {
                 Object.assign(activeEffects.value, data.active_effects);
+            }
+            // Sync SS if the server applied damage (Packet Flood)
+            if (data.current_ss != null) {
+                player.value.currentSS = data.current_ss;
+            }
+            // OS Exploit — reduce OS immediately; restore on effect expiry
+            if (effect.os_reduction) {
+                _osExploitReduction = effect.os_reduction;
+                rig.value.os = Math.max(0, (rig.value.os ?? 0) - _osExploitReduction);
+            }
+            // Buffer Overflow — randomly lock one equipped, ready command
+            if (command_name === 'Buffer Overflow') {
+                const ready = commands.value.filter(c => c.equipped && !c.cooldown);
+                if (ready.length > 0) {
+                    const target = ready[Math.floor(Math.random() * ready.length)];
+                    _bufferOverflowCmdId = target.id;
+                    target.cooldown  = true;
+                    target.movesLeft = effect.moves ?? 2;
+                }
             }
             // Show the hit notification
             trapHitNotification.value = { commandName: command_name, effect };
@@ -660,6 +698,17 @@ function handlePlayerMoved(event) {
             // Firewall Patch applied +2 on activation — undo it on expiry
             if (slug === 'firewall_patch') {
                 rig.value.firewall = Math.max(0, (rig.value.firewall ?? 0) - 2);
+            }
+            // OS Exploit — restore the OS stat that was reduced on trap hit
+            if (slug === 'os_exploit') {
+                rig.value.os = (rig.value.os ?? 0) + _osExploitReduction;
+                _osExploitReduction = 0;
+            }
+            // Buffer Overflow — re-enable the command that was randomly locked
+            if (slug === 'buffer_overflow' && _bufferOverflowCmdId) {
+                const locked = commands.value.find(c => c.id === _bufferOverflowCmdId);
+                if (locked) { locked.cooldown = false; locked.movesLeft = 0; }
+                _bufferOverflowCmdId = null;
             }
         }
     }
@@ -1235,6 +1284,14 @@ async function onUseCommand(cmd) {
     const match = commands.value.find(c => c.id === cmd.id);
     if (!match || match.cooldown) return;
 
+    // RootKit trap effect — all commands locked while the effect is active
+    if ((activeEffects.value.rootkit ?? 0) > 0) {
+        hudFlash.value = 'ROOTKIT ACTIVE — command systems locked';
+        clearTimeout(_flashTimer);
+        _flashTimer = setTimeout(() => { hudFlash.value = ''; }, 3_000);
+        return;
+    }
+
     // Mark cooldown immediately — cleared on Street Doc visit
     match.cooldown  = true;
     match.movesLeft = 0;
@@ -1717,6 +1774,15 @@ onMounted(async () => {
                 activePacketHijack.value  = true;
                 awaitingChallenge.value   = false;
                 incomingChallenge.value   = null;
+            })
+            .listen('.trap.triggered', (data) => {
+                // Our trap just consumed a victim — show the placer notification
+                // and refresh the trap markers so the map no longer shows the mine.
+                trapFiredNotification.value = {
+                    commandName:  data.command_name,
+                    victimHandle: data.victim_handle,
+                };
+                fetchMyTraps();
             });
     }
 
@@ -1760,6 +1826,10 @@ onUnmounted(() => {
     stopHeartbeat();
     stopAudio();
     clearInterval(_nowTick);
+    if (playerId.value && window.Echo) {
+        window.Echo.private(`player.${playerId.value}`)
+            .stopListening('.trap.triggered');
+    }
 });
 </script>
 
