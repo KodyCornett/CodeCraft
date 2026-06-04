@@ -10,5 +10,6 @@ const NPC = {
     storeName: "Patch's Clinic",
     district:  'North Spokane',
     tagline:   'Field-grade repairs. No anesthetic, no records.',
+    canvasId:  'NS-hub',
 };
 </script>

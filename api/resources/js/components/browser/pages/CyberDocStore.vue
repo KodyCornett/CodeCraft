@@ -380,7 +380,7 @@ import { ref, computed, inject, onMounted } from 'vue';
 import axios from 'axios';
 import { useUpgradeCosts } from '@/composables/useUpgradeCosts.js';
 
-defineProps({
+const props = defineProps({
     url: { type: String, default: '' },
     npc: {
         type: Object,
@@ -389,6 +389,7 @@ defineProps({
             storeName: 'CyberDoc',
             district:  'Network',
             tagline:   'Authorized Hardware & Software Vendor',
+            canvasId:  null,
         }),
     },
 });
@@ -619,7 +620,8 @@ const catalogLoading = ref(false);
 async function fetchCatalog() {
     catalogLoading.value = true;
     try {
-        const res = await axios.get('/api/store/catalog');
+        const params = props.npc?.canvasId ? { cyberdoc_canvas_id: props.npc.canvasId } : {};
+        const res = await axios.get('/api/store/catalog', { params });
         // Normalise both catalogs into one flat list with a uniform shape
         const hardware    = (res.data.hardware    ?? []).map(i => ({ ...i, price: i.price_creds }));
         const consumables = (res.data.consumables ?? []).map(i => ({ ...i, price: i.price_creds }));

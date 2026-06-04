@@ -10,5 +10,6 @@ const NPC = {
     storeName: 'Axiom Systems',
     district:  'University District',
     tagline:   'Research-grade hardware. Academic pricing.',
+    canvasId:  'UD-hub',
 };
 </script>

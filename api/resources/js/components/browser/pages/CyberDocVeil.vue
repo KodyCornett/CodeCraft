@@ -10,5 +10,6 @@ const NPC = {
     storeName: "Veil's Parlour",
     district:  'Downtown',
     tagline:   'Premium installs. Discretion guaranteed.',
+    canvasId:  'DT-hub',
 };
 </script>

@@ -10,5 +10,6 @@ const NPC = {
     storeName: "Knuckle's Med-Wagon",
     district:  "Browne's Addition",
     tagline:   "Roll up, get patched. Questions cost extra.",
+    canvasId:  'BA-hub',
 };
 </script>

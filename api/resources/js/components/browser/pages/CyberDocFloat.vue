@@ -10,5 +10,6 @@ const NPC = {
     storeName: "Float's Repair Bay",
     district:  'Spokane Valley',
     tagline:   'East-side tech. Competitive rates, fast hands.',
+    canvasId:  'SV-hub',
 };
 </script>
