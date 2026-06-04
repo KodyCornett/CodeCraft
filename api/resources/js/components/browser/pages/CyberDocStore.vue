@@ -7,62 +7,69 @@
             <span class="gate-msg">AUTHENTICATING TERMINAL…</span>
         </div>
         <div v-else-if="!atCyberDoc" class="access-gate access-gate--denied">
-            <span class="gate-icon">⛔</span>
+            <span class="gate-icon gate-icon--denied">⬡</span>
             <span class="gate-msg">ACCESS DENIED</span>
-            <span class="gate-sub">You must be physically at a CyberDoc terminal.</span>
+            <span class="gate-sub">You must be physically at a CyberDoc terminal to connect.</span>
         </div>
 
         <template v-else>
 
-        <header class="store-header">
-            <div class="store-brand">
-                <span class="store-logo">⬡ {{ npc.storeName.toUpperCase() }}</span>
-                <div class="store-brand-sub">
-                    <span class="store-district">{{ npc.district.toUpperCase() }}</span>
-                    <span class="store-tagline">// {{ npc.tagline }}</span>
+        <!-- ── Storefront header ──────────────────────────────────────────────── -->
+        <div class="storefront">
+            <div class="storefront-sign">
+                <span class="sf-mark">⬡</span>
+                <div class="sf-name-block">
+                    <span class="sf-name">{{ npc.storeName.toUpperCase() }}</span>
+                    <span class="sf-handle">{{ npc.handle ?? 'CYBERDOC' }}</span>
+                </div>
+                <div class="sf-district-tag">{{ npc.district.toUpperCase() }}</div>
+                <span class="sf-tagline">// {{ npc.tagline }}</span>
+                <div class="sf-status">
+                    <span class="sf-status-dot" />
+                    <span class="sf-status-text">TERMINAL ACTIVE</span>
                 </div>
             </div>
-            <div class="store-balances">
-                <div class="bal-item">
-                    <span class="bal-label">CREDS</span>
-                    <span class="bal-value">{{ playerCreds.toLocaleString() }} ₡</span>
+            <div class="sf-ledger">
+                <div class="ledger-row">
+                    <span class="ledger-label">WALLET</span>
+                    <span class="ledger-value">{{ playerCreds.toLocaleString() }} ₡</span>
                 </div>
-                <div class="bal-sep" />
-                <div class="bal-item">
-                    <span class="bal-label">TECH PTS</span>
-                    <span class="bal-value bal-tp">{{ playerTechPoints }} TP</span>
+                <div class="ledger-divider" />
+                <div class="ledger-row">
+                    <span class="ledger-label">TECH PTS</span>
+                    <span class="ledger-value ledger-tp">{{ playerTechPoints }} TP</span>
                 </div>
             </div>
-        </header>
+        </div>
 
-        <!-- ── Banking strip ─────────────────────────────────────────────────── -->
-        <div class="bank-strip" :class="{ 'bank-strip--hot': playerPocketCreds > 0 }">
-            <div class="bank-strip-left">
-                <span class="bank-label">POCKET</span>
-                <span class="bank-pocket" :class="playerPocketCreds > 0 ? 'pocket--hot' : 'pocket--empty'">
-                    {{ playerPocketCreds.toLocaleString() }} ₡
-                </span>
-                <span v-if="playerPocketCreds > 0" class="bank-risk">AT RISK</span>
-            </div>
+        <!-- ── Banking terminal strip ─────────────────────────────────────────── -->
+        <div class="bank-terminal" :class="{ 'bank-terminal--hot': playerPocketCreds > 0 }">
+            <span class="bt-label">POCKET</span>
+            <span class="bt-amount" :class="playerPocketCreds > 0 ? 'bt-amount--hot' : 'bt-amount--empty'">
+                {{ playerPocketCreds.toLocaleString() }} ₡
+            </span>
+            <span v-if="playerPocketCreds > 0" class="bt-risk">⚠ AT RISK</span>
+            <div class="bt-spacer" />
             <button
-                class="bank-btn"
+                class="bt-btn"
                 :disabled="playerPocketCreds === 0 || banking"
                 @click="onBankCreds"
             >
-                <span v-if="banking">BANKING…</span>
-                <span v-else-if="playerPocketCreds === 0">NOTHING TO BANK</span>
-                <span v-else>[ EXTRACT ◈{{ playerPocketCreds.toLocaleString() }} ]</span>
+                <span v-if="banking">PROCESSING…</span>
+                <span v-else-if="playerPocketCreds === 0">— NOTHING TO EXTRACT —</span>
+                <span v-else>EXTRACT {{ playerPocketCreds.toLocaleString() }} ₡ →</span>
             </button>
             <Transition name="bank-confirm">
-                <span v-if="bankConfirm" class="bank-confirm">✓ {{ bankConfirm.toLocaleString() }} ₡ SECURED</span>
+                <span v-if="bankConfirm" class="bt-confirm">✓ {{ bankConfirm.toLocaleString() }} ₡ SECURED</span>
             </Transition>
         </div>
 
-        <div class="store-category-bar">
+        <!-- ── Section nav ────────────────────────────────────────────────────── -->
+        <div class="store-nav">
             <button
                 v-for="cat in categories"
                 :key="cat.id"
-                class="cat-btn"
+                class="snav-btn"
                 :class="{ active: activeCategory === cat.id }"
                 @click="activeCategory = cat.id"
             >{{ cat.label }}</button>
@@ -70,179 +77,144 @@
 
         <!-- ── Off-site lockout banner ──────────────────────────────────────── -->
         <div v-if="!atCyberDoc" class="offsite-banner">
-            <span class="offsite-icon">⛔</span>
-            <div class="offsite-body">
-                <span class="offsite-title">NOT ON LOCATION</span>
-                <span class="offsite-sub">You are browsing remotely. Navigate to a CyberDoc node on the map to make purchases.</span>
-            </div>
+            <span>⛔</span>
+            <span>NOT ON LOCATION — navigate to a CyberDoc node to make purchases.</span>
         </div>
 
-        <!-- ── Rigs shop ─────────────────────────────────────────────────────── -->
-        <div v-if="activeCategory === 'rigs'" class="rigs-shop">
+        <!-- ════════════════════════════════════════════════════════════════════
+             RIGS
+             ════════════════════════════════════════════════════════════════════ -->
+        <div v-if="activeCategory === 'rigs'" class="section-scroll">
 
-            <!-- Current chassis block -->
+            <!-- Current chassis -->
             <div class="chassis-current">
-                <div class="chassis-current-header">
-                    <span class="cc-label">CURRENT CHASSIS</span>
-                    <div class="cc-equipped">EQUIPPED</div>
+                <div class="cc-topbar">
+                    <span class="cc-label">INSTALLED CHASSIS</span>
+                    <span class="cc-equipped">● EQUIPPED</span>
                 </div>
-
                 <div class="cc-identity">
-                    <div class="cc-tier">T{{ rig.tier }}</div>
+                    <span class="cc-tier-badge">T{{ rig.tier }}</span>
                     <span class="cc-name">{{ chassisBaseName }}</span>
                     <span class="cc-ver">v{{ rigVersionLabel }}</span>
                 </div>
-
                 <div class="cc-stats">
                     <div v-for="s in RIG_STATS" :key="s.key" class="cc-stat">
                         <span class="cc-stat-label">{{ s.short }}</span>
-                        <div class="cc-stat-pips">
+                        <div class="cc-pips">
                             <span
                                 v-for="n in (rig.caps[s.key] ?? effectiveStat(s.key, rig))"
                                 :key="n"
                                 class="cc-pip"
                                 :class="{
-                                    'cc-pip--base':     n <= rig[s.key] - (rig.investedPoints?.[s.key] ?? 0),
-                                    'cc-pip--invested': n > rig[s.key] - (rig.investedPoints?.[s.key] ?? 0) && n <= rig[s.key],
-                                    'cc-pip--empty':    n > rig[s.key],
+                                    'pip--base':     n <= rig[s.key] - (rig.investedPoints?.[s.key] ?? 0),
+                                    'pip--invested': n > rig[s.key] - (rig.investedPoints?.[s.key] ?? 0) && n <= rig[s.key],
+                                    'pip--empty':    n > rig[s.key],
                                 }"
                             />
                         </div>
                         <span class="cc-stat-val">{{ effectiveStat(s.key, rig) }}</span>
                     </div>
                 </div>
-
                 <div class="cc-footer">
-                    <div class="cc-progress">
-                        <span class="cc-prog-label">UPGRADE PROGRESS</span>
-                        <div class="cc-prog-bar">
+                    <div class="cc-prog">
+                        <span class="cc-prog-label">UPGRADE</span>
+                        <div class="cc-prog-pips">
                             <span
                                 v-for="n in (rig.pointsCap ?? 9)"
                                 :key="n"
                                 class="cc-prog-pip"
-                                :class="{ 'cc-prog-pip--lit': n <= totalInvestedAll }"
+                                :class="{ 'prog-pip--lit': n <= totalInvestedAll }"
                             />
                         </div>
-                        <span class="cc-prog-count">{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }} PTS</span>
-                        <span class="cc-prog-sub" v-if="chassisMaxed">— CHASSIS MAXED</span>
+                        <span class="cc-prog-count">{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }}</span>
+                        <span v-if="chassisMaxed" class="cc-maxed-tag">MAXED</span>
                     </div>
-                    <div class="cc-ports">
-                        <span class="cc-ports-label">PORT SLOTS</span>
-                        <span class="cc-ports-val">{{ rig.portSlots ?? 0 }}</span>
-                    </div>
+                    <span class="cc-ports">{{ rig.portSlots ?? 0 }} PORT SLOTS</span>
                 </div>
             </div>
 
-            <!-- Available chassis heading -->
-            <div class="rigs-section-label">
+            <!-- Available chassis section -->
+            <div class="section-subheading">
                 <span>AVAILABLE CHASSIS</span>
-                <span class="rigs-section-sub">NullTek Series 2 — unlock by maxing your current rig</span>
+                <span class="section-sub">NullTek Series 2 — unlock by maxing your current rig</span>
             </div>
 
-            <!-- Lock notice -->
-            <div v-if="!chassisMaxed && rig.tier === 1" class="chassis-lock-bar">
-                <span class="lock-icon">🔒</span>
-                <span class="lock-text">
-                    NullTek Series 2 unlocks when your BlackHat reaches v1.9 —
-                    <strong>{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }} upgrade points invested.</strong>
-                    Visit the STATS tab to keep investing.
-                </span>
+            <div v-if="!chassisMaxed && rig.tier === 1" class="lock-notice">
+                <span>🔒</span>
+                <span>NullTek Series 2 unlocks at BlackHat v1.9 — <strong>{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }} pts invested</strong></span>
             </div>
 
-            <!-- NullTek chassis cards -->
             <div class="chassis-grid">
                 <div
                     v-for="chassis in NULLTEK_CHASSIS"
                     :key="chassis.id"
                     class="chassis-card"
                     :class="{
-                        'chassis-card--locked':   !chassisMaxed || rig.tier > 1,
-                        'chassis-card--unavail':  rig.tier > 1,
+                        'chassis-card--locked':  !chassisMaxed || rig.tier > 1,
+                        'chassis-card--unavail': rig.tier > 1,
                     }"
                 >
                     <div class="ccard-header">
-                        <div class="ccard-tier">T{{ chassis.tier }}</div>
-                        <div class="ccard-brand">NULLTEK</div>
-                        <div class="ccard-build" :class="`build--${chassis.build}`">{{ chassis.build.toUpperCase() }}</div>
+                        <span class="ccard-tier">T{{ chassis.tier }}</span>
+                        <span class="ccard-brand">{{ chassis.brand.toUpperCase() }}</span>
+                        <span class="ccard-build" :class="`build--${chassis.build}`">{{ chassis.build.toUpperCase() }}</span>
                     </div>
-
-                    <div class="ccard-model">{{ chassis.model }}</div>
-                    <div class="ccard-name">{{ chassis.name }}</div>
+                    <div class="ccard-title">
+                        <span class="ccard-model">{{ chassis.model }}</span>
+                        <span class="ccard-name">{{ chassis.name }}</span>
+                    </div>
                     <div class="ccard-tagline">{{ chassis.tagline }}</div>
-
                     <div class="ccard-stats">
-                        <div v-for="s in RIG_STATS" :key="s.key" class="ccard-stat-row">
+                        <div v-for="s in RIG_STATS" :key="s.key" class="ccard-stat">
                             <span class="ccard-stat-key">{{ s.short }}</span>
-                            <div class="ccard-stat-bar">
+                            <div class="ccard-stat-pips">
                                 <span
                                     v-for="n in chassis.caps[s.key]"
                                     :key="n"
-                                    class="ccard-stat-pip"
-                                    :class="{ 'cstat-pip--base': n <= chassis.base[s.key] }"
+                                    class="ccard-pip"
+                                    :class="{ 'ccard-pip--base': n <= chassis.base[s.key] }"
                                 />
                             </div>
-                            <span class="ccard-stat-val">{{ chassis.base[s.key] }}</span>
-                            <span class="ccard-stat-cap">/ {{ chassis.caps[s.key] }}</span>
+                            <span class="ccard-stat-val">{{ chassis.base[s.key] }}/{{ chassis.caps[s.key] }}</span>
                         </div>
-                        <div class="ccard-stat-row">
+                        <div class="ccard-stat">
                             <span class="ccard-stat-key">UPL</span>
-                            <div class="ccard-stat-bar">
-                                <span
-                                    v-for="n in chassis.base.uplink"
-                                    :key="n"
-                                    class="ccard-stat-pip cstat-pip--uplink"
-                                />
+                            <div class="ccard-stat-pips">
+                                <span v-for="n in chassis.base.uplink" :key="n" class="ccard-pip ccard-pip--uplink" />
                             </div>
-                            <span class="ccard-stat-val">{{ chassis.base.uplink }}</span>
-                            <span class="ccard-stat-cap ccard-stat-cap--locked">🔒</span>
+                            <span class="ccard-stat-val">{{ chassis.base.uplink }} 🔒</span>
                         </div>
                     </div>
-
-                    <div class="ccard-meta">
-                        <div class="ccard-meta-row">
-                            <span class="ccard-meta-key">PORT SLOTS</span>
-                            <span class="ccard-meta-val">{{ chassis.portSlots }}</span>
-                        </div>
-                        <div class="ccard-meta-row">
-                            <span class="ccard-meta-key">UPGRADE CAP</span>
-                            <span class="ccard-meta-val">{{ chassis.caps.pointCap }} pts (v{{ chassis.tier }}.0 → v{{ chassis.tier }}.9)</span>
-                        </div>
-                    </div>
-
                     <div class="ccard-footer">
                         <div class="ccard-price">
-                            <span class="ccard-price-creds">{{ chassis.price.creds.toLocaleString() }} ₡</span>
-                            <span class="ccard-price-sep">+</span>
-                            <span class="ccard-price-tp">{{ chassis.price.tp }} TP</span>
+                            <span class="cp-creds">{{ chassis.price.creds.toLocaleString() }} ₡</span>
+                            <span class="cp-sep">+</span>
+                            <span class="cp-tp">{{ chassis.price.tp }} TP</span>
                         </div>
                         <button
-                            class="ccard-buy-btn"
+                            class="ccard-buy"
                             :disabled="!atCyberDoc || !chassisMaxed || rig.tier > 1 || !canAffordChassis(chassis)"
-                            :title="!atCyberDoc ? 'Navigate to a CyberDoc node to purchase' : chassisBtnTitle(chassis)"
+                            :title="chassisBtnTitle(chassis)"
                             @click="onPurchaseChassis(chassis)"
-                        >
-                            {{ rig.tier > 1 ? 'OWNED TIER' : 'PURCHASE' }}
-                        </button>
+                        >{{ rig.tier > 1 ? 'OWNED' : 'PURCHASE' }}</button>
                     </div>
                 </div>
             </div>
 
         </div>
 
-        <!-- ── Stat upgrades ────────────────────────────────────────────────── -->
-        <div v-else-if="activeCategory === 'stats'" class="stat-shop">
+        <!-- ════════════════════════════════════════════════════════════════════
+             STATS
+             ════════════════════════════════════════════════════════════════════ -->
+        <div v-else-if="activeCategory === 'stats'" class="section-scroll">
 
-            <div class="stat-shop-intro">
+            <div class="stat-intro">
                 <span class="stat-intro-label">RIG STAT INVESTMENT</span>
-                <span class="stat-intro-sub">
-                    Costs escalate with each upgrade — both within the same stat and globally as your rig grows.
-                    Chassis cap limits maximum investment per stat.
-                </span>
+                <span class="stat-intro-sub">Costs escalate with each upgrade — chassis cap limits maximum investment per stat.</span>
             </div>
 
-            <!-- Global scaling indicator -->
-            <div class="stat-global-row">
-                <span class="sg-label">GLOBAL PROGRESSION:</span>
+            <div class="stat-global">
+                <span class="sg-label">GLOBAL</span>
                 <div class="sg-pips">
                     <span
                         v-for="n in (rig.pointsCap ?? 9)"
@@ -251,182 +223,148 @@
                         :class="{ 'sg-pip--lit': n <= totalInvestedAll }"
                     />
                 </div>
-                <span class="sg-count">{{ totalInvestedAll }} POINT{{ totalInvestedAll !== 1 ? 'S' : '' }} INVESTED — COST MODIFIER: +{{ Math.round((Math.pow(1.25, totalInvestedAll) - 1) * 100) }}%</span>
+                <span class="sg-count">{{ totalInvestedAll }} pts — +{{ Math.round((Math.pow(1.25, totalInvestedAll) - 1) * 100) }}% cost modifier</span>
             </div>
 
             <div class="stat-list">
                 <div
                     v-for="s in upgradeableStats"
                     :key="s.key"
-                    class="stat-upgrade-row"
+                    class="stat-row"
                     :class="{ 'stat-row--maxed': !s.canUp }"
                 >
-                    <!-- Stat identity -->
-                    <div class="su-identity">
-                        <span class="su-name">{{ s.label }}</span>
-                        <span class="su-desc">{{ s.desc }}</span>
+                    <div class="sr-identity">
+                        <span class="sr-name">{{ s.label }}</span>
+                        <span class="sr-desc">{{ s.desc }}</span>
                     </div>
-
-                    <!-- Current value bar -->
-                    <div class="su-bar-wrap">
-                        <div
+                    <div class="sr-pips">
+                        <span
                             v-for="n in s.cap"
                             :key="n"
-                            class="su-bar-pip"
+                            class="sr-pip"
                             :class="{
                                 'pip--base':     n <= s.base,
                                 'pip--invested': n > s.base && n <= s.effective,
                                 'pip--empty':    n > s.effective,
                             }"
                         />
-                        <span class="su-bar-label">{{ s.effective }} / {{ s.cap }}</span>
+                        <span class="sr-pip-label">{{ s.effective }}/{{ s.cap }}</span>
                     </div>
-
-                    <!-- Cost + action -->
-                    <div class="su-cost-wrap">
+                    <div class="sr-cost">
                         <template v-if="s.canUp">
-                            <span class="su-next-label">NEXT POINT:</span>
-                            <span class="su-cost-creds">{{ s.cost.creds.toLocaleString() }} ₡</span>
-                            <span v-if="s.cost.tp > 0" class="su-cost-tp">+ {{ s.cost.tp }} TP</span>
-                            <span v-if="s.investedIn > 0" class="su-scale-warn">
-                                ↑ ×{{ scalingLabel(s.investedIn) }} ({{ s.investedIn }} invested)
-                            </span>
+                            <span class="sr-cost-creds">{{ s.cost.creds.toLocaleString() }} ₡</span>
+                            <span v-if="s.cost.tp > 0" class="sr-cost-tp">+ {{ s.cost.tp }} TP</span>
+                            <span v-if="s.investedIn > 0" class="sr-scale">×{{ scalingLabel(s.investedIn) }}</span>
                         </template>
-                        <template v-else-if="s.osGated">
-                            <span class="su-os-gate">{{ s.gateMsg }}</span>
-                        </template>
-                        <span v-else class="su-maxed">[ CAPPED ]</span>
+                        <span v-else-if="s.osGated" class="sr-gated">{{ s.gateMsg }}</span>
+                        <span v-else class="sr-capped">CAPPED</span>
                     </div>
-
                     <button
                         v-if="s.canUp"
-                        class="su-btn"
+                        class="sr-btn"
                         :disabled="!atCyberDoc || !canAffordStat(s.cost) || chassisMaxed"
-                        :title="!atCyberDoc ? 'Navigate to a CyberDoc node to invest' : chassisMaxed ? 'Chassis fully upgraded — purchase NullTek Series 2 to continue' : statBtnTitle(s)"
+                        :title="!atCyberDoc ? 'Navigate to a CyberDoc node' : chassisMaxed ? 'Chassis maxed — buy NullTek to continue' : statBtnTitle(s)"
                         @click="onUpgradeStat(s.key, s.cost)"
                     >INVEST</button>
-
                 </div>
             </div>
 
-            <!-- Upgrade error -->
-            <div v-if="upgradeError" class="stat-upgrade-error">{{ upgradeError }}</div>
+            <div v-if="upgradeError" class="stat-error">{{ upgradeError }}</div>
 
-            <!-- Chassis maxed notice -->
             <div v-if="chassisMaxed" class="stat-maxed-notice">
-                <span class="maxed-icon">✓</span>
-                <div class="maxed-body">
-                    <span class="maxed-title">BLACKHAT FULLY UPGRADED — v1.9</span>
-                    <span class="maxed-sub">Visit the RIGS tab to purchase a NullTek Series 2 chassis and continue your progression.</span>
+                <span class="smn-check">✓</span>
+                <div>
+                    <div class="smn-title">BLACKHAT FULLY UPGRADED — v1.9</div>
+                    <div class="smn-sub">Visit the RIGS tab to purchase a NullTek Series 2 chassis.</div>
                 </div>
             </div>
 
-            <!-- Cooldown reset -->
-            <div class="stat-cooldown-section">
-                <div class="scd-heading">COMMAND COOLDOWN RESET</div>
-                <div class="scd-sub">Visiting CyberDoc resets all command cooldowns. No charge.</div>
-                <button class="scd-btn" @click="onResetCooldowns">[ RESET ALL COOLDOWNS ]</button>
+            <div class="cooldown-strip">
+                <div>
+                    <div class="cd-label">COMMAND COOLDOWN RESET</div>
+                    <div class="cd-sub">Visiting CyberDoc resets all cooldowns. No charge.</div>
+                </div>
+                <button class="cd-btn" @click="onResetCooldowns">[ RESET ALL ]</button>
             </div>
 
         </div>
 
-        <!-- ── Commands shop ────────────────────────────────────────────────── -->
-        <div v-else-if="activeCategory === 'commands'" class="cmd-shop">
+        <!-- ════════════════════════════════════════════════════════════════════
+             COMMANDS
+             ════════════════════════════════════════════════════════════════════ -->
+        <div v-else-if="activeCategory === 'commands'" class="section-scroll">
 
-            <div v-if="purchasableCommands.length === 0" class="cmd-shop-empty">
+            <div v-if="purchasableCommands.length === 0" class="empty-state">
                 ALL AVAILABLE COMMANDS OWNED
             </div>
 
             <template v-for="ctx in ['map', 'hack']" :key="ctx">
-                <div v-if="commandsForContext(ctx).length" class="cmd-tier-group">
-
-                    <div class="cmd-tier-heading">
-                        <span class="cmd-tier-label">{{ ctx === 'map' ? 'MAP COMMANDS' : 'HACK COMMANDS' }}</span>
-                        <span class="cmd-tier-req">
-                            {{ ctx === 'map' ? 'Used during map traversal' : 'Used inside Packet Hijack' }}
-                        </span>
+                <div v-if="commandsForContext(ctx).length" class="cmd-group">
+                    <div class="cmd-group-header">
+                        <span>{{ ctx === 'map' ? 'MAP COMMANDS' : 'HACK COMMANDS' }}</span>
+                        <span class="cmd-group-sub">{{ ctx === 'map' ? 'Used during map traversal' : 'Used inside Packet Hijack' }}</span>
                     </div>
-
                     <div
                         v-for="cmd in commandsForContext(ctx)"
                         :key="cmd.id"
-                        class="cmd-shop-row"
+                        class="cmd-row"
                     >
-                        <div class="cmd-shop-main">
-                            <span class="cmd-shop-type" :class="`shop-type--${cmd.type}`">
-                                {{ cmd.type.toUpperCase() }}
-                            </span>
-                            <span class="cmd-shop-name">{{ cmd.name.toUpperCase() }}</span>
-                            <div class="cmd-shop-price">
-                                <span class="price-creds">{{ cmd.price.creds.toLocaleString() }} ₡</span>
-                                <span class="price-sep">+</span>
-                                <span class="price-tp">{{ cmd.price.techPoints }} TP</span>
-                            </div>
-                            <button
-                                class="cmd-buy-btn"
-                                :disabled="!atCyberDoc || !canAfford(cmd)"
-                                :title="!atCyberDoc ? 'Navigate to a CyberDoc node to purchase' : buyBtnTitle(cmd)"
-                                @click="onBuyCommand(cmd)"
-                            >PURCHASE</button>
+                        <span class="cmd-type" :class="`cmd-type--${cmd.type}`">{{ cmd.type.toUpperCase() }}</span>
+                        <span class="cmd-name">{{ cmd.name.toUpperCase() }}</span>
+                        <span class="cmd-effect">{{ cmd.context === 'hack' ? cmd.packethijackEffect : cmd.mapEffect }}</span>
+                        <div class="cmd-price">
+                            <span class="cp-creds">{{ cmd.price.creds.toLocaleString() }} ₡</span>
+                            <span class="cp-sep">+</span>
+                            <span class="cp-tp">{{ cmd.price.techPoints }} TP</span>
                         </div>
-                        <div class="cmd-shop-effect">
-                            <span class="eff-key">{{ cmd.context === 'hack' ? 'PACKET HIJACK' : 'MAP' }}</span>
-                            <span class="eff-val">{{ cmd.context === 'hack' ? cmd.packethijackEffect : cmd.mapEffect }}</span>
-                        </div>
+                        <button
+                            class="cmd-buy"
+                            :disabled="!atCyberDoc || !canAfford(cmd)"
+                            :title="buyBtnTitle(cmd)"
+                            @click="onBuyCommand(cmd)"
+                        >BUY</button>
                     </div>
                 </div>
             </template>
 
         </div>
 
-        <!-- ── Hardware / Software / Repair grid ───────────────────────────── -->
-        <div v-else class="store-grid">
-            <div
-                v-for="item in filteredItems"
-                :key="item.id"
-                class="store-item"
-                :class="`store-item--${item.rarity}`"
-            >
-                <div class="item-rarity">{{ item.rarity.toUpperCase() }}</div>
-                <div class="item-name">{{ item.name }}</div>
-                <!-- Command modules show slot type + tier instead of stat/boost -->
-                <div v-if="item.peripheral_type === 'command_module'" class="item-stat">
-                    <span class="stat-key">{{ item.slot_type?.toUpperCase() }} SLOT</span>
-                    <span class="stat-val stat-val--slot">T{{ item.slot_tier }}</span>
-                </div>
-                <div v-else-if="item.stat" class="item-stat">
-                    <span class="stat-key">{{ item.stat.toUpperCase() }}</span>
-                    <span class="stat-val">+{{ item.boost }}</span>
-                </div>
-                <div class="item-desc">{{ item.desc }}</div>
-                <div class="item-footer">
-                    <span class="item-price">{{ item.price.toLocaleString() }} ₡</span>
-
-                    <!-- Hardware: show OWNED badge if uninstalled copy in inventory -->
-                    <template v-if="item.category === 'hardware'">
-                        <span v-if="hardwareOwned(item.id)" class="item-owned-badge">OWNED — INSTALL AT PORTS</span>
-                        <button
-                            v-else
-                            class="buy-btn"
-                            :disabled="!atCyberDoc || playerCreds < item.price"
-                            @click="onBuy(item)"
-                        >PURCHASE</button>
-                    </template>
-
-                    <!-- Consumables: purchase + quantity display + USE button -->
-                    <template v-else>
-                        <span v-if="consumableQty(item.id) > 0" class="item-qty">×{{ consumableQty(item.id) }}</span>
-                        <button
-                            class="buy-btn"
-                            :disabled="!atCyberDoc || playerCreds < item.price"
-                            @click="onBuy(item)"
-                        >{{ consumableQty(item.id) > 0 ? '+1 MORE' : 'PURCHASE' }}</button>
-                        <button
-                            v-if="consumableQty(item.id) > 0"
-                            class="use-btn"
-                            @click="onUseConsumable(item)"
-                        >USE</button>
-                    </template>
+        <!-- ════════════════════════════════════════════════════════════════════
+             ITEM GRID (hardware / software / repair / all)
+             ════════════════════════════════════════════════════════════════════ -->
+        <div v-else class="section-scroll">
+            <div class="item-grid">
+                <div
+                    v-for="item in filteredItems"
+                    :key="item.id"
+                    class="item-card"
+                    :class="`item-card--${item.rarity}`"
+                >
+                    <div class="item-top">
+                        <span class="item-rarity">{{ item.rarity.toUpperCase() }}</span>
+                        <span v-if="item.peripheral_type === 'command_module'" class="item-stat-badge stat-badge--slot">
+                            {{ item.slot_type?.toUpperCase() }} T{{ item.slot_tier }}
+                        </span>
+                        <span v-else-if="item.stat" class="item-stat-badge">
+                            {{ item.stat.toUpperCase() }} +{{ item.boost }}
+                        </span>
+                    </div>
+                    <div class="item-name">{{ item.name }}</div>
+                    <div class="item-desc">{{ item.desc }}</div>
+                    <div class="item-footer">
+                        <span class="item-price">{{ item.price.toLocaleString() }} ₡</span>
+                        <template v-if="item.category === 'hardware'">
+                            <span v-if="hardwareOwned(item.id)" class="item-owned">OWNED</span>
+                            <button v-else class="item-buy" :disabled="!atCyberDoc || playerCreds < item.price" @click="onBuy(item)">BUY</button>
+                        </template>
+                        <template v-else>
+                            <span v-if="consumableQty(item.id) > 0" class="item-qty">×{{ consumableQty(item.id) }}</span>
+                            <button class="item-buy" :disabled="!atCyberDoc || playerCreds < item.price" @click="onBuy(item)">
+                                {{ consumableQty(item.id) > 0 ? '+1' : 'BUY' }}
+                            </button>
+                            <button v-if="consumableQty(item.id) > 0" class="item-use" @click="onUseConsumable(item)">USE</button>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
@@ -926,1087 +864,1032 @@ function onResetCooldowns() {
     background: #07060a;
     font-family: 'JetBrains Mono', monospace;
     overflow: hidden;
+    position: relative;
 }
 
-/* ── Location gate ────────────────────────────────────────────────────────── */
+/* Subtle scanline overlay — gives the whole page a screen feel */
+.store-page::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.06) 3px,
+        rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* All direct children sit above the scanline */
+.store-page > * { position: relative; z-index: 1; }
+
+/* ── Access gate ──────────────────────────────────────────────────────────── */
 .access-gate {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
-    gap: 10px;
+    gap: 8px;
     font-family: 'JetBrains Mono', monospace;
 }
 .access-gate--checking { color: #4FC3F7; }
 .access-gate--denied   { color: #ff4444; }
-.gate-icon { font-size: 32px; }
-.gate-msg  { font-size: 14px; letter-spacing: 0.15em; }
-.gate-sub  { font-size: 10px; opacity: 0.6; letter-spacing: 0.08em; }
+.gate-icon        { font-size: 28px; margin-bottom: 4px; }
+.gate-icon--denied { color: #ff3333; }
+.gate-msg         { font-size: 13px; letter-spacing: 0.18em; }
+.gate-sub         { font-size: 9px; opacity: 0.5; letter-spacing: 0.08em; margin-top: 2px; }
 
-/* ── Header ───────────────────────────────────────────────────────────────── */
-.store-header {
+/* ── Storefront header ────────────────────────────────────────────────────── */
+.storefront {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 24px 12px;
-    border-bottom: 1px solid rgba(255, 179, 0, 0.2);
-    background: rgba(255, 179, 0, 0.02);
+    padding: 10px 16px 9px;
+    background: rgba(255,179,0,0.03);
+    border-bottom: 1px solid rgba(255,179,0,0.15);
     flex-shrink: 0;
+    gap: 12px;
 }
 
-.store-brand {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.store-logo {
-    font-size: 18px;
-    color: #FFB300;
-    letter-spacing: 0.12em;
-    text-shadow: 0 0 14px rgba(255, 179, 0, 0.4);
-    line-height: 1;
-}
-
-.store-brand-sub {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-}
-
-.store-district {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.55);
-    letter-spacing: 0.14em;
-    border: 1px solid rgba(255, 179, 0, 0.2);
-    padding: 0px 6px;
-}
-
-.store-tagline {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.32);
-    letter-spacing: 0.06em;
-    font-style: italic;
-}
-
-.store-balances {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.bal-item {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-}
-
-.bal-label {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.35);
-    letter-spacing: 0.1em;
-}
-
-.bal-value {
-    font-size: 13px;
-    color: #FFB300;
-    letter-spacing: 0.06em;
-}
-
-.bal-tp {
-    color: rgba(125, 249, 255, 0.9);
-}
-
-.bal-sep {
-    width: 1px;
-    height: 16px;
-    background: rgba(255, 179, 0, 0.12);
-}
-
-/* ── Banking strip ────────────────────────────────────────────────────────── */
-.bank-strip {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 8px 24px;
-    background: rgba(0, 255, 136, 0.02);
-    border-bottom: 1px solid rgba(0, 255, 136, 0.08);
-    flex-shrink: 0;
-    transition: background 0.2s, border-color 0.2s;
-}
-.bank-strip--hot {
-    background: rgba(0, 255, 136, 0.04);
-    border-bottom-color: rgba(0, 255, 136, 0.2);
-}
-.bank-strip-left {
+.storefront-sign {
     display: flex;
     align-items: center;
     gap: 10px;
     flex: 1;
+    min-width: 0;
 }
-.bank-label {
+
+.sf-mark {
+    font-size: 20px;
+    color: #FFB300;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.sf-name-block {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+}
+
+.sf-name {
+    font-size: 15px;
+    color: #FFB300;
+    letter-spacing: 0.12em;
+    line-height: 1;
+}
+
+.sf-handle {
+    font-size: 7px;
+    color: rgba(255,179,0,0.4);
+    letter-spacing: 0.16em;
+}
+
+.sf-district-tag {
+    font-size: 7px;
+    color: rgba(255,179,0,0.55);
+    border: 1px solid rgba(255,179,0,0.2);
+    padding: 1px 6px;
+    letter-spacing: 0.12em;
+    flex-shrink: 0;
+}
+
+.sf-tagline {
     font-size: 8px;
-    color: rgba(0, 255, 136, 0.35);
+    color: rgba(255,179,0,0.25);
+    letter-spacing: 0.04em;
+    font-style: italic;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sf-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.sf-status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #00FF88;
+    animation: status-blink 2.5s ease-in-out infinite;
+}
+
+@keyframes status-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.sf-status-text {
+    font-size: 7px;
+    color: rgba(0,255,136,0.55);
     letter-spacing: 0.14em;
 }
-.bank-pocket {
-    font-size: 13px;
+
+/* Balance ledger */
+.sf-ledger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,179,0,0.1);
+    padding: 5px 12px;
+}
+
+.ledger-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+
+.ledger-label {
+    font-size: 6px;
+    color: rgba(255,179,0,0.35);
+    letter-spacing: 0.14em;
+}
+
+.ledger-value {
+    font-size: 12px;
+    color: #FFB300;
     letter-spacing: 0.06em;
 }
-.pocket--hot   { color: #00FF88; text-shadow: 0 0 8px rgba(0, 255, 136, 0.4); }
-.pocket--empty { color: rgba(0, 255, 136, 0.2); }
-.bank-risk {
+
+.ledger-tp { color: rgba(125,249,255,0.9); }
+
+.ledger-divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(255,179,0,0.1);
+}
+
+/* ── Banking terminal ─────────────────────────────────────────────────────── */
+.bank-terminal {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(0,255,136,0.08);
+    flex-shrink: 0;
+    transition: border-color 0.2s;
+}
+
+.bank-terminal--hot {
+    border-bottom-color: rgba(0,255,136,0.22);
+}
+
+.bt-label {
     font-size: 7px;
-    color: rgba(255, 179, 0, 0.7);
-    border: 1px solid rgba(255, 179, 0, 0.3);
-    padding: 1px 6px;
+    color: rgba(0,255,136,0.3);
+    letter-spacing: 0.16em;
+    flex-shrink: 0;
+}
+
+.bt-amount {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+}
+
+.bt-amount--hot   { color: #00FF88; }
+.bt-amount--empty { color: rgba(0,255,136,0.2); }
+
+.bt-risk {
+    font-size: 7px;
+    color: rgba(255,179,0,0.75);
+    border: 1px solid rgba(255,179,0,0.25);
+    padding: 1px 5px;
     letter-spacing: 0.1em;
     animation: risk-pulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
 }
-@keyframes risk-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
 
-.bank-btn {
+@keyframes risk-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.bt-spacer { flex: 1; }
+
+.bt-btn {
     background: transparent;
-    border: 1px solid rgba(0, 255, 136, 0.25);
-    color: rgba(0, 255, 136, 0.6);
+    border: 1px solid rgba(0,255,136,0.2);
+    color: rgba(0,255,136,0.55);
     font-family: 'JetBrains Mono', monospace;
     font-size: 8px;
     letter-spacing: 0.1em;
-    padding: 5px 14px;
+    padding: 4px 12px;
     cursor: pointer;
     transition: all 0.12s;
     flex-shrink: 0;
 }
-.bank-btn:hover:not(:disabled) {
-    background: rgba(0, 255, 136, 0.07);
-    border-color: rgba(0, 255, 136, 0.6);
+.bt-btn:hover:not(:disabled) {
+    background: rgba(0,255,136,0.07);
+    border-color: rgba(0,255,136,0.55);
     color: #00FF88;
 }
-.bank-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-.bank-confirm {
+.bt-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+
+.bt-confirm {
     font-size: 8px;
     color: #00FF88;
     letter-spacing: 0.1em;
     flex-shrink: 0;
 }
-.bank-confirm-enter-active, .bank-confirm-leave-active { transition: opacity 0.3s; }
-.bank-confirm-enter-from, .bank-confirm-leave-to       { opacity: 0; }
 
-/* ── Category bar ─────────────────────────────────────────────────────────── */
-.store-category-bar {
+.bank-confirm-enter-active, .bank-confirm-leave-active { transition: opacity 0.3s; }
+.bank-confirm-enter-from,   .bank-confirm-leave-to     { opacity: 0; }
+
+/* ── Section nav ──────────────────────────────────────────────────────────── */
+.store-nav {
     display: flex;
-    border-bottom: 1px solid rgba(255, 179, 0, 0.1);
+    border-bottom: 1px solid rgba(255,179,0,0.1);
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+.snav-btn {
+    padding: 7px 16px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(255,179,0,0.06);
+    color: rgba(255,179,0,0.3);
+    font-family: inherit;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: color 0.12s, background 0.12s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.snav-btn:hover  { color: rgba(255,179,0,0.65); background: rgba(255,179,0,0.03); }
+.snav-btn.active {
+    color: #FFB300;
+    background: rgba(255,179,0,0.05);
+    border-bottom: 2px solid #FFB300;
+}
+
+/* ── Off-site banner ──────────────────────────────────────────────────────── */
+.offsite-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: rgba(255,51,51,0.05);
+    border-bottom: 1px solid rgba(255,51,51,0.2);
+    font-size: 8px;
+    color: rgba(255,68,68,0.75);
+    letter-spacing: 0.06em;
     flex-shrink: 0;
 }
 
-.cat-btn {
-    padding: 9px 20px;
-    background: transparent;
-    border: none;
-    border-right: 1px solid rgba(255, 179, 0, 0.06);
-    color: rgba(255, 179, 0, 0.35);
-    font-family: inherit;
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    transition: color 0.15s, background 0.15s;
-    white-space: nowrap;
-}
-.cat-btn:hover  { color: rgba(255, 179, 0, 0.7); background: rgba(255, 179, 0, 0.03); }
-.cat-btn.active { color: #FFB300; background: rgba(255, 179, 0, 0.05); border-bottom: 2px solid #FFB300; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   RIGS SHOP
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-.rigs-shop {
+/* ── Shared section scroll wrapper ───────────────────────────────────────── */
+.section-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 24px 32px;
+    padding: 12px 16px 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 12px;
 }
-.rigs-shop::-webkit-scrollbar       { width: 3px; }
-.rigs-shop::-webkit-scrollbar-track { background: transparent; }
-.rigs-shop::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.12); }
+.section-scroll::-webkit-scrollbar       { width: 3px; }
+.section-scroll::-webkit-scrollbar-track { background: transparent; }
+.section-scroll::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.1); }
 
-/* ── Current chassis block ──────────────────────────────────────────────── */
+/* ── Shared section subheading ────────────────────────────────────────────── */
+.section-subheading {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,179,0,0.07);
+    font-size: 8px;
+    color: rgba(255,179,0,0.45);
+    letter-spacing: 0.16em;
+}
+.section-sub {
+    font-size: 7px;
+    color: rgba(255,255,255,0.2);
+    letter-spacing: 0.04em;
+}
+
+/* ── Lock notice ──────────────────────────────────────────────────────────── */
+.lock-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 10px;
+    background: rgba(255,179,0,0.03);
+    border: 1px solid rgba(255,179,0,0.09);
+    font-size: 8px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+}
+.lock-notice strong { color: rgba(255,179,0,0.65); font-weight: normal; }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty-state {
+    padding: 40px 0;
+    text-align: center;
+    font-size: 9px;
+    color: rgba(0,255,136,0.35);
+    letter-spacing: 0.16em;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CURRENT CHASSIS
+   ════════════════════════════════════════════════════════════════════════════ */
+
 .chassis-current {
-    border: 1px solid rgba(255, 179, 0, 0.2);
-    background: rgba(255, 179, 0, 0.025);
-    padding: 16px 20px;
+    border: 1px solid rgba(255,179,0,0.18);
+    background: rgba(255,179,0,0.02);
+    padding: 10px 14px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 8px;
 }
 
-.chassis-current-header {
+.cc-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
 .cc-label {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.4);
-    letter-spacing: 0.16em;
+    font-size: 7px;
+    color: rgba(255,179,0,0.35);
+    letter-spacing: 0.18em;
 }
 
 .cc-equipped {
     font-size: 7px;
     color: #00FF88;
-    border: 1px solid rgba(0, 255, 136, 0.3);
-    padding: 1px 8px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
 }
 
 .cc-identity {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
-.cc-tier {
-    font-size: 9px;
-    color: rgba(255, 179, 0, 0.6);
-    border: 1px solid rgba(255, 179, 0, 0.25);
-    padding: 2px 7px;
+.cc-tier-badge {
+    font-size: 8px;
+    color: rgba(255,179,0,0.55);
+    border: 1px solid rgba(255,179,0,0.2);
+    padding: 1px 5px;
     letter-spacing: 0.1em;
-    flex-shrink: 0;
 }
 
 .cc-name {
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    color: rgba(255,255,255,0.88);
     letter-spacing: 0.08em;
 }
 
 .cc-ver {
-    font-size: 13px;
-    color: rgba(255, 179, 0, 0.7);
+    font-size: 11px;
+    color: rgba(255,179,0,0.65);
     letter-spacing: 0.06em;
 }
 
-/* Stat pip display */
 .cc-stats {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 3px;
 }
 
 .cc-stat {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .cc-stat-label {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.4);
+    font-size: 7px;
+    color: rgba(255,179,0,0.35);
     letter-spacing: 0.1em;
-    width: 26px;
+    width: 24px;
     flex-shrink: 0;
 }
 
-.cc-stat-pips {
+.cc-pips {
     display: flex;
-    gap: 3px;
+    gap: 2px;
     flex: 1;
 }
 
 .cc-pip {
     display: inline-block;
-    width: 10px;
-    height: 10px;
-    border: 1px solid rgba(255, 179, 0, 0.1);
+    width: 9px;
+    height: 9px;
+    border: 1px solid rgba(255,179,0,0.08);
 }
 
-.cc-pip--base     { background: rgba(255, 179, 0, 0.25); border-color: rgba(255, 179, 0, 0.3); }
-.cc-pip--invested { background: rgba(0, 255, 136, 0.35); border-color: rgba(0, 255, 136, 0.45); }
-.cc-pip--empty    { background: transparent; }
+.pip--base     { background: rgba(255,179,0,0.22); border-color: rgba(255,179,0,0.28); }
+.pip--invested { background: rgba(0,255,136,0.32); border-color: rgba(0,255,136,0.4); }
+.pip--empty    { background: transparent; }
 
 .cc-stat-val {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
-    letter-spacing: 0.06em;
-    width: 20px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.5);
+    width: 16px;
     text-align: right;
     flex-shrink: 0;
 }
 
-/* Footer — progress + ports */
 .cc-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 179, 0, 0.07);
-    flex-wrap: wrap;
+    padding-top: 7px;
+    border-top: 1px solid rgba(255,179,0,0.07);
 }
 
-.cc-progress {
+.cc-prog {
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex: 1;
+    gap: 6px;
 }
 
 .cc-prog-label {
-    font-size: 7px;
-    color: rgba(255, 179, 0, 0.35);
-    letter-spacing: 0.12em;
-    flex-shrink: 0;
+    font-size: 6px;
+    color: rgba(255,179,0,0.3);
+    letter-spacing: 0.14em;
 }
 
-.cc-prog-bar {
+.cc-prog-pips {
     display: flex;
     gap: 2px;
 }
 
 .cc-prog-pip {
     display: inline-block;
-    width: 14px;
-    height: 6px;
-    background: rgba(255, 179, 0, 0.07);
-    border: 1px solid rgba(255, 179, 0, 0.12);
+    width: 12px;
+    height: 5px;
+    background: rgba(255,179,0,0.06);
+    border: 1px solid rgba(255,179,0,0.1);
 }
 
-.cc-prog-pip--lit {
-    background: rgba(255, 179, 0, 0.5);
-    border-color: rgba(255, 179, 0, 0.65);
-    box-shadow: 0 0 4px rgba(255, 179, 0, 0.2);
+.prog-pip--lit {
+    background: rgba(255,179,0,0.45);
+    border-color: rgba(255,179,0,0.6);
 }
 
 .cc-prog-count {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.5);
+    font-size: 7px;
+    color: rgba(255,179,0,0.4);
     letter-spacing: 0.08em;
-    flex-shrink: 0;
 }
 
-.cc-prog-sub {
-    font-size: 8px;
+.cc-maxed-tag {
+    font-size: 7px;
     color: #00FF88;
-    letter-spacing: 0.1em;
-    flex-shrink: 0;
+    letter-spacing: 0.12em;
+    border: 1px solid rgba(0,255,136,0.25);
+    padding: 0 5px;
 }
 
 .cc-ports {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.cc-ports-label {
     font-size: 7px;
-    color: rgba(255, 179, 0, 0.3);
-    letter-spacing: 0.12em;
+    color: rgba(255,179,0,0.3);
+    letter-spacing: 0.1em;
 }
 
-.cc-ports-val {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.55);
-    letter-spacing: 0.06em;
-}
+/* ════════════════════════════════════════════════════════════════════════════
+   CHASSIS CARDS
+   ════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Available chassis section label ────────────────────────────────────── */
-.rigs-section-label {
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-}
-
-.rigs-section-label > span:first-child {
-    font-size: 9px;
-    color: rgba(255, 179, 0, 0.5);
-    letter-spacing: 0.16em;
-}
-
-.rigs-section-sub {
-    font-size: 8px;
-    color: rgba(255, 255, 255, 0.2);
-    letter-spacing: 0.04em;
-}
-
-/* ── Lock notice ────────────────────────────────────────────────────────── */
-.chassis-lock-bar {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 14px;
-    background: rgba(255, 179, 0, 0.03);
-    border: 1px solid rgba(255, 179, 0, 0.1);
-}
-
-.lock-icon {
-    font-size: 12px;
-    flex-shrink: 0;
-    margin-top: 1px;
-}
-
-.lock-text {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.35);
-    letter-spacing: 0.04em;
-    line-height: 1.7;
-}
-
-.lock-text strong {
-    color: rgba(255, 179, 0, 0.7);
-    font-weight: normal;
-}
-
-/* ── Chassis card grid ──────────────────────────────────────────────────── */
 .chassis-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
 }
 
 .chassis-card {
-    border: 1px solid rgba(255, 179, 0, 0.18);
-    background: rgba(255, 179, 0, 0.015);
-    padding: 16px;
+    border: 1px solid rgba(255,179,0,0.15);
+    background: rgba(255,179,0,0.012);
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     transition: border-color 0.15s, background 0.15s;
 }
 
 .chassis-card:not(.chassis-card--locked):hover {
-    border-color: rgba(255, 179, 0, 0.4);
-    background: rgba(255, 179, 0, 0.03);
+    border-color: rgba(255,179,0,0.38);
+    background: rgba(255,179,0,0.025);
 }
 
-.chassis-card--locked {
-    opacity: 0.45;
-    pointer-events: none;
-}
+.chassis-card--locked  { opacity: 0.4; pointer-events: none; }
+.chassis-card--unavail { opacity: 0.22; }
 
-.chassis-card--unavail {
-    opacity: 0.25;
-}
-
-/* Card header */
 .ccard-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .ccard-tier {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.55);
-    border: 1px solid rgba(255, 179, 0, 0.2);
-    padding: 1px 6px;
+    font-size: 7px;
+    color: rgba(255,179,0,0.5);
+    border: 1px solid rgba(255,179,0,0.18);
+    padding: 1px 5px;
     letter-spacing: 0.1em;
 }
 
 .ccard-brand {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.4);
+    font-size: 7px;
+    color: rgba(255,179,0,0.35);
     letter-spacing: 0.14em;
     flex: 1;
 }
 
 .ccard-build {
-    font-size: 7px;
+    font-size: 6px;
     letter-spacing: 0.1em;
-    padding: 1px 6px;
+    padding: 1px 5px;
     border: 1px solid;
 }
 
-.build--ghost   { color: rgba(125, 249, 255, 0.8); border-color: rgba(125, 249, 255, 0.3); }
-.build--breaker { color: rgba(255, 69, 69, 0.8);  border-color: rgba(255, 69, 69, 0.3); }
-.build--vault   { color: rgba(0, 255, 136, 0.8);   border-color: rgba(0, 255, 136, 0.3); }
+.build--ghost   { color: rgba(125,249,255,0.75); border-color: rgba(125,249,255,0.25); }
+.build--breaker { color: rgba(255,69,69,0.75);   border-color: rgba(255,69,69,0.25); }
+.build--vault   { color: rgba(0,255,136,0.75);   border-color: rgba(0,255,136,0.25); }
 
-/* Model + name */
+.ccard-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
 .ccard-model {
-    font-size: 10px;
-    color: rgba(255, 179, 0, 0.5);
+    font-size: 9px;
+    color: rgba(255,179,0,0.45);
     letter-spacing: 0.14em;
 }
 
 .ccard-name {
-    font-size: 18px;
-    color: rgba(255, 255, 255, 0.9);
+    font-size: 16px;
+    color: rgba(255,255,255,0.88);
     letter-spacing: 0.08em;
     line-height: 1;
 }
 
 .ccard-tagline {
-    font-size: 8px;
-    color: rgba(255, 255, 255, 0.25);
-    letter-spacing: 0.04em;
+    font-size: 7px;
+    color: rgba(255,255,255,0.22);
+    letter-spacing: 0.03em;
     line-height: 1.6;
     font-style: italic;
-    border-left: 2px solid rgba(255, 179, 0, 0.12);
-    padding-left: 8px;
+    border-left: 2px solid rgba(255,179,0,0.1);
+    padding-left: 7px;
 }
 
-/* Stats */
 .ccard-stats {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 10px 0;
-    border-top: 1px solid rgba(255, 179, 0, 0.07);
-    border-bottom: 1px solid rgba(255, 179, 0, 0.07);
+    gap: 3px;
+    padding: 7px 0;
+    border-top: 1px solid rgba(255,179,0,0.06);
+    border-bottom: 1px solid rgba(255,179,0,0.06);
 }
 
-.ccard-stat-row {
+.ccard-stat {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .ccard-stat-key {
-    font-size: 7px;
-    color: rgba(255, 179, 0, 0.35);
+    font-size: 6px;
+    color: rgba(255,179,0,0.3);
     letter-spacing: 0.1em;
-    width: 24px;
+    width: 22px;
     flex-shrink: 0;
 }
 
-.ccard-stat-bar {
+.ccard-stat-pips {
     display: flex;
     gap: 2px;
     flex: 1;
 }
 
-.ccard-stat-pip {
+.ccard-pip {
     display: inline-block;
-    width: 8px;
-    height: 8px;
-    background: rgba(255, 179, 0, 0.07);
-    border: 1px solid rgba(255, 179, 0, 0.1);
+    width: 7px;
+    height: 7px;
+    background: rgba(255,179,0,0.06);
+    border: 1px solid rgba(255,179,0,0.1);
 }
 
-.cstat-pip--base   { background: rgba(255, 179, 0, 0.3); border-color: rgba(255, 179, 0, 0.4); }
-.cstat-pip--uplink { background: rgba(0, 255, 255, 0.25); border-color: rgba(0, 255, 255, 0.3); }
+.ccard-pip--base   { background: rgba(255,179,0,0.28); border-color: rgba(255,179,0,0.38); }
+.ccard-pip--uplink { background: rgba(0,255,255,0.22); border-color: rgba(0,255,255,0.28); }
 
 .ccard-stat-val {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.65);
-    letter-spacing: 0.06em;
-    width: 16px;
-    text-align: right;
-    flex-shrink: 0;
-}
-
-.ccard-stat-cap {
     font-size: 8px;
-    color: rgba(255, 255, 255, 0.2);
+    color: rgba(255,255,255,0.45);
     letter-spacing: 0.04em;
     flex-shrink: 0;
 }
 
-.ccard-stat-cap--locked {
-    font-size: 9px;
-}
-
-/* Meta */
-.ccard-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.ccard-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.ccard-meta-key {
-    font-size: 7px;
-    color: rgba(255, 179, 0, 0.3);
-    letter-spacing: 0.1em;
-    width: 80px;
-    flex-shrink: 0;
-}
-
-.ccard-meta-val {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.55);
-    letter-spacing: 0.05em;
-}
-
-/* Footer */
 .ccard-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 179, 0, 0.07);
+    padding-top: 7px;
+    border-top: 1px solid rgba(255,179,0,0.06);
 }
 
 .ccard-price {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: 5px;
 }
 
-.ccard-price-creds {
-    font-size: 13px;
-    color: #FFB300;
-    letter-spacing: 0.06em;
-}
+.cp-creds { font-size: 12px; color: #FFB300; letter-spacing: 0.05em; }
+.cp-sep   { font-size: 8px;  color: rgba(255,255,255,0.18); }
+.cp-tp    { font-size: 10px; color: rgba(125,249,255,0.75); letter-spacing: 0.05em; }
 
-.ccard-price-sep {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.2);
-}
-
-.ccard-price-tp {
-    font-size: 11px;
-    color: rgba(125, 249, 255, 0.8);
-    letter-spacing: 0.06em;
-}
-
-.ccard-buy-btn {
-    background: rgba(255, 179, 0, 0.08);
-    border: 1px solid rgba(255, 179, 0, 0.4);
-    color: #FFB300;
-    font-family: inherit;
-    font-size: 8px;
-    letter-spacing: 0.1em;
-    padding: 5px 14px;
-    cursor: pointer;
-    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
-}
-.ccard-buy-btn:hover:not(:disabled) {
-    background: rgba(255, 179, 0, 0.16);
-    border-color: #FFB300;
-    box-shadow: 0 0 10px rgba(255, 179, 0, 0.2);
-}
-.ccard-buy-btn:disabled { opacity: 0.25; cursor: not-allowed; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   STAT UPGRADES
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-.stat-shop {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 24px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-.stat-shop::-webkit-scrollbar       { width: 3px; }
-.stat-shop::-webkit-scrollbar-track { background: transparent; }
-.stat-shop::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.12); }
-
-.stat-shop-intro {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255,179,0,0.08);
-}
-.stat-intro-label {
-    font-size: 9px;
-    color: rgba(255,179,0,0.55);
-    letter-spacing: 0.14em;
-}
-.stat-intro-sub {
-    font-size: 8px;
-    color: rgba(255,255,255,0.28);
-    letter-spacing: 0.04em;
-    line-height: 1.7;
-    max-width: 560px;
-}
-
-/* Global progression indicator */
-.stat-global-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    background: rgba(255,179,0,0.03);
-    border: 1px solid rgba(255,179,0,0.08);
-}
-.sg-label {
-    font-size: 8px;
-    color: rgba(255,179,0,0.4);
-    letter-spacing: 0.1em;
-    flex-shrink: 0;
-}
-.sg-pips { display: flex; gap: 3px; }
-.sg-pip {
-    width: 8px;
-    height: 8px;
-    background: rgba(255,179,0,0.08);
-    border: 1px solid rgba(255,179,0,0.15);
-}
-.sg-pip--lit {
-    background: rgba(255,179,0,0.45);
-    border-color: rgba(255,179,0,0.6);
-    box-shadow: 0 0 4px rgba(255,179,0,0.2);
-}
-.sg-count {
-    font-size: 8px;
-    color: rgba(255,179,0,0.35);
-    letter-spacing: 0.06em;
-    margin-left: 4px;
-}
-
-/* Stat list */
-.stat-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.stat-upgrade-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    border: 1px solid rgba(255,179,0,0.1);
-    background: rgba(255,179,0,0.015);
-    transition: border-color 0.12s;
-    flex-wrap: wrap;
-}
-.stat-upgrade-row:hover:not(.stat-row--maxed) { border-color: rgba(255,179,0,0.28); }
-.stat-row--maxed { opacity: 0.4; }
-
-.su-identity {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    width: 110px;
-    flex-shrink: 0;
-}
-.su-name {
-    font-size: 11px;
-    color: rgba(255,255,255,0.8);
-    letter-spacing: 0.1em;
-}
-.su-desc {
-    font-size: 7px;
-    color: rgba(255,255,255,0.28);
-    letter-spacing: 0.03em;
-    line-height: 1.6;
-}
-
-/* Value pips */
-.su-bar-wrap {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    flex: 1;
-    min-width: 120px;
-}
-.su-bar-pip {
-    width: 12px;
-    height: 12px;
-    border: 1px solid rgba(255,179,0,0.12);
-    flex-shrink: 0;
-}
-.pip--base     { background: rgba(255,179,0,0.25); border-color: rgba(255,179,0,0.3); }
-.pip--invested { background: rgba(0,255,136,0.35); border-color: rgba(0,255,136,0.4); box-shadow: 0 0 4px rgba(0,255,136,0.15); }
-.pip--empty    { background: transparent; }
-.su-bar-label {
-    font-size: 9px;
-    color: rgba(255,179,0,0.4);
-    letter-spacing: 0.08em;
-    margin-left: 6px;
-    white-space: nowrap;
-}
-
-/* Cost */
-.su-cost-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-.su-next-label  { font-size: 7px; color: rgba(255,179,0,0.3); letter-spacing: 0.1em; }
-.su-cost-creds  { font-size: 11px; color: #FFB300; letter-spacing: 0.06em; }
-.su-cost-tp     { font-size: 10px; color: rgba(125,249,255,0.7); letter-spacing: 0.06em; }
-.su-scale-warn  { font-size: 7px; color: rgba(255,69,69,0.6); letter-spacing: 0.06em; white-space: nowrap; }
-.su-maxed       { font-size: 8px; color: rgba(0,255,136,0.45); letter-spacing: 0.12em; }
-.su-os-gate     { font-size: 8px; color: rgba(255,179,0,0.5); letter-spacing: 0.1em; }
-
-.su-btn {
-    background: rgba(255,179,0,0.08);
+.ccard-buy {
+    background: rgba(255,179,0,0.07);
     border: 1px solid rgba(255,179,0,0.35);
     color: #FFB300;
     font-family: inherit;
-    font-size: 8px;
+    font-size: 7px;
     letter-spacing: 0.12em;
-    padding: 5px 14px;
+    padding: 4px 12px;
     cursor: pointer;
-    flex-shrink: 0;
     transition: background 0.12s, border-color 0.12s;
-    margin-left: auto;
 }
-.su-btn:hover:not(:disabled) {
-    background: rgba(255,179,0,0.16);
+.ccard-buy:hover:not(:disabled) {
+    background: rgba(255,179,0,0.14);
     border-color: #FFB300;
 }
-.su-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.ccard-buy:disabled { opacity: 0.22; cursor: not-allowed; }
 
-/* Chassis maxed notice */
-.stat-upgrade-error {
-    padding: 8px 16px;
+/* ════════════════════════════════════════════════════════════════════════════
+   STAT UPGRADES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.stat-intro {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,179,0,0.07);
+}
+
+.stat-intro-label {
+    font-size: 8px;
+    color: rgba(255,179,0,0.5);
+    letter-spacing: 0.16em;
+}
+
+.stat-intro-sub {
+    font-size: 7px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+}
+
+.stat-global {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: rgba(255,179,0,0.025);
+    border: 1px solid rgba(255,179,0,0.07);
+}
+
+.sg-label {
+    font-size: 7px;
+    color: rgba(255,179,0,0.35);
+    letter-spacing: 0.12em;
+    flex-shrink: 0;
+}
+
+.sg-pips { display: flex; gap: 2px; }
+
+.sg-pip {
+    width: 7px;
+    height: 7px;
+    background: rgba(255,179,0,0.07);
+    border: 1px solid rgba(255,179,0,0.12);
+}
+
+.sg-pip--lit {
+    background: rgba(255,179,0,0.4);
+    border-color: rgba(255,179,0,0.55);
+}
+
+.sg-count {
+    font-size: 7px;
+    color: rgba(255,179,0,0.3);
+    letter-spacing: 0.05em;
+}
+
+.stat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255,179,0,0.09);
+    background: rgba(255,179,0,0.012);
+    transition: border-color 0.12s;
+    flex-wrap: wrap;
+}
+
+.stat-row:hover:not(.stat-row--maxed) { border-color: rgba(255,179,0,0.24); }
+.stat-row--maxed { opacity: 0.38; }
+
+.sr-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 90px;
+    flex-shrink: 0;
+}
+
+.sr-name {
     font-size: 10px;
-    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.78);
+    letter-spacing: 0.1em;
+}
+
+.sr-desc {
+    font-size: 6px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.03em;
+    line-height: 1.55;
+}
+
+.sr-pips {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 100px;
+}
+
+.sr-pip {
+    width: 10px;
+    height: 10px;
+    border: 1px solid rgba(255,179,0,0.1);
+    flex-shrink: 0;
+}
+
+.sr-pip-label {
+    font-size: 8px;
+    color: rgba(255,179,0,0.35);
+    letter-spacing: 0.07em;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+.sr-cost {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.sr-cost-creds { font-size: 10px; color: #FFB300; letter-spacing: 0.05em; }
+.sr-cost-tp    { font-size: 9px;  color: rgba(125,249,255,0.65); letter-spacing: 0.05em; }
+.sr-scale      { font-size: 7px;  color: rgba(255,69,69,0.55);  letter-spacing: 0.05em; }
+.sr-capped     { font-size: 7px;  color: rgba(0,255,136,0.4);  letter-spacing: 0.14em; }
+.sr-gated      { font-size: 7px;  color: rgba(255,179,0,0.45); letter-spacing: 0.08em; }
+
+.sr-btn {
+    background: rgba(255,179,0,0.07);
+    border: 1px solid rgba(255,179,0,0.3);
+    color: #FFB300;
+    font-family: inherit;
+    font-size: 7px;
+    letter-spacing: 0.14em;
+    padding: 4px 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-left: auto;
+    transition: background 0.12s, border-color 0.12s;
+}
+.sr-btn:hover:not(:disabled) {
+    background: rgba(255,179,0,0.14);
+    border-color: #FFB300;
+}
+.sr-btn:disabled { opacity: 0.22; cursor: not-allowed; }
+
+.stat-error {
+    padding: 6px 12px;
+    font-size: 9px;
+    letter-spacing: 0.07em;
     color: #ff4455;
-    border: 1px solid rgba(255, 68, 85, 0.3);
-    background: rgba(255, 68, 85, 0.05);
+    border: 1px solid rgba(255,68,85,0.3);
+    background: rgba(255,68,85,0.04);
 }
 
 .stat-maxed-notice {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 14px 16px;
-    border: 1px solid rgba(0, 255, 136, 0.2);
-    background: rgba(0, 255, 136, 0.03);
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(0,255,136,0.18);
+    background: rgba(0,255,136,0.025);
 }
 
-.maxed-icon {
-    font-size: 16px;
-    color: #00FF88;
-    flex-shrink: 0;
-    margin-top: 1px;
-}
+.smn-check { font-size: 14px; color: #00FF88; flex-shrink: 0; }
+.smn-title { font-size: 9px;  color: #00FF88; letter-spacing: 0.12em; }
+.smn-sub   { font-size: 7px;  color: rgba(0,255,136,0.45); letter-spacing: 0.04em; line-height: 1.6; margin-top: 2px; }
 
-.maxed-body {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.maxed-title {
-    font-size: 10px;
-    color: #00FF88;
-    letter-spacing: 0.12em;
-}
-
-.maxed-sub {
-    font-size: 8px;
-    color: rgba(0, 255, 136, 0.5);
-    letter-spacing: 0.04em;
-    line-height: 1.6;
-}
-
-/* Cooldown reset */
-.stat-cooldown-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 14px 16px;
-    border: 1px solid rgba(0,255,136,0.12);
-    background: rgba(0,255,136,0.02);
-    margin-top: 4px;
-}
-.scd-heading { font-size: 9px; color: rgba(0,255,136,0.6); letter-spacing: 0.12em; }
-.scd-sub     { font-size: 8px; color: rgba(255,255,255,0.3); letter-spacing: 0.04em; }
-.scd-btn {
-    align-self: flex-start;
-    background: transparent;
-    border: 1px solid rgba(0,255,136,0.25);
-    color: rgba(0,255,136,0.7);
-    font-family: inherit;
-    font-size: 8px;
-    letter-spacing: 0.12em;
-    padding: 5px 14px;
-    cursor: pointer;
-    margin-top: 4px;
-    transition: all 0.12s;
-}
-.scd-btn:hover { background: rgba(0,255,136,0.07); border-color: rgba(0,255,136,0.55); color: #00FF88; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   COMMANDS SHOP
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-.cmd-shop {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 24px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-.cmd-shop::-webkit-scrollbar       { width: 3px; }
-.cmd-shop::-webkit-scrollbar-track { background: transparent; }
-.cmd-shop::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.12); }
-
-.cmd-shop-empty {
-    padding: 40px 0;
-    text-align: center;
-    font-size: 10px;
-    color: rgba(0,255,136,0.4);
-    letter-spacing: 0.14em;
-}
-
-.cmd-tier-group { display: flex; flex-direction: column; gap: 4px; }
-
-.cmd-tier-heading {
+.cooldown-strip {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255,179,0,0.08);
-    margin-bottom: 4px;
+    padding: 8px 12px;
+    border: 1px solid rgba(0,255,136,0.1);
+    background: rgba(0,255,136,0.015);
 }
-.cmd-tier-label { font-size: 9px; color: rgba(255,179,0,0.5); letter-spacing: 0.16em; }
-.cmd-tier-req   { font-size: 8px; color: rgba(255,179,0,0.25); letter-spacing: 0.1em; }
 
-.cmd-shop-row {
-    border: 1px solid rgba(255,179,0,0.1);
-    background: rgba(255,179,0,0.01);
-    padding: 10px 14px;
+.cd-label { font-size: 8px; color: rgba(0,255,136,0.55); letter-spacing: 0.12em; }
+.cd-sub   { font-size: 7px; color: rgba(255,255,255,0.25); letter-spacing: 0.04em; margin-top: 2px; }
+
+.cd-btn {
+    background: transparent;
+    border: 1px solid rgba(0,255,136,0.22);
+    color: rgba(0,255,136,0.65);
+    font-family: inherit;
+    font-size: 7px;
+    letter-spacing: 0.12em;
+    padding: 4px 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.12s;
+    white-space: nowrap;
+}
+.cd-btn:hover { background: rgba(0,255,136,0.07); border-color: rgba(0,255,136,0.5); color: #00FF88; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COMMANDS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.cmd-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    transition: border-color 0.12s;
+    gap: 3px;
 }
-.cmd-shop-row:hover           { border-color: rgba(255,179,0,0.25); }
-.cmd-shop-row--locked         { opacity: 0.4; }
 
-.cmd-shop-main {
+.cmd-group-header {
     display: flex;
     align-items: center;
     gap: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,179,0,0.07);
+    margin-bottom: 2px;
+    font-size: 8px;
+    color: rgba(255,179,0,0.45);
+    letter-spacing: 0.16em;
 }
 
-.cmd-shop-type {
-    font-size: 7px; letter-spacing: 0.1em; padding: 1px 5px; border: 1px solid; flex-shrink: 0;
+.cmd-group-sub {
+    font-size: 7px;
+    color: rgba(255,179,0,0.22);
+    letter-spacing: 0.08em;
 }
-.shop-type--trap      { color: rgba(255,69,180,0.8);  border-color: rgba(255,69,180,0.3); }
-.shop-type--stealth   { color: rgba(125,249,255,0.8); border-color: rgba(125,249,255,0.3); }
-.shop-type--defensive { color: rgba(0,255,136,0.8);   border-color: rgba(0,255,136,0.3); }
-.shop-type--offensive { color: rgba(255,69,69,0.9);   border-color: rgba(255,69,69,0.3); }
 
-.cmd-shop-name  { font-size: 11px; color: rgba(255,255,255,0.8); letter-spacing: 0.06em; flex: 1; }
+.cmd-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255,179,0,0.08);
+    background: rgba(255,179,0,0.008);
+    transition: border-color 0.12s;
+    flex-wrap: wrap;
+}
 
-.cmd-shop-price { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.price-creds    { font-size: 10px; color: #FFB300; letter-spacing: 0.06em; }
-.price-sep      { font-size: 8px;  color: rgba(255,255,255,0.25); }
-.price-tp       { font-size: 10px; color: rgba(125,249,255,0.7); letter-spacing: 0.06em; }
+.cmd-row:hover { border-color: rgba(255,179,0,0.22); }
 
-.cmd-buy-btn {
-    background: rgba(255,179,0,0.08);
-    border: 1px solid rgba(255,179,0,0.4);
+.cmd-type {
+    font-size: 6px;
+    letter-spacing: 0.1em;
+    padding: 1px 4px;
+    border: 1px solid;
+    flex-shrink: 0;
+}
+
+.cmd-type--trap      { color: rgba(255,69,180,0.8);  border-color: rgba(255,69,180,0.28); }
+.cmd-type--stealth   { color: rgba(125,249,255,0.8); border-color: rgba(125,249,255,0.28); }
+.cmd-type--defensive { color: rgba(0,255,136,0.8);   border-color: rgba(0,255,136,0.28); }
+.cmd-type--offensive { color: rgba(255,69,69,0.9);   border-color: rgba(255,69,69,0.28); }
+
+.cmd-name   { font-size: 10px; color: rgba(255,255,255,0.78); letter-spacing: 0.06em; flex: 1; min-width: 80px; }
+.cmd-effect { font-size: 7px;  color: rgba(255,255,255,0.28); letter-spacing: 0.03em; flex: 2; min-width: 100px; line-height: 1.5; }
+
+.cmd-price {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.cmd-buy {
+    background: rgba(255,179,0,0.07);
+    border: 1px solid rgba(255,179,0,0.35);
     color: #FFB300;
     font-family: inherit;
-    font-size: 8px;
-    letter-spacing: 0.1em;
-    padding: 4px 12px;
+    font-size: 7px;
+    letter-spacing: 0.12em;
+    padding: 3px 10px;
     cursor: pointer;
     flex-shrink: 0;
     transition: background 0.12s, border-color 0.12s;
 }
-.cmd-buy-btn:hover:not(:disabled) {
-    background: rgba(255,179,0,0.16);
-    border-color: #FFB300;
-}
-.cmd-buy-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.cmd-buy:hover:not(:disabled) { background: rgba(255,179,0,0.14); border-color: #FFB300; }
+.cmd-buy:disabled { opacity: 0.22; cursor: not-allowed; }
 
-.cmd-shop-effect {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-}
-.eff-key { font-size: 6px; color: rgba(255,179,0,0.25); letter-spacing: 0.12em; width: 28px; flex-shrink: 0; padding-top: 2px; }
-.eff-val { font-size: 8px; color: rgba(255,255,255,0.35); letter-spacing: 0.03em; line-height: 1.6; }
+/* ════════════════════════════════════════════════════════════════════════════
+   ITEM GRID
+   ════════════════════════════════════════════════════════════════════════════ */
 
-.cmd-lock-notice {
-    font-size: 7px;
-    color: rgba(255,179,0,0.4);
-    letter-spacing: 0.06em;
-    padding-top: 2px;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   ITEM GRID (hardware / software / repair / all)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-.store-grid {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 20px;
+.item-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
     align-content: start;
 }
 
-.store-item {
-    border: 1px solid rgba(255, 179, 0, 0.12);
-    background: rgba(255, 179, 0, 0.02);
-    padding: 14px 16px;
+.item-card {
+    border: 1px solid rgba(255,179,0,0.1);
+    background: rgba(255,179,0,0.015);
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
     transition: border-color 0.15s, background 0.15s;
 }
-.store-item:hover {
-    border-color: rgba(255, 179, 0, 0.3);
-    background: rgba(255, 179, 0, 0.04);
+
+.item-card:hover {
+    border-color: rgba(255,179,0,0.28);
+    background: rgba(255,179,0,0.03);
 }
 
-.store-item--uncommon { border-color: rgba(125, 249, 255, 0.18); }
-.store-item--uncommon:hover { border-color: rgba(125, 249, 255, 0.4); }
-.store-item--rare     { border-color: rgba(255, 105, 180, 0.22); }
-.store-item--rare:hover { border-color: rgba(255, 105, 180, 0.45); }
+.item-card--uncommon { border-color: rgba(125,249,255,0.15); }
+.item-card--uncommon:hover { border-color: rgba(125,249,255,0.38); }
+.item-card--rare     { border-color: rgba(255,105,180,0.18); }
+.item-card--rare:hover { border-color: rgba(255,105,180,0.4); }
+
+.item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
 
 .item-rarity {
-    font-size: 7px;
+    font-size: 6px;
     letter-spacing: 0.14em;
 }
-.store-item--common   .item-rarity { color: rgba(255, 179, 0, 0.45); }
-.store-item--uncommon .item-rarity { color: rgba(125, 249, 255, 0.6); }
-.store-item--rare     .item-rarity { color: rgba(255, 105, 180, 0.7); }
+
+.item-card--common   .item-rarity { color: rgba(255,179,0,0.4); }
+.item-card--uncommon .item-rarity { color: rgba(125,249,255,0.55); }
+.item-card--rare     .item-rarity { color: rgba(255,105,180,0.65); }
+
+.item-stat-badge {
+    font-size: 7px;
+    color: #00FF88;
+    letter-spacing: 0.08em;
+    border: 1px solid rgba(0,255,136,0.25);
+    padding: 0 5px;
+}
+
+.stat-badge--slot { color: rgba(125,249,255,0.8); border-color: rgba(125,249,255,0.25); }
 
 .item-name {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.85);
-    letter-spacing: 0.06em;
+    font-size: 10px;
+    color: rgba(255,255,255,0.82);
+    letter-spacing: 0.05em;
     line-height: 1.3;
 }
 
-.item-stat {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.stat-key {
-    font-size: 8px;
-    color: rgba(255, 179, 0, 0.4);
-    letter-spacing: 0.1em;
-    width: 64px;
-}
-
-.stat-val {
-    font-size: 12px;
-    color: #00FF88;
-    letter-spacing: 0.06em;
-}
-.stat-val--slot {
-    color: rgba(125, 249, 255, 0.85);
-}
-
 .item-desc {
-    font-size: 8px;
-    color: rgba(255, 255, 255, 0.35);
-    letter-spacing: 0.04em;
-    line-height: 1.65;
+    font-size: 7px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.03em;
+    line-height: 1.55;
     flex: 1;
 }
 
@@ -2014,100 +1897,51 @@ function onResetCooldowns() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 179, 0, 0.08);
+    gap: 4px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,179,0,0.07);
 }
 
-.item-price {
-    font-size: 12px;
-    color: #FFB300;
-    letter-spacing: 0.06em;
-}
+.item-price { font-size: 11px; color: #FFB300; letter-spacing: 0.05em; }
 
-.buy-btn {
-    background: rgba(255, 179, 0, 0.08);
-    border: 1px solid rgba(255, 179, 0, 0.4);
-    color: #FFB300;
-    font-family: inherit;
-    font-size: 8px;
+.item-owned {
+    font-size: 6px;
+    color: rgba(0,255,136,0.65);
+    border: 1px solid rgba(0,255,136,0.22);
+    padding: 2px 6px;
     letter-spacing: 0.1em;
-    padding: 5px 12px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-}
-.buy-btn:hover:not(:disabled) {
-    background: rgba(255, 179, 0, 0.16);
-    border-color: #FFB300;
-    box-shadow: 0 0 10px rgba(255, 179, 0, 0.2);
-}
-.buy-btn:disabled {
-    opacity: 0.28;
-    cursor: not-allowed;
-}
-
-.item-owned-badge {
-    font-size: 7px;
-    color: rgba(0, 255, 136, 0.7);
-    border: 1px solid rgba(0, 255, 136, 0.25);
-    padding: 3px 8px;
-    letter-spacing: 0.08em;
 }
 
 .item-qty {
-    font-size: 11px;
-    color: rgba(0, 255, 136, 0.8);
-    letter-spacing: 0.06em;
+    font-size: 10px;
+    color: rgba(0,255,136,0.75);
+    letter-spacing: 0.05em;
 }
 
-.use-btn {
-    background: rgba(0, 255, 136, 0.08);
-    border: 1px solid rgba(0, 255, 136, 0.35);
-    color: rgba(0, 255, 136, 0.9);
+.item-buy {
+    background: rgba(255,179,0,0.07);
+    border: 1px solid rgba(255,179,0,0.35);
+    color: #FFB300;
     font-family: inherit;
-    font-size: 8px;
+    font-size: 7px;
     letter-spacing: 0.1em;
-    padding: 5px 10px;
+    padding: 3px 9px;
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
 }
-.use-btn:hover {
-    background: rgba(0, 255, 136, 0.16);
-    border-color: #00FF88;
-}
+.item-buy:hover:not(:disabled) { background: rgba(255,179,0,0.14); border-color: #FFB300; }
+.item-buy:disabled { opacity: 0.22; cursor: not-allowed; }
 
-/* ── Off-site lockout banner ──────────────────────────────────────────────── */
-.offsite-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 10px 20px;
-    background: rgba(255, 51, 51, 0.05);
-    border-bottom: 1px solid rgba(255, 51, 51, 0.25);
-    flex-shrink: 0;
+.item-use {
+    background: rgba(0,255,136,0.07);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: rgba(0,255,136,0.85);
+    font-family: inherit;
+    font-size: 7px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
 }
-
-.offsite-icon {
-    font-size: 13px;
-    flex-shrink: 0;
-    margin-top: 1px;
-}
-
-.offsite-body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.offsite-title {
-    font-size: 9px;
-    color: #FF4444;
-    letter-spacing: 0.16em;
-}
-
-.offsite-sub {
-    font-size: 8px;
-    color: rgba(255, 68, 68, 0.6);
-    letter-spacing: 0.04em;
-    line-height: 1.6;
-}
+.item-use:hover { background: rgba(0,255,136,0.14); border-color: #00FF88; }
 </style>
