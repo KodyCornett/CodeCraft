@@ -18,7 +18,6 @@ const props = defineProps({
     effect:      { type: Object, default: () => ({}) },
 });
 
-defineEmits(['done']);
 const emit = defineEmits(['done']);
 
 const visible = ref(true);
