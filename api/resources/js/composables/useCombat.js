@@ -5,14 +5,14 @@
  *
  * Challenge flow:
  *   1. Challenger calls challenge(targetId, nodeCanvasId)
- *      → POST /api/combat/challenge
- *      → Reverb broadcasts CombatChallengeReceived to the target's private channel
+ *      -> POST /api/combat/challenge
+ *      -> Reverb broadcasts CombatChallengeReceived to the target's private channel
  *   2. Target receives the challenge instantly via Echo private channel listener
  *      (replaces the former 2s GET /api/combat/pending poll)
  *   3. Target calls accept(challengeId) or decline(challengeId)
  *   4. Both clients enter GridBreach PvP mode
  *   5. Winner calls submitResult(winnerId, loserId, nodeId)
- *      → POST /api/combat/result
+ *      -> POST /api/combat/result
  */
 
 import { ref } from 'vue';
@@ -130,6 +130,45 @@ export function useCombat(playerId) {
         }
     }
 
+    /**
+     * Poll challenge status until it resolves (accepted / declined / expired).
+     * Handles the setInterval internally and resolves a Promise with the outcome.
+     * Caller owns all reactive state updates (awaitingChallenge, pocketCreds, etc).
+     *
+     * @returns {Promise<{status: 'accepted'|'declined'|'expired'}>}
+     */
+    function pollChallengeStatus(challengeId) {
+        return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 15;   // 15 x 2s = 30s TTL
+
+            const poll = setInterval(async () => {
+                attempts++;
+                if (attempts > maxAttempts) {
+                    clearInterval(poll);
+                    resolve({ status: 'expired' });
+                    return;
+                }
+                try {
+                    const res    = await axios.get(`/api/combat/challenge/${challengeId}/status`);
+                    const status = res.data.status;
+
+                    if (status === 'accepted') {
+                        clearInterval(poll);
+                        resolve({ status: 'accepted' });
+                    } else if (status === 'declined') {
+                        clearInterval(poll);
+                        resolve({ status: 'declined' });
+                    } else if (status === 'expired' || status === 'not_found') {
+                        clearInterval(poll);
+                        resolve({ status: 'expired' });
+                    }
+                    // 'pending' -> keep polling
+                } catch { /* silent — keep polling */ }
+            }, 2_000);
+        });
+    }
+
     return {
         busy,
         error,
@@ -142,5 +181,6 @@ export function useCombat(playerId) {
         decline,
         submitResult,
         pollResult,
+        pollChallengeStatus,
     };
 }

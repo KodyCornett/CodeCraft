@@ -163,8 +163,6 @@ export function useGameState() {
 
     /**
      * Fetch and replace the commands list from /api/player/commands.
-     * Preserves in-session cooldown state by merging rather than replacing
-     * if called after the session has started.
      */
     async function fetchCommands() {
         try {
@@ -177,8 +175,6 @@ export function useGameState() {
 
     /**
      * Fetch the player's current inventory from /api/inventory.
-     * hardware    — uninstalled HardwareEncrypt records
-     * consumables — owned consumables with remaining quantity
      */
     async function fetchInventory() {
         try {
@@ -194,17 +190,11 @@ export function useGameState() {
 
     /**
      * Use a consumable from the player's inventory.
-     * Applies the effect server-side and patches reactive state from the response.
-     *
-     * Repair result patches player.currentSS.
-     * Software result merges active_effects — the caller (Game.vue) must forward
-     * those into its activeEffects ref so the movement handler can decrement them.
-     *
      * Returns the raw API result object, or null on failure.
      */
     async function useConsumable(consumableId) {
         try {
-            const res = await axios.post('/api/inventory/use', { consumable_id: consumableId });
+            const res    = await axios.post('/api/inventory/use', { consumable_id: consumableId });
             const result = res.data;
 
             if (result.type === 'repair') {
@@ -234,8 +224,7 @@ export function useGameState() {
 
     /**
      * Upgrade an owned command by one level at the Street Doc.
-     * Deducts tech_points from player and bumps the command's level in place.
-     * Returns true on success, false on failure (insufficient TP, maxed, etc.)
+     * Returns true on success, false on failure.
      */
     async function upgradeCommand(playerId, commandId) {
         try {
@@ -244,16 +233,47 @@ export function useGameState() {
                 command_id: commandId,
             });
 
-            // Update the command level in the reactive list
             const cmd = commands.value.find(c => c.id === commandId);
             if (cmd) cmd.level = res.data.new_level;
 
-            // Sync tech points
             player.value.techPoints = res.data.tech_points;
 
             return true;
         } catch (e) {
             console.error('[useGameState] Command upgrade failed:', e?.response?.data?.message ?? e.message);
+            return false;
+        }
+    }
+
+    /**
+     * Re-fetch /api/player/me and return the raw response data.
+     * Callers patch their own reactive refs from the returned { player, rig }.
+     * Used after events (PvP resolve, decline penalty) where server state drifts.
+     * @returns {Promise<{player, rig}|null>}
+     */
+    async function resyncPlayer() {
+        try {
+            const res = await axios.get('/api/player/me');
+            return res.data;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Register a self-targeted command activation server-side so backend effects
+     * (Ghost Protocol trace suppression, Blackout, Firewall Patch) are enforced
+     * across reconnects.
+     * @returns {Promise<boolean>}
+     */
+    async function activateCommand(commandId) {
+        try {
+            await axios.post('/api/player/activate-command', { command_id: commandId });
+            return true;
+        } catch (e) {
+            if (import.meta.env.DEV) {
+                console.warn('[CMD] Server activation failed:', e?.response?.data);
+            }
             return false;
         }
     }
@@ -269,5 +289,7 @@ export function useGameState() {
         fetchInventory,
         upgradeCommand,
         useConsumable,
+        resyncPlayer,
+        activateCommand,
     };
 }

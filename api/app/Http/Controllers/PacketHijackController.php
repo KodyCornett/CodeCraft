@@ -11,6 +11,7 @@ use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Models\PlayerCommand;
 use App\Services\BountyService;
+use App\Services\PacketHijackLifecycleService;
 use App\Services\PacketHijackService;
 use App\Services\RigService;
 use Carbon\Carbon;
@@ -33,9 +34,10 @@ use Illuminate\Support\Facades\DB;
 class PacketHijackController extends Controller
 {
     public function __construct(
-        private readonly PacketHijackService $phService,
-        private readonly RigService          $rigService,
-        private readonly BountyService       $bountyService,
+        private readonly PacketHijackService      $phService,
+        private readonly PacketHijackLifecycleService $lifecycleService,
+        private readonly RigService               $rigService,
+        private readonly BountyService            $bountyService,
     ) {}
 
     // =========================================================================
@@ -453,11 +455,11 @@ class PacketHijackController extends Controller
             $myRig         = $this->rigService->getRigForPlayer($me);
             $attackerCpu   = $myRig ? $this->rigService->effectiveStats($myRig, $me)['cpu']['effective'] : 3;
 
-            $chain         = $this->phService->generateExploitChain($targetFw);
-            $portPool      = $this->phService->generatePortPool($chain, $targetFw, $targetOs);
-            $traceAttempts = $this->phService->initialTraceAttempts($attackerCpu);
+            $chain         = $this->lifecycleService->generateExploitChain($targetFw);
+            $portPool      = $this->lifecycleService->generatePortPool($chain, $targetFw, $targetOs);
+            $traceAttempts = $this->lifecycleService->initialTraceAttempts($attackerCpu);
             $fingerprint   = $match->fingerprintFor($role);
-            $credState     = $this->phService->initialCredentialState($fingerprint);
+            $credState     = $this->lifecycleService->initialCredentialState($fingerprint);
 
             $chainKey   = "{$role}_exploit_chain";
             $portsKey   = "{$role}_ports";

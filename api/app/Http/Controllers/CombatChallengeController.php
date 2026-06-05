@@ -10,6 +10,8 @@ use App\Models\Node;
 use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Services\BountyService;
+use App\Services\PacketHijackLifecycleService;
+use App\Services\PacketHijackMatchSetupService;
 use App\Services\PacketHijackService;
 use App\Services\RigService;
 use Illuminate\Http\JsonResponse;
@@ -48,9 +50,11 @@ class CombatChallengeController extends Controller
     private const DECLINE_SS_DAMAGE = 20;
 
     public function __construct(
-        private readonly BountyService       $bountyService,
-        private readonly RigService          $rigService,
-        private readonly PacketHijackService $phService,
+        private readonly BountyService              $bountyService,
+        private readonly RigService                 $rigService,
+        private readonly PacketHijackService        $phService,
+        private readonly PacketHijackLifecycleService  $lifecycleService,
+        private readonly PacketHijackMatchSetupService $setupService,
     ) {}
 
     /**
@@ -258,12 +262,12 @@ class CombatChallengeController extends Controller
             ->find($challenge->target_id);
 
         // Generate unique rig IPs for each player (what the opponent must locate)
-        $challengerRigIp = $this->phService->generateRigIp();
-        $defenderRigIp   = $this->phService->generateRigIp();
+        $challengerRigIp = $this->lifecycleService->generateRigIp();
+        $defenderRigIp   = $this->lifecycleService->generateRigIp();
 
         // Ensure the two generated IPs are distinct
         while ($defenderRigIp === $challengerRigIp) {
-            $defenderRigIp = $this->phService->generateRigIp();
+            $defenderRigIp = $this->lifecycleService->generateRigIp();
         }
 
         // challenger_target_ip = the IP the CHALLENGER must find = DEFENDER's rig
@@ -278,33 +282,33 @@ class CombatChallengeController extends Controller
 
         // Suspect boards: challenger hunts defenderRigIp in a board seeded by defender's OS.
         // Defender hunts challengerRigIp in a board seeded by challenger's OS.
-        $challengerSuspects = $this->phService->generateNodeConnections($defenderRigIp,   $defenderOs);
-        $defenderSuspects   = $this->phService->generateNodeConnections($challengerRigIp, $challengerOs);
+        $challengerSuspects = $this->lifecycleService->generateNodeConnections($defenderRigIp,   $defenderOs);
+        $defenderSuspects   = $this->lifecycleService->generateNodeConnections($challengerRigIp, $challengerOs);
 
         $challengerRig = $challengerRig ?? $this->rigService->getRigForPlayer($challenger);
         $defenderRig   = $defenderRig   ?? $this->rigService->getRigForPlayer($defender);
 
         $challengerPorts = $challengerRig && $challenger
-            ? $this->phService->generatePortTopology($challengerRig, $challenger)
+            ? $this->setupService->generatePortTopology($challengerRig, $challenger)
             : [];
 
         $defenderPorts = $defenderRig && $defender
-            ? $this->phService->generatePortTopology($defenderRig, $defender)
+            ? $this->setupService->generatePortTopology($defenderRig, $defender)
             : [];
 
         // Phase 2 fingerprints — challenger attacks defender's system, defender attacks challenger's.
         // Fingerprint derives Tier 1 credential prefixes from the TARGET's dominant stat.
         $challengerFingerprint = ($defenderRig && $defender)
-            ? $this->phService->generateFingerprint($defenderRig, $defender, $defenderPorts)
+            ? $this->setupService->generateFingerprint($defenderRig, $defender, $defenderPorts)
             : [];
 
         $defenderFingerprint = ($challengerRig && $challenger)
-            ? $this->phService->generateFingerprint($challengerRig, $challenger, $challengerPorts)
+            ? $this->setupService->generateFingerprint($challengerRig, $challenger, $challengerPorts)
             : [];
 
         // Phase 3 filesystems — one per player, wallet randomised per match.
-        $challengerFilesystem = $this->phService->generateFilesystem();
-        $defenderFilesystem   = $this->phService->generateFilesystem();
+        $challengerFilesystem = $this->setupService->generateFilesystem();
+        $defenderFilesystem   = $this->setupService->generateFilesystem();
 
         /** @var PacketHijackMatch $match */
         $match = PacketHijackMatch::create([

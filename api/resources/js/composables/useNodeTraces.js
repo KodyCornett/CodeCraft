@@ -17,6 +17,7 @@
  * Returns:
  *   traces        — ref to array of { id, player_id, handle, seconds_remaining, expires_at }
  *   refreshNow()  — force an immediate re-fetch (use after own hacks complete)
+ *   storeTrace()  — POST a trace fragment for a failed/successful hack attempt
  */
 
 import { ref, watch, onUnmounted, computed } from 'vue';
@@ -87,6 +88,21 @@ export function useNodeTraces(selectedCanvasIdRef, playerIdRef) {
         if (canvasId) fetchTraces(canvasId);
     }
 
+    /**
+     * Leave a trace fragment on a node (best-effort — errors are silenced).
+     * Called after a hack attempt regardless of success or failure.
+     * @param {string} nodeId  — DB UUID (not canvas_id)
+     * @param {string} playerId
+     */
+    async function storeTrace(nodeId, playerId) {
+        if (!nodeId || !playerId) return;
+        try {
+            await axios.post(`/api/nodes/${nodeId}/trace`, { player_id: playerId });
+        } catch {
+            // Best-effort — trace errors are never surfaced to the player
+        }
+    }
+
     watch(selectedCanvasIdRef, (id) => {
         if (id) startPolling(id);
         else    stopPolling();
@@ -94,5 +110,5 @@ export function useNodeTraces(selectedCanvasIdRef, playerIdRef) {
 
     onUnmounted(stopPolling);
 
-    return { traces, refreshNow };
+    return { traces, refreshNow, storeTrace };
 }

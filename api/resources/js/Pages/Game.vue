@@ -278,7 +278,6 @@
 
 <script setup>
 import { ref, computed, provide, watch, onMounted, onUnmounted } from 'vue';
-import axios from 'axios';
 
 // ── Layout & shared UI ────────────────────────────────────────────────────────
 import GameScreen    from '@/components/layout/GameScreen.vue';
@@ -312,10 +311,14 @@ import { useNodeTraces }     from '@/composables/useNodeTraces.js';
 import { useCombat }         from '@/composables/useCombat.js';
 import { usePacketHijack }   from '@/composables/usePacketHijack.js';
 import { useGameState }      from '@/composables/useGameState.js';
-import { useHeartbeat }     from '@/composables/useHeartbeat.js';
-import { useAudio }        from '@/composables/useAudio.js';
-import { useTutorial }    from '@/composables/useTutorial.js';
-import { SPLICE }         from '@/components/browser/SpliceRouter.js';
+import { useHeartbeat }      from '@/composables/useHeartbeat.js';
+import { useAudio }          from '@/composables/useAudio.js';
+import { useTutorial }       from '@/composables/useTutorial.js';
+import { useRigDamage }      from '@/composables/useRigDamage.js';
+import { useCyberDoc }       from '@/composables/useCyberDoc.js';
+import { useTrapSystem }     from '@/composables/useTrapSystem.js';
+import { usePingSystem }     from '@/composables/usePingSystem.js';
+import { SPLICE }            from '@/components/browser/SpliceRouter.js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const { playerId, player: authPlayer, rig: authRig, login } = useAuth();
@@ -324,6 +327,7 @@ const { playerId, player: authPlayer, rig: authRig, login } = useAuth();
 const {
     player, rig, commands, inventory, bounties: gameStateBounties,
     hydrateFromAuth, fetchCommands, fetchInventory, upgradeCommand, useConsumable,
+    resyncPlayer, activateCommand,
 } = useGameState();
 
 // ── Map data (API) ────────────────────────────────────────────────────────────
@@ -347,14 +351,24 @@ const { startAudio, stopAudio } = useAudio();
 // ── Combat — challenge handshake + result submission ─────────────────────────
 const {
     incomingChallenge,
-    challenge:     sendChallenge,
+    challenge:            sendChallenge,
     startPendingPoll,
     stopPendingPoll,
-    accept:        acceptChallenge,
-    decline:       declineChallenge,
-    submitResult:  submitCombatResult,
-    pollResult:    pollCombatResult,
+    accept:               acceptChallenge,
+    decline:              declineChallenge,
+    submitResult:         submitCombatResult,
+    pollResult:           pollCombatResult,
+    pollChallengeStatus,
 } = useCombat(playerId);
+
+// ── Rig damage — SS sync after failed hacks ───────────────────────────────────
+const { applyDamage } = useRigDamage();
+
+// ── CyberDoc — banking and NPC interactions ───────────────────────────────────
+const cyberDoc = useCyberDoc();
+
+// ── Trap system — mine/decoy placement + server-persisted trap list ───────────
+const { myTraps, placeTrap, placeDecoy, fetchMyTraps } = useTrapSystem();
 
 // PvP combat state
 const activePvpCombat   = ref(null);   // reserved — not used for PvP (Packet Hijack replaced GridBreach)
@@ -437,11 +451,10 @@ let   _flashTimer     = null;
 
 // ── Trap state ────────────────────────────────────────────────────────────────
 // trapTargetMode:        set to { cmd, match } while the player is picking a target node.
-// myTraps:              server-fetched list of this player's active traps (for map rendering).
+// myTraps:              owned by useTrapSystem (see composable instantiation above).
 // trapHitNotification:  set when position() returns trap_triggered — drives the victim hit popup.
 // trapFiredNotification: set when a WS trap.triggered event arrives — drives the placer popup.
 const trapTargetMode       = ref(null);
-const myTraps              = ref([]);
 const trapHitNotification  = ref(null);
 const trapFiredNotification = ref(null);
 
@@ -491,100 +504,9 @@ function checkBountyEscalation(nodeIce = null) {
     console.log(`[BOUNTY] ★${tier.level} — ${tier.message}`);
 }
 
-// ── ICE Ping range formula ─────────────────────────────────────────────────────
-//
-// The bounty star level amplifies the hacked node's ICE signal — the higher
-// the star AND the higher the node's ICE, the tighter the ping circle gets.
-//
-//   effective_ice  = node.ice × (1 + bountyLevel)
-//   raw_range      = BASE_RANGE + player.os − effective_ice
-//   ping_range     = clamp(raw_range, 0, MAX_RANGE_PER_STAR[bountyLevel])
-//
-// At ★5, even a low-ICE node (1 × 6 = 6) leaves very little OS headroom.
-// A high-ICE node (6 × 6 = 36) is instant pinpoint regardless of OS.
-// Commands like Signal Noise / Ghost Protocol are the only real escape at ★4–5.
-//
-const PING_BASE_RANGE      = 8;
-const PING_TTL_MS          = 30_000;
-// Max radius (in abstract "node hops") per bounty star level.
-// ★4–5 (Open Season) caps at 2 — high-bounty players can't escape to within 2 nodes.
-const PING_MAX_RANGE       = [8, 5, 4, 3, 2, 2];   // index = bountyLevel (0–5)
-// SVG pixel radius per node-hop — roughly matches hex node spacing on the canvas
-const PING_PX_PER_HOP      = 38;
-const PING_MIN_RADIUS_PX   = 18;   // tight ring for a range-0 exact ping
-
-// OS dampening by star level — at ★4–5 the bounty signal overwhelms evasion,
-// making high OS builds unable to stay hidden. Full OS at ★0–3; halved at ★4; quartered at ★5.
-const OS_WEIGHT = [1.0, 1.0, 1.0, 1.0, 0.5, 0.25];
-
-function calcPingRange(nodeIce, playerOs, bountyLevel) {
-    const lvl          = Math.min(bountyLevel, 5);
-    const effectiveIce = nodeIce * (1 + lvl);
-    const effectiveOs  = Math.floor(playerOs * OS_WEIGHT[lvl]);
-    const raw          = PING_BASE_RANGE + effectiveOs - effectiveIce;
-    const cap          = PING_MAX_RANGE[lvl] ?? 1;
-    return Math.max(0, Math.min(cap, raw));
-}
-
-function pingRadiusPx(range) {
-    return range === 0
-        ? PING_MIN_RADIUS_PX
-        : PING_MIN_RADIUS_PX + range * PING_PX_PER_HOP;
-}
-
-// ── ICE Ping generation ────────────────────────────────────────────────────────
-//
-// nodeIce  — ICE rating of the node the player just hacked (0 = use current node)
-// reason   — 'hack' | 'threshold' | 'movement' | 'false'
-// type     — 'real' | 'false'  (false pings come from Signal Noise command)
-//
-function firePing(reason = 'movement', nodeIce = null, type = 'real') {
-    const node = currentNode.value;
-    if (!node || (!node.x && !node.y)) return;
-
-    // Resolve ICE: provided > selected node > current standing node > default 3
-    const ice = nodeIce
-        ?? selectedNode.value?.ice
-        ?? getByCanvasId(node.canvasId)?.ice
-        ?? 3;
-
-    const os    = rig.value?.os ?? 2;
-    const range = calcPingRange(ice, os, player.value.bountyLevel);
-
-    const ping = {
-        pingId:       Math.random().toString(36).slice(2),
-        canvasId:     node.canvasId,
-        x:            node.x,
-        y:            node.y,
-        range,                              // abstract node-hop radius
-        radiusPx:     pingRadiusPx(range),  // pre-computed SVG radius
-        bountyLevel:  player.value.bountyLevel,
-        isOpenSeason: player.value.isOpenSeason,
-        type,
-        reason,
-        createdAt: Date.now(),
-    };
-    pings.value.push(ping);
-
-    setTimeout(() => {
-        pings.value = pings.value.filter(p => p.pingId !== ping.pingId);
-    }, PING_TTL_MS);
-
-    console.log(
-        `[ICE PING] ★${ping.bountyLevel} — ICE ${ice} × (1+${ping.bountyLevel}) ` +
-        `vs OS ${os} → range ${range} (${ping.radiusPx}px) — ${reason}`
-    );
-}
-
-// ── False ping (Signal Noise command) ─────────────────────────────────────────
-//
-// Drops a fake ping ring at a chosen node for N player moves, then expires.
-// Called when the player activates the Signal Noise command and picks a target.
-// The target must be within 4 node-hops of the player's current position.
-//
-const FALSE_PING_MOVE_TTL = 3;
-let   _falsePingMovesLeft  = 0;
-let   _falsePingIds        = [];   // tracks all active false pings (Signal Noise plants 2)
+// ── ICE Ping system — see usePingSystem.js ─────────────────────────────────────────────
+// Instantiated below after useMapInteraction (needs pings ref from it).
+// firePing / fireFalsePing / clearFalsePings / onMoveTick / reset exposed there.
 
 // OS Exploit trap — magnitude of the OS reduction applied to this player so it
 // can be reversed exactly when the effect expires.
@@ -593,44 +515,6 @@ let _osExploitReduction = 0;
 // Buffer Overflow trap — id of the command randomly locked by the effect so it
 // can be re-enabled when the effect expires.
 let _bufferOverflowCmdId = null;
-
-// Remove all currently tracked false pings from the pings array.
-function clearFalsePings() {
-    pings.value = pings.value.filter(p => !_falsePingIds.includes(p.pingId));
-    _falsePingIds = [];
-}
-
-// Add a single false ping ring at the given node.
-// Callers are responsible for calling clearFalsePings() first when they want to
-// replace existing pings (Decoy) vs. accumulate them (Signal Noise).
-function fireFalsePing(targetNode) {
-    if (!targetNode?.x) return;
-
-    const range = calcPingRange(
-        targetNode.ice ?? 3,
-        rig.value?.os ?? 2,
-        player.value.bountyLevel,
-    );
-
-    const ping = {
-        pingId:       Math.random().toString(36).slice(2),
-        canvasId:     targetNode.canvasId ?? targetNode.id,
-        x:            targetNode.x,
-        y:            targetNode.y,
-        range,
-        radiusPx:     pingRadiusPx(range),
-        bountyLevel:  player.value.bountyLevel,
-        isOpenSeason: player.value.isOpenSeason,
-        type:         'false',
-        reason:       'signal_noise',
-        createdAt:    Date.now(),
-    };
-    pings.value.push(ping);
-    _falsePingIds.push(ping.pingId);
-    _falsePingMovesLeft = FALSE_PING_MOVE_TTL;
-
-    console.log(`[SIGNAL NOISE] False ping planted at ${ping.canvasId} — ${FALSE_PING_MOVE_TTL} moves`);
-}
 
 // ── Player movement handler ────────────────────────────────────────────────────
 //
@@ -713,15 +597,8 @@ function handlePlayerMoved(event) {
         }
     }
 
-    // Tick down false ping counter (Signal Noise / Decoy planted via fireFalsePing)
-    if (_falsePingIds.length > 0 && _falsePingMovesLeft > 0) {
-        _falsePingMovesLeft--;
-        if (_falsePingMovesLeft <= 0) {
-            clearFalsePings();
-            // Re-ping real location so ICE snaps back on
-            setTimeout(() => firePing('false_expired'), 0);
-        }
-    }
+    // Tick down false-ping TTL (Signal Noise / Decoy) — delegated to usePingSystem.
+    onMoveTick();
 
     // Pings are hack-triggered only — no movement pings.
 }
@@ -740,20 +617,15 @@ function handleNodeClicked(event) {
         const ttl            = cmd.duration?.moves ?? 5;
 
         // POST to server — trap is now persisted and will fire for any other player
-        import('axios').then(m =>
-            m.default.post(`/api/nodes/${node.id}/place-trap`, { command_id: cmd.id })
-                .then(res => {
-                    // Refresh our trap list so the mine marker appears immediately
-                    fetchMyTraps();
-                    console.log(`[TRAP] ${cmd.name} planted at ${node.id} — ${ttl} moves TTL`);
-                })
-                .catch(e => {
-                    console.warn(`[TRAP] Server placement failed:`, e?.response?.data);
-                    // Revert cooldown so the player can try again
-                    match.cooldown  = false;
-                    match.movesLeft = 0;
-                })
-        );
+        placeTrap(node.id, cmd.id).then(res => {
+            if (res) {
+                fetchMyTraps();  // Refresh map mine markers
+            } else {
+                // Revert cooldown so the player can try again
+                match.cooldown  = false;
+                match.movesLeft = 0;
+            }
+        });
 
         match.cooldown  = true;
         match.movesLeft = ttl;
@@ -770,15 +642,7 @@ function cancelTrapTarget() {
     trapTargetMode.value = null;
 }
 
-// Fetch this player's active traps from the server (for map mine markers)
-async function fetchMyTraps() {
-    try {
-        const res = await import('axios').then(m => m.default.get('/api/player/traps'));
-        myTraps.value = res.data.traps ?? [];
-    } catch (e) {
-        // Non-critical — map markers are cosmetic only
-    }
-}
+// fetchMyTraps is provided by useTrapSystem (see composable instantiation above)
 
 // ── Resource availability ──────────────────────────────────────────────────────
 //
@@ -853,6 +717,11 @@ const {
     onPlayerMoved, onNodeClicked,
 } = useMapInteraction(player, getByCanvasId);
 
+// ── Ping system — instantiated here so pings ref (from useMapInteraction) is ready ──
+const {
+    firePing, fireFalsePing, clearFalsePings, onMoveTick, reset: resetPings,
+} = usePingSystem({ pings, player, rig, currentNode, selectedNode, getByCanvasId, bounties });
+
 // ── Node presence — polls for other players at the current node ──────────────
 // Must come after useMapInteraction so currentNodeId is already declared.
 // playerId is passed so the guard knows auth is complete (session auth uses
@@ -865,57 +734,10 @@ const { nodePlayers } = useNodePresence(currentNodeId, playerId);
 // called after the player's own hack completes so they see their own fragment
 // pop in without waiting for the 10s poll.
 const selectedCanvasId = computed(() => selectedNode.value?.canvasId ?? null);
-const { traces: nodeTraces, refreshNow: refreshTraces } = useNodeTraces(selectedCanvasId, playerId);
+const { traces: nodeTraces, refreshNow: refreshTraces, storeTrace } = useNodeTraces(selectedCanvasId, playerId);
 
-// ── Opponent bounty pings ─────────────────────────────────────────────────────
-//
-// For every Open Season (★4+) player on the bounty board, fire a red ping ring
-// at their last known canvas node so hunters can see where they are.
-//
-// Since Reverb is still a stub, we approximate by re-firing on every board
-// refresh (up to every 30s) and re-firing on a 20s interval so the 30s TTL
-// ring never fully expires between refreshes.
-//
-// Opponent pings use the target's bounty level and default OS 2 (minimum),
-// which at ★4–5 always clamps to range 0–1 — a tight, nearly exact ring.
-//
-// Fire a ping ring for each Open Season (★4–5) opponent whenever the bounty
-// board refreshes. The board position updates after every hack (via updatePosition),
-// so this fires close to when the target hacked — matching the hack-only ping rule.
-// OS 2 (base minimum) is used for the target so the ring is always tight (≤2 nodes).
-function fireOpponentPings() {
-    const targets = bounties.value.filter(b => b.isOpenSeason && b.canvasNodeId);
-    for (const target of targets) {
-        const node = getByCanvasId(target.canvasNodeId);
-        if (!node?.x && !node?.y) continue;
+// ── Opponent bounty pings — handled by usePingSystem (watches bounties internally) ──
 
-        const ice    = node.ice ?? 3;
-        const lvl    = Math.min(target.stars, 5);
-        const range  = calcPingRange(ice, 2, lvl);
-        const pingId = Math.random().toString(36).slice(2);
-
-        pings.value.push({
-            pingId,
-            canvasId:     target.canvasNodeId,
-            x:            node.x,
-            y:            node.y,
-            range,
-            radiusPx:     pingRadiusPx(range),
-            isOpenSeason: true,
-            type:         'real',
-            handle:       target.handle,
-        });
-
-        setTimeout(() => {
-            pings.value = pings.value.filter(p => p.pingId !== pingId);
-        }, PING_TTL_MS);
-    }
-}
-
-// Trigger on every board refresh — no interval needed since pings are hack-driven.
-watch(bounties, () => {
-    fireOpponentPings();
-}, { deep: true });
 
 // ── Browser state ─────────────────────────────────────────────────────────────
 const { activeBrowserUrl, onLaunch, onCloseBrowser } = useBrowserState();
@@ -1165,16 +987,13 @@ async function onHackFailed({ resource, amount }) {
 
     // Sync SS with the server and handle critical failure if SS hits 0
     if (playerId.value && nodeCanvasId) {
-        try {
-            const res = await axios.post('/api/rig/damage', {
-                node_canvas_id: nodeCanvasId,
-                source:         'pve',
-            });
-            player.value.currentSS = res.data.current_ss;
-            player.value.maxSS     = res.data.max_ss;
+        const res = await applyDamage(nodeCanvasId, 'pve');
+        if (res) {
+            player.value.currentSS = res.current_ss;
+            player.value.maxSS     = res.max_ss;
 
-            if (res.data.event === 'critical_failure') {
-                const cf = res.data.critical_failure ?? {};
+            if (res.event === 'critical_failure') {
+                const cf = res.critical_failure ?? {};
 
                 // Wipe pocket + bounty state
                 player.value.pocketCreds         = 0;
@@ -1194,21 +1013,14 @@ async function onHackFailed({ resource, amount }) {
                 // Show critical failure overlay — blocks action until dismissed
                 criticalFailure.value = { repairCost: cf.repair_cost ?? 0 };
             }
-        } catch {
-            // Server sync failed — client-side SS is already decremented
         }
     }
 
     // Leave a data fragment even on failure — the attempt is detectable.
     const nodeId = failedNode?.id;
-    const pid    = playerId.value;
-    if (nodeId && pid) {
-        try {
-            await axios.post(`/api/nodes/${nodeId}/trace`, { player_id: pid });
-            refreshTraces();
-        } catch {
-            // Best-effort — don't surface trace errors to the player
-        }
+    if (nodeId && playerId.value) {
+        await storeTrace(nodeId, playerId.value);
+        refreshTraces();
     }
 }
 
@@ -1226,47 +1038,35 @@ async function bankCreds() {
     const canvasId  = currentNodeId.value;
     if (!pid) return null;
 
-    try {
-        const res = await axios.post('/api/cyberdoc/bank', {
-            player_id:           pid,
-            cyberdoc_canvas_id:  canvasId ?? undefined,
-        });
-        const result = res.data;
+    const result = await cyberDoc.bank(pid, canvasId ?? null);
+    if (!result) return null;
 
-        // Move pocket into wallet
-        const banked = result.pocket_banked ?? 0;
-        if (banked > 0) {
-            player.value.creds = (player.value.creds ?? 0) + banked;
-            console.log(`[CYBERDOC] ◈${banked} pocket creds banked to wallet`);
-        }
-        player.value.pocketCreds = 0;
-
-        // Uplink is restored by visit() when the storefront opens — not on bank.
-
-        // Reset bounty run state
-        player.value.bountyLevel      = result.player?.bounty_level      ?? 0;
-        player.value.bountyMultiplier = result.player?.bounty_multiplier  ?? 1.0;
-        player.value.isOpenSeason     = result.player?.is_open_season     ?? false;
-
-        // Reset session counters
-        hackCount.value                  = 0;
-        player.value.nodesHackedThisRun  = 0;
-        player.value.pvpWinsThisRun      = 0;
-        bountyAlert.value = null;
-        pings.value        = [];
-        _falsePingIds       = [];
-        _falsePingMovesLeft = 0;
-
-        // Clear command cooldowns and active effects
-        commands.value.forEach(cmd => { cmd.cooldown = false; cmd.movesLeft = 0; });
-        activeEffects.value = {};
-
-        console.log('[CYBERDOC] Bounty reset. Commands refreshed.');
-        return result;
-    } catch (e) {
-        console.error('[CYBERDOC] Bank failed:', e?.response?.data?.message ?? e.message);
-        return null;
+    // Move pocket into wallet
+    const banked = result.pocket_banked ?? 0;
+    if (banked > 0) {
+        player.value.creds = (player.value.creds ?? 0) + banked;
     }
+    player.value.pocketCreds = 0;
+
+    // Uplink is restored by visit() when the storefront opens — not on bank.
+
+    // Reset bounty run state
+    player.value.bountyLevel      = result.player?.bounty_level      ?? 0;
+    player.value.bountyMultiplier = result.player?.bounty_multiplier  ?? 1.0;
+    player.value.isOpenSeason     = result.player?.is_open_season     ?? false;
+
+    // Reset session counters
+    hackCount.value                  = 0;
+    player.value.nodesHackedThisRun  = 0;
+    player.value.pvpWinsThisRun      = 0;
+    bountyAlert.value = null;
+    resetPings();
+
+    // Clear command cooldowns and active effects
+    commands.value.forEach(cmd => { cmd.cooldown = false; cmd.movesLeft = 0; });
+    activeEffects.value = {};
+
+    return result;
 }
 
 // ── Command activation ────────────────────────────────────────────────────────
@@ -1305,13 +1105,7 @@ async function onUseCommand(cmd) {
     // Self-targeted + move duration = server needs to know (Ghost Protocol trace
     // suppression, Blackout incoming-command blocking, Firewall Patch stat boost).
     if (cmd.targetType === 'self' && moveDuration > 0) {
-        try {
-            await import('axios').then(m =>
-                m.default.post('/api/player/activate-command', { command_id: cmd.id })
-            );
-        } catch (e) {
-            console.warn(`[CMD] Server activation failed for ${cmd.name}:`, e?.response?.data);
-        }
+        await activateCommand(cmd.id);
         // Mirror locally for ping suppression and UI countdown
         activeEffects.value[slug] = moveDuration;
         match.movesLeft           = moveDuration;
@@ -1377,9 +1171,7 @@ async function onUseCommand(cmd) {
             if (decoyTarget) {
                 // Persist to server — other players inspecting that node will see
                 // a fake trace from a spoofed handle.
-                import('axios').then(m =>
-                    m.default.post(`/api/nodes/${decoyTarget.canvasId}/place-decoy`, { command_id: cmd.id })
-                ).catch(e => console.warn('[DECOY] Server call failed:', e?.response?.data));
+                placeDecoy(decoyTarget.canvasId, cmd.id);
 
                 clearFalsePings();   // replace any existing false ping with the new decoy
                 fireFalsePing(decoyTarget);
@@ -1437,48 +1229,20 @@ async function onHackPlayer(targetPlayer) {
 
     console.log(`[PVP] Challenge sent to ${targetPlayer.handle} — waiting for response`);
 
-    // Poll /api/combat/challenge/{id}/status until the target accepts, declines,
-    // or the 30s TTL expires (15 attempts × 2s).
-    const challengeId = result.challenge_id;
-    let   attempts    = 0;
-    const maxAttempts = 15;
+    // Poll until the target accepts, declines, or the 30s TTL expires.
+    // PacketHijackStarted WS event fires on accept — ph.init() handles the launch.
+    const challengeId   = result.challenge_id;
+    const { status }    = await pollChallengeStatus(challengeId);
+    awaitingChallenge.value = false;
 
-    const pollAccept = setInterval(async () => {
-        attempts++;
-        if (attempts > maxAttempts) {
-            clearInterval(pollAccept);
-            awaitingChallenge.value = false;
-            console.log('[PVP] Challenge expired — no response from target');
-            return;
+    if (status === 'declined') {
+        // Sync pocket creds — server deducted the decline penalty from the target,
+        // and may have credited the challenger; re-fetch to get the accurate value.
+        const data = await resyncPlayer();
+        if (data?.player) {
+            player.value.pocketCreds = data.player.pocket_creds ?? player.value.pocketCreds;
         }
-
-        try {
-            const res = await axios.get(`/api/combat/challenge/${challengeId}/status`);
-            const status = res.data.status;
-
-            if (status === 'accepted') {
-                clearInterval(pollAccept);
-                awaitingChallenge.value = false;
-                // PacketHijackStarted WS event fires simultaneously — ph.init() is
-                // called from the .packet-hijack.started listener registered on mount.
-            } else if (status === 'declined') {
-                clearInterval(pollAccept);
-                awaitingChallenge.value = false;
-                console.log(`[PVP] ${targetPlayer.handle} declined — they took the penalty`);
-                // Challenger gets their stolen creds from the decline response which
-                // fires on the target's client; poll /api/player/me to sync pocket.
-                const meRes = await axios.get('/api/player/me');
-                if (meRes.data?.player) {
-                    player.value.pocketCreds = meRes.data.player.pocket_creds ?? player.value.pocketCreds;
-                }
-            } else if (status === 'expired' || status === 'not_found') {
-                clearInterval(pollAccept);
-                awaitingChallenge.value = false;
-                console.log('[PVP] Challenge expired');
-            }
-            // status === 'pending' → keep polling
-        } catch { /* silent — keep polling */ }
-    }, 2_000);
+    }
 }
 
 // Called when the target accepts an incoming challenge.
@@ -1517,10 +1281,10 @@ async function onDeclineChallenge() {
     if (result?.penalty) {
         player.value.pocketCreds = result.penalty.pocket_after ?? player.value.pocketCreds;
 
-        // Apply SS damage — sync from server via player/me rather than guessing
-        const meRes = await axios.get('/api/player/me').catch(() => null);
-        if (meRes?.data?.rig) {
-            player.value.currentSS = meRes.data.rig.current_ss ?? player.value.currentSS;
+        // Apply SS damage — sync from server rather than guessing the formula
+        const meData = await resyncPlayer();
+        if (meData?.rig) {
+            player.value.currentSS = meData.rig.current_ss ?? player.value.currentSS;
         }
 
         if (result.critical_failure) {
@@ -1530,7 +1294,7 @@ async function onDeclineChallenge() {
             hackCount.value                  = 0;
             player.value.nodesHackedThisRun  = 0;
             player.value.pvpWinsThisRun      = 0;
-            pings.value                   = [];
+            resetPings();
             if (result.critical_failure.respawn_canvas_id) {
                 currentNodeId.value = result.critical_failure.respawn_canvas_id;
             }
@@ -1631,7 +1395,7 @@ function applyPvpResult(result, opponentHandle) {
             hackCount.value                  = 0;
             player.value.nodesHackedThisRun  = 0;
             player.value.pvpWinsThisRun      = 0;
-            pings.value                      = [];
+            resetPings();
 
             // Teleport to spawn node
             if (cf.respawn_canvas_id) {
@@ -1669,17 +1433,17 @@ function onPacketHijackMatchComplete(result) {
     }
 
     // Sync full state from the server to pick up bounty escalation, SS changes, and limp flag
-    axios.get('/api/player/me').then(res => {
-        if (res.data?.player) {
-            player.value.bountyLevel      = res.data.player.bounty_level      ?? player.value.bountyLevel;
-            player.value.bountyMultiplier = res.data.player.bounty_multiplier ?? player.value.bountyMultiplier;
-            player.value.isOpenSeason     = res.data.player.is_open_season    ?? player.value.isOpenSeason;
-            player.value.isLimping        = res.data.player.is_limping        ?? player.value.isLimping;
+    resyncPlayer().then(data => {
+        if (data?.player) {
+            player.value.bountyLevel      = data.player.bounty_level      ?? player.value.bountyLevel;
+            player.value.bountyMultiplier = data.player.bounty_multiplier ?? player.value.bountyMultiplier;
+            player.value.isOpenSeason     = data.player.is_open_season    ?? player.value.isOpenSeason;
+            player.value.isLimping        = data.player.is_limping        ?? player.value.isLimping;
         }
-        if (res.data?.rig) {
-            player.value.currentSS = res.data.rig.current_ss ?? player.value.currentSS;
+        if (data?.rig) {
+            player.value.currentSS = data.rig.current_ss ?? player.value.currentSS;
         }
-    }).catch(() => { /* silent — stale state until next interaction */ });
+    });
 }
 
 // ── Consumable use — wraps gameState useConsumable to sync activeEffects ──────
@@ -2294,9 +2058,4 @@ onUnmounted(() => {
     transition: all 0.15s;
 }
 .cf-btn:hover {
-    background: rgba(255,51,51,0.1);
-    border-color: #FF3333;
-    color: #FF3333;
-    box-shadow: 0 0 12px rgba(255,51,51,0.2);
-}
-</style>
+    background: rgba(255,51,51,0.1)                                                                      
