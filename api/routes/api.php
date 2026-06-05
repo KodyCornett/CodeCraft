@@ -59,7 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/nodes/{canvasId}/players',     [NodeController::class, 'players']);
     Route::get('/nodes/{canvasId}/traces',      [NodeController::class, 'traces']);
     Route::post('/nodes/{nodeId}/trace',        [NodeController::class, 'storeTrace']);
-    Route::post('/nodes/{canvasId}/place-trap', [NodeController::class, 'placeTrap']);
+    Route::post('/nodes/{canvasId}/place-trap',  [NodeController::class, 'placeTrap']);
+    Route::post('/nodes/{canvasId}/place-decoy', [NodeController::class, 'placeDecoy']);
     Route::get('/player/traps',                 [NodeController::class, 'myTraps']);
     // deplete: 60/min — generous enough for normal play, blocks scripted hack loops
     Route::post('/nodes/{nodeId}/deplete',   [NodeController::class, 'deplete'])

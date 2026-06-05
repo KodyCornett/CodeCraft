@@ -112,6 +112,11 @@ class CombatChallengeController extends Controller
             return response()->json(['message' => 'Target is in post-combat cooldown.'], 422);
         }
 
+        // Block challenge if target has Blackout active
+        if (($target->active_effects['blackout'] ?? 0) > 0) {
+            return response()->json(['message' => 'Target has BLACKOUT active — challenge blocked.'], 422);
+        }
+
         // Clear stale outgoing challenges from this player
         CombatChallenge::where('challenger_id', $me->id)
             ->whereIn('status', ['pending', 'accepted'])

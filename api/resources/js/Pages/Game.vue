@@ -1368,16 +1368,22 @@ async function onUseCommand(cmd) {
         }
 
         case 'Decoy': {
-            // Plants a single false ping at the currently selected node (if different
-            // from the player's current node) or a random node within 6 hops.
+            // Plants a false hack trace on the target node (server-persisted so other
+            // players see it) and fires a local false ping for the caster's own view.
             const decoyTarget = (selectedNode.value && selectedNode.value.canvasId !== currentNodeId.value)
                 ? selectedNode.value
                 : getNodesNear(currentNode.value?.x ?? 0, currentNode.value?.y ?? 0, { minPx: 100, maxPx: 400, count: 1 })[0];
 
             if (decoyTarget) {
+                // Persist to server — other players inspecting that node will see
+                // a fake trace from a spoofed handle.
+                import('axios').then(m =>
+                    m.default.post(`/api/nodes/${decoyTarget.canvasId}/place-decoy`, { command_id: cmd.id })
+                ).catch(e => console.warn('[DECOY] Server call failed:', e?.response?.data));
+
                 clearFalsePings();   // replace any existing false ping with the new decoy
                 fireFalsePing(decoyTarget);
-                console.log(`[DECOY] False ping planted at ${decoyTarget.canvasId}.`);
+                console.log(`[DECOY] False trace + ping planted at ${decoyTarget.canvasId}.`);
             } else {
                 console.warn('[DECOY] No valid target node found.');
             }
@@ -1393,10 +1399,10 @@ async function onUseCommand(cmd) {
             break;
 
         case 'Blackout':
-            // Blocks all incoming player commands for moveDuration moves.
+            // Blocks all incoming PvP challenges for moveDuration moves.
             // Enforced server-side: active_effects['blackout'] > 0 checked by
-            // CombatChallengeController (TODO: wire that check when PvP commands land).
-            console.log(`[BLACKOUT] Incoming commands blocked for ${moveDuration} moves.`);
+            // CombatChallengeController::challenge() — returns 422 to the challenger.
+            console.log(`[BLACKOUT] Incoming challenges blocked for ${moveDuration} moves.`);
             break;
 
         default:

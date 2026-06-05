@@ -29,6 +29,8 @@ class NodeTrace extends Model
         'node_id',
         'player_id',
         'expires_at',
+        'is_decoy',
+        'fake_handle',
     ];
 
     protected $casts = [

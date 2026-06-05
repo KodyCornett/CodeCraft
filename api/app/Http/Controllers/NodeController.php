@@ -147,7 +147,7 @@ class NodeController extends Controller
 
         NodeTrace::updateOrCreate(
             ['node_id' => $node->id, 'player_id' => $player->id],
-            ['expires_at' => Carbon::now()->addSeconds(NodeTrace::DEFAULT_TTL_SECONDS)],
+            ['expires_at' => Carbon::now()->addSeconds(NodeTrace::DEFAULT_TTL_SECONDS), 'is_decoy' => false, 'fake_handle' => null],
         );
 
         return response()->json(['ok' => true]);
@@ -179,8 +179,9 @@ class NodeController extends Controller
             ->get()
             ->map(fn (NodeTrace $t) => [
                 'id'                => $t->id,
-                'player_id'         => $t->player_id,
-                'handle'            => $t->player?->handle ?? '???',
+                'player_id'         => $t->is_decoy ? null : $t->player_id,
+                'handle'            => $t->is_decoy ? ($t->fake_handle ?? '???') : ($t->player?->handle ?? '???'),
+                'is_decoy'          => (bool) $t->is_decoy,
                 'expires_at'        => $t->expires_at->toIso8601String(),
                 'seconds_remaining' => max(0, $now->diffInSeconds($t->expires_at, false)),
             ]);
@@ -294,7 +295,7 @@ class NodeController extends Controller
                 if ($ghostMovesLeft <= 0) {
                     NodeTrace::updateOrCreate(
                         ['node_id'   => $node->id, 'player_id' => $player->id],
-                        ['expires_at' => Carbon::now()->addSeconds(NodeTrace::DEFAULT_TTL_SECONDS)],
+                        ['expires_at' => Carbon::now()->addSeconds(NodeTrace::DEFAULT_TTL_SECONDS), 'is_decoy' => false, 'fake_handle' => null],
                     );
                 }
             }
@@ -409,6 +410,71 @@ class NodeController extends Controller
             'trap_id' => $trap->id,
             'node'    => $canvasId,
             'ttl'     => ['moves' => $moveTtl, 'minutes' => NodeTrap::DEFAULT_TTL_MINUTES],
+        ]);
+    }
+
+    /**
+     * POST /api/nodes/{canvasId}/place-decoy
+     *
+     * Plants a fake NodeTrace on the target node using the Decoy command.
+     * The trace appears to other players as a recent hack by a random other player,
+     * misdirecting ICE or opponents who inspect that node.
+     *
+     * The placer's player_id is stored for ownership/cascade-delete purposes but
+     * is_decoy=true causes traces() to return fake_handle instead of the real one.
+     *
+     * Stacking: updateOrCreate on [node_id, player_id] means a player can only
+     * have one decoy per node at a time — re-casting refreshes it.
+     */
+    public function placeDecoy(Request $request, string $canvasId): JsonResponse
+    {
+        $data = $request->validate([
+            'command_id' => ['required', 'uuid'],
+        ]);
+
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $node = Node::where('canvas_id', $canvasId)->first();
+        if ($node === null) {
+            return response()->json(['message' => 'Node not found.'], 404);
+        }
+
+        // Verify ownership and loadout
+        $cmd = $player->commands()
+            ->withPivot('is_active')
+            ->where('commands.id', $data['command_id'])
+            ->first();
+
+        if ($cmd === null || ! $cmd->pivot->is_active) {
+            return response()->json(['message' => 'Command not equipped.'], 422);
+        }
+
+        if ($cmd->name !== 'Decoy') {
+            return response()->json(['message' => 'Not a Decoy command.'], 422);
+        }
+
+        // Pick a random other player's handle to spoof. Falls back to a
+        // generated handle if this is the only player in the DB.
+        $fakeHandle = Player::where('id', '!=', $player->id)
+            ->inRandomOrder()
+            ->value('handle') ?? 'Ghost_' . strtoupper(substr(md5(uniqid()), 0, 4));
+
+        NodeTrace::updateOrCreate(
+            ['node_id' => $node->id, 'player_id' => $player->id],
+            [
+                'expires_at'   => Carbon::now()->addSeconds(NodeTrace::DEFAULT_TTL_SECONDS),
+                'is_decoy'     => true,
+                'fake_handle'  => $fakeHandle,
+            ],
+        );
+
+        return response()->json([
+            'ok'          => true,
+            'node'        => $canvasId,
+            'fake_handle' => $fakeHandle,
         ]);
     }
 
