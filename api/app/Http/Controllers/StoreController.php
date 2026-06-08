@@ -7,8 +7,8 @@ use App\Models\Consumable;
 use App\Models\Node;
 use App\Models\Peripheral;
 use App\Models\Player;
+use App\Services\CyberDocInventoryService;
 use App\Services\InventoryService;
-use App\Services\StreetDocInventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
 class StoreController extends Controller
 {
     public function __construct(
-        private readonly InventoryService          $inventoryService,
-        private readonly StreetDocInventoryService $streetDocInventory,
+        private readonly CyberDocInventoryService $cyberDocInventory,
+        private readonly InventoryService         $inventoryService,
     ) {}
 
     /**
@@ -62,7 +62,7 @@ class StoreController extends Controller
         // ── Doc-filtered catalog ──────────────────────────────────────────────
         if ($canvasId !== null) {
             try {
-                $catalog = $this->streetDocInventory->catalogForDoc($canvasId);
+                $catalog = $this->cyberDocInventory->catalogForDoc($canvasId);
             } catch (\RuntimeException $e) {
                 // Unknown canvas_id — fall through to the global catalog rather
                 // than returning a hard error (doc may not be seeded yet in dev).

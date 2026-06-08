@@ -2,16 +2,14 @@
 
 namespace Database\Seeders;
 
+use App\Models\CyberDoc;
 use App\Models\Node;
-use App\Models\StreetDoc;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds one Street Doc (repair/upgrade shop) per district.
+ * Seeds one CyberDoc (repair/upgrade shop) per district.
  *
- * Each Street Doc is anchored to the district's CyberDoc hub node
- * (type = 'cyberdoc') — the yellow hexagonal nodes on the canvas.
- * One per district means the player always has a clear, named home base.
+ * Each CyberDoc is anchored to the district's hub node (type = 'cyberdoc').
  *
  * Hub canvas_ids:
  *   NS-hub  → North Spokane
@@ -20,7 +18,7 @@ use Illuminate\Database\Seeder;
  *   UD-hub  → University District
  *   SV-hub  → Spokane Valley
  */
-class StreetDocSeeder extends Seeder
+class CyberDocSeeder extends Seeder
 {
     private const DOCS = [
         'NS-hub' => ['name' => 'North Side Hardware Hub',     'district' => 'North Spokane'],
@@ -36,11 +34,11 @@ class StreetDocSeeder extends Seeder
             $node = Node::where('canvas_id', $canvasId)->first();
 
             if ($node === null) {
-                $this->command?->warn("StreetDocSeeder: node '{$canvasId}' not found — skipped.");
+                $this->command?->warn("CyberDocSeeder: node '{$canvasId}' not found — skipped.");
                 continue;
             }
 
-            StreetDoc::updateOrCreate(
+            CyberDoc::updateOrCreate(
                 ['node_id' => $node->id],
                 [
                     'district' => $config['district'],

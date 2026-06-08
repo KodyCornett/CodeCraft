@@ -27,7 +27,7 @@ class PlayerFactory extends Factory
             'open_season_best_wins'    => 0,
             'is_limping'               => false,
             'post_combat_silent_moves' => 0,
-            'last_street_doc_id'       => null,
+            'last_cyber_doc_id'        => null,
         ];
     }
 }

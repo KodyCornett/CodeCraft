@@ -6,14 +6,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class StreetDocCatalog extends Model
+class CyberDocCatalog extends Model
 {
     use HasUuids;
 
-    protected $table = 'street_doc_catalog';
+    protected $table = 'cyber_doc_catalog';
 
     protected $fillable = [
-        'street_doc_id',
+        'cyber_doc_id',
         'item_type',
         'item_id',
         'is_exclusive',
@@ -32,9 +32,9 @@ class StreetDocCatalog extends Model
     // Relationships
     // -------------------------------------------------------------------------
 
-    public function streetDoc(): BelongsTo
+    public function cyberDoc(): BelongsTo
     {
-        return $this->belongsTo(StreetDoc::class);
+        return $this->belongsTo(CyberDoc::class);
     }
 
     // -------------------------------------------------------------------------
@@ -53,13 +53,13 @@ class StreetDocCatalog extends Model
     }
 
     /**
-     * Items that belong to a specific doc OR are global (street_doc_id IS NULL).
+     * Items that belong to a specific doc OR are global (cyber_doc_id IS NULL).
      */
-    public function scopeForDoc($query, string $streetDocId)
+    public function scopeForDoc($query, string $cyberDocId)
     {
-        return $query->where(function ($q) use ($streetDocId) {
-            $q->where('street_doc_id', $streetDocId)
-              ->orWhereNull('street_doc_id');
+        return $query->where(function ($q) use ($cyberDocId) {
+            $q->where('cyber_doc_id', $cyberDocId)
+              ->orWhereNull('cyber_doc_id');
         });
     }
 }

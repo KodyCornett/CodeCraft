@@ -5,14 +5,14 @@ namespace Database\Seeders;
 use App\Models\Command;
 use App\Models\Consumable;
 use App\Models\Peripheral;
-use App\Services\StreetDocInventoryService;
+use App\Services\CyberDocInventoryService;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds the street_doc_catalog table.
+ * Seeds the cyber_doc_catalog table.
  *
  * ── Global items (every doc) ──────────────────────────────────────────────────
- *   All repair consumables — seeded with street_doc_id = null.
+ *   All repair consumables — seeded with cyber_doc_id = null.
  *
  * ── Per-doc inventory ─────────────────────────────────────────────────────────
  *
@@ -24,7 +24,7 @@ use Illuminate\Database\Seeder;
  *
  * ── Adding items via missions, events, or admin calls ─────────────────────────
  *
- *   Use StreetDocInventoryService::grantCatalogItem() directly from any context:
+ *   Use CyberDocInventoryService::grantCatalogItem() directly from any context:
  *
  *   // Mission-exclusive chassis at Float, one unit only
  *   $service->grantCatalogItem('SV-hub', 'chassis', $chassisId, [
@@ -38,15 +38,11 @@ use Illuminate\Database\Seeder;
  *       'source'          => 'rotation:2026-06-04',
  *       'available_until' => now()->addHours(24),
  *   ]);
- *
- *   // Remove all items from a mission arc
- *   $service->revokeBySource('mission:valley_contract_03');
  */
-class StreetDocCatalogSeeder extends Seeder
+class CyberDocCatalogSeeder extends Seeder
 {
-    public function __construct(private readonly StreetDocInventoryService $inventory) {}
+    public function __construct(private readonly CyberDocInventoryService $inventory) {}
 
-    // ── Doc canvas IDs ────────────────────────────────────────────────────────
     private const NS = 'NS-hub';
     private const BA = 'BA-hub';
     private const DT = 'DT-hub';
@@ -62,7 +58,7 @@ class StreetDocCatalogSeeder extends Seeder
         $this->seedAxiom();
         $this->seedFloat();
 
-        $this->command?->info('StreetDocCatalogSeeder: all doc inventories seeded.');
+        $this->command?->info('CyberDocCatalogSeeder: all doc inventories seeded.');
     }
 
     // -------------------------------------------------------------------------
@@ -74,7 +70,7 @@ class StreetDocCatalogSeeder extends Seeder
         $kits = Consumable::where('category', 'repair')->get();
 
         if ($kits->isEmpty()) {
-            $this->command?->warn('StreetDocCatalogSeeder: no repair consumables found — run ConsumableSeeder first.');
+            $this->command?->warn('CyberDocCatalogSeeder: no repair consumables found — run ConsumableSeeder first.');
             return;
         }
 
@@ -85,10 +81,8 @@ class StreetDocCatalogSeeder extends Seeder
         $this->command?->info("  [global] {$kits->count()} repair consumable(s).");
     }
 
-    // -------------------------------------------------------------------------
-    // Patch's Clinic — North Spokane
+    // ── Patch's Clinic — North Spokane ────────────────────────────────────────
     // Budget starter hub. Common peripherals, entry-level commands.
-    // -------------------------------------------------------------------------
 
     private function seedPatch(): void
     {
@@ -100,159 +94,84 @@ class StreetDocCatalogSeeder extends Seeder
             'Bootleg OS Patch',
             'Deep Link Mk.I',
         ]);
-
-        $this->software(self::NS, [
-            'Scan Patch v1.1',
-        ]);
-
+        $this->software(self::NS, ['Scan Patch v1.1']);
         $this->commands(self::NS, [
-            // Map
-            'Ghost Protocol',
-            'Signal Noise',
-            'Crash',
-            // Hack
-            'Trace Route',
-            'Static Burst',
+            'Ghost Protocol', 'Signal Noise', 'Crash',
+            'Trace Route', 'Static Burst',
         ]);
-
         $this->command?->info('  [NS-hub] Patch seeded.');
     }
 
-    // -------------------------------------------------------------------------
-    // Knuckle's Med-Wagon — Browne's Addition
+    // ── Knuckle's Med-Wagon — Browne's Addition ───────────────────────────────
     // Combat and brawl. ICE Pick modules, offensive hack commands.
-    // -------------------------------------------------------------------------
 
     private function seedKnuckle(): void
     {
         $this->peripherals(self::BA, [
-            'ICE Pick Mk.I',
-            'ICE Pick Mk.II',
-            'Overclocked CPU Module',
-            'Hardened NIC',
+            'ICE Pick Mk.I', 'ICE Pick Mk.II',
+            'Overclocked CPU Module', 'Hardened NIC',
         ]);
-
-        $this->software(self::BA, [
-            'Scan Patch v1.1',
-        ]);
-
+        $this->software(self::BA, ['Scan Patch v1.1']);
         $this->commands(self::BA, [
-            // Map
-            'Packet Flood',
-            'Blackout',
-            'OS Exploit',
-            // Hack
-            'Hardlock',
-            'Null Byte',
-            'Data Spike',
-            'Sector Corrupt',
+            'Packet Flood', 'Blackout', 'OS Exploit',
+            'Hardlock', 'Null Byte', 'Data Spike', 'Sector Corrupt',
         ]);
-
         $this->command?->info('  [BA-hub] Knuckle seeded.');
     }
 
-    // -------------------------------------------------------------------------
-    // Veil's Parlour — Downtown
+    // ── Veil's Parlour — Downtown ─────────────────────────────────────────────
     // Stealth and deception. OS hardware, evasion and counter commands.
-    // -------------------------------------------------------------------------
 
     private function seedVeil(): void
     {
         $this->peripherals(self::DT, [
-            'Ghost OS Kernel',
-            'Daemon Core Kernel',
-            'Ghost RAM Module',
-            'Deep Link Mk.II',
+            'Ghost OS Kernel', 'Daemon Core Kernel',
+            'Ghost RAM Module', 'Deep Link Mk.II',
         ]);
-
-        $this->software(self::DT, [
-            'Stealth Kernel',
-        ]);
-
+        $this->software(self::DT, ['Stealth Kernel']);
         $this->commands(self::DT, [
-            // Map
-            'Dark Mode',
-            'Decoy',
-            'RootKit',
-            'Signal Noise',
-            // Hack
-            'Phase Shift',
-            'Mirror Protocol',
-            'Bait',
+            'Dark Mode', 'Decoy', 'RootKit', 'Signal Noise',
+            'Phase Shift', 'Mirror Protocol', 'Bait',
         ]);
-
         $this->command?->info('  [DT-hub] Veil seeded.');
     }
 
-    // -------------------------------------------------------------------------
-    // Axiom Systems — University District
+    // ── Axiom Systems — University District ──────────────────────────────────
     // Research and tech. High-end CPU/storage, Packet Hijack specialists.
-    // -------------------------------------------------------------------------
 
     private function seedAxiom(): void
     {
         $this->peripherals(self::UD, [
-            'Hardwired CPU Core',
-            'Expanded Drive Array',
-            'Deep Vault Array',
-            'Nav Wraith Mk.I',
-            'Nav Wraith Mk.II',
+            'Hardwired CPU Core', 'Expanded Drive Array',
+            'Deep Vault Array', 'Nav Wraith Mk.I', 'Nav Wraith Mk.II',
         ]);
-
-        $this->software(self::UD, [
-            'Zero-Day Exploit Pack',
-        ]);
-
+        $this->software(self::UD, ['Zero-Day Exploit Pack']);
         $this->commands(self::UD, [
-            // Map
-            'Buffer Overflow',
-            'Ghost Protocol',
-            // Hack
-            'Sector Purge',
-            'Phantom Key',
-            'Overclock',
-            'Trace Route',
+            'Buffer Overflow', 'Ghost Protocol',
+            'Sector Purge', 'Phantom Key', 'Overclock', 'Trace Route',
         ]);
-
         $this->command?->info('  [UD-hub] Axiom seeded.');
     }
 
-    // -------------------------------------------------------------------------
-    // Float's Repair Bay — Spokane Valley
+    // ── Float's Repair Bay — Spokane Valley ──────────────────────────────────
     // Utility and defense. Firewall hardware, mixed command set.
-    // -------------------------------------------------------------------------
 
     private function seedFloat(): void
     {
         $this->peripherals(self::SV, [
-            'Military-Grade Firewall Card',
-            'Hardened NIC',
-            'Deep Link Mk.I',
-            'Nav Wraith Mk.I',
-            'ICE Pick Mk.I',
+            'Military-Grade Firewall Card', 'Hardened NIC',
+            'Deep Link Mk.I', 'Nav Wraith Mk.I', 'ICE Pick Mk.I',
         ]);
-
-        $this->software(self::SV, [
-            'Scan Patch v1.1',
-            'Stealth Kernel',
-        ]);
-
+        $this->software(self::SV, ['Scan Patch v1.1', 'Stealth Kernel']);
         $this->commands(self::SV, [
-            // Map
-            'Crash',
-            'Blackout',
-            'Decoy',
-            // Hack
-            'Overclock',
-            'Phase Shift',
-            'Hardlock',
+            'Crash', 'Blackout', 'Decoy',
+            'Overclock', 'Phase Shift', 'Hardlock',
         ]);
-
         $this->command?->info('  [SV-hub] Float seeded.');
     }
 
     // -------------------------------------------------------------------------
-    // Helpers — resolve by name and grant
+    // Helpers
     // -------------------------------------------------------------------------
 
     private function peripherals(string $canvasId, array $names): void
@@ -260,7 +179,7 @@ class StreetDocCatalogSeeder extends Seeder
         foreach ($names as $name) {
             $item = Peripheral::where('name', $name)->first();
             if ($item === null) {
-                $this->command?->warn("  StreetDocCatalogSeeder: peripheral '{$name}' not found — skipped.");
+                $this->command?->warn("  CyberDocCatalogSeeder: peripheral '{$name}' not found — skipped.");
                 continue;
             }
             $this->inventory->grantCatalogItem($canvasId, 'peripheral', $item->id, ['source' => 'seed']);
@@ -272,7 +191,7 @@ class StreetDocCatalogSeeder extends Seeder
         foreach ($names as $name) {
             $item = Consumable::where('name', $name)->first();
             if ($item === null) {
-                $this->command?->warn("  StreetDocCatalogSeeder: consumable '{$name}' not found — skipped.");
+                $this->command?->warn("  CyberDocCatalogSeeder: consumable '{$name}' not found — skipped.");
                 continue;
             }
             $this->inventory->grantCatalogItem($canvasId, 'consumable', $item->id, ['source' => 'seed']);
@@ -284,7 +203,7 @@ class StreetDocCatalogSeeder extends Seeder
         foreach ($names as $name) {
             $item = Command::where('name', $name)->first();
             if ($item === null) {
-                $this->command?->warn("  StreetDocCatalogSeeder: command '{$name}' not found — skipped.");
+                $this->command?->warn("  CyberDocCatalogSeeder: command '{$name}' not found — skipped.");
                 continue;
             }
             $this->inventory->grantCatalogItem($canvasId, 'command', $item->id, ['source' => 'seed']);
