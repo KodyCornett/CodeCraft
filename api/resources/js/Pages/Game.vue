@@ -146,7 +146,7 @@
                             <div class="pvp-await-title">CHALLENGE SENT</div>
                             <div class="pvp-await-sub">Waiting for target to respond…</div>
                             <div class="pvp-await-dots">
-                                <span /><span /><span />
+                                <span></span><span></span><span></span>
                             </div>
                         </div>
                     </div>
