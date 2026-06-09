@@ -28,18 +28,23 @@
                 <button class="hs-go" @click="onGo">GO</button>
             </div>
 
-            <!-- Speed dial -->
-            <div class="speed-dial">
-                <button
-                    v-for="link in speedLinks"
-                    :key="link.url"
-                    class="sd-item"
-                    @click="spliceNavigate(link.url)"
-                    :title="link.url"
-                >
-                    <span class="sd-icon" :class="`sd-icon--${link.accent}`">{{ link.icon }}</span>
-                    <span class="sd-label">{{ link.label }}</span>
-                </button>
+            <!-- Quick nav sections -->
+            <div class="quick-nav">
+                <div v-for="section in navSections" :key="section.label" class="qn-section">
+                    <div class="qn-section-label">{{ section.label }}</div>
+                    <div class="qn-row">
+                        <button
+                            v-for="link in section.links"
+                            :key="link.url"
+                            class="sd-item"
+                            :title="link.url"
+                            @click="spliceNavigate(link.url)"
+                        >
+                            <span class="sd-icon" :class="`sd-icon--${link.accent}`">{{ link.icon }}</span>
+                            <span class="sd-label">{{ link.label }}</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -88,14 +93,43 @@ function onGo() {
     query.value = '';
 }
 
-const speedLinks = [
-    { label: 'CYBERDOC',      icon: '⬡', accent: 'amber',  url: SPLICE.CYBER_DOC        },
-    { label: 'DARKNET FEED',  icon: '◉', accent: 'cyan',   url: SPLICE.FEED             },
-    { label: 'CMD CATALOG',   icon: '⬡', accent: 'yellow', url: SPLICE.COMMAND_CATALOG  },
-    { label: 'STAT GUIDE',    icon: '◈', accent: 'blue',   url: SPLICE.STAT_GUIDE       },
-    { label: 'MANUAL',        icon: '◈', accent: 'gray',   url: SPLICE.MANUAL           },
-    { label: 'GRID-BREACH',   icon: '◉', accent: 'red',    url: SPLICE.GRID_BREACH_GUIDE},
-    { label: 'PKT HIJACK',    icon: '◈', accent: 'orange', url: SPLICE.PACKET_HIJACK_GUIDE },
+const navSections = [
+    {
+        label: 'NETWORK',
+        links: [
+            { label: 'DARKNET FEED',  icon: '◉', accent: 'cyan',   url: SPLICE.FEED  },
+            { label: 'HCT BANK',      icon: '⬡', accent: 'silver', url: SPLICE.BANK  },
+        ],
+    },
+    {
+        label: 'CYBERDOC TERMINALS',
+        links: [
+            { label: 'PATCH',   icon: '⬡', accent: 'amber',  url: SPLICE.CYBER_DOC_PATCH   },
+            { label: 'KNUCKLE', icon: '⬡', accent: 'red',    url: SPLICE.CYBER_DOC_KNUCKLE },
+            { label: 'VEIL',    icon: '⬡', accent: 'cyan',   url: SPLICE.CYBER_DOC_VEIL    },
+            { label: 'AXIOM',   icon: '⬡', accent: 'blue',   url: SPLICE.CYBER_DOC_AXIOM   },
+            { label: 'FLOAT',   icon: '⬡', accent: 'green',  url: SPLICE.CYBER_DOC_FLOAT   },
+        ],
+    },
+    {
+        label: 'SYSTEM',
+        links: [
+            { label: 'STATUS',    icon: '◈', accent: 'cyan',   url: SPLICE.STATS          },
+            { label: 'RIG',       icon: '◈', accent: 'amber',  url: SPLICE.RIG            },
+            { label: 'COMMANDS',  icon: '◈', accent: 'yellow', url: SPLICE.COMMANDS       },
+            { label: 'INVENTORY', icon: '◈', accent: 'orange', url: SPLICE.INVENTORY      },
+            { label: 'TERMINAL',  icon: '◉', accent: 'green',  url: SPLICE.TERMINAL       },
+        ],
+    },
+    {
+        label: 'GUIDES',
+        links: [
+            { label: 'MANUAL',      icon: '◈', accent: 'gray',   url: SPLICE.MANUAL             },
+            { label: 'STAT REF',    icon: '◈', accent: 'blue',   url: SPLICE.STAT_GUIDE         },
+            { label: 'GRID-BREACH', icon: '◉', accent: 'red',    url: SPLICE.GRID_BREACH_GUIDE  },
+            { label: 'PKT HIJACK',  icon: '◈', accent: 'orange', url: SPLICE.PACKET_HIJACK_GUIDE},
+        ],
+    },
 ];
 </script>
 
@@ -235,13 +269,32 @@ const speedLinks = [
     color: #00FFFF;
 }
 
-/* ── Speed dial ───────────────────────────────────────────────────────────── */
-.speed-dial {
+/* ── Quick nav ────────────────────────────────────────────────────────────── */
+.quick-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+}
+
+.qn-section {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.qn-section-label {
+    font-size: 6px;
+    color: rgba(0,255,255,0.2);
+    letter-spacing: 0.22em;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(0,255,255,0.06);
+}
+
+.qn-row {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
+    gap: 8px;
 }
 
 .sd-item {
@@ -274,6 +327,8 @@ const speedLinks = [
 .sd-icon--gray   { color: rgba(160,160,160,0.6); }
 .sd-icon--red    { color: rgba(255,80,80,0.75); }
 .sd-icon--orange { color: rgba(255,140,0,0.75); }
+.sd-icon--green  { color: rgba(0,255,136,0.75); }
+.sd-icon--silver { color: rgba(168,207,255,0.7); }
 
 .sd-label {
     font-size: 7px;

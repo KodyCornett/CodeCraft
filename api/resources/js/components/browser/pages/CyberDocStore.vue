@@ -291,83 +291,224 @@
         </div>
 
         <!-- ════════════════════════════════════════════════════════════════════
-             COMMANDS
+             COMMANDS — dual pane
              ════════════════════════════════════════════════════════════════════ -->
-        <div v-else-if="activeCategory === 'commands'" class="section-scroll">
+        <div v-else-if="activeCategory === 'commands'" class="dual-pane">
 
-            <div v-if="purchasableCommands.length === 0" class="empty-state">
-                ALL AVAILABLE COMMANDS OWNED
-            </div>
-
-            <template v-for="ctx in ['map', 'hack']" :key="ctx">
-                <div v-if="commandsForContext(ctx).length" class="cmd-group">
-                    <div class="cmd-group-header">
-                        <span>{{ ctx === 'map' ? 'MAP COMMANDS' : 'HACK COMMANDS' }}</span>
-                        <span class="cmd-group-sub">{{ ctx === 'map' ? 'Used during map traversal' : 'Used inside Packet Hijack' }}</span>
+            <!-- Left: dense catalog -->
+            <div class="dp-catalog">
+                <div v-if="purchasableCommands.length === 0" class="empty-state">ALL AVAILABLE COMMANDS OWNED</div>
+                <template v-for="ctx in ['map', 'hack']" :key="ctx">
+                    <div v-if="commandsForContext(ctx).length" class="dp-group-label">
+                        {{ ctx === 'map' ? '// MAP COMMANDS' : '// HACK COMMANDS' }}
                     </div>
-                    <div
+                    <button
                         v-for="cmd in commandsForContext(ctx)"
                         :key="cmd.id"
-                        class="cmd-row"
+                        class="catalog-row"
+                        :class="{ 'catalog-row--active': inspectedItem?.id === cmd.id }"
+                        @click="inspectItem(cmd, 'command')"
                     >
-                        <span class="cmd-type" :class="`cmd-type--${cmd.type}`">{{ cmd.type.toUpperCase() }}</span>
-                        <span class="cmd-name">{{ cmd.name.toUpperCase() }}</span>
-                        <span class="cmd-effect">{{ cmd.context === 'hack' ? cmd.packethijackEffect : cmd.mapEffect }}</span>
-                        <div class="cmd-price">
-                            <span class="cp-creds">{{ cmd.price.creds.toLocaleString() }} ₡</span>
-                            <span class="cp-sep">+</span>
-                            <span class="cp-tp">{{ cmd.price.techPoints }} TP</span>
-                        </div>
-                        <button
-                            class="cmd-buy"
-                            :disabled="!atCyberDoc || !canAfford(cmd)"
-                            :title="buyBtnTitle(cmd)"
-                            @click="onBuyCommand(cmd)"
-                        >BUY</button>
-                    </div>
+                        <span class="cr-badge" :class="`cr-badge--${cmd.type}`">{{ cmd.type?.slice(0,3).toUpperCase() }}</span>
+                        <span class="cr-name">{{ cmd.name }}</span>
+                        <span class="cr-ctx">{{ cmd.context.toUpperCase() }}</span>
+                        <span class="cr-price">{{ cmd.price.creds.toLocaleString() }} ₡</span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Right: inspector -->
+            <div class="dp-inspector">
+                <div v-if="!inspectedItem || inspectedType !== 'command'" class="insp-empty">
+                    <span class="insp-empty-icon">◈</span>
+                    <span>SELECT A COMMAND</span>
+                    <span class="insp-empty-sub">Click any entry to inspect</span>
                 </div>
-            </template>
+                <template v-else>
+                    <div class="insp-header">
+                        <div class="insp-type-row">
+                            <span class="insp-badge" :class="`insp-badge--${inspectedItem.type}`">{{ inspectedItem.type?.toUpperCase() }}</span>
+                            <span class="insp-ctx">{{ inspectedItem.context?.toUpperCase() }} COMMAND</span>
+                        </div>
+                        <div class="insp-name">{{ inspectedItem.name }}</div>
+                    </div>
+                    <div class="insp-body">
+                        <div v-if="inspectedItem.mapEffect" class="insp-row">
+                            <span class="insp-row-label">MAP EFFECT</span>
+                            <span class="insp-row-val">{{ inspectedItem.mapEffect }}</span>
+                        </div>
+                        <div v-if="inspectedItem.packethijackEffect" class="insp-row">
+                            <span class="insp-row-label">PKT HIJACK</span>
+                            <span class="insp-row-val">{{ inspectedItem.packethijackEffect }}</span>
+                        </div>
+                        <div v-if="inspectedItem.gridbreachEffect" class="insp-row">
+                            <span class="insp-row-label">GRIDBREACH</span>
+                            <span class="insp-row-val">{{ inspectedItem.gridbreachEffect }}</span>
+                        </div>
+                        <div v-if="inspectedItem.duration?.moves" class="insp-row">
+                            <span class="insp-row-label">DURATION</span>
+                            <span class="insp-row-val">{{ inspectedItem.duration.moves }} MOVES</span>
+                        </div>
+                        <div v-if="inspectedItem.targetType" class="insp-row">
+                            <span class="insp-row-label">TARGET</span>
+                            <span class="insp-row-val">{{ inspectedItem.targetType?.toUpperCase() }}</span>
+                        </div>
+                        <div class="insp-divider" />
+                        <div class="insp-price-block">
+                            <div class="insp-price-row">
+                                <span class="insp-price-label">COST</span>
+                                <span class="insp-price-creds">{{ inspectedItem.price.creds.toLocaleString() }} ₡</span>
+                                <span v-if="inspectedItem.price.techPoints > 0" class="insp-price-tp">+ {{ inspectedItem.price.techPoints }} TP</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="insp-footer">
+                        <span v-if="inspectedItem.owned" class="insp-owned">✓ ALREADY OWNED</span>
+                        <button
+                            v-else
+                            class="insp-buy-btn"
+                            :disabled="!atCyberDoc || !canAfford(inspectedItem)"
+                            :title="buyBtnTitle(inspectedItem)"
+                            @click="onBuyCommand(inspectedItem)"
+                        >[ PURCHASE COMMAND ]</button>
+                    </div>
+                </template>
+            </div>
 
         </div>
 
         <!-- ════════════════════════════════════════════════════════════════════
-             ITEM GRID (hardware / software / repair / all)
+             ITEM GRID (hardware / software / repair / all) — dual pane
              ════════════════════════════════════════════════════════════════════ -->
-        <div v-else class="section-scroll">
-            <div class="item-grid">
-                <div
+        <div v-else class="dual-pane">
+
+            <!-- Left: dense catalog -->
+            <div class="dp-catalog">
+                <div v-if="filteredItems.length === 0" class="empty-state">NO ITEMS IN THIS CATEGORY</div>
+                <button
                     v-for="item in filteredItems"
                     :key="item.id"
-                    class="item-card"
-                    :class="`item-card--${item.rarity}`"
+                    class="catalog-row"
+                    :class="{ 'catalog-row--active': inspectedItem?.id === item.id }"
+                    @click="inspectItem(item, 'catalog')"
                 >
-                    <div class="item-top">
-                        <span class="item-rarity">{{ item.rarity.toUpperCase() }}</span>
-                        <span v-if="item.peripheral_type === 'command_module'" class="item-stat-badge stat-badge--slot">
-                            {{ item.slot_type?.toUpperCase() }} T{{ item.slot_tier }}
-                        </span>
-                        <span v-else-if="item.stat" class="item-stat-badge">
-                            {{ item.stat.toUpperCase() }} +{{ item.boost }}
-                        </span>
+                    <span class="cr-rarity-dot" :class="`cr-dot--${item.rarity}`" />
+                    <span class="cr-name">{{ item.name }}</span>
+                    <span v-if="item.peripheral_type === 'command_module'" class="cr-badge cr-badge--tier">
+                        {{ item.slot_type?.toUpperCase() }} T{{ item.slot_tier }}
+                    </span>
+                    <span v-else-if="item.stat" class="cr-badge cr-badge--stat">{{ item.stat?.toUpperCase() }} +{{ item.boost }}</span>
+                    <span v-else-if="item.duration_moves" class="cr-badge cr-badge--dur">{{ item.duration_moves }}M</span>
+                    <span class="cr-price">{{ (item.price ?? item.price_creds)?.toLocaleString() }} ₡</span>
+                </button>
+            </div>
+
+            <!-- Right: inspector -->
+            <div class="dp-inspector">
+                <div v-if="!inspectedItem || inspectedType !== 'catalog'" class="insp-empty">
+                    <span class="insp-empty-icon">◈</span>
+                    <span>SELECT AN ITEM</span>
+                    <span class="insp-empty-sub">Click any entry to inspect</span>
+                </div>
+                <template v-else>
+                    <div class="insp-header">
+                        <div class="insp-type-row">
+                            <span class="insp-rarity" :class="`insp-rarity--${inspectedItem.rarity}`">
+                                {{ inspectedItem.rarity?.toUpperCase() }}
+                            </span>
+                            <span v-if="inspectedItem.is_exclusive" class="insp-excl">EXCLUSIVE</span>
+                        </div>
+                        <div class="insp-name">{{ inspectedItem.name }}</div>
+                        <div class="insp-cat">{{ inspectedItem.category?.toUpperCase() }}</div>
                     </div>
-                    <div class="item-name">{{ item.name }}</div>
-                    <div class="item-desc">{{ item.desc }}</div>
-                    <div class="item-footer">
-                        <span class="item-price">{{ item.price.toLocaleString() }} ₡</span>
-                        <template v-if="item.category === 'hardware'">
-                            <span v-if="hardwareOwned(item.id)" class="item-owned">OWNED</span>
-                            <button v-else class="item-buy" :disabled="!atCyberDoc || playerCreds < item.price" @click="onBuy(item)">BUY</button>
+                    <div class="insp-body">
+
+                        <!-- Hardware / peripheral -->
+                        <template v-if="inspectedItem.category === 'hardware'">
+                            <div v-if="inspectedItem.peripheral_type === 'command_module'" class="insp-slot-block">
+                                <div class="insp-row">
+                                    <span class="insp-row-label">SLOT TYPE</span>
+                                    <span class="insp-row-val">{{ inspectedItem.slot_type?.toUpperCase() }}</span>
+                                </div>
+                                <div class="insp-row">
+                                    <span class="insp-row-label">TIER GATE</span>
+                                    <span class="insp-row-val">T{{ inspectedItem.slot_tier }} — accepts Lvl ≤{{ inspectedItem.slot_tier }} commands</span>
+                                </div>
+                            </div>
+                            <template v-else>
+                                <div v-if="inspectedItem.stat" class="insp-stat-block">
+                                    <div class="insp-stat-name">{{ inspectedItem.stat?.toUpperCase() }}</div>
+                                    <div class="insp-stat-pip-row">
+                                        <span
+                                            v-for="n in 5"
+                                            :key="n"
+                                            class="insp-pip"
+                                            :class="{ 'insp-pip--lit': n <= (inspectedItem.boost ?? 0) }"
+                                        />
+                                    </div>
+                                    <div class="insp-stat-val">+{{ inspectedItem.boost }}</div>
+                                </div>
+                            </template>
+                            <div class="insp-row">
+                                <span class="insp-row-label">PORT COST</span>
+                                <span class="insp-row-val">{{ inspectedItem.port_cost ?? 1 }} PORT{{ (inspectedItem.port_cost ?? 1) !== 1 ? 'S' : '' }}</span>
+                            </div>
+                        </template>
+
+                        <!-- Consumable / software / repair -->
+                        <template v-else>
+                            <div v-if="inspectedItem.stat" class="insp-row">
+                                <span class="insp-row-label">EFFECT</span>
+                                <span class="insp-row-val">{{ inspectedItem.stat?.toUpperCase() }} +{{ inspectedItem.boost }}</span>
+                            </div>
+                            <div v-if="inspectedItem.duration_moves" class="insp-row">
+                                <span class="insp-row-label">DURATION</span>
+                                <span class="insp-row-val">{{ inspectedItem.duration_moves }} MOVES</span>
+                            </div>
+                            <div v-if="inspectedItem.desc" class="insp-desc">{{ inspectedItem.desc }}</div>
+                            <div v-if="consumableQty(inspectedItem.id) > 0" class="insp-row">
+                                <span class="insp-row-label">OWNED</span>
+                                <span class="insp-row-val insp-row-val--green">×{{ consumableQty(inspectedItem.id) }}</span>
+                            </div>
+                        </template>
+
+                        <div class="insp-divider" />
+                        <div class="insp-price-block">
+                            <div class="insp-price-row">
+                                <span class="insp-price-label">PRICE</span>
+                                <span class="insp-price-creds">{{ (inspectedItem.price ?? inspectedItem.price_creds)?.toLocaleString() }} ₡</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="insp-footer">
+                        <template v-if="inspectedItem.category === 'hardware'">
+                            <span v-if="hardwareOwned(inspectedItem.id)" class="insp-owned">✓ INSTALLED</span>
+                            <button
+                                v-else
+                                class="insp-buy-btn"
+                                :disabled="!atCyberDoc || playerCreds < (inspectedItem.price ?? inspectedItem.price_creds ?? 0)"
+                                @click="onBuy(inspectedItem)"
+                            >[ PURCHASE ITEM ]</button>
                         </template>
                         <template v-else>
-                            <span v-if="consumableQty(item.id) > 0" class="item-qty">×{{ consumableQty(item.id) }}</span>
-                            <button class="item-buy" :disabled="!atCyberDoc || playerCreds < item.price" @click="onBuy(item)">
-                                {{ consumableQty(item.id) > 0 ? '+1' : 'BUY' }}
-                            </button>
-                            <button v-if="consumableQty(item.id) > 0" class="item-use" @click="onUseConsumable(item)">USE</button>
+                            <div class="insp-consumable-actions">
+                                <button
+                                    class="insp-buy-btn"
+                                    :disabled="!atCyberDoc || playerCreds < (inspectedItem.price ?? inspectedItem.price_creds ?? 0)"
+                                    @click="onBuy(inspectedItem)"
+                                >{{ consumableQty(inspectedItem.id) > 0 ? '[ +1 RESTOCK ]' : '[ PURCHASE ITEM ]' }}</button>
+                                <button
+                                    v-if="consumableQty(inspectedItem.id) > 0"
+                                    class="insp-use-btn"
+                                    @click="onUseConsumable(inspectedItem)"
+                                >[ USE ]</button>
+                            </div>
                         </template>
                     </div>
-                </div>
+                </template>
             </div>
+
         </div>
 
         </template><!-- end v-else (atCyberDoc) -->
@@ -616,6 +757,15 @@ async function onPurchaseChassis(chassis) {
 // ── Item grid — catalog fetched from /api/store/catalog ──────────────────────
 const catalogItems = ref([]);  // flat merged array after fetch
 const catalogLoading = ref(false);
+
+// ── Inspector ─────────────────────────────────────────────────────────────────
+const inspectedItem = ref(null);
+const inspectedType = ref(null); // 'catalog' | 'command'
+
+function inspectItem(item, type) {
+    inspectedItem.value = item;
+    inspectedType.value = type;
+}
 
 async function fetchCatalog() {
     catalogLoading.value = true;
@@ -1947,4 +2097,389 @@ function onResetCooldowns() {
     transition: background 0.12s, border-color 0.12s;
 }
 .item-use:hover { background: rgba(0,255,136,0.14); border-color: #00FF88; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DUAL-PANE LAYOUT
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.dual-pane {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ── Left pane — dense catalog ───────────────────────────────────────────── */
+.dp-catalog {
+    width: 60%;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-right: 1px solid rgba(255,179,0,0.08);
+    display: flex;
+    flex-direction: column;
+}
+
+.dp-catalog::-webkit-scrollbar       { width: 2px; }
+.dp-catalog::-webkit-scrollbar-track { background: transparent; }
+.dp-catalog::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.1); }
+
+.dp-group-label {
+    font-size: 7px;
+    color: rgba(255,179,0,0.25);
+    letter-spacing: 0.2em;
+    padding: 8px 12px 4px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,179,0,0.05);
+}
+
+/* ── Right pane — inspector ──────────────────────────────────────────────── */
+.dp-inspector {
+    width: 40%;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: rgba(255,179,0,0.012);
+}
+
+/* ── Catalog rows ─────────────────────────────────────────────────────────── */
+.catalog-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,179,0,0.04);
+    border-left: 2px solid transparent;
+    color: rgba(255,255,255,0.6);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 0.1s, color 0.1s;
+    flex-shrink: 0;
+}
+
+.catalog-row:hover {
+    background: rgba(255,179,0,0.04);
+    color: rgba(255,255,255,0.85);
+}
+
+.catalog-row--active {
+    background: rgba(255,179,0,0.07) !important;
+    border-left-color: rgba(255,179,0,0.6);
+    color: rgba(255,255,255,0.9);
+}
+
+.cr-rarity-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cr-dot--common   { background: rgba(255,179,0,0.45); }
+.cr-dot--uncommon { background: rgba(125,249,255,0.55); }
+.cr-dot--rare     { background: rgba(255,105,180,0.65); }
+
+.cr-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    min-width: 0;
+}
+
+.cr-badge {
+    font-size: 7px;
+    letter-spacing: 0.06em;
+    padding: 1px 5px;
+    border: 1px solid;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.cr-badge--tier      { color: rgba(255,179,0,0.7);   border-color: rgba(255,179,0,0.2); }
+.cr-badge--stat      { color: rgba(0,255,136,0.7);   border-color: rgba(0,255,136,0.2); }
+.cr-badge--dur       { color: rgba(125,249,255,0.7); border-color: rgba(125,249,255,0.2); }
+.cr-badge--trap      { color: rgba(255,69,180,0.8);  border-color: rgba(255,69,180,0.25); }
+.cr-badge--stealth   { color: rgba(125,249,255,0.8); border-color: rgba(125,249,255,0.25); }
+.cr-badge--defensive { color: rgba(0,255,136,0.8);   border-color: rgba(0,255,136,0.25); }
+.cr-badge--offensive { color: rgba(255,69,69,0.85);  border-color: rgba(255,69,69,0.25); }
+
+.cr-ctx {
+    font-size: 6px;
+    color: rgba(255,179,0,0.3);
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+}
+
+.cr-price {
+    font-size: 9px;
+    color: #FFB300;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* ── Inspector pane ──────────────────────────────────────────────────────── */
+.insp-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: rgba(255,179,0,0.2);
+    font-size: 8px;
+    letter-spacing: 0.16em;
+    padding: 20px;
+    text-align: center;
+}
+
+.insp-empty-icon { font-size: 22px; opacity: 0.35; margin-bottom: 2px; }
+.insp-empty-sub  { font-size: 7px; color: rgba(255,179,0,0.12); letter-spacing: 0.1em; }
+
+.insp-header {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid rgba(255,179,0,0.08);
+    flex-shrink: 0;
+}
+
+.insp-type-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.insp-badge {
+    font-size: 6px;
+    padding: 1px 5px;
+    border: 1px solid;
+    letter-spacing: 0.1em;
+}
+
+.insp-badge--trap      { color: rgba(255,69,180,0.8);  border-color: rgba(255,69,180,0.3); }
+.insp-badge--stealth   { color: rgba(125,249,255,0.8); border-color: rgba(125,249,255,0.3); }
+.insp-badge--defensive { color: rgba(0,255,136,0.8);   border-color: rgba(0,255,136,0.3); }
+.insp-badge--offensive { color: rgba(255,69,69,0.9);   border-color: rgba(255,69,69,0.3); }
+
+.insp-rarity {
+    font-size: 6px;
+    letter-spacing: 0.14em;
+}
+
+.insp-rarity--common   { color: rgba(255,179,0,0.5); }
+.insp-rarity--uncommon { color: rgba(125,249,255,0.65); }
+.insp-rarity--rare     { color: rgba(255,105,180,0.75); }
+
+.insp-excl {
+    font-size: 6px;
+    color: rgba(255,105,180,0.7);
+    border: 1px solid rgba(255,105,180,0.2);
+    padding: 1px 5px;
+    letter-spacing: 0.1em;
+}
+
+.insp-ctx {
+    font-size: 7px;
+    color: rgba(255,179,0,0.3);
+    letter-spacing: 0.12em;
+}
+
+.insp-name {
+    font-size: 14px;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+}
+
+.insp-cat {
+    font-size: 7px;
+    color: rgba(255,179,0,0.28);
+    letter-spacing: 0.14em;
+    margin-top: 3px;
+}
+
+.insp-body {
+    flex: 1;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.insp-body::-webkit-scrollbar       { width: 2px; }
+.insp-body::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.1); }
+
+.insp-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.insp-row-label {
+    font-size: 7px;
+    color: rgba(255,179,0,0.32);
+    letter-spacing: 0.12em;
+    width: 68px;
+    flex-shrink: 0;
+    padding-top: 1px;
+}
+
+.insp-row-val {
+    font-size: 8px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.03em;
+    line-height: 1.55;
+    flex: 1;
+}
+
+.insp-row-val--green { color: rgba(0,255,136,0.65); }
+
+.insp-stat-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,179,0,0.03);
+    border: 1px solid rgba(255,179,0,0.1);
+}
+
+.insp-stat-name {
+    font-size: 8px;
+    color: rgba(255,179,0,0.5);
+    letter-spacing: 0.14em;
+    width: 30px;
+    flex-shrink: 0;
+}
+
+.insp-stat-pip-row { display: flex; gap: 3px; flex: 1; }
+
+.insp-pip {
+    width: 10px;
+    height: 10px;
+    background: rgba(255,179,0,0.06);
+    border: 1px solid rgba(255,179,0,0.1);
+}
+
+.insp-pip--lit {
+    background: rgba(0,255,136,0.38);
+    border-color: rgba(0,255,136,0.5);
+}
+
+.insp-stat-val {
+    font-size: 13px;
+    color: #00FF88;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+.insp-slot-block {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 10px;
+    background: rgba(125,249,255,0.02);
+    border: 1px solid rgba(125,249,255,0.1);
+}
+
+.insp-desc {
+    font-size: 8px;
+    color: rgba(255,255,255,0.28);
+    letter-spacing: 0.02em;
+    line-height: 1.65;
+    font-style: italic;
+    border-left: 2px solid rgba(255,179,0,0.1);
+    padding-left: 8px;
+}
+
+.insp-divider {
+    height: 1px;
+    background: rgba(255,179,0,0.06);
+    margin: 2px 0;
+}
+
+.insp-price-block { display: flex; flex-direction: column; gap: 4px; }
+
+.insp-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.insp-price-label {
+    font-size: 7px;
+    color: rgba(255,179,0,0.32);
+    letter-spacing: 0.14em;
+    width: 38px;
+    flex-shrink: 0;
+}
+
+.insp-price-creds { font-size: 17px; color: #FFB300; letter-spacing: 0.04em; }
+.insp-price-tp    { font-size: 11px; color: rgba(125,249,255,0.75); letter-spacing: 0.04em; }
+
+.insp-footer {
+    padding: 10px 14px;
+    border-top: 1px solid rgba(255,179,0,0.08);
+    flex-shrink: 0;
+}
+
+.insp-owned {
+    display: block;
+    text-align: center;
+    font-size: 8px;
+    color: rgba(0,255,136,0.55);
+    letter-spacing: 0.16em;
+    padding: 8px;
+    border: 1px solid rgba(0,255,136,0.15);
+}
+
+.insp-buy-btn {
+    width: 100%;
+    padding: 9px;
+    background: rgba(255,179,0,0.07);
+    border: 1px solid rgba(255,179,0,0.38);
+    color: #FFB300;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.insp-buy-btn:hover:not(:disabled) {
+    background: rgba(255,179,0,0.15);
+    border-color: #FFB300;
+}
+
+.insp-buy-btn:disabled { opacity: 0.22; cursor: not-allowed; }
+
+.insp-consumable-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.insp-use-btn {
+    width: 100%;
+    padding: 7px;
+    background: rgba(0,255,136,0.06);
+    border: 1px solid rgba(0,255,136,0.25);
+    color: rgba(0,255,136,0.75);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.insp-use-btn:hover { background: rgba(0,255,136,0.12); border-color: rgba(0,255,136,0.5); }
 </style>

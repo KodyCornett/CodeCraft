@@ -28,6 +28,7 @@ import SysInventory      from './pages/SysInventory.vue';
 import GridBreachGuide   from './pages/GridBreachGuide.vue';
 import PacketHijackGuide from './pages/PacketHijackGuide.vue';
 import GhostProtocol0   from './pages/GhostProtocol0.vue';
+import BankPage      from './pages/BankPage.vue';
 import NotFound      from './pages/NotFound.vue';
 
 // ── Route table ───────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ const ROUTES = [
     { url: 'splice://sys.local/guide/gridbreach',   title: 'Grid-Breach Manual',    component: GridBreachGuide   },
     { url: 'splice://sys.local/guide/packethijack', title: 'Packet Hijack Manual', component: PacketHijackGuide },
     { url: 'splice://sys.local/tutorial',         title: 'GHOST_PROTOCOL_0',   component: GhostProtocol0  },
+    { url: 'splice://bank.ch/hct',               title: 'Helvetic Cipher Trust', component: BankPage       },
     { url: 'splice://sys.local/commands',         title: 'Commands',        component: SysCommands       },
     { url: 'splice://sys.local/inventory', title: 'Inventory',    component: SysInventory },
 ];
@@ -90,4 +92,5 @@ export const SPLICE = {
     TUTORIAL:          'splice://sys.local/tutorial',
     TERMINAL:          'splice://sys.local/tutorial',   // NavBar TERMINAL app — same page as TUTORIAL
     INVENTORY: 'splice://sys.local/inventory',
+    BANK:      'splice://bank.ch/hct',
 };
