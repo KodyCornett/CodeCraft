@@ -237,6 +237,8 @@
                 :traces="nodeTraces"
                 @hack="onHackSelected"
                 @open-store="onOpenStore"
+                @open-bank="onLaunch(SPLICE.BANK)"
+                @reset-cooldowns="onResetCooldowns"
                 @use-command="onUseCommand"
                 @hack-player="onHackPlayer"
             />
@@ -258,8 +260,8 @@
                     <div class="welcome-tag">// INCOMING TRANSMISSION</div>
                     <div class="welcome-title">WELCOME, RUNNER</div>
                     <div class="welcome-body">
-                        Your rig is online. Your uplink is live.<br>
-                        Complete orientation before running anything hot.<br>
+                        Your rig is online. Your uplink is live.<br />
+                        Complete orientation before running anything hot.<br />
                         <span class="welcome-note">Rewards go directly to your wallet — safe from PvP.</span>
                     </div>
                     <div class="welcome-actions">
@@ -755,6 +757,10 @@ const CYBERDOC_URLS = {
 function onOpenStore() {
     const url = CYBERDOC_URLS[currentNodeId.value] ?? SPLICE.CYBER_DOC;
     onLaunch(url);
+}
+
+function onResetCooldowns() {
+    commands.value.forEach(c => { c.cooldown = false; });
 }
 
 // ── Tutorial ──────────────────────────────────────────────────────────────────
@@ -2058,4 +2064,7 @@ onUnmounted(() => {
     transition: all 0.15s;
 }
 .cf-btn:hover {
-    background: rgba(255,51,51,0.1)                                                                      
+    background: rgba(255,51,51,0.1);
+    border-color: rgba(255,51,51,0.5);
+}
+</style>

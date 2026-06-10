@@ -59,8 +59,16 @@
                     </div>
                 </div>
                 <div class="ni-store-desc">Licensed hardware &amp; software vendor.</div>
-                <button class="ni-store-btn" @click="$emit('open-store')">
-                    <span>⬡</span> OPEN STOREFRONT
+                <div class="ni-store-actions">
+                    <button class="ni-store-btn" @click="$emit('open-store')">
+                        <span>⬡</span> OPEN STOREFRONT
+                    </button>
+                    <button class="ni-bank-btn" @click="$emit('open-bank')">
+                        <span>◈</span> BANK
+                    </button>
+                </div>
+                <button class="ni-cooldown-btn" :disabled="!isOnNode" @click="$emit('reset-cooldowns')">
+                    [ RESET COOLDOWNS ]
                 </button>
             </div>
 
@@ -175,7 +183,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['hack', 'open-store', 'hack-player']);
+defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'hack-player']);
 
 // Render seconds_remaining as M:SS
 function formatTimer(seconds) {
@@ -265,10 +273,20 @@ const iceColorClass = computed(() => {
 
 .ni-store { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
 .ni-store-desc { font-size:9px; color:rgba(255,179,0,.72); letter-spacing:.06em; line-height:1.7; }
-.ni-store-btn  { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:9px 0;
+.ni-store-actions { display:flex; gap:6px; }
+.ni-store-btn  { display:flex; align-items:center; justify-content:center; gap:8px; flex:1; padding:9px 0;
     background:rgba(255,179,0,.04); border:1px solid rgba(255,179,0,.35); color:#FFB300;
     font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; cursor:pointer; transition:all .15s; }
 .ni-store-btn:hover { background:rgba(255,179,0,.09); border-color:rgba(255,179,0,.7); }
+.ni-bank-btn   { display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 12px;
+    background:rgba(0,255,136,.04); border:1px solid rgba(0,255,136,.3); color:rgba(0,255,136,.8);
+    font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; cursor:pointer; transition:all .15s; }
+.ni-bank-btn:hover { background:rgba(0,255,136,.09); border-color:rgba(0,255,136,.65); }
+.ni-cooldown-btn { width:100%; padding:6px 0; background:transparent; border:1px solid rgba(255,179,0,.18);
+    color:rgba(255,179,0,.45); font-family:'JetBrains Mono',monospace; font-size:7px; letter-spacing:.14em;
+    cursor:pointer; transition:all .15s; }
+.ni-cooldown-btn:hover:not(:disabled) { border-color:rgba(255,179,0,.45); color:rgba(255,179,0,.75); background:rgba(255,179,0,.03); }
+.ni-cooldown-btn:disabled { opacity:.28; cursor:not-allowed; }
 
 /* ── NPC identity block ───────────────────────────────────────────────────── */
 .ni-npc {

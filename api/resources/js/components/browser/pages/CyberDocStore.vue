@@ -1,5 +1,5 @@
 <template>
-    <div class="store-page">
+    <div class="store-page" :style="npc.theme ? { '--doc-accent': npc.theme.color, '--doc-accent-dim': npc.theme.dimColor, '--doc-accent-faint': npc.theme.faintColor } : {}">
 
         <!-- ── Location gate ─────────────────────────────────────────────────── -->
         <div v-if="visitChecking" class="access-gate access-gate--checking">
@@ -13,6 +13,14 @@
         </div>
 
         <template v-else>
+
+        <!-- ── Character intro ───────────────────────────────────────────────── -->
+        <div v-if="npc.theme" class="doc-intro">
+            <div class="di-header">
+                <span v-for="line in npc.theme.terminalLines" :key="line" class="di-line">{{ line }}</span>
+            </div>
+            <div class="di-quote">"{{ npc.theme.quote }}"<span class="di-attribution"> — {{ npc.handle }}</span></div>
+        </div>
 
         <!-- ── Storefront header ──────────────────────────────────────────────── -->
         <div class="storefront">
@@ -42,37 +50,6 @@
             </div>
         </div>
 
-        <!-- ── Banking terminal strip ─────────────────────────────────────────── -->
-        <div class="bank-terminal" :class="{ 'bank-terminal--hot': playerPocketCreds > 0 }">
-            <span class="bt-label">POCKET</span>
-            <span class="bt-amount" :class="playerPocketCreds > 0 ? 'bt-amount--hot' : 'bt-amount--empty'">
-                {{ playerPocketCreds.toLocaleString() }} ₡
-            </span>
-            <span v-if="playerPocketCreds > 0" class="bt-risk">⚠ AT RISK</span>
-            <div class="bt-spacer" />
-            <button
-                class="bt-btn"
-                :disabled="playerPocketCreds === 0 || banking"
-                @click="onBankCreds"
-            >
-                <span v-if="banking">PROCESSING…</span>
-                <span v-else-if="playerPocketCreds === 0">— NOTHING TO EXTRACT —</span>
-                <span v-else>EXTRACT {{ playerPocketCreds.toLocaleString() }} ₡ →</span>
-            </button>
-            <Transition name="bank-confirm">
-                <span v-if="bankConfirm" class="bt-confirm">✓ {{ bankConfirm.toLocaleString() }} ₡ SECURED</span>
-            </Transition>
-        </div>
-
-        <!-- ── Cooldown reset strip ────────────────────────────────────────────── -->
-        <div class="cooldown-strip">
-            <div>
-                <div class="cd-label">COMMAND COOLDOWN RESET</div>
-                <div class="cd-sub">Resets all command cooldowns. No charge. No bounty impact.</div>
-            </div>
-            <button class="cd-btn" :disabled="!atCyberDoc" @click="onResetCooldowns">[ RESET ALL ]</button>
-        </div>
-
         <!-- ── Section nav ────────────────────────────────────────────────────── -->
         <div class="store-nav">
             <button
@@ -94,53 +71,6 @@
              RIGS
              ════════════════════════════════════════════════════════════════════ -->
         <div v-if="activeCategory === 'rigs'" class="section-scroll">
-
-            <!-- Current chassis -->
-            <div class="chassis-current">
-                <div class="cc-topbar">
-                    <span class="cc-label">INSTALLED CHASSIS</span>
-                    <span class="cc-equipped">● EQUIPPED</span>
-                </div>
-                <div class="cc-identity">
-                    <span class="cc-tier-badge">T{{ rig.tier }}</span>
-                    <span class="cc-name">{{ chassisBaseName }}</span>
-                    <span class="cc-ver">v{{ rigVersionLabel }}</span>
-                </div>
-                <div class="cc-stats">
-                    <div v-for="s in RIG_STATS" :key="s.key" class="cc-stat">
-                        <span class="cc-stat-label">{{ s.short }}</span>
-                        <div class="cc-pips">
-                            <span
-                                v-for="n in (rig.caps[s.key] ?? effectiveStat(s.key, rig))"
-                                :key="n"
-                                class="cc-pip"
-                                :class="{
-                                    'pip--base':     n <= rig[s.key] - (rig.investedPoints?.[s.key] ?? 0),
-                                    'pip--invested': n > rig[s.key] - (rig.investedPoints?.[s.key] ?? 0) && n <= rig[s.key],
-                                    'pip--empty':    n > rig[s.key],
-                                }"
-                            />
-                        </div>
-                        <span class="cc-stat-val">{{ effectiveStat(s.key, rig) }}</span>
-                    </div>
-                </div>
-                <div class="cc-footer">
-                    <div class="cc-prog">
-                        <span class="cc-prog-label">UPGRADE</span>
-                        <div class="cc-prog-pips">
-                            <span
-                                v-for="n in (rig.pointsCap ?? 9)"
-                                :key="n"
-                                class="cc-prog-pip"
-                                :class="{ 'prog-pip--lit': n <= totalInvestedAll }"
-                            />
-                        </div>
-                        <span class="cc-prog-count">{{ totalInvestedAll }}/{{ rig.pointsCap ?? 9 }}</span>
-                        <span v-if="chassisMaxed" class="cc-maxed-tag">MAXED</span>
-                    </div>
-                    <span class="cc-ports">{{ rig.portSlots ?? 0 }} PORT SLOTS</span>
-                </div>
-            </div>
 
             <!-- Available chassis section -->
             <div class="section-subheading">
@@ -570,28 +500,9 @@ async function visitCyberDoc() {
     }
 }
 
-const playerCreds       = computed(() => player.value?.creds       ?? 0);
-const playerPocketCreds = computed(() => player.value?.pocketCreds ?? 0);
-const playerTechPoints  = computed(() => player.value?.techPoints  ?? 0);
-// ── Banking ───────────────────────────────────────────────────────────────────
-const banking      = ref(false);
-const bankConfirm  = ref(null);
+const playerCreds      = computed(() => player.value?.creds      ?? 0);
+const playerTechPoints = computed(() => player.value?.techPoints ?? 0);
 const upgradeError = ref(null);
-
-async function onBankCreds() {
-    if (banking.value || playerPocketCreds.value === 0) return;
-    banking.value = true;
-    bankConfirm.value = null;
-
-    const banked = playerPocketCreds.value;
-    const result = await gameState?.bankCreds?.();
-
-    banking.value = false;
-    if (result !== null) {
-        bankConfirm.value = banked;
-        setTimeout(() => { bankConfirm.value = null; }, 3000);
-    }
-}
 
 const { upgradeCost, totalInvested, canUpgrade, effectiveStat } = useUpgradeCosts();
 
@@ -1003,10 +914,6 @@ async function onUpgradeStat(stat, cost) {
     }
 }
 
-function onResetCooldowns() {
-    allCommands.value.forEach(c => { c.cooldown = false; });
-    console.log('[CYBERDOC] All command cooldowns reset.');
-}
 </script>
 
 <style scoped>
@@ -1062,8 +969,8 @@ function onResetCooldowns() {
     align-items: center;
     justify-content: space-between;
     padding: 10px 16px 9px;
-    background: rgba(255,179,0,0.03);
-    border-bottom: 1px solid rgba(255,179,0,0.15);
+    background: var(--doc-accent-faint, rgba(255,179,0,0.03));
+    border-bottom: 1px solid var(--doc-accent-dim, rgba(255,179,0,0.15));
     flex-shrink: 0;
     gap: 12px;
 }
@@ -1078,7 +985,7 @@ function onResetCooldowns() {
 
 .sf-mark {
     font-size: 20px;
-    color: #FFB300;
+    color: var(--doc-accent, #FFB300);
     flex-shrink: 0;
     opacity: 0.85;
 }
@@ -1092,7 +999,7 @@ function onResetCooldowns() {
 
 .sf-name {
     font-size: 15px;
-    color: #FFB300;
+    color: var(--doc-accent, #FFB300);
     letter-spacing: 0.12em;
     line-height: 1;
 }
@@ -1283,9 +1190,9 @@ function onResetCooldowns() {
 }
 .snav-btn:hover  { color: rgba(255,179,0,0.65); background: rgba(255,179,0,0.03); }
 .snav-btn.active {
-    color: #FFB300;
-    background: rgba(255,179,0,0.05);
-    border-bottom: 2px solid #FFB300;
+    color: var(--doc-accent, #FFB300);
+    background: var(--doc-accent-faint, rgba(255,179,0,0.05));
+    border-bottom: 2px solid var(--doc-accent, #FFB300);
 }
 
 /* ── Off-site banner ──────────────────────────────────────────────────────── */
@@ -2482,4 +2389,51 @@ function onResetCooldowns() {
 }
 
 .insp-use-btn:hover { background: rgba(0,255,136,0.12); border-color: rgba(0,255,136,0.5); }
+
+/* ── Character intro block ───────────────────────────────────────────────── */
+.doc-intro {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px 7px;
+    background: var(--doc-accent-faint, rgba(255,179,0,0.02));
+    border-bottom: 1px solid var(--doc-accent-dim, rgba(255,179,0,0.1));
+    flex-shrink: 0;
+}
+
+.di-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.di-line {
+    font-size: 7px;
+    color: var(--doc-accent, #FFB300);
+    opacity: 0.55;
+    letter-spacing: 0.12em;
+    line-height: 1.5;
+}
+
+.di-quote {
+    font-size: 8px;
+    color: rgba(255,255,255,0.28);
+    letter-spacing: 0.03em;
+    line-height: 1.6;
+    font-style: italic;
+    border-left: 2px solid var(--doc-accent-dim, rgba(255,179,0,0.2));
+    padding-left: 8px;
+    max-width: 260px;
+    flex-shrink: 0;
+}
+
+.di-attribution {
+    font-style: normal;
+    color: var(--doc-accent, #FFB300);
+    opacity: 0.5;
+    font-size: 7px;
+    letter-spacing: 0.1em;
+}
 </style>

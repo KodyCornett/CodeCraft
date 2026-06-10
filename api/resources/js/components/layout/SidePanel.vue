@@ -26,6 +26,8 @@
                 :current-player-id="currentPlayerId"
                 @hack="$emit('hack', $event)"
                 @open-store="$emit('open-store')"
+                @open-bank="$emit('open-bank')"
+                @reset-cooldowns="$emit('reset-cooldowns')"
                 @hack-player="$emit('hack-player', $event)"
             />
 
@@ -76,7 +78,7 @@ defineProps({
     playerOpenSeason: { type: Boolean, default: false },
 });
 
-defineEmits(['hack', 'open-store', 'use-command', 'hack-player']);
+defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'use-command', 'hack-player']);
 </script>
 
 <style scoped>
