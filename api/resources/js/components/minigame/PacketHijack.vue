@@ -234,22 +234,46 @@
 
                     <div class="ph-rule ph-rule--light" />
 
-                    <!-- Auth prompt — shown after successful breach -->
+                    <!-- Auth prompt — shown after successful breach, credentials auto-filled -->
                     <div v-if="awaitingAuth && phase === 2" class="ph-auth-prompt">
-                        <div class="ph-auth-title">[ SYSTEM LOGIN // ENTER CREDENTIALS ]</div>
+                        <div class="ph-auth-title">[ SYSTEM ACCESS GRANTED — CREDENTIALS ASSEMBLED ]</div>
+                        <div class="ph-auth-sub">CONFIRM TO AUTHENTICATE</div>
                         <div class="ph-auth-row">
                             <span class="ph-auth-label">USERNAME &gt;</span>
-                            <input v-model="authUser" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER HOSTNAME CREDENTIAL" @keydown.enter="onSubmitAuth" />
+                            <input v-model="authUser" class="ph-auth-input ph-auth-input--prefilled" type="text" spellcheck="false" autocomplete="off" @keydown.enter="onSubmitAuth" />
                         </div>
                         <div class="ph-auth-row">
                             <span class="ph-auth-label">PASSWORD &gt;</span>
-                            <input v-model="authPass" class="ph-auth-input" type="text" spellcheck="false" autocomplete="off" placeholder="ENTER OS CREDENTIAL" @keydown.enter="onSubmitAuth" />
+                            <input v-model="authPass" class="ph-auth-input ph-auth-input--prefilled" type="text" spellcheck="false" autocomplete="off" @keydown.enter="onSubmitAuth" />
                         </div>
-                        <button class="ph-auth-submit" @click="onSubmitAuth">AUTHENTICATE</button>
+                        <button class="ph-auth-submit ph-auth-submit--ready" @click="onSubmitAuth">[ AUTHENTICATE → ]</button>
                     </div>
 
-                    <!-- Input row -->
-                    <div class="ph-input-row" v-show="!awaitingAuth || phase !== 2">
+                    <!-- Dropdown selector — replaces typed input once board is ready -->
+                    <div v-if="showDropdown" class="ph-dropdown">
+                        <div class="ph-dd-preview">
+                            <span class="ph-prompt">SYS_INPUT &gt;</span>
+                            <span v-if="ddSelectedCmd" class="ph-dd-cmd-token">{{ ddSelectedCmd }}</span>
+                            <span v-if="ddArg1" class="ph-dd-arg-token"> {{ ddArg1 }}</span>
+                            <span class="ph-cursor cursor--blink">█</span>
+                        </div>
+                        <div class="ph-dd-stage-hint">{{ ddStageHint }}</div>
+                        <div class="ph-dd-list" ref="ddListEl">
+                            <div
+                                v-for="(opt, i) in currentDdList"
+                                :key="opt"
+                                class="ph-dd-item"
+                                :class="{ 'dd-item--active': i === ddCursorIdx }"
+                            >
+                                <span class="ph-dd-arrow">{{ i === ddCursorIdx ? '▶' : '·' }}</span>
+                                <span class="ph-dd-opt">{{ opt }}</span>
+                            </div>
+                        </div>
+                        <div class="ph-dd-hint">↑↓ NAVIGATE · SPACE SELECT · ESC BACK</div>
+                    </div>
+
+                    <!-- Input row — shown only when not in dropdown mode -->
+                    <div class="ph-input-row" v-show="!showDropdown && (!awaitingAuth || phase !== 2)">
                         <span class="ph-prompt">SYS_INPUT &gt;</span>
                         <div v-if="isLocked" class="ph-locked">
                             <span class="ph-lock-msg">[ INPUT LOCKED — {{ lockCountdown }}s ]</span>
@@ -415,6 +439,7 @@ const emit = defineEmits(['submit-command', 'submit-auth', 'submit-transfer', 'm
 
 const inputEl    = ref(null);
 const historyEl  = ref(null);
+const ddListEl   = ref(null);
 const inputValue = ref('');
 const authUser   = ref('');
 const authPass   = ref('');
@@ -428,6 +453,122 @@ function onSubmitAuth() {
     authUser.value = '';
     authPass.value = '';
 }
+
+// ── Dropdown state machine ────────────────────────────────────────────────────
+// Replaces the typed input once the board becomes ready.
+// Stage flow: null → command → arg1 → (arg2 for trace only) → submit → command
+const ddStage       = ref(null); // null | 'command' | 'arg1' | 'arg2'
+const ddSelectedCmd = ref(null);
+const ddArg1        = ref(null);
+const ddCursorIdx   = ref(0);
+
+const NO_ARG_CMDS  = new Set(['arp --scan', 'sniff --traffic']);
+const TWO_ARG_CMDS = new Set(['trace']);
+
+const ddCommandList = computed(() => {
+    if (props.phase === 1) return ['ping', 'traceroute', 'arp --scan', 'whois', 'sniff --traffic', 'flush', 'inject'];
+    if (props.phase === 2) return ['probe', 'trace', 'exploit', 'breach'];
+    return [];
+});
+
+const ddArgList = computed(() => {
+    const cmd = ddSelectedCmd.value;
+    if (!cmd) return [];
+    if (cmd === 'breach') return props.targetIp ? [props.targetIp] : [];
+    if (['probe', 'exploit'].includes(cmd)) return props.portPool.map(p => String(p.port));
+    if (cmd === 'trace') {
+        const ports = props.portPool.map(p => String(p.port));
+        return ddStage.value === 'arg2' ? ports.filter(p => p !== ddArg1.value) : ports;
+    }
+    // Phase 1 IP commands
+    return props.suspects.filter(s => !s.flushed).map(s => s.ip);
+});
+
+const currentDdList = computed(() =>
+    ddStage.value === 'command' ? ddCommandList.value : ddArgList.value
+);
+
+const isTwoArgCmd = computed(() => TWO_ARG_CMDS.has(ddSelectedCmd.value ?? ''));
+
+const ddStageHint = computed(() => {
+    if (ddStage.value === 'command') return 'SELECT COMMAND';
+    if (ddStage.value === 'arg2')    return 'SELECT PORT 2';
+    if (isTwoArgCmd.value)           return 'SELECT PORT 1';
+    if (ddSelectedCmd.value === 'breach') return 'SELECT TARGET IP';
+    return 'SELECT PORT / IP';
+});
+
+const showDropdown = computed(() =>
+    ddStage.value !== null && !props.awaitingAuth && !props.isLocked && !props.isComplete
+);
+
+function handleDropdownKey(e) {
+    const list = currentDdList.value;
+    if (!list.length) return;
+
+    if (e.key === 'ArrowUp') {
+        ddCursorIdx.value = (ddCursorIdx.value - 1 + list.length) % list.length;
+    } else if (e.key === 'ArrowDown') {
+        ddCursorIdx.value = (ddCursorIdx.value + 1) % list.length;
+    } else if (e.key === ' ' || e.key === 'Enter') {
+        const selected = list[ddCursorIdx.value];
+        if (ddStage.value === 'command') {
+            ddSelectedCmd.value = selected;
+            if (NO_ARG_CMDS.has(selected)) {
+                _submitDropdown(selected, null, null);
+            } else {
+                ddStage.value = 'arg1';
+                ddCursorIdx.value = 0;
+            }
+        } else if (ddStage.value === 'arg1') {
+            if (isTwoArgCmd.value) {
+                ddArg1.value = selected;
+                ddStage.value = 'arg2';
+                ddCursorIdx.value = 0;
+            } else {
+                _submitDropdown(ddSelectedCmd.value, selected, null);
+            }
+        } else if (ddStage.value === 'arg2') {
+            _submitDropdown(ddSelectedCmd.value, ddArg1.value, selected);
+        }
+    } else if (e.key === 'Escape') {
+        if (ddStage.value === 'arg2') {
+            ddStage.value = 'arg1';
+            ddCursorIdx.value = 0;
+        } else if (ddStage.value === 'arg1') {
+            ddArg1.value  = null;
+            ddStage.value = 'command';
+            ddSelectedCmd.value = null;
+            ddCursorIdx.value = 0;
+        }
+    }
+}
+
+function _submitDropdown(cmd, arg1, arg2) {
+    let full = cmd;
+    if (arg1) full += ' ' + arg1;
+    if (arg2) full += ' ' + arg2;
+    historyNav.unshift(full);
+    historyNavI = -1;
+    emit('submit-command', full);
+    ddStage.value = 'command';
+    ddSelectedCmd.value = null;
+    ddArg1.value = null;
+    ddCursorIdx.value = 0;
+}
+
+function _resetDropdown() {
+    ddStage.value = null;
+    ddSelectedCmd.value = null;
+    ddArg1.value = null;
+    ddCursorIdx.value = 0;
+}
+
+// Auto-scroll the active item into view when cursor moves
+watch(ddCursorIdx, async () => {
+    await nextTick();
+    ddListEl.value?.querySelector('.dd-item--active')?.scrollIntoView({ block: 'nearest' });
+});
 
 // Random threat message — rotates per match open
 const threatMessages = [
@@ -481,6 +622,15 @@ const SKIP_KEYS = new Set([
 ]);
 
 function _onDocumentKeydown(e) {
+    // Dropdown mode: intercept navigation keys, swallow all others
+    if (ddStage.value !== null && !props.isComplete && !props.awaitingAuth && !props.isLocked && !props.busy) {
+        if (['ArrowUp', 'ArrowDown', ' ', 'Enter', 'Escape'].includes(e.key)) {
+            e.preventDefault();
+            handleDropdownKey(e);
+        }
+        return;
+    }
+
     // Let the overlay handle its own close / escape
     if (e.key === 'Escape') return;
 
@@ -552,15 +702,30 @@ watch(() => props.commandHistory, async () => {
 }, { deep: true });
 
 watch(() => props.isLocked, (locked) => {
-    if (!locked) nextTick(() => inputEl.value?.focus());
+    if (!locked) nextTick(() => { if (!showDropdown.value) inputEl.value?.focus(); });
 });
 
 watch(() => props.awaitingAuth, (auth) => {
-    if (!auth) nextTick(() => inputEl.value?.focus());
+    if (auth) {
+        // Auto-fill assembled credentials so player only needs to confirm
+        authUser.value = props.credentialState?.hostname || '';
+        authPass.value = props.credentialState?.os       || '';
+    } else {
+        nextTick(() => { if (!showDropdown.value) inputEl.value?.focus(); });
+    }
 });
 
 watch(() => props.phase, () => {
+    _resetDropdown();
     nextTick(() => inputEl.value?.focus());
+});
+
+// Enter dropdown mode once the board for each phase is populated
+watch(() => props.boardReady, (ready) => {
+    if (ready && props.phase === 1) { ddStage.value = 'command'; ddCursorIdx.value = 0; }
+});
+watch(() => props.boardScanned, (scanned) => {
+    if (scanned && props.phase === 2) { ddStage.value = 'command'; ddCursorIdx.value = 0; }
 });
 
 watch(() => props.busy, (b) => {
@@ -1278,6 +1443,83 @@ function lineClass(line) {
 .cf-val--dead     { color: rgba(255,68,68,0.5) !important; }
 .ph-cf-clue       { color: #FF69B4; }
 
+/* ── Dropdown selector ───────────────────────────────────────────────────── */
+.ph-dropdown {
+    flex-shrink: 0;
+    border-top: 1px solid rgba(0,255,255,0.1);
+    background: rgba(0,255,255,0.015);
+    display: flex;
+    flex-direction: column;
+}
+
+.ph-dd-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px 3px;
+}
+
+.ph-dd-cmd-token {
+    font-size: 12px;
+    color: #00FFFF;
+    letter-spacing: 0.06em;
+}
+
+.ph-dd-arg-token {
+    font-size: 12px;
+    color: #FFB300;
+    letter-spacing: 0.06em;
+}
+
+.ph-dd-stage-hint {
+    font-size: 7px;
+    color: rgba(0,255,255,0.22);
+    letter-spacing: 0.16em;
+    padding: 0 14px 4px;
+}
+
+.ph-dd-list {
+    max-height: 148px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 2px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,255,255,0.1) transparent;
+}
+.ph-dd-list::-webkit-scrollbar       { width: 2px; }
+.ph-dd-list::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.12); }
+
+.ph-dd-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px;
+    font-size: 11px;
+    color: rgba(0,255,255,0.32);
+    letter-spacing: 0.05em;
+}
+
+.dd-item--active {
+    color: #00FFFF;
+    background: rgba(0,255,255,0.05);
+}
+
+.ph-dd-arrow {
+    font-size: 9px;
+    width: 10px;
+    flex-shrink: 0;
+    color: rgba(0,255,255,0.25);
+}
+.dd-item--active .ph-dd-arrow { color: #00FFFF; }
+
+.ph-dd-hint {
+    font-size: 7px;
+    color: rgba(0,255,255,0.15);
+    letter-spacing: 0.1em;
+    padding: 3px 14px 6px;
+}
+
 /* ── Auth prompt ─────────────────────────────────────────────────────────── */
 .ph-auth-prompt {
     flex-shrink: 0;
@@ -1293,6 +1535,14 @@ function lineClass(line) {
     font-size: 10px;
     letter-spacing: 0.12em;
     color: #00ff88;
+    margin-bottom: 2px;
+}
+
+.ph-auth-sub {
+    font-size: 8px;
+    color: rgba(0,255,136,0.4);
+    letter-spacing: 0.12em;
+    margin-top: -4px;
     margin-bottom: 4px;
 }
 
@@ -1323,6 +1573,12 @@ function lineClass(line) {
     padding: 4px 8px;
 }
 
+.ph-auth-input--prefilled {
+    border-color: rgba(0,255,136,0.4) !important;
+    background: rgba(0,255,136,0.06) !important;
+    color: #00ff88 !important;
+}
+
 .ph-auth-submit {
     align-self: flex-start;
     background: transparent;
@@ -1335,9 +1591,22 @@ function lineClass(line) {
     cursor: pointer;
     transition: border-color 0.15s, color 0.15s;
 }
-.ph-auth-submit:hover {
-    border-color: #00ff88;
+.ph-auth-submit:hover { border-color: #00ff88; color: #00ff88; }
+
+.ph-auth-submit--ready {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    padding: 8px 24px;
+    margin-top: 4px;
+    background: rgba(0,255,136,0.06);
+    border-color: rgba(0,255,136,0.55);
     color: #00ff88;
+    animation: auth-ready-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes auth-ready-pulse {
+    from { border-color: rgba(0,255,136,0.35); box-shadow: none; }
+    to   { border-color: rgba(0,255,136,0.85); box-shadow: 0 0 14px rgba(0,255,136,0.12); }
 }
 
 /* ── fp--complete (used in Phase 2 top strip) ────────────────────────────── */
