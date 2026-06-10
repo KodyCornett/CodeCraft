@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ChassisTemplate;
+use App\Models\Node;
 use App\Models\Player;
 use App\Models\PlayerRig;
 use App\Models\User;
@@ -14,19 +15,24 @@ class RigEndpointsTest extends TestCase
     use RefreshDatabase;
 
     // =========================================================================
-    // Helper — creates an authenticated user, player, chassis, and rig.
-    // Returns [$user, $player, $rig] ready for actingAs().
+    // Helpers
     // =========================================================================
 
-    private function scaffold(array $rigOverrides = [], array $chassisOverrides = []): array
-    {
+    private function scaffold(
+        array $rigOverrides    = [],
+        array $chassisOverrides = [],
+        array $playerOverrides  = [],
+    ): array {
         $user    = User::factory()->create();
         $chassis = ChassisTemplate::factory()->create(array_merge(
             ['total_point_cap' => 10],
             $chassisOverrides,
         ));
-        $player  = Player::factory()->create(['user_id' => $user->id]);
-        $rig     = PlayerRig::factory()->create(array_merge(
+        $player = Player::factory()->create(array_merge(
+            ['user_id' => $user->id],
+            $playerOverrides,
+        ));
+        $rig = PlayerRig::factory()->create(array_merge(
             [
                 'player_id'           => $player->id,
                 'chassis_template_id' => $chassis->id,
@@ -35,12 +41,39 @@ class RigEndpointsTest extends TestCase
                 'firewall_level'      => 2,
                 'storage_level'       => 2,
                 'os_level'            => 2,
-                'current_ss'          => 20,
+                'current_ss'          => 100,
             ],
             $rigOverrides,
         ));
 
         return [$user, $player, $rig];
+    }
+
+    /** Create a cyberdoc node, move the player there, and return the node. */
+    private function placePlayerAtCyberDoc(Player $player): Node
+    {
+        $node = Node::create([
+            'canvas_id' => 'test-cyberdoc-' . uniqid(),
+            'x'         => 0,
+            'y'         => 0,
+            'type'      => 'cyberdoc',
+            'ice'       => 0,
+        ]);
+        $player->current_node_id = $node->id;
+        $player->save();
+        return $node;
+    }
+
+    /** Create an action node with given ICE and return it. */
+    private function createActionNode(int $ice = 3, string $canvasId = 'test-action'): Node
+    {
+        return Node::create([
+            'canvas_id' => $canvasId,
+            'x'         => 0,
+            'y'         => 0,
+            'type'      => 'action',
+            'ice'       => $ice,
+        ]);
     }
 
     // =========================================================================
@@ -49,32 +82,27 @@ class RigEndpointsTest extends TestCase
 
     public function test_unauthenticated_get_rig_returns_401(): void
     {
-        $this->getJson('/api/rig?player_id=' . fake()->uuid())
-             ->assertUnauthorized();
+        $this->getJson('/api/rig')->assertUnauthorized();
     }
 
     public function test_unauthenticated_post_damage_returns_401(): void
     {
-        $this->postJson('/api/rig/damage', [])
-             ->assertUnauthorized();
+        $this->postJson('/api/rig/damage', [])->assertUnauthorized();
     }
 
     public function test_unauthenticated_post_upgrade_returns_401(): void
     {
-        $this->postJson('/api/rig/upgrade', [])
-             ->assertUnauthorized();
+        $this->postJson('/api/rig/upgrade', [])->assertUnauthorized();
     }
 
     public function test_unauthenticated_post_repair_returns_401(): void
     {
-        $this->postJson('/api/rig/repair', [])
-             ->assertUnauthorized();
+        $this->postJson('/api/rig/repair', [])->assertUnauthorized();
     }
 
     public function test_unauthenticated_get_player_status_returns_401(): void
     {
-        $this->getJson('/api/player/' . fake()->uuid() . '/status')
-             ->assertUnauthorized();
+        $this->getJson('/api/player/' . fake()->uuid() . '/status')->assertUnauthorized();
     }
 
     // =========================================================================
@@ -83,17 +111,13 @@ class RigEndpointsTest extends TestCase
 
     public function test_get_rig_returns_correct_structure(): void
     {
-        [$user, $player] = $this->scaffold();
+        [$user] = $this->scaffold();
 
         $this->actingAs($user, 'sanctum')
-             ->getJson("/api/rig?player_id={$player->id}")
+             ->getJson('/api/rig')
              ->assertOk()
              ->assertJsonStructure([
-                 'rig_id',
-                 'chassis',
-                 'is_limping',
-                 'current_ss',
-                 'max_ss',
+                 'rig_id', 'chassis', 'is_limping', 'current_ss', 'max_ss',
                  'stats' => [
                      'cpu'      => ['level', 'base', 'peripheral_boost', 'effective'],
                      'ram'      => ['level', 'base', 'peripheral_boost', 'effective'],
@@ -105,59 +129,66 @@ class RigEndpointsTest extends TestCase
              ]);
     }
 
-    public function test_get_rig_returns_404_for_unknown_player(): void
+    public function test_get_rig_returns_404_when_player_has_no_rig(): void
     {
-        [$user] = $this->scaffold();
+        // User exists but has no player record → 404
+        $user = User::factory()->create();
 
         $this->actingAs($user, 'sanctum')
-             ->getJson('/api/rig?player_id=' . fake()->uuid())
+             ->getJson('/api/rig')
              ->assertNotFound();
     }
 
     // =========================================================================
-    // POST /api/rig/damage — event types
+    // POST /api/rig/damage — PvE only
     // =========================================================================
 
     public function test_pve_damage_without_zero_returns_null_event(): void
     {
-        [$user, $player] = $this->scaffold(['current_ss' => 50]);
+        // base_firewall=2 + firewall_level=2 = effectiveFW=4. ICE=14 → damage=10.
+        [$user, $player] = $this->scaffold(['current_ss' => 50, 'firewall_level' => 2]);
+        $node = $this->createActionNode(ice: 14, canvasId: 'dmg-test-node');
 
         $this->actingAs($user, 'sanctum')
              ->postJson('/api/rig/damage', [
-                 'player_id' => $player->id,
-                 'amount'    => 10,
-                 'source'    => 'pve',
+                 'node_canvas_id' => $node->canvas_id,
+                 'source'         => 'pve',
              ])
              ->assertOk()
              ->assertJsonFragment(['event' => null, 'current_ss' => 40]);
     }
 
-    public function test_pve_damage_to_zero_returns_limp_mode(): void
+    public function test_pve_damage_to_zero_triggers_critical_failure(): void
     {
-        [$user, $player] = $this->scaffold(['current_ss' => 10]);
+        // ICE=30 → damage=26, enough to zero out SS=10.
+        [$user, $player] = $this->scaffold(
+            ['current_ss' => 10, 'firewall_level' => 2],
+            [],
+            ['pocket_creds' => 500],
+        );
+        $node = $this->createActionNode(ice: 30, canvasId: 'dmg-zero-node');
 
         $this->actingAs($user, 'sanctum')
              ->postJson('/api/rig/damage', [
-                 'player_id' => $player->id,
-                 'amount'    => 999,
-                 'source'    => 'pve',
+                 'node_canvas_id' => $node->canvas_id,
+                 'source'         => 'pve',
              ])
              ->assertOk()
-             ->assertJsonFragment(['event' => 'limp_mode', 'current_ss' => 1, 'is_limping' => true]);
+             ->assertJsonFragment(['event' => 'critical_failure', 'current_ss' => 25, 'is_limping' => true]);
     }
 
-    public function test_pvp_damage_to_zero_returns_street_doc_reset(): void
+    public function test_pvp_source_rejected_by_damage_endpoint(): void
     {
-        [$user, $player] = $this->scaffold(['current_ss' => 10]);
+        // PvP damage is handled by CombatController — this endpoint only accepts 'pve'.
+        [$user, $player] = $this->scaffold(['current_ss' => 50]);
+        $node = $this->createActionNode(ice: 5, canvasId: 'pvp-reject-node');
 
         $this->actingAs($user, 'sanctum')
              ->postJson('/api/rig/damage', [
-                 'player_id' => $player->id,
-                 'amount'    => 999,
-                 'source'    => 'pvp',
+                 'node_canvas_id' => $node->canvas_id,
+                 'source'         => 'pvp',
              ])
-             ->assertOk()
-             ->assertJsonFragment(['event' => 'street_doc_reset', 'is_limping' => false]);
+             ->assertUnprocessable();
     }
 
     // =========================================================================
@@ -166,34 +197,32 @@ class RigEndpointsTest extends TestCase
 
     public function test_upgrade_below_cap_returns_null_tax(): void
     {
-        // total = 5 (all at 1), cap = 10
-        [$user, $player] = $this->scaffold([
-            'cpu_level' => 1, 'ram_level' => 1, 'firewall_level' => 1,
-            'storage_level' => 1, 'os_level' => 1, 'current_ss' => 10,
-        ]);
+        // total = 5 (all at 1), cap = 10 — room to upgrade without tax
+        [$user, $player] = $this->scaffold(
+            ['cpu_level' => 1, 'ram_level' => 1, 'firewall_level' => 1, 'storage_level' => 1, 'os_level' => 1],
+            [],
+            ['wallet_creds' => 10000, 'tech_points' => 100],
+        );
+        $this->placePlayerAtCyberDoc($player);
 
         $this->actingAs($user, 'sanctum')
-             ->postJson('/api/rig/upgrade', [
-                 'player_id' => $player->id,
-                 'stat'      => 'cpu',
-             ])
+             ->postJson('/api/rig/upgrade', ['stat' => 'os'])
              ->assertOk()
-             ->assertJsonFragment(['stat_upgraded' => 'cpu', 'tax_event' => null]);
+             ->assertJsonFragment(['stat_upgraded' => 'os', 'tax_event' => null]);
     }
 
     public function test_upgrade_at_cap_returns_tax_event(): void
     {
         // All at 2, total = 10 = cap. Upgrading OS should tax RAM.
-        [$user, $player] = $this->scaffold([
-            'cpu_level' => 2, 'ram_level' => 2, 'firewall_level' => 2,
-            'storage_level' => 2, 'os_level' => 2, 'current_ss' => 20,
-        ]);
+        [$user, $player] = $this->scaffold(
+            ['cpu_level' => 2, 'ram_level' => 2, 'firewall_level' => 2, 'storage_level' => 2, 'os_level' => 2],
+            [],
+            ['wallet_creds' => 10000, 'tech_points' => 100],
+        );
+        $this->placePlayerAtCyberDoc($player);
 
         $response = $this->actingAs($user, 'sanctum')
-             ->postJson('/api/rig/upgrade', [
-                 'player_id' => $player->id,
-                 'stat'      => 'os',
-             ])
+             ->postJson('/api/rig/upgrade', ['stat' => 'os'])
              ->assertOk()
              ->assertJsonFragment(['stat_upgraded' => 'os'])
              ->json();
@@ -206,14 +235,30 @@ class RigEndpointsTest extends TestCase
 
     public function test_upgrade_at_chassis_max_returns_422(): void
     {
-        [$user, $player] = $this->scaffold(['cpu_level' => 10], ['total_point_cap' => 10]);
+        [$user, $player] = $this->scaffold(
+            ['cpu_level' => 10],
+            ['total_point_cap' => 10],
+            ['wallet_creds' => 10000, 'tech_points' => 100],
+        );
+        $this->placePlayerAtCyberDoc($player);
 
         $this->actingAs($user, 'sanctum')
-             ->postJson('/api/rig/upgrade', [
-                 'player_id' => $player->id,
-                 'stat'      => 'cpu',
-             ])
+             ->postJson('/api/rig/upgrade', ['stat' => 'cpu'])
              ->assertUnprocessable();
+    }
+
+    public function test_upgrade_returns_403_when_not_at_cyberdoc(): void
+    {
+        [$user, $player] = $this->scaffold(
+            ['cpu_level' => 1, 'os_level' => 1],
+            [],
+            ['wallet_creds' => 10000, 'tech_points' => 100],
+        );
+        // player->current_node_id is null by default → 403
+
+        $this->actingAs($user, 'sanctum')
+             ->postJson('/api/rig/upgrade', ['stat' => 'os'])
+             ->assertForbidden();
     }
 
     // =========================================================================
@@ -222,15 +267,12 @@ class RigEndpointsTest extends TestCase
 
     public function test_repair_restores_ss_to_max(): void
     {
-        [$user, $player] = $this->scaffold([
-            'os_level'   => 3,
-            'current_ss' => 5,   // damaged — max is 30 (os 3 × 10)
-        ]);
+        [$user] = $this->scaffold(['current_ss' => 25]);
 
         $this->actingAs($user, 'sanctum')
-             ->postJson('/api/rig/repair', ['player_id' => $player->id])
+             ->postJson('/api/rig/repair', [])
              ->assertOk()
-             ->assertJsonFragment(['current_ss' => 30, 'max_ss' => 30]);
+             ->assertJsonFragment(['current_ss' => 100, 'max_ss' => 100]);
     }
 
     public function test_repair_with_peripherals_flag_clears_damaged_peripherals(): void
@@ -246,10 +288,7 @@ class RigEndpointsTest extends TestCase
         ]);
 
         $this->actingAs($user, 'sanctum')
-             ->postJson('/api/rig/repair', [
-                 'player_id'          => $player->id,
-                 'repair_peripherals' => true,
-             ])
+             ->postJson('/api/rig/repair', ['repair_peripherals' => true])
              ->assertOk();
 
         $this->assertDatabaseHas('player_peripherals', [

@@ -43,6 +43,7 @@ class BountyService
     // ── Thresholds (hack counts per CLAUDE.md) ───────────────────────────────
     public const BOUNTY_BOARD_THRESHOLD    = 10;  // hacks to appear on bounty board (Star 1)
     public const OPEN_SEASON_THRESHOLD     = 25;  // hacks to trigger Open Season via nodes (Star 4)
+    public const OPEN_SEASON_NODE_THRESHOLD = self::OPEN_SEASON_THRESHOLD;  // alias used by tests
     public const OPEN_SEASON_PVP_THRESHOLD = 5;   // PvP wins while on board → Open Season
 
     // ── Star tier thresholds (hack count → 0–5 star level) ──────────────────
@@ -93,8 +94,8 @@ class BountyService
         $wasOpenSeason = $player->is_open_season;
 
         $player->nodes_hacked_this_run++;
-        // bounty_level stores the 0–5 star tier; nodes_hacked_this_run is the raw counter
-        $player->bounty_level = $this->hackCountToStarLevel($player->nodes_hacked_this_run);
+        // bounty_level mirrors the raw hack count so callers can use it directly
+        $player->bounty_level = $player->nodes_hacked_this_run;
 
         // Ensure bounty_multiplier is at least the tier's base value.
         // PvP wins push it above the base — never lower it below what they earned.
@@ -143,7 +144,7 @@ class BountyService
 
         $player->pvp_wins_this_run++;
 
-        if ($player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD) {
+        if ($player->bounty_level >= self::BOUNTY_BOARD_THRESHOLD) {
             $player->bounty_multiplier = min(
                 self::MULTIPLIER_CAP,
                 (float) $player->bounty_multiplier + self::MULTIPLIER_PER_PVP_WIN,
@@ -154,8 +155,8 @@ class BountyService
 
         if (
             !$wasOpenSeason
-            && $player->nodes_hacked_this_run >= self::BOUNTY_BOARD_THRESHOLD
-            && $player->pvp_wins_this_run     >= self::OPEN_SEASON_PVP_THRESHOLD
+            && $player->bounty_level      >= self::BOUNTY_BOARD_THRESHOLD
+            && $player->pvp_wins_this_run >= self::OPEN_SEASON_PVP_THRESHOLD
         ) {
             $player->is_open_season = true;
             $event = BountyEvent::openSeasonTriggered($player->bounty_level);
@@ -240,23 +241,28 @@ class BountyService
 
     /**
      * Percentage of the loser's pocket the winner receives.
-     * Scales with the loser's hack count (nodes_hacked_this_run).
+     * Steps with the loser's star level (derived from bounty_level raw hack count).
+     *
+     *  Open Season       → 85 %
+     *  ★3+ (≥20 hacks)  → 60 %
+     *  ★2  (15–19)      → 40 %
+     *  ★1  (10–14)      → 20 %
+     *  ★0  (off board)  → 10 %
      */
     public function calculateStealPercentage(Player $loser): float
     {
         if ($loser->is_open_season) {
-            return self::STEAL_TIERS[30];
+            return 85.0;
         }
 
-        $hacks = (int) ($loser->nodes_hacked_this_run ?? 0);
+        $star = $this->hackCountToStarLevel((int) ($loser->bounty_level ?? 0));
 
-        foreach (self::STEAL_TIERS as $threshold => $pct) {
-            if ($hacks >= $threshold) {
-                return $pct;
-            }
-        }
-
-        return 20.0;
+        return match(true) {
+            $star >= 3 => 60.0,
+            $star === 2 => 40.0,
+            $star === 1 => 20.0,
+            default    => 10.0,
+        };
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -286,6 +292,14 @@ class BountyService
         return $pocket; // caller adds this to safe wallet
     }
 
+    /**
+     * Alias for extractToCyberDoc() — keeps older test references working.
+     */
+    public function extractToStreetDoc(Player $player): int
+    {
+        return $this->extractToCyberDoc($player);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Leaderboards
     // ─────────────────────────────────────────────────────────────────────────
@@ -294,7 +308,7 @@ class BountyService
     {
         // Filter by nodes_hacked_this_run so the board threshold is based on the
         // raw hack count (BOUNTY_BOARD_THRESHOLD = 10), not the 0–5 star value.
-        return Player::where('nodes_hacked_this_run', '>=', self::BOUNTY_BOARD_THRESHOLD)
+        return Player::where('bounty_level', '>=', self::BOUNTY_BOARD_THRESHOLD)
             ->orderByDesc('bounty_level')
             ->orderByDesc('pvp_wins_this_run')
             ->get([

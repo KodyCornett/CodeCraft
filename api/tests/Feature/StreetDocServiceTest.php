@@ -46,11 +46,11 @@ class StreetDocServiceTest extends TestCase
             'player_id'          => $player->id,
             'chassis_template_id' => $chassis->id,
             'cpu_level'          => 1,
-            'ram_level'          => 2, // 2 loadout slots by default
+            'ram_level'          => 2,
             'firewall_level'     => 1,
             'storage_level'      => 1,
-            'os_level'           => 2, // max SS = 20
-            'current_ss'         => 20,
+            'os_level'           => 2,
+            'current_ss'         => 100, // max SS is always 100 — flat for all rigs
             'is_limping'         => false,
         ];
 
@@ -100,19 +100,20 @@ class StreetDocServiceTest extends TestCase
     // repairCost
     // =========================================================================
 
-    public function test_repair_cost_is_missing_ss_times_two(): void
+    public function test_repair_cost_uses_flat_100_max_formula(): void
     {
-        [$player, $rig] = $this->makePlayer([], ['os_level' => 3, 'current_ss' => 10]);
-        // max SS = 30, missing = 20, cost = 40
+        // max SS = 100 (flat). current_ss=10, missing=90.
+        // cost = floor(90/100 × 600) = 540
+        [$player, $rig] = $this->makePlayer([], ['current_ss' => 10]);
 
         $cost = $this->service->repairCost($player);
 
-        $this->assertSame(40, $cost);
+        $this->assertSame(540, $cost);
     }
 
     public function test_repair_cost_is_zero_when_ss_is_full(): void
     {
-        [$player, $rig] = $this->makePlayer([], ['os_level' => 2, 'current_ss' => 20]);
+        [$player, $rig] = $this->makePlayer([], ['current_ss' => 100]);
 
         $this->assertSame(0, $this->service->repairCost($player));
     }
@@ -131,11 +132,11 @@ class StreetDocServiceTest extends TestCase
 
     public function test_repair_ss_restores_to_maximum(): void
     {
-        [$player, $rig] = $this->makePlayer([], ['os_level' => 3, 'current_ss' => 5]);
+        [$player, $rig] = $this->makePlayer([], ['current_ss' => 5]);
 
         $this->service->repairSS($player, 0);
 
-        $this->assertSame(30, $rig->fresh()->current_ss);
+        $this->assertSame(100, $rig->fresh()->current_ss);
     }
 
     public function test_repair_ss_clears_limping_flag(): void
@@ -152,11 +153,11 @@ class StreetDocServiceTest extends TestCase
 
     public function test_repair_ss_succeeds_when_already_at_max(): void
     {
-        [$player, $rig] = $this->makePlayer([], ['os_level' => 2, 'current_ss' => 20]);
+        [$player, $rig] = $this->makePlayer([], ['current_ss' => 100]);
 
         $this->service->repairSS($player, 0);
 
-        $this->assertSame(20, $rig->fresh()->current_ss);
+        $this->assertSame(100, $rig->fresh()->current_ss);
     }
 
     public function test_repair_ss_throws_when_no_rig(): void
@@ -376,17 +377,16 @@ class StreetDocServiceTest extends TestCase
         $this->assertSame(2, $result['to']['new_level']);
     }
 
-    public function test_reallocate_caps_ss_when_os_is_reduced(): void
+    public function test_reallocate_does_not_affect_ss_when_os_is_reduced(): void
     {
-        // os_level=2 → max SS=20. After moving OS→CPU, os_level=1 → max SS=10.
-        // current_ss=20 must be capped to 10.
-        [$player, $rig] = $this->makePlayer([], ['os_level' => 2, 'cpu_level' => 1, 'current_ss' => 20]);
+        // SS is flat 100 — reducing OS does not change current_ss.
+        [$player, $rig] = $this->makePlayer([], ['os_level' => 2, 'cpu_level' => 1, 'current_ss' => 60]);
 
         $this->service->reallocateStats($player, 'os', 'cpu');
 
         $fresh = $rig->fresh();
         $this->assertSame(1, $fresh->os_level);
-        $this->assertSame(10, $fresh->current_ss);
+        $this->assertSame(60, $fresh->current_ss);
     }
 
     public function test_reallocate_does_not_cap_ss_when_os_not_involved(): void

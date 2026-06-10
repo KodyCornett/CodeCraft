@@ -41,7 +41,7 @@ class RigServiceTest extends TestCase
             'firewall_level' => 1,
             'storage_level'  => 1,
             'os_level'       => 1,
-            'current_ss'     => 10,
+            'current_ss'     => 100,
         ];
 
         $rig = PlayerRig::factory()->create(array_merge(
@@ -159,31 +159,31 @@ class RigServiceTest extends TestCase
     // upgradeStat — OS level change recalculates current_ss
     // =========================================================================
 
-    public function test_upgrading_os_recalculates_current_ss(): void
+    public function test_upgrading_os_does_not_change_current_ss(): void
     {
-        [$rig] = $this->makeRig(['os_level' => 2, 'current_ss' => 20]);
+        // SS is flat 100 — OS upgrades do not affect max or current SS.
+        [$rig] = $this->makeRig(['os_level' => 2, 'current_ss' => 50]);
 
         $this->service->upgradeStat($rig, 'os');
 
-        $this->assertEquals(30, $rig->fresh()->current_ss);
+        $this->assertEquals(50, $rig->fresh()->current_ss);
     }
 
-    public function test_taxing_os_via_ring_recalculates_current_ss(): void
+    public function test_taxing_os_via_ring_does_not_change_current_ss(): void
     {
-        // Upgrade Firewall at cap → OS is taxed → max_ss drops → current_ss recalculated
+        // Upgrade Firewall at cap → OS is taxed. With flat SS, current_ss is unchanged.
         [$rig] = $this->makeRig([
             'firewall_level' => 2,
             'os_level'       => 2,
             'ram_level'      => 2,
             'cpu_level'      => 2,
             'storage_level'  => 2,
-            'current_ss'     => 20,
+            'current_ss'     => 50,
         ]);
 
         $this->service->upgradeStat($rig, 'firewall');
 
-        // os_level drops to 1 → max_ss = 10
-        $this->assertEquals(10, $rig->fresh()->current_ss);
+        $this->assertEquals(50, $rig->fresh()->current_ss);
     }
 
     // =========================================================================
@@ -207,36 +207,33 @@ class RigServiceTest extends TestCase
     // applyDamage — PvE: SS hits zero → Limp Mode
     // =========================================================================
 
-    public function test_pve_damage_to_zero_triggers_limp_mode(): void
+    public function test_pve_damage_to_zero_triggers_critical_failure(): void
     {
         [$rig] = $this->makeRig([
             'cpu_level'  => 2, 'ram_level' => 2, 'firewall_level' => 2,
             'storage_level' => 2, 'os_level' => 2, 'current_ss' => 10,
         ]);
-        $player = Player::factory()->create();
-
-        $pointsBefore = $this->service->totalPointsSpent($rig);
+        $player = Player::factory()->create(['pocket_creds' => 500]);
 
         ['event' => $event] = $this->service->applyDamage($rig, 999, 'pve', $player);
 
-        $this->assertEquals('limp_mode', $event);
-        $this->assertEquals(1, $rig->fresh()->current_ss);
+        $this->assertEquals('critical_failure', $event);
+        $this->assertEquals(25, $rig->fresh()->current_ss);
         $this->assertTrue($rig->fresh()->is_limping);
         $this->assertTrue($player->fresh()->is_limping);
-        // No stat levels lost in PvE
-        $this->assertEquals($pointsBefore, $this->service->totalPointsSpent($rig->fresh()));
+        $this->assertEquals(0, $player->fresh()->pocket_creds);
     }
 
     // =========================================================================
     // applyDamage — PvP: SS hits zero → Critical Crash
     // =========================================================================
 
-    public function test_pvp_damage_to_zero_triggers_street_doc_reset(): void
+    public function test_pvp_damage_to_zero_triggers_critical_failure(): void
     {
-        $streetDocId = (string) \Illuminate\Support\Str::uuid();
         $player = Player::factory()->create([
-            'last_street_doc_id' => $streetDocId,
-            'current_node_id'    => (string) \Illuminate\Support\Str::uuid(),
+            'last_cyber_doc_id' => null,
+            'current_node_id'   => (string) \Illuminate\Support\Str::uuid(),
+            'pocket_creds'      => 1000,
         ]);
 
         [$rig] = $this->makeRig([
@@ -249,41 +246,29 @@ class RigServiceTest extends TestCase
             'current_ss'     => 20,
         ]);
 
-        $pointsBefore = $this->service->totalPointsSpent($rig);
-
         ['event' => $event] = $this->service->applyDamage($rig, 999, 'pvp', $player);
 
         $freshRig    = $rig->fresh();
         $freshPlayer = $player->fresh();
 
-        $this->assertEquals('street_doc_reset', $event);
-        $this->assertFalse($freshRig->is_limping);
-        $this->assertFalse($freshPlayer->is_limping);
-
-        // Player teleported to last street doc
-        $this->assertEquals($streetDocId, $freshPlayer->current_node_id);
-
-        // Exactly one stat level was lost
-        $this->assertEquals(
-            $pointsBefore - 1,
-            $this->service->totalPointsSpent($freshRig),
-            'PvP crash must cost exactly 1 stat level.',
-        );
-
-        // SS restored to max (based on possibly-reduced os_level)
-        $this->assertEquals($this->service->maxSs($freshRig), $freshRig->current_ss);
+        $this->assertEquals('critical_failure', $event);
+        $this->assertEquals(25, $freshRig->current_ss);
+        $this->assertTrue($freshRig->is_limping);
+        $this->assertTrue($freshPlayer->is_limping);
+        $this->assertEquals(0, $freshPlayer->pocket_creds);
+        $this->assertEquals(0, $freshPlayer->bounty_level);
     }
 
     public function test_pvp_crash_does_not_lose_stat_when_all_at_minimum(): void
     {
-        // All stats at 1 (minimum) — no stat can be lost, should not throw
-        $player = Player::factory()->create(['last_street_doc_id' => null]);
+        // All stats at 1 (minimum) — elimination still fires with critical_failure
+        $player = Player::factory()->create(['last_cyber_doc_id' => null]);
         [$rig]  = $this->makeRig(['player_id' => $player->id, 'current_ss' => 10]);
 
         ['event' => $event] = $this->service->applyDamage($rig, 999, 'pvp', $player);
 
-        $this->assertEquals('street_doc_reset', $event);
-        $this->assertEquals(5, $this->service->totalPointsSpent($rig->fresh()));
+        $this->assertEquals('critical_failure', $event);
+        $this->assertEquals(25, $rig->fresh()->current_ss);
     }
 
     // =========================================================================

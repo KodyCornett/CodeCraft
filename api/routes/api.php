@@ -38,8 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rig/damage',          [RigController::class, 'damage']);
     Route::post('/rig/upgrade',         [RigController::class, 'upgrade']);
     Route::post('/rig/chassis-upgrade', [RigController::class, 'chassisUpgrade']);
-    // NOTE: /rig/repair intentionally removed — free repair with no cost check.
-    // All player-facing SS restoration goes through POST /api/cyberdoc/repair.
+    Route::post('/rig/repair',          [RigController::class, 'repair']);
 
 // ---------------------------------------------------------------------------
 // Player Status & Actions

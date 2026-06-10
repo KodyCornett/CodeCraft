@@ -395,11 +395,12 @@ class RigService
      */
     private function criticalFailure(PlayerRig $rig, ?Player $player): string
     {
-        $rig->is_limping     = false;
+        // Reset to 25% SS — player limps to the nearest CyberDoc for repair.
+        $rig->current_ss     = 25;
+        $rig->is_limping     = true;
         // Reset uplink so the next run starts with a full pool after repair.
         $uplinkBoost         = $player !== null ? ($this->peripheralBoosts($player)['uplink'] ?? 0) : 0;
         $rig->current_uplink = (int) ($rig->chassis->base_uplink ?? 3) + $uplinkBoost;
-        // current_ss remains 0 — locked until repaired
 
         if ($player) {
             $player->pocket_creds          = 0;
@@ -408,7 +409,7 @@ class RigService
             $player->is_open_season        = false;
             $player->nodes_hacked_this_run = 0;
             $player->pvp_wins_this_run     = 0;
-            $player->is_limping            = false;
+            $player->is_limping            = true;
 
             // Teleport to the nearest CyberDoc node so the player can pay for repairs
             // immediately upon resuming play. Fall back to a random spawn node only if

@@ -195,16 +195,15 @@ class BountyServiceTest extends TestCase
             'is_open_season' => false,
         ]);
 
-        $this->assertEqualsWithDelta(25.0, $this->service->calculateStealPercentage($player), 0.1);
+        $this->assertEqualsWithDelta(20.0, $this->service->calculateStealPercentage($player), 0.1);
     }
 
     public function test_steal_percentage_scales_up_mid_board(): void
     {
-        // Level 20 = midpoint between board threshold (15) and open season threshold (25)
+        // bounty_level 20 = ★3 (20–24 hacks) → 60%
         $player = $this->makePlayer(['bounty_level' => 20, 'is_open_season' => false]);
 
-        // Expected: 25 + ((20-15) / (25-15)) * 35 = 25 + 0.5 * 35 = 42.5
-        $this->assertEqualsWithDelta(42.5, $this->service->calculateStealPercentage($player), 0.5);
+        $this->assertEqualsWithDelta(60.0, $this->service->calculateStealPercentage($player), 0.5);
     }
 
     public function test_steal_percentage_is_60_at_open_season_node_threshold(): void
@@ -221,7 +220,7 @@ class BountyServiceTest extends TestCase
     {
         $player = $this->makePlayer(['is_open_season' => true, 'bounty_level' => 30]);
 
-        $this->assertEquals(87.5, $this->service->calculateStealPercentage($player));
+        $this->assertEquals(85.0, $this->service->calculateStealPercentage($player));
     }
 
     public function test_steal_percentage_never_exceeds_75_before_open_season(): void
