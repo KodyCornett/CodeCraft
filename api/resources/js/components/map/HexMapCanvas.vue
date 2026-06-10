@@ -211,7 +211,7 @@
                     :x="tooltipSvgPos.x - 4"
                     :y="tooltipSvgPos.y - 22"
                     width="200"
-                    height="88"
+                    height="106"
                     class="tooltip-bg"
                 />
                 <!-- CyberDoc nodes: show store name, type, and safe harbor status -->
