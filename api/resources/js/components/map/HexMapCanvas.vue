@@ -210,19 +210,34 @@
                 <rect
                     :x="tooltipSvgPos.x - 4"
                     :y="tooltipSvgPos.y - 22"
-                    width="176"
+                    width="200"
                     height="88"
                     class="tooltip-bg"
                 />
-                <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y" class="tooltip-line">
-                    ICE {{ hoveredDbNode.ice ?? '?' }}  T{{ hoveredDbNode.tier ?? '?' }}
-                </text>
-                <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--dim">
-                    {{ hoveredDbNode.zoneType ?? 'netlink' }}
-                </text>
-                <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 56" class="tooltip-line tooltip-line--creds">
-                    ₡ {{ hoveredDbNode.credValueBase ?? '?' }}
-                </text>
+                <!-- CyberDoc nodes: show store name, type, and safe harbor status -->
+                <template v-if="hoveredDbNode.type === 'cyberdoc'">
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y" class="tooltip-line tooltip-line--cyberdoc">
+                        {{ cyberDocStoreName(hoveredDbNode) }}
+                    </text>
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--dim">
+                        CYBER DOC
+                    </text>
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 56" class="tooltip-line tooltip-line--safe">
+                        SAFE HARBOR
+                    </text>
+                </template>
+                <!-- Action nodes: show ICE, zone type, and cred value -->
+                <template v-else>
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y" class="tooltip-line">
+                        ICE {{ hoveredDbNode.ice ?? '?' }}  T{{ hoveredDbNode.tier ?? '?' }}
+                    </text>
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--dim">
+                        {{ hoveredDbNode.zoneType ?? 'netlink' }}
+                    </text>
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 56" class="tooltip-line tooltip-line--creds">
+                        ₡ {{ hoveredDbNode.credValueBase ?? '?' }}
+                    </text>
+                </template>
             </g>
 
             </g><!-- end pan group -->
@@ -1139,6 +1154,21 @@ const reachableNames = computed(() => {
 const hoveredNodeId  = ref(null);
 const tooltipSvgPos  = ref({ x: 0, y: 0 });
 
+const CYBERDOC_STORE_NAMES = {
+    KNUCKLE: "Knuckle's Med-Wagon",
+    VEIL:    "Veil's Parlour",
+    AXIOM:   'Axiom Systems',
+    FLOAT:   "Float's Repair Bay",
+    PATCH:   "Patch's Clinic",
+};
+
+function cyberDocStoreName(node) {
+    if (node.npcHandle && CYBERDOC_STORE_NAMES[node.npcHandle.toUpperCase()]) {
+        return CYBERDOC_STORE_NAMES[node.npcHandle.toUpperCase()];
+    }
+    return 'CyberDoc';
+}
+
 function onNodeHover(nodeId) {
     hoveredNodeId.value = nodeId;
     const node = ALL_NODES.get(nodeId);
@@ -1434,6 +1464,14 @@ defineExpose({
 }
 .tooltip-line--creds {
     fill: rgba(255, 179, 0, 0.85);
+}
+.tooltip-line--cyberdoc {
+    fill: #FFB300;
+    font-size: 16px;
+}
+.tooltip-line--safe {
+    fill: rgba(0, 255, 136, 0.85);
+    font-size: 16px;
 }
 
 .district-yellow-hub {
