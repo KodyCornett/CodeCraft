@@ -24,7 +24,7 @@
                         :style="{ width: ssPercent + '%' }"
                     />
                     <div class="ss-stab-marks">
-                        <span /><span /><span /><span />
+                        <span></span><span></span><span></span><span></span>
                     </div>
                 </div>
                 <span class="ss-stab-val" :class="ssClass">
@@ -111,7 +111,7 @@
                 <div class="ss-heat-track">
                     <div class="ss-heat-fill" :style="{ width: heatPct + '%' }" :class="heatClass" />
                     <div class="ss-heat-marks">
-                        <span v-for="n in 4" :key="n" />
+                        <span v-for="n in 4" :key="n"></span>
                     </div>
                 </div>
                 <span class="ss-heat-label" :class="heatClass">{{ heatLabel }}</span>

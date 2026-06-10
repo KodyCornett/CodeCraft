@@ -62,7 +62,7 @@
 
                 <button class="lp-submit" type="submit" :disabled="busy">
                     <span v-if="busy" class="lp-submit-busy">
-                        <span class="lp-dots"><span /><span /><span /></span>
+                        <span class="lp-dots"><span></span><span></span><span></span></span>
                         AUTHENTICATING
                     </span>
                     <span v-else>[ AUTHENTICATE ]</span>

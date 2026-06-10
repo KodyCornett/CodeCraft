@@ -90,7 +90,7 @@
 
                 <button class="lp-submit" type="submit" :disabled="busy">
                     <span v-if="busy" class="lp-submit-busy">
-                        <span class="lp-dots"><span /><span /><span /></span>
+                        <span class="lp-dots"><span></span><span></span><span></span></span>
                         REGISTERING
                     </span>
                     <span v-else>[ REGISTER RUNNER ]</span>

@@ -21,14 +21,14 @@
                     <span class="lf-label">ACCESS IDENTIFIER</span>
                     <div class="lf-input">
                         <span class="lf-value">{{ accessId }}</span>
-                        <span class="lf-cursor" :class="{ 'lf-cursor--blink': accessIdDone }" />
+                        <span class="lf-cursor" :class="{ 'lf-cursor--blink': accessIdDone }"></span>
                     </div>
                 </div>
                 <div class="lf-field">
                     <span class="lf-label">CIPHER HANDSHAKE</span>
                     <div class="lf-input lf-input--masked">
                         <span class="lf-value lf-value--key">{{ handshakeKey }}</span>
-                        <span class="lf-cursor" :class="{ 'lf-cursor--blink': keyDone }" />
+                        <span class="lf-cursor" :class="{ 'lf-cursor--blink': keyDone }"></span>
                     </div>
                 </div>
             </div>

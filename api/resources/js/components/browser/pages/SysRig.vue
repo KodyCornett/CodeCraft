@@ -20,7 +20,7 @@
                 <div class="pts-bar-track">
                     <div class="pts-bar-fill" :style="{ width: pointsPct + '%' }" :class="pointsClass" />
                     <div class="pts-bar-marks">
-                        <span v-for="n in 4" :key="n" />
+                        <span v-for="n in 4" :key="n"></span>
                     </div>
                 </div>
             </div>
