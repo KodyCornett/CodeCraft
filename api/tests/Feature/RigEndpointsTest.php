@@ -145,8 +145,9 @@ class RigEndpointsTest extends TestCase
 
     public function test_pve_damage_without_zero_returns_null_event(): void
     {
-        // base_firewall=2 + firewall_level=2 = effectiveFW=4. ICE=14 → damage=10.
-        [$user, $player] = $this->scaffold(['current_ss' => 50, 'firewall_level' => 2]);
+        // current_ss=90: 10% SS lost → no degradation tiers fire.
+        // effectiveFW = base(2) + level(2) = 4. ICE=14 → damage=max(1,14-4)=10 → new SS=80.
+        [$user, $player] = $this->scaffold(['current_ss' => 90, 'firewall_level' => 2]);
         $node = $this->createActionNode(ice: 14, canvasId: 'dmg-test-node');
 
         $this->actingAs($user, 'sanctum')
@@ -155,7 +156,7 @@ class RigEndpointsTest extends TestCase
                  'source'         => 'pve',
              ])
              ->assertOk()
-             ->assertJsonFragment(['event' => null, 'current_ss' => 40]);
+             ->assertJsonFragment(['event' => null, 'current_ss' => 80]);
     }
 
     public function test_pve_damage_to_zero_triggers_critical_failure(): void
