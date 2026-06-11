@@ -115,6 +115,22 @@
                                     [ CLASSIFIED — COMPLETE PREVIOUS OBJECTIVE ]
                                 </div>
 
+                                <!-- Minigame launch — only shown when player is at the target node -->
+                                <button
+                                    v-if="stage.status === 'active' && stage.minigame_type && stage.node_canvas_id"
+                                    class="ql-hack-btn"
+                                    :class="{ 'ql-hack-btn--ready': currentNodeCanvasId === stage.node_canvas_id }"
+                                    :disabled="currentNodeCanvasId !== stage.node_canvas_id"
+                                    @click="onLaunchMinigame(stage)"
+                                >
+                                    <template v-if="currentNodeCanvasId === stage.node_canvas_id">
+                                        ▶ INITIATE HACK
+                                    </template>
+                                    <template v-else>
+                                        ▸ TRAVEL TO {{ stage.node_canvas_id?.toUpperCase() }} TO INITIATE
+                                    </template>
+                                </button>
+
                                 <!-- Branch options -->
                                 <div v-if="stage.status === 'active' && stage.is_branch && stage.branch_options" class="ql-branch">
                                     <div class="ql-branch-label">TURN JOB INTO:</div>
@@ -141,9 +157,36 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useQuestLog } from '../../../composables/useQuestLog.js';
+import { useQuestLog }      from '../../../composables/useQuestLog.js';
+import { useQuestMinigame } from '../../../composables/useQuestMinigame.js';
 
 const { docs, loading, error, fetchQuestLog, completeStage } = useQuestLog();
+const { currentNodeCanvasId, launch } = useQuestMinigame();
+
+// Per-type skin defaults — labels and brief objective text
+const MINIGAME_SKIN = {
+    disconnect_layer:   { primary: 'TRACE',       stability: 'SYSTEM HEAT', brief: 'Sever the governor chain before it reroutes.'           },
+    flush_buffer:       { primary: 'SIGNAL LOAD', stability: 'STABILITY',   brief: 'Cancel the ghost signal before buffer overflow.'        },
+    toxic_soak:         { primary: 'ABSORPTION',  stability: 'OVERLOAD',    brief: 'Hold position. Anchor until saturation threshold.'      },
+    archive_extraction: { primary: 'DETECTION',   stability: 'SUPPRESSION', brief: 'Extract the packet. Avoid triggering live ICE.'         },
+    calibration_tether: { primary: 'PAYLOAD',     stability: 'INTEGRITY',   brief: 'Deliver the sub-routines. Do not let the chain cascade.' },
+};
+
+function onLaunchMinigame(stage) {
+    const meta = MINIGAME_SKIN[stage.minigame_type] ?? { primary: 'TRACE', stability: 'STABILITY', brief: '' };
+    const skin = {
+        gameType:        stage.minigame_type,
+        fileName:        (stage.node_canvas_id ?? 'UNKNOWN').toUpperCase() + '.sys',
+        objectiveText:   meta.brief,
+        successText:     'Objective complete. Disconnecting.',
+        failText:        'Connection lost.',
+        primaryBarLabel: meta.primary,
+        stabilityLabel:  meta.stability,
+        timeLimit:       30,
+        difficulty:      1,
+    };
+    launch(stage.id, stage.minigame_type, skin);
+}
 
 // ── Collapse state ────────────────────────────────────────────────────────────
 const openDocs = ref(new Set());
@@ -426,4 +469,34 @@ onMounted(async () => {
 }
 .ql-branch-btn:hover { border-color: #00ff9d; color: #fff; }
 .ql-branch-rep { color: #00c87a; font-size: 9px; }
+
+/* ── Minigame launch button ──────────────────────────────────────────────── */
+.ql-hack-btn {
+    display: block;
+    margin-top: 6px;
+    margin-left: 16px;
+    background: none;
+    border: 1px solid #1e3a2a;
+    color: #3a6a52;
+    font-family: inherit;
+    font-size: 10px;
+    padding: 5px 12px;
+    cursor: default;
+    letter-spacing: 0.1em;
+    text-align: left;
+    transition: border-color 0.15s, color 0.15s;
+}
+.ql-hack-btn--ready {
+    border-color: #00ff9d;
+    color: #00ff9d;
+    cursor: pointer;
+    animation: ql-hack-pulse 2s ease-in-out infinite;
+}
+.ql-hack-btn--ready:hover {
+    background: rgba(0,255,100,0.06);
+}
+@keyframes ql-hack-pulse {
+    0%,100% { box-shadow: none; }
+    50%      { box-shadow: 0 0 10px rgba(0,255,100,0.2); }
+}
 </style>

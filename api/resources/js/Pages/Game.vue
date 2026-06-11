@@ -148,13 +148,13 @@
                     />
                 </Transition>
 
-                <!-- Data Grab — quest hacking mini-game -->
+                <!-- Quest minigame — launched from QuestLog via useQuestMinigame -->
                 <Transition name="breach-fade">
-                    <DataGrab
-                        v-if="activeDataGrab"
-                        :skin="activeDataGrab.skin"
-                        @complete="onDataGrabComplete"
-                        @fail="onDataGrabFail"
+                    <QuestMinigame
+                        v-if="activeMinigame"
+                        :skin="activeMinigame.skin"
+                        @complete="onQuestMinigameComplete"
+                        @fail="onQuestMinigameFail"
                     />
                 </Transition>
 
@@ -321,7 +321,7 @@ import TrapFiredNotification   from '@/components/shared/TrapFiredNotification.v
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
 import PacketHijack  from '@/components/minigame/PacketHijack.vue';
-import DataGrab      from '@/components/minigame/DataGrab.vue';
+import QuestMinigame from '@/components/minigame/QuestMinigame.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
 import { useMapData }        from '@/composables/useMapData.js';
@@ -346,6 +346,7 @@ import { useTrapSystem }     from '@/composables/useTrapSystem.js';
 import { usePingSystem }     from '@/composables/usePingSystem.js';
 import { useWatcher }            from '@/composables/useWatcher.js';
 import { useQuestLog }           from '@/composables/useQuestLog.js';
+import { useQuestMinigame }      from '@/composables/useQuestMinigame.js';
 import { useDocNotifications }   from '@/composables/useDocNotifications.js';
 import { useQuestArchive }       from '@/composables/useQuestArchive.js';
 import { docColorByName }        from '@/constants/docColors.js';
@@ -410,30 +411,24 @@ const awaitingChallenge = ref(false);  // true while waiting for target to accep
 const ph                  = usePacketHijack(playerId);
 const activePacketHijack  = ref(false);  // true while the PH terminal overlay is shown
 
-// Data Grab — quest hacking mini-game
-// activeDataGrab = { stageId, skin } while the game is running, null otherwise
-const activeDataGrab = ref(null);
+// Quest minigame — launched from QuestLog via useQuestMinigame composable
+const { activeMinigame, setCurrentNode, clear: clearMinigame } = useQuestMinigame();
 
-function launchDataGrab(stageId, skin) {
-    activeDataGrab.value = { stageId, skin };
-}
-
-async function onDataGrabComplete() {
-    if (!activeDataGrab.value) return;
-    const { stageId } = activeDataGrab.value;
-    activeDataGrab.value = null;
-    // Complete the quest stage server-side
+async function onQuestMinigameComplete() {
+    if (!activeMinigame.value) return;
+    const { stageId } = activeMinigame.value;
+    clearMinigame();
     try {
         await completeQuestStage(stageId);
         await Promise.all([fetchQuestLog(), fetchArchive()]);
         processDocEvents(archiveEvents.value);
     } catch (e) {
-        console.warn('[DATA GRAB] stage completion failed:', e?.message);
+        console.warn('[QUEST MINIGAME] stage completion failed:', e?.message);
     }
 }
 
-function onDataGrabFail() {
-    activeDataGrab.value = null;
+function onQuestMinigameFail() {
+    clearMinigame();
 }
 
 // Equipped hack- and map-context commands passed into the PH terminal as the rig loadout strip.
@@ -845,6 +840,13 @@ watch(currentNodeId, (newVal, oldVal) => {
         const node = getByCanvasId(newVal);
         if (node?.type === 'cyberdoc') tutorial.markStepDone('visit_cyberdoc');
     }
+    // Keep QuestLog in sync so the INITIATE HACK button gates correctly
+    setCurrentNode(newVal ?? null);
+});
+
+// Close the SPLICE browser when a minigame is launched from QuestLog
+watch(activeMinigame, (val) => {
+    if (val) activeBrowserUrl.value = null;
 });
 
 // onTutorial — kept for GameMenu backward compat; opens TERMINAL page
