@@ -1917,7 +1917,7 @@ onUnmounted(() => {
 /* ── ICE alert banner ─────────────────────────────────────────────────────── */
 .ice-alert {
     position: absolute;
-    top: 40px;           /* sits just below the 32px HUD bar */
+    top: 46px;           /* sits just below the 38px HUD bar */
     left: 50%;
     transform: translateX(-50%);
     z-index: 30;

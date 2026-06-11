@@ -87,14 +87,17 @@ onUnmounted(() => clearInterval(timer));
     display: flex;
     align-items: center;
     width: 100%;
-    height: 42px;
+    height: 48px;
     background: #06060e;
     border-top: 1px solid rgba(0, 255, 255, 0.18);
     flex-shrink: 0;
     gap: 1px;
-    padding: 0 4px;
+    padding: 0 6px;
     position: relative;   /* anchor for GameMenu's absolute panel */
 }
+
+@media (max-width: 1440px) { .taskbar { height: 44px; } }
+@media (max-width: 1280px) { .taskbar { height: 42px; padding: 0 4px; } }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .tb-btn {
@@ -102,8 +105,8 @@ onUnmounted(() => clearInterval(timer));
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 0 14px;
+    gap: 7px;
+    padding: 0 18px;
     height: 100%;
     background: transparent;
     border: none;
@@ -124,16 +127,27 @@ onUnmounted(() => clearInterval(timer));
 }
 
 /* ── SPLICE home ──────────────────────────────────────────────────────────── */
-.tb-home .tb-icon  { font-size: 13px; color: rgba(0, 255, 255, 0.6); line-height: 1; }
-.tb-home .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(0, 255, 255, 0.5); letter-spacing: 0.12em; }
+.tb-home .tb-icon  { font-size: 15px; color: rgba(0, 255, 255, 0.6); line-height: 1; }
+.tb-home .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(0, 255, 255, 0.5); letter-spacing: 0.12em; }
 .tb-home:hover .tb-icon,
 .tb-home:hover .tb-label  { color: #00FFFF; }
 .tb-home.tb-btn--active .tb-icon,
 .tb-home.tb-btn--active .tb-label { color: #00FFFF; }
 
 /* ── App buttons ──────────────────────────────────────────────────────────── */
-.tb-app .tb-icon  { font-size: 13px; color: rgba(0, 255, 255, 0.45); line-height: 1; }
-.tb-app .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(0, 255, 255, 0.4); letter-spacing: 0.1em; }
+.tb-app .tb-icon  { font-size: 15px; color: rgba(0, 255, 255, 0.45); line-height: 1; }
+.tb-app .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(0, 255, 255, 0.4); letter-spacing: 0.1em; }
+
+@media (max-width: 1440px) {
+    .tb-btn { padding: 0 14px; }
+    .tb-home .tb-icon, .tb-app .tb-icon { font-size: 14px; }
+    .tb-home .tb-label, .tb-app .tb-label { font-size: 11px; }
+}
+@media (max-width: 1280px) {
+    .tb-btn { padding: 0 12px; gap: 5px; }
+    .tb-home .tb-icon, .tb-app .tb-icon { font-size: 13px; }
+    .tb-home .tb-label, .tb-app .tb-label { font-size: 10px; }
+}
 .tb-app:hover .tb-icon,
 .tb-app:hover .tb-label   { color: #00FFFF; }
 .tb-app.tb-btn--active .tb-icon  { color: #00FFFF; text-shadow: 0 0 8px rgba(0,255,255,0.6); }
@@ -169,10 +183,13 @@ onUnmounted(() => clearInterval(timer));
 /* ── Clock ────────────────────────────────────────────────────────────────── */
 .tb-clock {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 12px;
     color: rgba(0, 255, 255, 0.35);
     letter-spacing: 0.1em;
-    padding: 0 12px;
+    padding: 0 16px;
     flex-shrink: 0;
 }
+
+@media (max-width: 1440px) { .tb-clock { font-size: 11px; padding: 0 12px; } }
+@media (max-width: 1280px) { .tb-clock { font-size: 10px; padding: 0 10px; } }
 </style>

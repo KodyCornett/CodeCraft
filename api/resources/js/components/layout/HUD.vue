@@ -171,15 +171,22 @@ const flashClass = computed(() =>
     left: 0;
     right: 0;
     z-index: 20;
-    height: 32px;
+    height: 38px;
     display: flex;
     align-items: center;
     background: rgba(4, 4, 10, 0.82);
     border-bottom: 1px solid rgba(0, 255, 255, 0.15);
     backdrop-filter: blur(4px);
-    padding: 0 14px;
+    padding: 0 18px;
     gap: 0;
     font-family: 'JetBrains Mono', monospace;
+}
+
+@media (max-width: 1440px) {
+    .hud-bar { height: 34px; padding: 0 14px; }
+}
+@media (max-width: 1280px) {
+    .hud-bar { height: 32px; padding: 0 10px; }
 }
 
 /* ── Items ────────────────────────────────────────────────────────────────── */
@@ -187,25 +194,38 @@ const flashClass = computed(() =>
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 0 14px;
+    padding: 0 16px;
     white-space: nowrap;
 }
 
 .hud-key {
-    font-size: 9px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.62);
     letter-spacing: 0.1em;
 }
 
 .hud-sep {
-    font-size: 9px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.38);
 }
 
 .hud-val {
-    font-size: 10px;
+    font-size: 12px;
     color: #00FFFF;
     letter-spacing: 0.06em;
+}
+
+@media (max-width: 1440px) {
+    .hud-item { padding: 0 12px; }
+    .hud-key  { font-size: 10px; }
+    .hud-sep  { font-size: 10px; }
+    .hud-val  { font-size: 11px; }
+}
+@media (max-width: 1280px) {
+    .hud-item { padding: 0 10px; gap: 5px; }
+    .hud-key  { font-size: 9px; }
+    .hud-sep  { font-size: 9px; }
+    .hud-val  { font-size: 10px; }
 }
 
 .hud-val--dim { color: rgba(0, 255, 255, 0.82); }
@@ -243,7 +263,9 @@ const flashClass = computed(() =>
 .hud-item--bounty { gap: 6px; }
 
 /* Hack counter */
-.hud-ticker     { font-size: 10px; letter-spacing: 0.06em; }
+.hud-ticker     { font-size: 12px; letter-spacing: 0.06em; }
+@media (max-width: 1440px) { .hud-ticker { font-size: 11px; } }
+@media (max-width: 1280px) { .hud-ticker { font-size: 10px; } }
 .ticker--idle   { color: rgba(0, 255, 255, 0.68); }
 .ticker--active { color: #FFB300; }
 .ticker--warn   {
@@ -264,7 +286,7 @@ const flashClass = computed(() =>
 }
 
 .hud-star {
-    font-size: 13px;
+    font-size: 15px;
     color: rgba(255, 255, 255, 0.15);
     transition: color 0.3s ease, text-shadow 0.3s ease;
     line-height: 1;
@@ -305,7 +327,7 @@ const flashClass = computed(() =>
 
 /* Multiplier bonus badge */
 .hud-multiplier {
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.08em;
     padding: 1px 5px;
     border: 1px solid rgba(0, 255, 255, 0.15);
@@ -379,16 +401,16 @@ const flashClass = computed(() =>
 /* ── Move-block flash toast ───────────────────────────────────────────────── */
 .hud-flash {
     position: absolute;
-    top: 36px;   /* sits just below the 32px HUD bar */
+    top: 42px;   /* sits just below the 38px HUD bar */
     left: 50%;
     transform: translateX(-50%);
     z-index: 21;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 18px;
+    padding: 6px 20px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.12em;
     white-space: nowrap;
     border: 1px solid;

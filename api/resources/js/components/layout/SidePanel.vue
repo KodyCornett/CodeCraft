@@ -84,7 +84,7 @@ defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'use-command'
 <style scoped>
 .side-panel {
     position: relative;
-    width: 280px;
+    width: clamp(260px, 18vw, 340px);
     flex-shrink: 0;
     background: rgba(3, 6, 10, 0.97);
     border-left: 1px solid rgba(0, 255, 255, 0.15);
@@ -110,19 +110,22 @@ defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'use-command'
     z-index: 1;
 }
 
-/* ── Header — matches HUD bar height (32px) ───────────────────────────────── */
+/* ── Header — matches HUD bar height (38px) ───────────────────────────────── */
 .sp-header {
     position: relative;
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 32px;
-    padding: 0 14px;
+    height: 38px;
+    padding: 0 16px;
     background: rgba(0, 255, 255, 0.02);
     border-bottom: 1px solid rgba(0, 255, 255, 0.1);
     flex-shrink: 0;
 }
+
+@media (max-width: 1440px) { .sp-header { height: 34px; padding: 0 14px; } }
+@media (max-width: 1280px) { .sp-header { height: 32px; padding: 0 12px; } }
 
 .sp-header-left {
     display: flex;
@@ -131,20 +134,26 @@ defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'use-command'
 }
 
 .sp-splice-logo {
-    font-size: 9px;
+    font-size: 11px;
     color: #00FFFF;
     letter-spacing: 0.2em;
     text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.3);
 }
 .sp-header-sep {
-    font-size: 8px;
+    font-size: 10px;
     color: rgba(0, 255, 255, 0.5);
 }
 .sp-title {
-    font-size: 8px;
+    font-size: 10px;
     color: rgba(0, 255, 255, 0.85);
     letter-spacing: 0.14em;
     text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+@media (max-width: 1280px) {
+    .sp-splice-logo { font-size: 9px; }
+    .sp-header-sep  { font-size: 8px; }
+    .sp-title       { font-size: 9px; }
 }
 
 .sp-status-dot {

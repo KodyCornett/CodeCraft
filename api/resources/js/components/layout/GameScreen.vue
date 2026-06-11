@@ -22,16 +22,14 @@
 
 <style scoped>
 .bezel {
-    /* Scale the entire game up for readability at 100% browser zoom.
-       Tune --game-scale to taste: 1.0 = original size, 1.75 = matches 175% browser zoom. */
-    --game-scale: 1.75;
-    width: calc(100vw / var(--game-scale));
-    height: calc(100vh / var(--game-scale));
-    transform: scale(var(--game-scale));
-    transform-origin: top left;
+    /* Renders at native resolution — no zoom trick.
+       Optimised for 1920×1080; responsive down to 1280px via media queries. */
+    width: 100vw;
+    height: 100vh;
     background: #111111;
     padding: 6px;
     box-sizing: border-box;
+    overflow: hidden;
     /* Subtle depth shadow suggesting a physical housing */
     box-shadow:
         inset 0 2px 8px rgba(0,0,0,0.9),
