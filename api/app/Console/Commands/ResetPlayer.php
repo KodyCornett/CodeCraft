@@ -35,7 +35,7 @@ class ResetPlayer extends Command
             return self::FAILURE;
         }
 
-        $player = $user->player;
+        $player = \App\Models\Player::where('user_id', $user->id)->first();
         if (!$player) {
             $this->error("No player found for user: {$email}");
             return self::FAILURE;
@@ -85,8 +85,9 @@ class ResetPlayer extends Command
                 'cyberdoc_cooldowns'      => null,
                 'current_node_id'         => null,
                 'current_district'        => 'DOWNTOWN',
-                'last_street_doc_id'      => null,
-                'updated_at'              => now(),
+                'last_cyber_doc_id'        => null,
+                'tutorial_state'           => null,
+                'updated_at'               => now(),
             ]);
 
             // ── Rig — restore to BlackHat v1.0 base stats ─────────────────────
@@ -110,6 +111,7 @@ class ResetPlayer extends Command
         $this->info('✓ Quest progress wiped (arc, stage, log, watcher messages)');
         $this->info('✓ Inventory wiped     (peripherals, commands, consumables)');
         $this->info('✓ Node traces wiped');
+        $this->info('✓ Tutorial state wiped');
         $this->newLine();
         $this->info("Player '{$player->handle}' is ready for a fresh prologue run.");
 

@@ -1,8 +1,8 @@
 /**
  * useTutorial
  *
- * Manages tutorial quest state — stored in localStorage so progress persists
- * across page reloads without requiring a backend migration.
+ * Manages tutorial quest state — persisted server-side via GET/PATCH /api/tutorial/state
+ * so it survives browser clears, device switches, and can be reset via player:reset.
  *
  * Quest rewards (wallet_creds) are credited server-side via POST /api/tutorial/reward.
  * Rewards go directly to wallet — they cannot be stolen by other players in PvP.
@@ -15,10 +15,7 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 
-const STORAGE_KEY = 'codecraft_tutorial_v1';
-
 // ── Quest definitions ─────────────────────────────────────────────────────────
-// Add future quests here. Order = unlock order.
 const QUEST_DEFS = [
     {
         id:       'q1_movement',
@@ -44,7 +41,7 @@ const QUEST_DEFS = [
         label:    'FIRST BREACH',
         subtitle: 'Hit a node and take its cache',
         steps: [
-            { id: 'hack', label: 'Attempt a hack on any node you\'re standing on' },
+            { id: 'hack', label: "Attempt a hack on any node you're standing on" },
         ],
         reward: 100,
     },
@@ -59,36 +56,48 @@ const QUEST_DEFS = [
     },
 ];
 
-// ── Storage helpers ───────────────────────────────────────────────────────────
-function loadState() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-}
-
 function defaultState() {
     return {
-        tutorialSeen:    false,  // welcome modal has been acknowledged
-        tutorialSkipped: false,  // player clicked Skip on the welcome modal
-        stepsDone:       {},     // { [stepId]: true }
-        questsRewarded:  [],     // quest ids whose wallet reward has been credited
-        hasBadge:        false,  // TERMINAL NavBar badge — new update pending
+        tutorialSeen:    false,
+        tutorialSkipped: false,
+        stepsDone:       {},
+        questsRewarded:  [],
+        hasBadge:        false,
     };
 }
 
 // ── Composable ────────────────────────────────────────────────────────────────
 export function useTutorial() {
 
-    const _state = ref({ ...defaultState(), ...(loadState() ?? {}) });
+    const _state   = ref(defaultState());
+    const _syncing = ref(false);   // prevents overlapping PATCH calls
 
-    function _save() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(_state.value));
+    // ── Hydration (called once on game boot from useGameState / Game.vue) ─────
+    async function hydrate() {
+        try {
+            const { data } = await axios.get('/api/tutorial/state');
+            _state.value = { ...defaultState(), ...(data.tutorial_state ?? {}) };
+        } catch (e) {
+            console.warn('[TUTORIAL] Failed to load state from server:', e?.message);
+        }
+    }
+
+    // ── Persist to server ─────────────────────────────────────────────────────
+    async function _save() {
+        if (_syncing.value) return;
+        _syncing.value = true;
+        try {
+            await axios.patch('/api/tutorial/state', {
+                tutorial_state: _state.value,
+            });
+        } catch (e) {
+            console.warn('[TUTORIAL] Failed to persist state:', e?.message);
+        } finally {
+            _syncing.value = false;
+        }
     }
 
     // ── Computed quest list ───────────────────────────────────────────────────
-    // Each quest entry is enriched with: steps[].done, allDone, rewarded, locked.
-    // A quest is locked until all steps of the preceding quest are complete.
     const quests = computed(() => {
         let prevComplete = true;
         return QUEST_DEFS.map((def) => {
@@ -101,7 +110,6 @@ export function useTutorial() {
         });
     });
 
-    // First unlocked, not-yet-complete quest
     const activeQuest = computed(() =>
         quests.value.find(q => !q.locked && !q.allDone) ?? null
     );
@@ -118,49 +126,35 @@ export function useTutorial() {
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
-    /** Mark the welcome modal as seen (called when player opens or skips it). */
     function markSeen() {
         _state.value.tutorialSeen = true;
         _save();
     }
 
-    /** Skip the tutorial entirely. */
     function skip() {
         _state.value.tutorialSeen    = true;
         _state.value.tutorialSkipped = true;
         _save();
     }
 
-    /** Clear the TERMINAL NavBar badge (called when player opens the TERMINAL page). */
     function clearBadge() {
         if (!_state.value.hasBadge) return;
         _state.value.hasBadge = false;
         _save();
     }
 
-    /**
-     * markStepDone(stepId)
-     *
-     * Idempotent — safe to call multiple times for the same step.
-     * Only accepts step IDs that belong to the currently active quest,
-     * so steps cannot be completed out of order.
-     * When all steps of a quest are done the wallet reward is credited.
-     */
     async function markStepDone(stepId) {
         if (_state.value.tutorialSkipped)   return;
-        if (_state.value.stepsDone[stepId]) return;   // already done
+        if (_state.value.stepsDone[stepId]) return;
 
         const active = activeQuest.value;
         if (!active) return;
-
-        // Guard: only accept steps belonging to the active quest
         if (!active.steps.find(s => s.id === stepId)) return;
 
         _state.value.stepsDone[stepId] = true;
         _state.value.hasBadge          = true;
-        _save();
+        await _save();
 
-        // If this step completed the quest, credit the reward
         const questNowDone = active.steps.every(s => _state.value.stepsDone[s.id]);
         if (questNowDone) {
             await _creditReward(active);
@@ -175,9 +169,8 @@ export function useTutorial() {
                 amount:   quest.reward,
             });
             _state.value.questsRewarded.push(quest.id);
-            _save();
+            await _save();
         } catch (e) {
-            // Non-fatal — quest stays marked done; reward can be retried on next session
             console.warn('[TUTORIAL] Reward credit failed:', e?.message);
         }
     }
@@ -190,6 +183,7 @@ export function useTutorial() {
         tutorialSeen,
         tutorialSkipped,
         hasBadge,
+        hydrate,
         markSeen,
         skip,
         clearBadge,

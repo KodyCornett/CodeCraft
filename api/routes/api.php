@@ -135,8 +135,13 @@ Route::middleware('auth:sanctum')->group(function () {
 // Tutorial
 // ---------------------------------------------------------------------------
 
+    // Tutorial state — persisted server-side so it survives browser clears and
+    // can be reset via player:reset. Client is still source of truth for UI logic.
+    Route::get('/tutorial/state',   [TutorialController::class, 'state']);
+    Route::patch('/tutorial/state', [TutorialController::class, 'updateState']);
+
     // Credits quest rewards directly to wallet_creds (safe — not stealable in PvP).
-    // Throttled to prevent reward farming; a new player completes at most 3 quests.
+    // Throttled to prevent reward farming; a new player completes at most 4 quests.
     Route::post('/tutorial/reward', [TutorialController::class, 'reward'])
         ->middleware('throttle:10,1');
 

@@ -40,6 +40,7 @@ class Player extends Model
         'tech_points',
         'last_seen_at',
         'last_cyber_doc_id',
+        'tutorial_state',
     ];
 
     protected $casts = [
@@ -59,6 +60,7 @@ class Player extends Model
         'cache'                    => 'integer',
         'cyberdoc_cooldowns'       => 'array',
         'tech_points'              => 'decimal:2',
+        'tutorial_state'           => 'array',
     ];
 
     public function user(): BelongsTo

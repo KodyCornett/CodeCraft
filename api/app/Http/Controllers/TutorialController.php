@@ -9,12 +9,61 @@ use Illuminate\Http\Request;
 class TutorialController extends Controller
 {
     /**
+     * GET /api/tutorial/state
+     *
+     * Returns the player's current tutorial_state JSON blob.
+     * null means the player has never interacted with the tutorial.
+     */
+    public function state(Request $request): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+
+        if (! $player) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        return response()->json([
+            'tutorial_state' => $player->tutorial_state,
+        ]);
+    }
+
+    /**
+     * PATCH /api/tutorial/state
+     *
+     * Persists the full tutorial_state blob sent by the client.
+     * The client is the source of truth for tutorial UI state — the server
+     * just stores and returns it.
+     */
+    public function updateState(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'tutorial_state'                  => ['required', 'array'],
+            'tutorial_state.tutorialSeen'     => ['boolean'],
+            'tutorial_state.tutorialSkipped'  => ['boolean'],
+            'tutorial_state.stepsDone'        => ['array'],
+            'tutorial_state.questsRewarded'   => ['array'],
+            'tutorial_state.hasBadge'         => ['boolean'],
+        ]);
+
+        $player = Player::where('user_id', $request->user()->id)->first();
+
+        if (! $player) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $player->update(['tutorial_state' => $data['tutorial_state']]);
+
+        return response()->json([
+            'tutorial_state' => $player->fresh()->tutorial_state,
+        ]);
+    }
+
+    /**
      * POST /api/tutorial/reward
      *
      * Credits a quest completion reward directly to wallet_creds.
      * Wallet creds are safe — they cannot be stolen by other players in PvP.
      *
-     * Quest completion state is tracked client-side in localStorage.
      * This endpoint trusts the client's reported quest ID and amount
      * (both validated within allowed ranges) since tutorial rewards are low-stakes.
      */

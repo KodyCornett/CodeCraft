@@ -1634,7 +1634,8 @@ onMounted(async () => {
             t => hackCount.value >= t.hacks
         )?.level ?? 0;
 
-        // Fetch commands, inventory, active traps, Watcher signals, quest log, and archive in parallel
+        // Fetch commands, inventory, active traps, Watcher signals, quest log, archive,
+        // and tutorial state in parallel
         await Promise.all([
             fetchCommands(),
             fetchInventory(),
@@ -1642,6 +1643,7 @@ onMounted(async () => {
             fetchWatcherUnread(),
             fetchQuestLog(),
             fetchArchive(),
+            tutorial.hydrate(),
         ]);
         // Process archive events for doc notifications (arc unlocks, referrals)
         processDocEvents(archiveEvents.value);
