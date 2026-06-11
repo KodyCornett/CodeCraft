@@ -170,8 +170,23 @@ export function useTutorial() {
             });
             _state.value.questsRewarded.push(quest.id);
             await _save();
+
+            // If every quest is now rewarded, the tutorial is complete.
+            // Fire the complete signal so the server unlocks the Knuckle arc.
+            const allRewarded = QUEST_DEFS.every(q => _state.value.questsRewarded.includes(q.id));
+            if (allRewarded) {
+                await _completeTutorial();
+            }
         } catch (e) {
             console.warn('[TUTORIAL] Reward credit failed:', e?.message);
+        }
+    }
+
+    async function _completeTutorial() {
+        try {
+            await axios.post('/api/tutorial/complete');
+        } catch (e) {
+            console.warn('[TUTORIAL] Complete signal failed:', e?.message);
         }
     }
 

@@ -792,7 +792,15 @@ const { traces: nodeTraces, refreshNow: refreshTraces, storeTrace } = useNodeTra
 
 
 // ── Browser state ─────────────────────────────────────────────────────────────
-const { activeBrowserUrl, onLaunch, onCloseBrowser } = useBrowserState();
+const { activeBrowserUrl, onLaunch: _onLaunch, onCloseBrowser } = useBrowserState();
+
+// Intercept TERMINAL launches — redirect to the tutorial page until it's complete.
+function onLaunch(url) {
+    if (url === SPLICE.TERMINAL && !tutorial.allComplete.value) {
+        return _onLaunch(SPLICE.TUTORIAL);
+    }
+    _onLaunch(url);
+}
 
 // Maps each CyberDoc hub node ID to its named SPLICE page.
 // When the player opens the store from a hub, they land on that doc's branded page.
@@ -821,9 +829,11 @@ const tutorial = useTutorial();
 // GridBreachGuide calls markStepDone('read_manual') on mount.
 provide('tutorial', tutorial);
 
-// Clear TERMINAL badge when the player opens the tutorial page
+// Clear badge when the player opens the tutorial or terminal page
 watch(activeBrowserUrl, (url) => {
-    if (url?.startsWith(SPLICE.TERMINAL)) tutorial.clearBadge();
+    if (url?.startsWith(SPLICE.TERMINAL) || url?.startsWith(SPLICE.TUTORIAL)) {
+        tutorial.clearBadge();
+    }
 });
 
 // Quest trigger: node inspected (any node click)
@@ -909,7 +919,8 @@ const showWelcomeModal = computed(() =>
 
 function onWelcomeStart() {
     tutorial.markSeen();
-    onLaunch(SPLICE.TERMINAL);
+    // Send new players to the tutorial page first; quest log is available after
+    onLaunch(SPLICE.TUTORIAL);
 }
 
 function onWelcomeSkip() {

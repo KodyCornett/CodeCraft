@@ -144,6 +144,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Throttled to prevent reward farming; a new player completes at most 4 quests.
     Route::post('/tutorial/reward', [TutorialController::class, 'reward'])
         ->middleware('throttle:10,1');
+    // Fired once when all tutorial quests are complete — unlocks the entry arc (Knuckle).
+    Route::post('/tutorial/complete', [TutorialController::class, 'complete'])
+        ->middleware('throttle:5,1');
 
 // ---------------------------------------------------------------------------
 // Inventory

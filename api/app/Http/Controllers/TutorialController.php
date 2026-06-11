@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CyberDoc;
 use App\Models\Player;
+use App\Services\QuestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TutorialController extends Controller
 {
+    public function __construct(private readonly QuestService $questService) {}
+
     /**
      * GET /api/tutorial/state
      *
@@ -86,5 +90,31 @@ class TutorialController extends Controller
             'wallet_creds' => $player->fresh()->wallet_creds,
             'quest_id'     => $data['quest_id'],
         ]);
+    }
+
+    /**
+     * POST /api/tutorial/complete
+     *
+     * Called by the client when all tutorial quests are rewarded.
+     * Unlocks the entry arc (Knuckle / BA-hub) so it appears active
+     * in the quest log immediately — no CyberDoc visit required.
+     *
+     * Idempotent: initArcForDoc skips arcs that are already initialised.
+     */
+    public function complete(Request $request): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+
+        if (! $player) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $entryDoc = CyberDoc::whereHas('questArcs', fn ($q) => $q->where('is_entry_arc', true))->first();
+
+        if ($entryDoc) {
+            $this->questService->initArcForDoc($player, $entryDoc);
+        }
+
+        return response()->json(['ok' => true]);
     }
 }
