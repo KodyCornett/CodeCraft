@@ -162,7 +162,7 @@ async function confirm() {
     position: relative;
     z-index: 1;
     width: min(640px, 96vw);
-    max-height: 92vh;
+    max-height: 96vh;
     display: flex;
     flex-direction: column;
     border: 1px solid rgba(0,255,157,0.12);
@@ -172,25 +172,25 @@ async function confirm() {
 
 /* ── Header ──────────────────────────────────────────────────────────────────── */
 .ps-header {
-    padding: 24px 28px 18px;
+    padding: clamp(10px, 2vh, 20px) 24px clamp(8px, 1.5vh, 14px);
     border-bottom: 1px solid rgba(0,255,157,0.08);
     flex-shrink: 0;
 }
 .ps-logo {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 8px;
+    margin-bottom: clamp(6px, 1vh, 12px);
 }
 .ps-logo-mark {
-    font-size: 16px;
+    font-size: 14px;
     color: #00ff9d;
     text-shadow: 0 0 12px rgba(0,255,157,0.5);
     animation: ps-pulse 4s ease-in-out infinite;
 }
 @keyframes ps-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
 .ps-logo-text {
-    font-size: 11px;
+    font-size: 10px;
     color: #00ff9d;
     letter-spacing: 0.3em;
     text-shadow: 0 0 8px rgba(0,255,157,0.3);
@@ -198,19 +198,19 @@ async function confirm() {
 .ps-rule {
     border: none;
     border-top: 1px solid rgba(0,255,157,0.08);
-    margin-bottom: 12px;
+    margin-bottom: clamp(6px, 1vh, 10px);
 }
 .ps-title {
-    font-size: 14px;
+    font-size: 13px;
     color: #c0f0d8;
     letter-spacing: 0.15em;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 .ps-sub {
     font-size: 9px;
     color: rgba(0,255,157,0.35);
     letter-spacing: 0.08em;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
 }
 .ps-sub--warn {
     color: rgba(255,179,0,0.5);
@@ -226,7 +226,7 @@ async function confirm() {
 
 /* Preview strip */
 .ps-preview {
-    padding: 10px 28px;
+    padding: 7px 24px;
     border-bottom: 1px solid rgba(0,255,157,0.06);
     font-size: 10px;
     color: #00ff9d;
@@ -234,7 +234,7 @@ async function confirm() {
     gap: 8px;
     align-items: baseline;
     flex-wrap: wrap;
-    min-height: 36px;
+    min-height: 28px;
     flex-shrink: 0;
 }
 .ps-preview--empty { color: rgba(0,255,157,0.2); }
@@ -257,7 +257,7 @@ async function confirm() {
     display: flex;
     align-items: baseline;
     gap: 10px;
-    padding: 8px 28px;
+    padding: 5px 24px;
     cursor: pointer;
     transition: background 0.1s;
 }
@@ -283,11 +283,11 @@ async function confirm() {
 
 /* ── Footer ──────────────────────────────────────────────────────────────────── */
 .ps-footer {
-    padding: 14px 28px;
+    padding: 10px 24px;
     border-top: 1px solid rgba(0,255,157,0.08);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
 }
 .ps-warning {
@@ -297,7 +297,7 @@ async function confirm() {
 }
 .ps-confirm-btn {
     width: 100%;
-    padding: 12px;
+    padding: 9px 12px;
     background: transparent;
     border: 1px solid rgba(0,255,157,0.15);
     color: rgba(0,255,157,0.3);
