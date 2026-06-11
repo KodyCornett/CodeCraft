@@ -120,8 +120,8 @@ class WatcherService
     private function resolveTokens(string $text, Player $player): string
     {
         return str_replace(
-            ['{persona}',      '{persona_desc}'],
-            [$player->persona, $player->persona_desc],
+            ['{handle}',       '{persona}',      '{persona_desc}'],
+            [$player->handle,  $player->persona, $player->persona_desc],
             $text,
         );
     }

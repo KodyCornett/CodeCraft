@@ -23,34 +23,18 @@ use Illuminate\Database\Seeder;
 class QuestArcSeeder extends Seeder
 {
     private const ARCS = [
-        'BA-hub' => [   // Knuckle — starting doc
+        'BA-hub' => [   // Knuckle — starting doc, auto-unlocks for all new players
             [
                 'sequence_order' => 1,
-                'title'          => 'Arc 1: First Contact',
+                'title'          => 'The Viral Breach',
                 'rep_required'   => 0,
                 'is_entry_arc'   => true,
-            ],
-        ],
-        'NS-hub' => [   // Patch
-            [
-                'sequence_order' => 1,
-                'title'          => 'Arc 1: North Side Dealings',
-                'rep_required'   => 0,
-                'is_entry_arc'   => false,
             ],
         ],
         'DT-hub' => [   // Veil
             [
                 'sequence_order' => 1,
-                'title'          => 'Arc 1: Into the Downtown Grid',
-                'rep_required'   => 0,
-                'is_entry_arc'   => false,
-            ],
-        ],
-        'UD-hub' => [   // Axiom
-            [
-                'sequence_order' => 1,
-                'title'          => 'Arc 1: Campus Protocols',
+                'title'          => 'The Smoothing Protocol',
                 'rep_required'   => 0,
                 'is_entry_arc'   => false,
             ],
@@ -58,7 +42,23 @@ class QuestArcSeeder extends Seeder
         'SV-hub' => [   // Float
             [
                 'sequence_order' => 1,
-                'title'          => 'Arc 1: Valley Runs',
+                'title'          => 'The Drift-Anchor',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
+        ],
+        'UD-hub' => [   // Axiom
+            [
+                'sequence_order' => 1,
+                'title'          => 'The Deep Archive',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
+        ],
+        'NS-hub' => [   // Patch
+            [
+                'sequence_order' => 1,
+                'title'          => 'Ghost-Kernel Calibration',
                 'rep_required'   => 0,
                 'is_entry_arc'   => false,
             ],

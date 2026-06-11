@@ -1,19 +1,11 @@
 <template>
-    <!-- Glitch phase -->
-    <Transition name="ws-glitch" @after-leave="onGlitchDone">
-        <div v-if="phase === 'glitch'" class="ws-glitch-overlay" aria-hidden="true">
-            <div class="ws-glitch-layer ws-glitch-layer--r" />
-            <div class="ws-glitch-layer ws-glitch-layer--g" />
-            <div class="ws-glitch-layer ws-glitch-layer--b" />
-            <div class="ws-glitch-scanlines" />
-            <div class="ws-glitch-bars">
-                <div v-for="i in 8" :key="i" class="ws-glitch-bar" :style="glitchBarStyle(i)" />
-            </div>
-            <div class="ws-glitch-text">
-                <span v-for="ch in scrambledChars" :key="ch.id" class="ws-scramble-ch">{{ ch.c }}</span>
-            </div>
-        </div>
-    </Transition>
+    <!-- Glitch phase — delegates to shared GlitchEffect -->
+    <GlitchEffect
+        type="full"
+        :intensity="1.0"
+        :active="phase === 'glitch'"
+        overlay
+    />
 
     <!-- Signal phase -->
     <Transition name="ws-signal">
@@ -47,6 +39,7 @@
 
 <script setup>
 import { ref, watch, onUnmounted } from 'vue';
+import GlitchEffect from './GlitchEffect.vue';
 
 const props = defineProps({
     signal: { type: Object, default: null }, // { id, signal_text, delivered_at }
@@ -55,9 +48,8 @@ const props = defineProps({
 const emit = defineEmits(['complete']);
 
 // ── State machine: idle → glitch → signal → idle ─────────────────────────────
-const phase         = ref('idle');
+const phase        = ref('idle');
 const revealedChars = ref([]);
-const scrambledChars = ref([]);
 const textComplete  = ref(false);
 
 let glitchTimer = null;
@@ -70,48 +62,22 @@ watch(() => props.signal, (sig) => {
     }
 }, { immediate: true });
 
-// ── Glitch phase ──────────────────────────────────────────────────────────────
+// ── Glitch phase — runs GlitchEffect for 1.2s then transitions ───────────────
 
-const GLITCH_CHARS = '!@#$%^&*<>{}[]|\\/?~`01';
-
+const GLITCH_CHARS = '!@#$%^&*<>{}[]|\\/?~`01░▒▓';
 function randomGlitchChar() {
     return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
 }
 
 function startGlitch() {
-    phase.value = 'glitch';
+    phase.value        = 'glitch';
     textComplete.value = false;
     revealedChars.value = [];
 
-    // Animate scrambled characters during glitch
-    let frame = 0;
-    const scrambleInterval = setInterval(() => {
-        scrambledChars.value = Array.from({ length: 24 }, (_, i) => ({
-            id: i,
-            c: randomGlitchChar(),
-        }));
-        frame++;
-        if (frame > 12) clearInterval(scrambleInterval);
-    }, 80);
-
-    // Glitch lasts ~1.2s then transitions to signal
     glitchTimer = setTimeout(() => {
         phase.value = 'signal';
         startTypewriter();
     }, 1200);
-}
-
-function glitchBarStyle(i) {
-    const top  = Math.random() * 100;
-    const h    = 2 + Math.random() * 8;
-    const left = (Math.random() - 0.5) * 6;
-    return {
-        top:       `${top}%`,
-        height:    `${h}px`,
-        transform: `translateX(${left}%)`,
-        opacity:   0.3 + Math.random() * 0.5,
-        animationDelay: `${i * 0.07}s`,
-    };
 }
 
 // ── Signal / typewriter phase ─────────────────────────────────────────────────
@@ -160,10 +126,6 @@ function charDelay() {
 
 // ── Collapse ──────────────────────────────────────────────────────────────────
 
-function onGlitchDone() {
-    // Nothing — handled by the glitchTimer
-}
-
 function onDismiss() {
     if (!textComplete.value) return; // don't allow early dismiss
     phase.value = 'idle';
@@ -179,95 +141,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ── Glitch overlay ──────────────────────────────────────────────────────────── */
-.ws-glitch-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 10000;
-    background: #000;
-    overflow: hidden;
-}
-
-.ws-glitch-layer {
-    position: absolute;
-    inset: 0;
-    mix-blend-mode: screen;
-    animation: ws-glitch-shift 0.1s steps(1) infinite;
-}
-.ws-glitch-layer--r {
-    background: rgba(255, 0, 60, 0.15);
-    animation-delay: 0s;
-    transform: translateX(3px);
-}
-.ws-glitch-layer--g {
-    background: rgba(0, 255, 100, 0.08);
-    animation-delay: 0.03s;
-    transform: translateX(-2px);
-}
-.ws-glitch-layer--b {
-    background: rgba(0, 100, 255, 0.12);
-    animation-delay: 0.06s;
-}
-@keyframes ws-glitch-shift {
-    0%   { transform: translateX(0); opacity: 1; }
-    25%  { transform: translateX(4px) scaleY(1.01); opacity: 0.9; }
-    50%  { transform: translateX(-3px); opacity: 1; }
-    75%  { transform: translateX(2px); opacity: 0.85; }
-    100% { transform: translateX(0); opacity: 1; }
-}
-
-.ws-glitch-scanlines {
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent, transparent 2px,
-        rgba(0,255,100,0.04) 2px, rgba(0,255,100,0.04) 4px
-    );
-    animation: ws-scan-move 0.3s linear infinite;
-}
-@keyframes ws-scan-move {
-    from { background-position-y: 0; }
-    to   { background-position-y: 8px; }
-}
-
-.ws-glitch-bars {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-}
-.ws-glitch-bar {
-    position: absolute;
-    left: 0; right: 0;
-    background: rgba(0, 255, 100, 0.25);
-    animation: ws-bar-flicker 0.15s steps(1) infinite;
-}
-@keyframes ws-bar-flicker {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
-}
-
-.ws-glitch-text {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 40px;
-}
-.ws-scramble-ch {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
-    color: rgba(0, 255, 100, 0.4);
-    animation: ws-ch-flicker 0.08s steps(1) infinite;
-}
-@keyframes ws-ch-flicker {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.2; }
-}
-
 /* ── Signal overlay ───────────────────────────────────────────────────────────── */
 .ws-signal-overlay {
     position: fixed;
