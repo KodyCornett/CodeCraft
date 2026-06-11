@@ -22,6 +22,13 @@
             <div class="di-quote">"{{ npc.theme.quote }}"<span class="di-attribution"> — {{ npc.handle }}</span></div>
         </div>
 
+        <!-- ── Mission log nudge ─────────────────────────────────────────────── -->
+        <div class="quest-nudge" @click="spliceNavigate(SPLICE.TERMINAL)">
+            <span class="qn-icon">◈</span>
+            <span class="qn-text">MISSION LOG</span>
+            <span class="qn-arrow">→</span>
+        </div>
+
         <!-- ── Storefront header ──────────────────────────────────────────────── -->
         <div class="storefront">
             <div class="storefront-sign">
@@ -450,6 +457,7 @@
 import { ref, computed, inject, onMounted } from 'vue';
 import axios from 'axios';
 import { useUpgradeCosts } from '@/composables/useUpgradeCosts.js';
+import { SPLICE } from '../SpliceRouter.js';
 
 const props = defineProps({
     url: { type: String, default: '' },
@@ -464,6 +472,9 @@ const props = defineProps({
         }),
     },
 });
+
+// ── Splice navigation (provided by InGameBrowser) ────────────────────────────
+const spliceNavigate = inject('spliceNavigate', () => {});
 
 // ── Real player state from Game.vue ──────────────────────────────────────────
 const gameState     = inject('gameState', null);
@@ -1208,6 +1219,29 @@ async function onUpgradeStat(stat, cost) {
     letter-spacing: 0.06em;
     flex-shrink: 0;
 }
+
+/* ── Mission log nudge ───────────────────────────────────────────────────── */
+.quest-nudge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 16px;
+    background: rgba(0, 200, 120, 0.04);
+    border-bottom: 1px solid rgba(0, 200, 120, 0.12);
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(0, 200, 120, 0.5);
+    letter-spacing: 0.08em;
+    transition: color 0.15s, background 0.15s;
+}
+.quest-nudge:hover {
+    background: rgba(0, 200, 120, 0.08);
+    color: #00c878;
+}
+.qn-icon  { font-size: 9px; }
+.qn-text  { flex: 1; }
+.qn-arrow { font-size: 11px; }
 
 /* ── Shared section scroll wrapper ───────────────────────────────────────── */
 .section-scroll {

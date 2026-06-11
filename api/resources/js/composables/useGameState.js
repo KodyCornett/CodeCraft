@@ -17,6 +17,8 @@ export function useGameState() {
     const player = ref({
         id:                  null,
         handle:              null,
+        persona:             null,
+        persona_desc:        null,
         district:            null,
         currentNodeCanvasId: null,   // last persisted canvas node ID — used to restore position on reload
 
@@ -110,6 +112,8 @@ export function useGameState() {
         if (authPlayer) {
             player.value.id                  = authPlayer.id                      ?? null;
             player.value.handle              = authPlayer.handle                  ?? null;
+            player.value.persona             = authPlayer.persona                 ?? null;
+            player.value.persona_desc        = authPlayer.persona_desc            ?? null;
             player.value.district            = authPlayer.current_district        ?? null;
             player.value.currentNodeCanvasId = authPlayer.current_node_canvas_id  ?? null;
             player.value.creds               = authPlayer.wallet_creds            ?? 0;

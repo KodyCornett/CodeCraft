@@ -465,12 +465,10 @@ const ddCursorIdx   = ref(0);
 const NO_ARG_CMDS  = new Set(['arp --scan', 'sniff --traffic']);
 const TWO_ARG_CMDS = new Set(['trace']);
 
-const ddCommandList = computed(() => {
-    if (props.phase === 1) return ['ping', 'traceroute', 'arp --scan', 'whois', 'sniff --traffic', 'flush', 'inject'];
-    if (props.phase === 2) return ['probe', 'trace', 'exploit', 'breach'];
-    return [];
-});
-
+const PHASE_COMMANDS = {
+    1: ['ping', 'traceroute', 'arp --scan', 'whois', 'sniff --traffic', 'flush', 'inject'],
+    2: ['probe', 'trace', 'exploit', 'breach'],
+};
 const ddArgList = computed(() => {
     const cmd = ddSelectedCmd.value;
     if (!cmd) return [];
@@ -485,7 +483,7 @@ const ddArgList = computed(() => {
 });
 
 const currentDdList = computed(() =>
-    ddStage.value === 'command' ? ddCommandList.value : ddArgList.value
+    ddStage.value === 'command' ? (PHASE_COMMANDS[props.phase] ?? []) : ddArgList.value
 );
 
 const isTwoArgCmd = computed(() => TWO_ARG_CMDS.has(ddSelectedCmd.value ?? ''));
@@ -533,6 +531,7 @@ function handleDropdownKey(e) {
         }
     } else if (e.key === 'Escape') {
         if (ddStage.value === 'arg2') {
+            ddArg1.value  = null;   // clear stale preview token before re-selecting
             ddStage.value = 'arg1';
             ddCursorIdx.value = 0;
         } else if (ddStage.value === 'arg1') {
@@ -593,7 +592,7 @@ function onSubmit() {
 }
 
 function refocusInput() {
-    if (!props.awaitingAuth && !props.isLocked && !props.isComplete) {
+    if (!props.awaitingAuth && !props.isLocked && !props.isComplete && !showDropdown.value) {
         inputEl.value?.focus();
     }
 }

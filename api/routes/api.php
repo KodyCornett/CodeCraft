@@ -9,6 +9,9 @@ use App\Http\Controllers\PacketHijackController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\NodeController;
 use App\Http\Controllers\PlayerController;
+use App\Http\Controllers\PersonaController;
+use App\Http\Controllers\QuestController;
+use App\Http\Controllers\WatcherController;
 use App\Http\Controllers\RigController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\CyberDocController;
@@ -45,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // ---------------------------------------------------------------------------
 
     Route::get('/player/me',                      [PlayerController::class, 'me']);
+    Route::post('/player/persona',                [PersonaController::class, 'store']);
     Route::get('/player/commands',                [PlayerController::class, 'commands']);
     Route::get('/player/inventory',               [PlayerController::class, 'inventory']);
     Route::post('/player/activate-command',       [PlayerController::class, 'activateCommand']);
@@ -142,5 +146,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/inventory',      [InventoryController::class, 'index']);
     Route::post('/inventory/use', [InventoryController::class, 'use']);
+
+// ---------------------------------------------------------------------------
+// Quests & Reputation
+// ---------------------------------------------------------------------------
+
+    Route::get('/quests',                               [QuestController::class, 'index']);
+    Route::get('/quests/archive',                       [QuestController::class, 'archive']);
+    Route::post('/quests/stage/{stageId}/complete',     [QuestController::class, 'completeStage']);
+
+// ---------------------------------------------------------------------------
+// Watcher
+// ---------------------------------------------------------------------------
+
+    Route::get('/watcher/unread',   [WatcherController::class, 'unread']);
+    Route::get('/watcher/all',      [WatcherController::class, 'all']);
+    Route::post('/watcher/read-all',[WatcherController::class, 'readAll']);
 
 });

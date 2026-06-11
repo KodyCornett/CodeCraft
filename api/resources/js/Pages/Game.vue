@@ -1,8 +1,17 @@
 <template>
     <GameScreen>
+        <!-- Persona selection — first-login gate, shown before boot sequence -->
+        <PersonaSelect v-if="needsPersonaSelect" @done="onPersonaDone" />
+
+        <!-- Watcher signal interrupt — renders above everything when active -->
+        <WatcherSignal :signal="activeSignal" @complete="onSignalComplete" />
+
+        <!-- Doc notifications — identified HUD alerts for arc unlocks and referrals -->
+        <DocNotification :queue="docNotifQueue" @dismiss="dismissDocNotif" />
+
         <!-- Boot sequence — shown before map loads -->
         <Transition name="boot-fade">
-            <BootSequence v-if="!booted" @done="booted = true" />
+            <BootSequence v-if="!booted && !needsPersonaSelect" @done="booted = true" />
         </Transition>
 
         <!-- Map row: map canvas + persistent side panel side by side -->
@@ -15,6 +24,7 @@
                     :nodes="nodes"
                     :pings="pings"
                     :traps="myTraps"
+                    :quest-markers="questMarkers"
                     :current-node-id="currentNodeId"
                     :player-uplink="player.uplink"
                     :player-ss="player.currentSS"
@@ -135,6 +145,16 @@
                         @submit-transfer="ph.submitTransfer"
                         @use-rig-command="ph.submitRigCommand"
                         @match-complete="onPacketHijackMatchComplete"
+                    />
+                </Transition>
+
+                <!-- Data Grab — quest hacking mini-game -->
+                <Transition name="breach-fade">
+                    <DataGrab
+                        v-if="activeDataGrab"
+                        :skin="activeDataGrab.skin"
+                        @complete="onDataGrabComplete"
+                        @fail="onDataGrabFail"
                     />
                 </Transition>
 
@@ -292,12 +312,16 @@ import HexMapCanvas  from '@/components/map/HexMapCanvas.vue';
 
 // ── Overlays ──────────────────────────────────────────────────────────────────
 import BootSequence             from '@/components/shared/BootSequence.vue';
+import PersonaSelect            from '@/components/shared/PersonaSelect.vue';
+import WatcherSignal            from '@/components/shared/WatcherSignal.vue';
+import DocNotification          from '@/components/shared/DocNotification.vue';
 import OpenSeasonNotification   from '@/components/shared/OpenSeasonNotification.vue';
 import CommandHitNotification  from '@/components/shared/CommandHitNotification.vue';
 import TrapFiredNotification   from '@/components/shared/TrapFiredNotification.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
 import PacketHijack  from '@/components/minigame/PacketHijack.vue';
+import DataGrab      from '@/components/minigame/DataGrab.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
 import { useMapData }        from '@/composables/useMapData.js';
@@ -320,6 +344,11 @@ import { useRigDamage }      from '@/composables/useRigDamage.js';
 import { useCyberDoc }       from '@/composables/useCyberDoc.js';
 import { useTrapSystem }     from '@/composables/useTrapSystem.js';
 import { usePingSystem }     from '@/composables/usePingSystem.js';
+import { useWatcher }            from '@/composables/useWatcher.js';
+import { useQuestLog }           from '@/composables/useQuestLog.js';
+import { useDocNotifications }   from '@/composables/useDocNotifications.js';
+import { useQuestArchive }       from '@/composables/useQuestArchive.js';
+import { docColorByName }        from '@/constants/docColors.js';
 import { SPLICE }            from '@/components/browser/SpliceRouter.js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -380,6 +409,32 @@ const awaitingChallenge = ref(false);  // true while waiting for target to accep
 // Packet Hijack — terminal PvP mini-game
 const ph                  = usePacketHijack(playerId);
 const activePacketHijack  = ref(false);  // true while the PH terminal overlay is shown
+
+// Data Grab — quest hacking mini-game
+// activeDataGrab = { stageId, skin } while the game is running, null otherwise
+const activeDataGrab = ref(null);
+
+function launchDataGrab(stageId, skin) {
+    activeDataGrab.value = { stageId, skin };
+}
+
+async function onDataGrabComplete() {
+    if (!activeDataGrab.value) return;
+    const { stageId } = activeDataGrab.value;
+    activeDataGrab.value = null;
+    // Complete the quest stage server-side
+    try {
+        await completeQuestStage(stageId);
+        await Promise.all([fetchQuestLog(), fetchArchive()]);
+        processDocEvents(archiveEvents.value);
+    } catch (e) {
+        console.warn('[DATA GRAB] stage completion failed:', e?.message);
+    }
+}
+
+function onDataGrabFail() {
+    activeDataGrab.value = null;
+}
 
 // Equipped hack- and map-context commands passed into the PH terminal as the rig loadout strip.
 // Ghost Protocol and Signal Noise are 'map' context but carry Packet Hijack effects, so both
@@ -795,6 +850,54 @@ watch(currentNodeId, (newVal, oldVal) => {
 // onTutorial — kept for GameMenu backward compat; opens TERMINAL page
 function onTutorial() {
     onLaunch(SPLICE.TERMINAL);
+}
+
+// ── Quest log + map markers + doc notifications ───────────────────────────────
+const { docs: questDocs, fetchQuestLog, completeStage: completeQuestStage } = useQuestLog();
+const { events: archiveEvents, fetchArchive } = useQuestArchive();
+const { queue: docNotifQueue, processEvents: processDocEvents, dismiss: dismissDocNotif } = useDocNotifications();
+
+// Derive active objective markers from quest state.
+// One marker per active stage that has a node_canvas_id, using the doc's accent colour.
+const questMarkers = computed(() => {
+    const markers = [];
+    for (const doc of questDocs.value) {
+        if (!doc.met) continue;
+        for (const arc of doc.arcs) {
+            if (arc.status !== 'active') continue;
+            for (const stage of arc.stages) {
+                if (stage.status === 'active' && stage.node_canvas_id) {
+                    markers.push({
+                        canvasId: stage.node_canvas_id,
+                        color:    docColorByName(doc.name),
+                        docName:  doc.name,
+                    });
+                }
+            }
+        }
+    }
+    return markers;
+});
+
+// ── Watcher signal system ─────────────────────────────────────────────────────
+const {
+    activeSignal, hasUnread: watcherHasUnread,
+    fetchUnread: fetchWatcherUnread,
+    markAllRead: watcherMarkAllRead,
+    onSignalComplete,
+} = useWatcher();
+
+// Provide markAllRead to WatcherChannel.vue via inject
+provide('watcherMarkAllRead', watcherMarkAllRead);
+
+// ── Persona selection — shown on first login before boot sequence ─────────────
+// true once auth has loaded and player has no persona set yet
+const needsPersonaSelect = ref(false);
+
+function onPersonaDone(persona) {
+    player.value.persona      = persona.name;
+    player.value.persona_desc = persona.desc;
+    needsPersonaSelect.value  = false;
 }
 
 // First-login modal
@@ -1491,6 +1594,17 @@ onMounted(async () => {
         // Single call seeds player + rig from the /api/player/me response
         hydrateFromAuth(authPlayer.value, authRig.value);
 
+        // First-login gate — show persona selection before boot sequence runs
+        if (!player.value.persona) {
+            needsPersonaSelect.value = true;
+            // Wait until the player confirms their persona before continuing boot
+            await new Promise(resolve => {
+                const stop = watch(needsPersonaSelect, val => {
+                    if (!val) { stop(); resolve(); }
+                });
+            });
+        }
+
         // Seed the map's currentNodeId from the server's persisted position so
         // the player can move freely on reload regardless of which node type they
         // are on. Without this, currentNodeId starts null and the server's
@@ -1518,8 +1632,17 @@ onMounted(async () => {
             t => hackCount.value >= t.hacks
         )?.level ?? 0;
 
-        // Fetch commands, inventory, and active traps in parallel
-        await Promise.all([fetchCommands(), fetchInventory(), fetchMyTraps()]);
+        // Fetch commands, inventory, active traps, Watcher signals, quest log, and archive in parallel
+        await Promise.all([
+            fetchCommands(),
+            fetchInventory(),
+            fetchMyTraps(),
+            fetchWatcherUnread(),
+            fetchQuestLog(),
+            fetchArchive(),
+        ]);
+        // Process archive events for doc notifications (arc unlocks, referrals)
+        processDocEvents(archiveEvents.value);
 
         // Start presence heartbeat — stamps last_seen_at every 45s and fires
         // sendBeacon on beforeunload so ghost players are removed immediately

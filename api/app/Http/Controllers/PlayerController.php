@@ -42,6 +42,8 @@ class PlayerController extends Controller
             'player' => [
                 'id'                      => $player->id,
                 'handle'                  => $player->handle,
+                'persona'                 => $player->persona,
+                'persona_desc'            => $player->persona_desc,
                 'current_node_id'         => $player->current_node_id,
                 'current_node_canvas_id'  => $currentNodeCanvasId,
                 'current_district'        => $player->current_district,

@@ -17,6 +17,8 @@ class Player extends Model
     protected $fillable = [
         'user_id',
         'handle',
+        'persona',
+        'persona_desc',
         'current_node_id',
         'current_district',
         'bounty_level',
@@ -88,5 +90,20 @@ class Player extends Model
     public function playerConsumables(): HasMany
     {
         return $this->hasMany(PlayerConsumable::class);
+    }
+
+    public function reputations(): HasMany
+    {
+        return $this->hasMany(PlayerReputation::class);
+    }
+
+    public function arcProgress(): HasMany
+    {
+        return $this->hasMany(PlayerArcProgress::class);
+    }
+
+    public function stageProgress(): HasMany
+    {
+        return $this->hasMany(PlayerStageProgress::class);
     }
 }

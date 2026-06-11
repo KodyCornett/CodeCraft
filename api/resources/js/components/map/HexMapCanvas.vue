@@ -195,6 +195,30 @@
                 </g>
             </g>
 
+            <!-- Quest objective markers — active stage node targets -->
+            <g class="quest-marker-layer" pointer-events="none">
+                <g
+                    v-for="marker in resolvedQuestMarkers"
+                    :key="marker.canvasId"
+                    class="quest-marker"
+                >
+                    <!-- Outer pulse ring -->
+                    <circle
+                        :cx="marker.x"
+                        :cy="marker.y"
+                        r="18"
+                        class="qm-pulse"
+                        :style="{ stroke: marker.color }"
+                    />
+                    <!-- Diamond objective icon -->
+                    <polygon
+                        :points="`${marker.x},${marker.y - 8} ${marker.x + 6},${marker.y} ${marker.x},${marker.y + 8} ${marker.x - 6},${marker.y}`"
+                        class="qm-diamond"
+                        :style="{ fill: marker.color, stroke: marker.color }"
+                    />
+                </g>
+            </g>
+
             <!-- Player marker — pulsing ring above everything else -->
             <g v-if="playerToken" class="player-marker">
                 <circle
@@ -298,6 +322,8 @@ const props = defineProps({
     links:         { type: Array,   default: () => [] },
     pings:         { type: Array,   default: () => [] },
     traps:         { type: Array,   default: () => [] },
+    // questMarkers: [{ canvasId: 'BA-hub', color: '#FF6B35', docName: 'Knuckle' }, ...]
+    questMarkers:  { type: Array,   default: () => [] },
     currentNodeId: { type: String,  default: null     },
     playerUplink:  { type: Number,  default: 3        },
     playerSs:      { type: Number,  default: 100      },
@@ -1104,6 +1130,19 @@ const playerToken    = ref(createPlayerToken(startNode));
 const uplinkDepleted  = computed(() => props.playerUplink <= 0);
 const ssCritical      = computed(() => props.playerSs <= 0);
 
+// ── Quest marker positions ────────────────────────────────────────────────────
+// Resolves each questMarker canvas ID to the node's SVG x/y coordinates.
+// Markers with no matching node in ALL_NODES are silently skipped.
+const resolvedQuestMarkers = computed(() =>
+    props.questMarkers
+        .map(m => {
+            const node = ALL_NODES.get(m.canvasId);
+            if (!node) return null;
+            return { ...m, x: node.x, y: node.y };
+        })
+        .filter(Boolean)
+);
+
 // ── DB node lookup ────────────────────────────────────────────────────────────
 // Build a canvasId → DB node map from the nodes prop for zone_type lookups.
 const dbNodeMap = computed(() => {
@@ -1593,5 +1632,27 @@ defineExpose({
 @keyframes mine-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.3; }
+}
+
+/* ── Quest objective markers ─────────────────────────────────────────────── */
+.qm-pulse {
+    fill: none;
+    stroke-width: 1.5;
+    opacity: 0.6;
+    animation: qm-pulse 1.8s ease-in-out infinite;
+}
+@keyframes qm-pulse {
+    0%, 100% { r: 18; opacity: 0.6; }
+    50%       { r: 22; opacity: 0.25; }
+}
+.qm-diamond {
+    opacity: 0.85;
+    fill-opacity: 0.15;
+    stroke-width: 1.5;
+    animation: qm-diamond-pulse 1.8s ease-in-out infinite;
+}
+@keyframes qm-diamond-pulse {
+    0%, 100% { opacity: 0.85; }
+    50%       { opacity: 0.5; }
 }
 </style>

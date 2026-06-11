@@ -21,11 +21,11 @@ use Illuminate\Database\Seeder;
 class CyberDocSeeder extends Seeder
 {
     private const DOCS = [
-        'NS-hub' => ['name' => 'North Side Hardware Hub',     'district' => 'North Spokane'],
-        'BA-hub' => ['name' => "Browne's Backroom Clinic",    'district' => "Browne's Addition"],
-        'DT-hub' => ['name' => 'Monroe St. Underground',      'district' => 'Downtown'],
-        'UD-hub' => ['name' => 'Campus Black Market',         'district' => 'University District'],
-        'SV-hub' => ['name' => 'Valley Depot Repairs',        'district' => 'Spokane Valley'],
+        'NS-hub' => ['name' => "Patch's Clinic",     'district' => 'North Spokane'],
+        'BA-hub' => ['name' => "Knuckle's Med-Wagon", 'district' => "Browne's Addition"],
+        'DT-hub' => ['name' => "Veil's Parlour",      'district' => 'Downtown'],
+        'UD-hub' => ['name' => 'Axiom Systems',        'district' => 'University District'],
+        'SV-hub' => ['name' => "Float's Repair Bay",  'district' => 'Spokane Valley'],
     ];
 
     public function run(): void

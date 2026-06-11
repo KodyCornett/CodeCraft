@@ -36,5 +36,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CommandSeeder::class);
         $this->call(CyberDocSeeder::class);
         $this->call(CyberDocCatalogSeeder::class); // must run after CyberDocSeeder + ConsumableSeeder
+        $this->call(QuestArcSeeder::class);        // must run after CyberDocSeeder
+        $this->call(QuestStageSeeder::class);      // must run after QuestArcSeeder
     }
 }

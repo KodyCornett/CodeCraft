@@ -28,6 +28,10 @@ import SysInventory      from './pages/SysInventory.vue';
 import GridBreachGuide   from './pages/GridBreachGuide.vue';
 import PacketHijackGuide from './pages/PacketHijackGuide.vue';
 import GhostProtocol0   from './pages/GhostProtocol0.vue';
+import QuestLog      from './pages/QuestLog.vue';
+import PersonasPage    from './pages/PersonasPage.vue';
+import WatcherChannel  from './pages/WatcherChannel.vue';
+import ArchivePage     from './pages/ArchivePage.vue';
 import BankPage      from './pages/BankPage.vue';
 import NotFound      from './pages/NotFound.vue';
 
@@ -53,6 +57,11 @@ const ROUTES = [
     { url: 'splice://sys.local/guide/gridbreach',   title: 'Grid-Breach Manual',    component: GridBreachGuide   },
     { url: 'splice://sys.local/guide/packethijack', title: 'Packet Hijack Manual', component: PacketHijackGuide },
     { url: 'splice://sys.local/tutorial',         title: 'GHOST_PROTOCOL_0',   component: GhostProtocol0  },
+    { url: 'splice://sys.local/terminal',         title: 'Mission Log',        component: QuestLog        },
+    { url: 'splice://sys.local/archive',          title: 'Mission Archive',    component: ArchivePage     },
+    { url: 'splice://sys.local/personas',         title: 'Runner Personas',    component: PersonasPage    },
+    // Hidden — not linked anywhere. Discoverable only via the Watcher glitch sequence.
+    { url: 'splice://watcher',                   title: '[ENCRYPTED_CHANNEL]', component: WatcherChannel  },
     { url: 'splice://bank.ch/hct',               title: 'Helvetic Cipher Trust', component: BankPage       },
     { url: 'splice://sys.local/commands',         title: 'Commands',        component: SysCommands       },
     { url: 'splice://sys.local/inventory', title: 'Inventory',    component: SysInventory },
@@ -90,7 +99,9 @@ export const SPLICE = {
     GRID_BREACH_GUIDE:   'splice://sys.local/guide/gridbreach',
     PACKET_HIJACK_GUIDE: 'splice://sys.local/guide/packethijack',
     TUTORIAL:          'splice://sys.local/tutorial',
-    TERMINAL:          'splice://sys.local/tutorial',   // NavBar TERMINAL app — same page as TUTORIAL
+    TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app — Mission Log / Quest Log
+    ARCHIVE:           'splice://sys.local/archive',   // Chronological story archive
+    PERSONAS:          'splice://sys.local/personas',  // Runner Personas reference
     INVENTORY: 'splice://sys.local/inventory',
     BANK:      'splice://bank.ch/hct',
 };
