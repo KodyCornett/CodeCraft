@@ -12,7 +12,7 @@
  * quest's steps are all complete.
  */
 
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import axios from 'axios';
 
 // ── Quest definitions ─────────────────────────────────────────────────────────
@@ -69,8 +69,9 @@ function defaultState() {
 // ── Composable ────────────────────────────────────────────────────────────────
 export function useTutorial() {
 
-    const _state   = ref(defaultState());
-    const _syncing = ref(false);   // prevents overlapping PATCH calls
+    const _state        = ref(defaultState());
+    const _syncing      = ref(false);   // prevents overlapping PATCH calls
+    const justCompleted = ref(false);   // pulses true once after tutorial finishes; Game.vue watches this
 
     // ── Hydration (called once on game boot from useGameState / Game.vue) ─────
     async function hydrate() {
@@ -185,6 +186,12 @@ export function useTutorial() {
     async function _completeTutorial() {
         try {
             await axios.post('/api/tutorial/complete');
+            // Signal Game.vue to open the quest terminal so the player sees
+            // Knuckle's newly unlocked arc. Reset to false after one tick so
+            // the watch fires again if needed (e.g. dev hot-reload).
+            justCompleted.value = true;
+            await nextTick();
+            justCompleted.value = false;
         } catch (e) {
             console.warn('[TUTORIAL] Complete signal failed:', e?.message);
         }
@@ -198,6 +205,7 @@ export function useTutorial() {
         tutorialSeen,
         tutorialSkipped,
         hasBadge,
+        justCompleted,
         hydrate,
         markSeen,
         skip,

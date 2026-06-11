@@ -139,8 +139,7 @@ class QuestService
      */
     public function initArcForDoc(Player $player, CyberDoc $doc): void
     {
-        $arcs    = QuestArc::where('cyber_doc_id', $doc->id)->orderBy('sequence_order')->get();
-        $repScore = $this->reputationService->getScore($player, $doc->id);
+        $arcs = QuestArc::where('cyber_doc_id', $doc->id)->orderBy('sequence_order')->get();
 
         foreach ($arcs as $arc) {
             $existing = PlayerArcProgress::where('player_id', $player->id)
@@ -151,7 +150,11 @@ class QuestService
                 continue; // already initialised
             }
 
-            $shouldUnlock = $arc->is_entry_arc || $repScore >= $arc->rep_required;
+            // Only entry arcs auto-unlock on first visit.
+            // Non-entry arcs (rep_required = 0 or otherwise) start locked and
+            // are unlocked via checkAndUnlockArcs (rep threshold) or explicit
+            // story triggers — not merely by the player visiting the CyberDoc.
+            $shouldUnlock = $arc->is_entry_arc;
             $status       = $shouldUnlock ? 'active' : 'locked';
 
             PlayerArcProgress::create([
@@ -325,7 +328,10 @@ class QuestService
             $arc      = $prog->arc;
             $repScore = $this->reputationService->getScore($player, $arc->cyber_doc_id);
 
-            if ($repScore >= $arc->rep_required) {
+            // rep_required = 0 arcs are NOT auto-unlocked via rep sweep —
+            // they need an explicit story trigger (referral, tutorial complete, etc).
+            // Only arcs with a genuine positive threshold unlock here.
+            if ($arc->rep_required > 0 && $repScore >= $arc->rep_required) {
                 $prog->update([
                     'status'      => 'active',
                     'unlocked_at' => Carbon::now(),

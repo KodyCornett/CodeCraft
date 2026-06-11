@@ -329,6 +329,7 @@ class CombatChallengeController extends Controller
             'challenger_phase'         => 1,
             'defender_phase'           => 1,
             'started_at'               => now(),
+            'expires_at'               => now()->addMinutes(15),
         ]);
 
         // ── Broadcast started events — blank terminal, player types netstat ───

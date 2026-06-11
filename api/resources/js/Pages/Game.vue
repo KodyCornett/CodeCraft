@@ -37,6 +37,17 @@
                 <!-- HUD overlay -->
                 <HUD :player="player" :rig="rig" :current-node="currentNode" :bounty-ticker="bountyTicker" :flash="hudFlash" />
 
+                <!-- Active objective tracker — top-left, collapses to header bar -->
+                <ObjectiveTracker :objective="activeObjective" />
+
+                <!-- Mission update toast — fires when active stage changes -->
+                <Transition name="ice-alert-fade">
+                    <div v-if="missionToast" class="mission-toast">
+                        <span class="mission-toast-icon">◈</span>
+                        OBJECTIVE — {{ missionToast }}
+                    </div>
+                </Transition>
+
                 <!-- ICE alert banner — fires on bounty escalation events -->
                 <Transition name="ice-alert-fade">
                     <div v-if="bountyAlert" class="ice-alert">
@@ -295,6 +306,14 @@
                 </div>
             </div>
         </Transition>
+
+        <!-- Inactivity auto-logout warning -->
+        <IdleWarning
+            :visible="idle.warningActive.value"
+            :countdown="idle.countdown.value"
+            :seconds-left="idle.secondsLeft.value"
+            @cancel="idle.cancel()"
+        />
     </GameScreen>
 </template>
 
@@ -317,6 +336,8 @@ import WatcherSignal            from '@/components/shared/WatcherSignal.vue';
 import DocNotification          from '@/components/shared/DocNotification.vue';
 import OpenSeasonNotification   from '@/components/shared/OpenSeasonNotification.vue';
 import CommandHitNotification  from '@/components/shared/CommandHitNotification.vue';
+import IdleWarning              from '@/components/shared/IdleWarning.vue';
+import ObjectiveTracker         from '@/components/shared/ObjectiveTracker.vue';
 import TrapFiredNotification   from '@/components/shared/TrapFiredNotification.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
@@ -349,6 +370,8 @@ import { useQuestLog }           from '@/composables/useQuestLog.js';
 import { useQuestMinigame }      from '@/composables/useQuestMinigame.js';
 import { useDocNotifications }   from '@/composables/useDocNotifications.js';
 import { useQuestArchive }       from '@/composables/useQuestArchive.js';
+import { useInactivityTimer }    from '@/composables/useInactivityTimer.js';
+import { useActiveObjective }    from '@/composables/useActiveObjective.js';
 import { docColorByName }        from '@/constants/docColors.js';
 import { SPLICE }            from '@/components/browser/SpliceRouter.js';
 
@@ -824,6 +847,9 @@ function onResetCooldowns() {
 // ── Tutorial ──────────────────────────────────────────────────────────────────
 const tutorial = useTutorial();
 
+// ── Inactivity auto-logout ────────────────────────────────────────────────────
+const idle = useInactivityTimer();
+
 // Provide tutorial state to all SPLICE page components via inject('tutorial').
 // GhostProtocol0 reads it to render quest status.
 // GridBreachGuide calls markStepDone('read_manual') on mount.
@@ -834,6 +860,14 @@ watch(activeBrowserUrl, (url) => {
     if (url?.startsWith(SPLICE.TERMINAL) || url?.startsWith(SPLICE.TUTORIAL)) {
         tutorial.clearBadge();
     }
+});
+
+// When all tutorial quests are rewarded and the server has unlocked Knuckle's arc,
+// navigate to the forced CyberWare update SPLICE page, which auto-advances to the
+// mission terminal when the install sequence finishes.
+// justCompleted pulses true→false in a single tick so this fires exactly once.
+watch(tutorial.justCompleted, (val) => {
+    if (val) onLaunch(SPLICE.CORTEX_PATCH);
 });
 
 // Quest trigger: node inspected (any node click)
@@ -866,6 +900,21 @@ function onTutorial() {
 
 // ── Quest log + map markers + doc notifications ───────────────────────────────
 const { docs: questDocs, fetchQuestLog, completeStage: completeQuestStage } = useQuestLog();
+
+// ── Active objective tracker ──────────────────────────────────────────────────
+const { objective: activeObjective } = useActiveObjective(questDocs);
+
+// Mission toast — fires for 3.5 s whenever the active stage changes.
+// Follows the same pattern as bountyAlert (auto-dismiss via timer).
+const missionToast = ref(null);
+let   _missionToastTimer = null;
+
+watch(() => activeObjective.value?.stageId, (next, prev) => {
+    if (!next || next === prev) return;
+    if (_missionToastTimer) clearTimeout(_missionToastTimer);
+    missionToast.value      = activeObjective.value?.stageTitle ?? 'MISSION UPDATED';
+    _missionToastTimer = setTimeout(() => { missionToast.value = null; }, 3500);
+});
 const { events: archiveEvents, fetchArchive } = useQuestArchive();
 const { queue: docNotifQueue, processEvents: processDocEvents, dismiss: dismissDocNotif } = useDocNotifications();
 
@@ -1591,6 +1640,7 @@ function onKeyDown(e) {
 
 onMounted(async () => {
     window.addEventListener('keydown', onKeyDown);
+    idle.start();
 
     // Drive the replenish countdown in nodeResources — 1 s resolution is enough.
     _nowTick = setInterval(() => { _now.value = Date.now(); }, 1000);
@@ -1734,6 +1784,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('keydown', onKeyDown);
+    idle.destroy();
     ws.disconnect();
     stopBountyPolling();
     stopPendingPoll();
@@ -1958,6 +2009,34 @@ onUnmounted(() => {
 .ice-alert-fade-leave-active { transition: opacity 0.6s ease 3s; } /* hold for 3s then fade */
 .ice-alert-fade-enter-from   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
 .ice-alert-fade-leave-to     { opacity: 0; }
+
+/* ── Mission update toast ─────────────────────────────────────────────────── */
+.mission-toast {
+    position: absolute;
+    top: 88px;           /* sits below the ICE alert slot */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    padding: 6px 16px;
+    background: rgba(4, 6, 14, 0.92);
+    border: 1px solid rgba(0, 255, 200, 0.35);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: #00FFC8;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 0 16px rgba(0, 255, 200, 0.1);
+    text-shadow: 0 0 8px rgba(0, 255, 200, 0.5);
+}
+
+.mission-toast-icon {
+    font-size: 11px;
+    animation: crit-pulse 0.8s ease-in-out infinite;
+}
 
 @keyframes ice-alert-flicker {
     0%, 100% { opacity: 1; }

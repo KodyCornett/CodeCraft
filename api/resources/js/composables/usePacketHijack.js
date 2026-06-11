@@ -23,6 +23,7 @@ export function usePacketHijack(playerId) {
     const lockCountdown       = ref(0);
     const defenderAlertActive = ref(false);
     const matchResult         = ref(null);
+    const isAbandoned         = ref(false);   // true when server returns 410 (expired/disconnect)
     const usedRigCommands     = ref([]);
     const echoChannel         = ref(null);
 
@@ -59,6 +60,14 @@ export function usePacketHijack(playerId) {
     // ── Derived ───────────────────────────────────────────────────────────────
 
     const isComplete         = computed(() => matchResult.value !== null);
+
+    function _handleAbandoned() {
+        isAbandoned.value = true;
+        _appendHistory('[SESSION]', [
+            '[CONNECTION LOST — SESSION EXPIRED]',
+            '[MATCH ABANDONED — RETURN TO THE GRID]',
+        ]);
+    }
     const activeSuspectCount = computed(() => suspects.value.filter(s => !s.flushed).length);
 
     // ── Init ──────────────────────────────────────────────────────────────────
@@ -293,7 +302,9 @@ export function usePacketHijack(playerId) {
             await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
         } catch (e) {
             const status = e?.response?.status;
-            if (status === 409) {
+            if (status === 410) {
+                _handleAbandoned();
+            } else if (status === 409) {
                 _appendHistory(trimmed, ['[ERROR]: TARGET ALREADY PURGED']);
             } else if (status === 429) {
                 const lockData = e?.response?.data;
@@ -315,7 +326,8 @@ export function usePacketHijack(playerId) {
                 auth_pass: password,
             });
         } catch (e) {
-            _appendHistory('[AUTH]', ['[SYSTEM ERROR]: AUTHENTICATION REQUEST FAILED']);
+            if (e?.response?.status === 410) _handleAbandoned();
+            else _appendHistory('[AUTH]', ['[SYSTEM ERROR]: AUTHENTICATION REQUEST FAILED']);
         } finally {
             busy.value = false;
         }
@@ -328,7 +340,9 @@ export function usePacketHijack(playerId) {
             await axios.post(`/api/packet-hijack/${matchId.value}/transfer`);
         } catch (e) {
             const status = e?.response?.status;
-            if (status === 409) {
+            if (status === 410) {
+                _handleAbandoned();
+            } else if (status === 409) {
                 // Match already resolved — matchResult will arrive via WS
             } else {
                 _appendHistory('[XFER]', ['[SYSTEM ERROR]: TRANSFER CONNECTION INTERRUPTED']);
@@ -350,7 +364,9 @@ export function usePacketHijack(playerId) {
             await axios.post(`/api/packet-hijack/${matchId.value}/command`, { rig_command: slug });
         } catch (e) {
             const status = e?.response?.status;
-            if (status === 409) {
+            if (status === 410) {
+                _handleAbandoned();
+            } else if (status === 409) {
                 _appendHistory(`[RIG] ${displaySlug}`, ['[ERROR]: COMMAND ALREADY DEPLOYED THIS MATCH']);
             } else {
                 _appendHistory(`[RIG] ${displaySlug}`, ['[SYSTEM ERROR]: CONNECTION INTERRUPTED']);
@@ -420,6 +436,7 @@ export function usePacketHijack(playerId) {
         phase,
         commandHistory,
         busy,
+        isAbandoned,
         isLocked,
         lockCountdown,
         defenderAlertActive,

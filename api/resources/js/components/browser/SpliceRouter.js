@@ -33,6 +33,7 @@ import PersonasPage    from './pages/PersonasPage.vue';
 import WatcherChannel  from './pages/WatcherChannel.vue';
 import ArchivePage     from './pages/ArchivePage.vue';
 import BankPage      from './pages/BankPage.vue';
+import SystemUpdate  from './pages/SystemUpdate.vue';
 import NotFound      from './pages/NotFound.vue';
 
 // ── Route table ───────────────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ const ROUTES = [
     // Hidden — not linked anywhere. Discoverable only via the Watcher glitch sequence.
     { url: 'splice://watcher',                   title: '[ENCRYPTED_CHANNEL]', component: WatcherChannel  },
     { url: 'splice://bank.ch/hct',               title: 'Helvetic Cipher Trust', component: BankPage       },
+    { url: 'splice://sys.tacat/cortex-patch',    title: 'CORTEX PATCH // FORCED', component: SystemUpdate   },
     { url: 'splice://sys.local/commands',         title: 'Commands',        component: SysCommands       },
     { url: 'splice://sys.local/inventory', title: 'Inventory',    component: SysInventory },
 ];
@@ -102,6 +104,7 @@ export const SPLICE = {
     TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app — Mission Log / Quest Log
     ARCHIVE:           'splice://sys.local/archive',   // Chronological story archive
     PERSONAS:          'splice://sys.local/personas',  // Runner Personas reference
-    INVENTORY: 'splice://sys.local/inventory',
-    BANK:      'splice://bank.ch/hct',
+    INVENTORY:    'splice://sys.local/inventory',
+    BANK:         'splice://bank.ch/hct',
+    CORTEX_PATCH: 'splice://sys.tacat/cortex-patch',   // forced install — story-triggered only
 };

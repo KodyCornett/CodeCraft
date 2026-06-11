@@ -84,6 +84,10 @@ class PacketHijackController extends Controller
                 return response()->json(['message' => 'Not your match.'], 403);
             }
 
+            if ($abandoned = $this->checkAndMarkExpired($match)) {
+                return $abandoned;
+            }
+
             if ($match->status === 'complete') {
                 return response()->json(['message' => 'Match already complete.'], 409);
             }
@@ -210,6 +214,10 @@ class PacketHijackController extends Controller
 
         if ($role === null) {
             return response()->json(['message' => 'Not your match.'], 403);
+        }
+
+        if ($abandoned = $this->checkAndMarkExpired($match)) {
+            return $abandoned;
         }
 
         $phase = $match->phaseOf($role);
@@ -1092,12 +1100,41 @@ class PacketHijackController extends Controller
                 return response()->json(['message' => 'Match already complete.'], 409);
             }
 
+            if ($abandoned = $this->checkAndMarkExpired($match)) {
+                return $abandoned;
+            }
+
             if ($match->phaseOf($role) !== 3) {
                 return response()->json(['message' => 'Bank screen not yet reached.'], 409);
             }
 
             return $this->resolveMatch($match, $me, $role, '[XFER FUNDS]');
         });
+    }
+
+    // =========================================================================
+    // Expiry helper
+    // =========================================================================
+
+    /**
+     * If the match has passed its expires_at, mark it abandoned and return a 410 response.
+     * Returns null if the match is still valid.
+     */
+    private function checkAndMarkExpired(PacketHijackMatch $match): ?JsonResponse
+    {
+        if ($match->status === 'abandoned') {
+            return response()->json(['status' => 'abandoned', 'message' => 'Match abandoned — session expired.'], 410);
+        }
+
+        if ($match->expires_at !== null && now()->isAfter($match->expires_at) && $match->status !== 'complete') {
+            $match->status       = 'abandoned';
+            $match->completed_at = now();
+            $match->save();
+
+            return response()->json(['status' => 'abandoned', 'message' => 'Match abandoned — session expired.'], 410);
+        }
+
+        return null;
     }
 
     // =========================================================================
