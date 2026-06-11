@@ -19,10 +19,6 @@
                         <span class="obj-tracker__stage-title">{{ objective.stageTitle }}</span>
                     </div>
 
-                    <div v-if="objective.objectiveText" class="obj-tracker__objective">
-                        <span class="obj-tracker__obj-prefix">▸</span>
-                        {{ objective.objectiveText }}
-                    </div>
                 </div>
             </Transition>
 
@@ -57,7 +53,7 @@ watch(() => props.objective?.stageId, (next, prev) => {
 /* ── Positioning ──────────────────────────────────────────────────────────── */
 .obj-tracker {
     position: absolute;
-    top: 12px;
+    top: 44px;
     left: 12px;
     z-index: 30;
     width: 260px;
@@ -152,23 +148,6 @@ watch(() => props.objective?.stageId, (next, prev) => {
     letter-spacing: 0.1em;
     line-height: 1.3;
     text-shadow: 0 0 10px rgba(0, 255, 200, 0.4);
-}
-
-.obj-tracker__objective {
-    display: flex;
-    gap: 6px;
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.55);
-    letter-spacing: 0.06em;
-    line-height: 1.5;
-    padding-top: 2px;
-    border-top: 1px solid rgba(0, 255, 200, 0.08);
-}
-
-.obj-tracker__obj-prefix {
-    color: rgba(0, 255, 200, 0.6);
-    flex-shrink: 0;
-    line-height: 1.5;
 }
 
 /* ── Transitions ──────────────────────────────────────────────────────────── */

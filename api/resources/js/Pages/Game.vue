@@ -38,7 +38,7 @@
                 <HUD :player="player" :rig="rig" :current-node="currentNode" :bounty-ticker="bountyTicker" :flash="hudFlash" />
 
                 <!-- Active objective tracker — top-left, collapses to header bar -->
-                <ObjectiveTracker :objective="activeObjective" />
+                <ObjectiveTracker v-if="tutorial.allComplete.value" :objective="activeObjective" />
 
                 <!-- Mission update toast — fires when active stage changes -->
                 <Transition name="ice-alert-fade">
