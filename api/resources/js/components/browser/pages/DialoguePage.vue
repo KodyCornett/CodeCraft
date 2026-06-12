@@ -112,12 +112,18 @@ function _playLineAudio(relativePath) {
         _lineAudio.src = '';
         _lineAudio = null;
     }
+    const url = '/audio/Sound/' + relativePath;
+    console.log('[DIALOGUE] Playing audio:', url);
     try {
-        const el = new Audio('/audio/Sound/' + relativePath);
+        const el = new Audio(url);
         el.volume = 0.9;
-        el.play().catch(() => {});
+        el.play()
+            .then(() => console.log('[DIALOGUE] Audio playing OK:', url))
+            .catch(err => console.warn('[DIALOGUE] Audio blocked:', url, err.message));
         _lineAudio = el;
-    } catch (_) {}
+    } catch (err) {
+        console.error('[DIALOGUE] Audio error:', url, err.message);
+    }
 }
 
 // ── Format text — newlines → <br> ────────────────────────────────────────────
@@ -174,6 +180,7 @@ function _revealNext() {
 
     const t = setTimeout(() => {
         revealedEntries.value.push(entry);
+        console.log('[DIALOGUE] Entry revealed — speaker:', entry.speaker, '| audio key:', entry.audio ?? 'NONE');
         if (entry.audio) _playLineAudio(entry.audio);
         isTyping.value = false;
         _scrollBottom();
