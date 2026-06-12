@@ -7,10 +7,10 @@
                     :key="'c' + i"
                     class="wt-line"
                     :style="{ opacity: lineOpacity(i) }"
-                >{{ line }}</p>
+                >{{ line.text }}</p>
 
-                <p v-if="currentText !== null" class="wt-line wt-active">
-                    {{ currentText }}<span class="wt-cursor">█</span>
+                <p v-if="active" class="wt-line wt-active">
+                    {{ active.typed }}<span class="wt-cursor">█</span>
                 </p>
             </div>
         </div>
@@ -21,145 +21,195 @@
 /**
  * WorldTone.vue — Opening cinematic narration scene.
  *
- * Plays once on first login, after PersonaSelect and before BootSequence.
- * Narrator audio: /audio/Sound/narrator/world_tone.mp3
+ * Lines are triggered by audio.currentTime so text stays locked to the voice.
  *
- * TIMING GUIDE — Each LINES entry has { text, pauseMs }.
- * pauseMs is the silence AFTER the typewriter finishes the line.
- * Tune these values so the visual roughly tracks your audio recording.
+ * startSec values are computed from:
+ *   • speaking duration estimate at ~150 WPM per line
+ *   • 1.5 s SSML break after every line
  *
- * Emits @done when the cinematic is complete.
+ * If a line feels early/late after hearing the audio, nudge its startSec.
+ * All values are cumulative from t=0 of the audio file.
+ *
+ * Script source (SSML): each <break time="1.5s" /> marks the boundary.
+ *
+ * Emits @done when cinematic completes.
  */
 
 import { ref, computed, onUnmounted } from 'vue';
 
 const emit = defineEmits(['done']);
 
-// ── Script ────────────────────────────────────────────────────────────────────
-// pauseMs = silence held after this line finishes typing, before the next begins.
-// Adjust to match your narrator audio recording.
+// ── Script — 41 lines, startSec computed from word count + 1.5 s breaks ───────
+// To recalibrate: open the audio in Audacity, find when each line starts, update.
+// startSec values are computed from the SSML break times + estimated speaking
+// duration per line at ~145 WPM narrator rate. If a line feels early or late
+// after generating the audio, nudge its startSec by ±0.5 until it locks.
 const LINES = [
-    { text: "Nobody remembers exactly when the physical world stopped being enough.", pauseMs: 3000 },
-    { text: "It happened slowly at first.",                                           pauseMs: 2200 },
-    { text: "A few hours a day.",                                                     pauseMs: 1800 },
-    { text: "Then a few more.",                                                       pauseMs: 1800 },
-    { text: "Then most.",                                                             pauseMs: 3200 },
-    { text: "The rigs came first. Console systems. Crude things.",                    pauseMs: 2600 },
-    { text: "Then came full sensory integration.",                                    pauseMs: 2200 },
-    { text: "Smell. Taste. Touch.",                                                   pauseMs: 2800 },
-    { text: "If your rig is good enough, you stop noticing the difference.",         pauseMs: 3000 },
-    { text: "Most people stopped trying.",                                            pauseMs: 3400 },
-    { text: "The Splice Frequency runs beneath everything.",                          pauseMs: 2600 },
-    { text: "A hidden channel carved into the city's infrastructure.",               pauseMs: 2800 },
-    { text: "People don't log into SPLICE.",                                          pauseMs: 2000 },
-    { text: "They live there.",                                                       pauseMs: 3600 },
-    { text: "The ones who work the underground call themselves runners.",             pauseMs: 2600 },
-    { text: "They move between nodes. Hack data. Stay invisible.",                   pauseMs: 2800 },
-    { text: "Or they try to.",                                                        pauseMs: 3400 },
-    { text: "Your rig is old. Your signal bleeds all over the network.",             pauseMs: 2800 },
-    { text: "Someone noticed.",                                                       pauseMs: 4000 },
-    { text: "Welcome to the Frequency.",                                              pauseMs: 2600 },
-    { text: "Try not to flatline.",                                                   pauseMs: 0    },
+    { text: "Nobody remembers exactly when the physical world stopped being enough.",                                                                             startSec:   0.0 },
+    { text: "It happened slowly at first.",                                                                                                                       startSec:   6.7 },
+    { text: "A few hours a day.",                                                                                                                                 startSec:  10.8 },
+    { text: "Then a few more.",                                                                                                                                   startSec:  14.1 },
+    { text: "Then most.",                                                                                                                                         startSec:  16.8 },
+    { text: "The consoles came cheap. The connection came easy. And The Splice Frequency offered something the concrete world never could.",                       startSec:  20.6 },
+    { text: "A place where you could be exactly who you decided to be.",                                                                                          startSec:  30.6 },
+    { text: "Feel exactly what you chose to feel.",                                                                                                               startSec:  37.6 },
+    { text: "Build something that mattered in a world that answered back.",                                                                                       startSec:  42.0 },
+    { text: "The cities didn't empty.",                                                                                                                           startSec:  48.7 },
+    { text: "They just went quiet.",                                                                                                                              startSec:  52.4 },
+    { text: "People are still out there.",                                                                                                                        startSec:  56.6 },
+    { text: "Bodies in chairs.",                                                                                                                                  startSec:  60.2 },
+    { text: "Bodies in beds.",                                                                                                                                    startSec:  62.5 },
+    { text: "Bodies kept alive by systems that ask no questions and make no demands.",                                                                            startSec:  64.8 },
+    { text: "But the part of them that thinks...",                                                                                                                startSec:  72.8 },
+    { text: "The part that wants...",                                                                                                                             startSec:  77.4 },
+    { text: "The part that acts...",                                                                                                                              startSec:  80.6 },
+    { text: "That part lives here.",                                                                                                                              startSec:  83.8 },
+    { text: "On the Frequency.",                                                                                                                                  startSec:  88.0 },
+    { text: "In the network beneath the network, where corporations built their towers and runners carved out their tunnels.",                                     startSec:  92.3 },
+    { text: "The Splice Frequency is real.",                                                                                                                      startSec: 101.4 },
+    { text: "More real than the room your body is sitting in right now.",                                                                                         startSec: 105.5 },
+    { text: "You can smell it.",                                                                                                                                  startSec: 112.5 },
+    { text: "Feel it.",                                                                                                                                           startSec: 115.0 },
+    { text: "The heat of a node under load.",                                                                                                                     startSec: 116.6 },
+    { text: "The sting of static when ICE gets close.",                                                                                                          startSec: 120.3 },
+    { text: "The strange silence of a district at three in the morning, when the traffic fades and the grid itself seems to breathe.",                            startSec: 124.7 },
+    { text: "The corporations own the upper layers.",                                                                                                             startSec: 136.9 },
+    { text: "Clean.",                                                                                                                                             startSec: 140.9 },
+    { text: "Bright.",                                                                                                                                            startSec: 142.3 },
+    { text: "Controlled.",                                                                                                                                        startSec: 143.7 },
+    { text: "They sell access.",                                                                                                                                  startSec: 146.3 },
+    { text: "They sell safety.",                                                                                                                                  startSec: 148.4 },
+    { text: "They sell the version of the Frequency they want you to see.",                                                                                       startSec: 150.5 },
+    { text: "Everything beneath it belongs to everyone else.",                                                                                                    startSec: 158.0 },
+    { text: "That's where you live.",                                                                                                                             startSec: 162.4 },
+    { text: "That's where you work.",                                                                                                                             startSec: 164.9 },
+    { text: "That's where you run.",                                                                                                                              startSec: 167.4 },
+    { text: "Welcome to the Frequency.",                                                                                                                          startSec: 171.1 },
+    { text: "Try not to flatline.",                                                                                                                               startSec: 175.3 },
 ];
 
-// ── Typewriter config ─────────────────────────────────────────────────────────
-const CHAR_DELAY_MS  = 32;   // ms per character while typing
-const LINE_HEIGHT_PX = 56;   // px per line (font + margin) — matches CSS below
-const FADE_HOLD_MS   = 2000; // pause after last line before fade begins
-const FADE_MS        = 1800; // fade-to-black duration (matches CSS transition)
+// ── Config ────────────────────────────────────────────────────────────────────
+const CHAR_DELAY_MS  = 14;   // keep fast — text must finish before narrator does
+const LINE_HEIGHT_PX = 56;   // must match CSS (.wt-line line-height + margin-bottom)
+const HOLD_AFTER_MS  = 2000; // pause after audio ends before fade
+const FADE_MS        = 1800; // must match CSS transition on .wt-root
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const completedLines = ref([]);
-const currentText    = ref(null);
+const active         = ref(null);
 const fading         = ref(false);
 
-// Derived translateY — shifts the block up by one line height per completed line.
-// CSS transition on .wt-lines animates this smoothly.
 const scrollOffset = computed(() =>
     completedLines.value.length * -LINE_HEIGHT_PX
 );
 
-// Older lines fade to dim so the active line always reads as foreground.
 function lineOpacity(i) {
     const distFromEnd = completedLines.value.length - 1 - i;
-    return Math.max(0.12, 1 - distFromEnd * 0.13);
+    return Math.max(0.10, 1 - distFromEnd * 0.10);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const _timers = [];
+// ── Typewriter ────────────────────────────────────────────────────────────────
+let _typingTimer   = null;
+let _typingResolve = null;
+let _typingBusy    = false;
 
-function sleep(ms) {
+function _typeText(text) {
     return new Promise(resolve => {
-        const id = setTimeout(resolve, ms);
-        _timers.push(id);
+        _typingResolve = resolve;
+        active.value   = { text, typed: '' };
+        let i = 0;
+
+        function tick() {
+            if (i >= text.length) {
+                completedLines.value.push({ text });
+                active.value   = null;
+                _typingResolve = null;
+                resolve();
+                return;
+            }
+            active.value = { text, typed: text.slice(0, ++i) };
+            _typingTimer = setTimeout(tick, CHAR_DELAY_MS);
+        }
+        tick();
     });
 }
 
-// ── Audio ─────────────────────────────────────────────────────────────────────
-let _audio = null;
+function _snapCurrent() {
+    if (_typingTimer)   { clearTimeout(_typingTimer); _typingTimer = null; }
+    if (active.value)   { completedLines.value.push({ text: active.value.text }); active.value = null; }
+    if (_typingResolve) { _typingResolve(); _typingResolve = null; }
+}
 
-function _startAudio() {
+// ── Audio-time poll ───────────────────────────────────────────────────────────
+let _audio       = null;
+let _pollInterval = null;
+let _nextIdx      = 0;
+
+function _startPoll() {
+    _pollInterval = setInterval(() => {
+        if (!_audio) return;
+        const nowSec = _audio.currentTime;
+
+        while (_nextIdx < LINES.length && nowSec >= LINES[_nextIdx].startSec) {
+            const line = LINES[_nextIdx++];
+            if (_typingBusy) _snapCurrent();
+            _typingBusy = true;
+            _typeText(line.text).then(() => { _typingBusy = false; });
+        }
+    }, 80);
+}
+
+// ── Cinematic entry ───────────────────────────────────────────────────────────
+function runCinematic() {
     _audio = new Audio('/audio/Sound/narrator/world_tone.mp3');
     _audio.volume = 0.9;
-    _audio.play().catch(() => {
-        console.warn('[WORLDTONE] Narrator audio blocked or missing — visual will run without audio.');
+
+    _audio.addEventListener('ended', async () => {
+        clearInterval(_pollInterval);
+        if (_typingBusy) _snapCurrent();
+        // Snap any lines the poll missed (shouldn't happen with correct startSec values)
+        while (_nextIdx < LINES.length) {
+            completedLines.value.push({ text: LINES[_nextIdx++].text });
+        }
+        await new Promise(r => setTimeout(r, HOLD_AFTER_MS));
+        fading.value = true;
+        await new Promise(r => setTimeout(r, FADE_MS));
+        emit('done');
     });
+
+    _audio.play()
+        .then(() => _startPoll())
+        .catch(() => {
+            console.warn('[WORLDTONE] Audio blocked or missing — running fallback timer.');
+            _runFallback();
+        });
 }
 
-// ── Cinematic loop ────────────────────────────────────────────────────────────
-async function runCinematic() {
-    _startAudio();
-
-    for (let i = 0; i < LINES.length; i++) {
-        const line = LINES[i];
-        currentText.value = '';
-
-        // Typewriter — one character at a time
-        for (const char of line.text) {
-            await sleep(CHAR_DELAY_MS);
-            currentText.value += char;
-        }
-
-        // Brief hold so the cursor shows on the completed line before moving on
-        await sleep(280);
-
-        // Promote to completed (triggers scroll animation)
-        completedLines.value.push(line.text);
-        currentText.value = null;
-
-        // Inter-line pause
-        if (line.pauseMs > 0) {
-            await sleep(line.pauseMs);
-        }
+// ── Fallback — no audio available ─────────────────────────────────────────────
+async function _runFallback() {
+    for (const line of LINES) {
+        _typingBusy = true;
+        await _typeText(line.text);
+        _typingBusy = false;
+        await new Promise(r => setTimeout(r, 2500));
     }
-
-    // Final hold — let the last line breathe
-    await sleep(FADE_HOLD_MS);
-
-    // Fade to black
+    await new Promise(r => setTimeout(r, HOLD_AFTER_MS));
     fading.value = true;
-    await sleep(FADE_MS);
-
+    await new Promise(r => setTimeout(r, FADE_MS));
     emit('done');
 }
 
-// Start immediately on mount — this is called from Game.vue which gates it
-// behind first-login state, so it never fires for returning players.
 runCinematic();
 
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 onUnmounted(() => {
-    _timers.forEach(clearTimeout);
-    if (_audio) {
-        _audio.pause();
-        _audio.src = '';
-        _audio = null;
-    }
+    clearInterval(_pollInterval);
+    if (_typingTimer) clearTimeout(_typingTimer);
+    if (_audio) { _audio.pause(); _audio.src = ''; _audio = null; }
 });
 </script>
 
 <style scoped>
-/* ── Root — full-screen black overlay ──────────────────────────────────────── */
 .wt-root {
     position: fixed;
     inset: 0;
@@ -171,12 +221,10 @@ onUnmounted(() => {
     transition: opacity 1.8s ease;
 }
 
-/* Fade-to-black on completion */
 .wt-fading {
     opacity: 0;
 }
 
-/* ── Viewport — clips overflow so lines drift upward cleanly ───────────────── */
 .wt-viewport {
     width: 100%;
     max-width: 620px;
@@ -186,7 +234,6 @@ onUnmounted(() => {
     padding: 0 48px;
     box-sizing: border-box;
 
-    /* Gradient mask: lines fade in at top, sharp at bottom */
     -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0%,
@@ -205,7 +252,6 @@ onUnmounted(() => {
     );
 }
 
-/* ── Lines container — animated upward drift ───────────────────────────────── */
 .wt-lines {
     position: absolute;
     bottom: 0;
@@ -216,26 +262,24 @@ onUnmounted(() => {
     transition: transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* ── Individual line ────────────────────────────────────────────────────────── */
+/* LINE_HEIGHT_PX = line-height (~24px at 13px/1.65) + margin-bottom (32px) = ~56px */
 .wt-line {
     font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
     line-height: 1.65;
     letter-spacing: 0.04em;
     color: rgba(220, 215, 235, 0.9);
-    margin: 0 0 28px 0;     /* 28px gap + ~24px line-height ≈ LINE_HEIGHT_PX 56px */
+    margin: 0 0 32px 0;
     padding: 0;
     white-space: pre-wrap;
     transition: opacity 0.6s ease;
 }
 
-/* Active (currently typing) line — full brightness */
 .wt-active {
-    color: rgba(230, 225, 245, 1);
+    color: rgba(235, 230, 250, 1);
     opacity: 1 !important;
 }
 
-/* ── Blinking cursor ────────────────────────────────────────────────────────── */
 .wt-cursor {
     display: inline-block;
     color: rgba(0, 255, 200, 0.85);
