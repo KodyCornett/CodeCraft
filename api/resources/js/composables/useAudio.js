@@ -195,6 +195,37 @@ function stopAudio() {
 }
 
 /**
+ * Fade music out for a dialogue scene (1.5s), then pause.
+ * Preserves playback position so fadeInAfterDialogue() resumes the same track.
+ */
+function fadeOutForDialogue() {
+    clearFade();
+    if (!_audio) return;
+    fadeTo(_audio, 0, 1500, () => {
+        if (_audio) {
+            _audio.pause();
+            playing.value = false;
+        }
+    });
+}
+
+/**
+ * Fade music back in after a dialogue scene (1.5s).
+ * Resumes the paused track at position; starts a new track if none is loaded.
+ */
+function fadeInAfterDialogue() {
+    if (!_started || !_unlocked) return;
+    if (!_audio) {
+        playNext();
+        return;
+    }
+    clearFade();
+    _audio.play().catch(() => {});
+    playing.value = true;
+    fadeTo(_audio, muted.value ? 0 : VOLUME, 1500, null);
+}
+
+/**
  * Instantly silence and pause — for dramatic story interrupts.
  * Preserves _started and _unlocked state so resumeAudio() can restart.
  */
@@ -260,6 +291,8 @@ export function useAudio() {
         stopAudio,
         cutAudio,
         resumeAudio,
+        fadeOutForDialogue,
+        fadeInAfterDialogue,
         toggleMute,
         setVolume,
     };

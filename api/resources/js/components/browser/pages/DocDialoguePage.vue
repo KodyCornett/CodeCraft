@@ -24,15 +24,17 @@
             :npc-subtitle="config.npcSubtitle"
             :location-label="config.locationLabel"
             :accent-color="config.accentColor"
+            :ambient-src="config.ambientSrc"
             @complete="onDialogueComplete"
         />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
 import DialoguePage from './DialoguePage.vue';
 import { SPLICE } from '../SpliceRouter.js';
+import { useAudio } from '../../../composables/useAudio.js';
 
 const props = defineProps({
     url: { type: String, default: '' },
@@ -46,6 +48,7 @@ const DOC_CONFIG = {
         locationLabel: 'BA-HUB // KNUCKLE\'S MED-WAGON',
         accentColor:   '#FF6B35',
         district:      "Browne's Addition",
+        ambientSrc:    'k_node_BG.mp3',
     },
     patch: {
         npcHandle:     'PATCH',
@@ -53,6 +56,7 @@ const DOC_CONFIG = {
         locationLabel: 'NS-HUB // PATCH\'S CLINIC',
         accentColor:   '#00FFC8',
         district:      'North Spokane',
+        ambientSrc:    null,
     },
     veil: {
         npcHandle:     'VEIL',
@@ -60,6 +64,7 @@ const DOC_CONFIG = {
         locationLabel: 'DT-HUB // VEIL\'S PARLOUR',
         accentColor:   '#B06FFF',
         district:      'Downtown',
+        ambientSrc:    null,
     },
     axiom: {
         npcHandle:     'AXIOM',
@@ -67,6 +72,7 @@ const DOC_CONFIG = {
         locationLabel: 'UD-HUB // AXIOM SYSTEMS',
         accentColor:   '#FFD700',
         district:      'University District',
+        ambientSrc:    null,
     },
     float: {
         npcHandle:     'FLOAT',
@@ -74,6 +80,7 @@ const DOC_CONFIG = {
         locationLabel: 'SV-HUB // FLOAT\'S REPAIR BAY',
         accentColor:   '#00BFFF',
         district:      'Spokane Valley',
+        ambientSrc:    null,
     },
 };
 
@@ -112,6 +119,12 @@ const activeStage = computed(() => {
     }
     return null;
 });
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+const { fadeOutForDialogue, fadeInAfterDialogue } = useAudio();
+
+onMounted(() => fadeOutForDialogue());
+onUnmounted(() => fadeInAfterDialogue());
 
 // ── Navigation + callbacks ────────────────────────────────────────────────────
 const spliceNavigate          = inject('spliceNavigate',          () => {});

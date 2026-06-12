@@ -88,6 +88,7 @@ const props = defineProps({
     npcSubtitle:   { type: String, default: '' },
     locationLabel: { type: String, default: '' },
     accentColor:   { type: String, default: '#00FFC8' },
+    ambientSrc:    { type: String, default: null },
 });
 
 const emit = defineEmits(['complete']);
@@ -105,6 +106,59 @@ const scrollEl        = ref(null);
 let _entryIdx   = 0;
 let _timers     = [];
 let _lineAudio  = null;
+
+// ── Ambient audio ─────────────────────────────────────────────────────────────
+// Loops under NPC lines only. Fades out for narrator + player choice sections.
+let _ambient        = null;
+let _ambientFade    = null;
+const AMBIENT_VOL   = 0.3;
+const AMBIENT_FADE  = 800; // ms
+
+function _ambientFadeTo(targetVol) {
+    if (_ambientFade) { clearInterval(_ambientFade); _ambientFade = null; }
+    if (!_ambient) return;
+    const steps    = Math.max(1, Math.round(AMBIENT_FADE / 50));
+    const startVol = _ambient.volume;
+    const delta    = (targetVol - startVol) / steps;
+    let   done     = 0;
+    _ambientFade = setInterval(() => {
+        done++;
+        _ambient.volume = Math.min(1, Math.max(0, startVol + delta * done));
+        if (done >= steps) {
+            _ambient.volume = targetVol;
+            clearInterval(_ambientFade);
+            _ambientFade = null;
+            if (targetVol === 0) _ambient.pause();
+        }
+    }, 50);
+}
+
+function _ambientIn() {
+    if (!props.ambientSrc) return;
+    if (!_ambient) {
+        _ambient          = new Audio('/audio/Sound/ambient/' + props.ambientSrc);
+        _ambient.loop     = true;
+        _ambient.volume   = 0;
+        _ambient.play().catch(() => {});
+    } else {
+        _ambient.play().catch(() => {});
+    }
+    _ambientFadeTo(AMBIENT_VOL);
+}
+
+function _ambientOut() {
+    if (!_ambient) return;
+    _ambientFadeTo(0);
+}
+
+function _ambientStop() {
+    if (_ambientFade) { clearInterval(_ambientFade); _ambientFade = null; }
+    if (_ambient) {
+        _ambient.pause();
+        _ambient.src = '';
+        _ambient     = null;
+    }
+}
 
 // Plays a line's audio file. Calls onEnded when the clip finishes.
 // Guards against double-firing (_fired flag) so error + rejected play
@@ -177,6 +231,7 @@ function _revealNext() {
     if (_entryIdx >= props.entries.length) {
         complete.value = true;
         isTyping.value = false;
+        _ambientOut();
         _scrollBottom();
         return;
     }
@@ -185,16 +240,22 @@ function _revealNext() {
     _entryIdx++;
 
     if (entry.speaker === 'PLAYER_CHOICE') {
-        // Show choices
         currentChoices.value = entry.options ?? [];
         isTyping.value = false;
+        _ambientOut();
         const t = setTimeout(() => {
             choicesReady.value = true;
             _scrollBottom();
         }, DELAY.PLAYER_CHOICE);
         _timers.push(t);
-        // Execution pauses here — resumes when player picks a choice
         return;
+    }
+
+    // Ambient: fade in for NPC lines, fade out for narrator
+    if (entry.speaker === 'NARRATOR') {
+        _ambientOut();
+    } else {
+        _ambientIn();
     }
 
     // Regular entry — show typing cursor, then reveal line and play audio.
@@ -265,6 +326,7 @@ onUnmounted(() => {
         _lineAudio.src = '';
         _lineAudio = null;
     }
+    _ambientStop();
 });
 </script>
 
