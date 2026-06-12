@@ -1023,6 +1023,37 @@ provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQ
 // Pool of nodes near BA-hub — random pick so players can't camp a fixed respawn point
 const _WATCHER_RESPAWN_POOL = ['B6', 'E7', 'C10', 'G11', 'H8', 'E5'];
 
+// ── Prologue Watcher transition map ───────────────────────────────────────────
+// Each entry fires the intrusion cinematic when the player leaves that doc's
+// hub node after completing the arc. The Watcher — not the doc — directs the
+// player to the next contact.
+const _WATCHER_TRANSITIONS = {
+    knuckle: {
+        leaveNode:  'BA-hub',
+        signalId:   'watcher-veil-redirect',
+        signalText: '[PROCESS: RESUMING]\n▓░▓░▓▓░░▓░▓░\n...Downtown...\n*SIGNAL FRAGMENTING*\n[SYS_INTEGRITY: RECOVERING]\n...she sees what he cannot...\n*HIGH_FREQ_INTERFERENCE*\n...Veil...\n[KERNEL_PULSE: ACTIVE]\n...find...her...\n[CONTAINMENT: ░░░░░░░░░░] STABILIZING',
+    },
+    veil: {
+        leaveNode:  'DT-hub',
+        signalId:   'watcher-float-redirect',
+        signalText: '[PROCESS: RESUMING]\n░▓░▓▓░▓░░▓▓░\n...Spokane Valley...\n*SIGNAL FRAGMENTING*\n[SYS_INTEGRITY: RECOVERING]\n...old architecture...she knows it...\n*HIGH_FREQ_INTERFERENCE*\n...Float...\n[KERNEL_PULSE: ACTIVE]\n...the salvager...\n[CONTAINMENT: ░░░░░░░░░░] STABILIZING',
+    },
+    float: {
+        leaveNode:  'SV-hub',
+        signalId:   'watcher-axiom-redirect',
+        signalText: '[PROCESS: RESUMING]\n▓▓░░▓░▓▓░░▓░\n...University District...\n*SIGNAL FRAGMENTING*\n[SYS_INTEGRITY: RECOVERING]\n...they have been waiting...\n*HIGH_FREQ_INTERFERENCE*\n...Axiom...\n[KERNEL_PULSE: ACTIVE]\n...they already know...\n[CONTAINMENT: ░░░░░░░░░░] STABILIZING',
+    },
+    axiom: {
+        leaveNode:  'UD-hub',
+        signalId:   'watcher-patch-redirect',
+        signalText: '[PROCESS: RESUMING]\n░░▓▓░▓░░▓▓░▓\n...North Spokane...\n*SIGNAL FRAGMENTING*\n[SYS_INTEGRITY: RECOVERING]\n...under the grid...\n*HIGH_FREQ_INTERFERENCE*\n...Patch...\n[KERNEL_PULSE: ACTIVE]\n...they hear everything...\n[CONTAINMENT: ░░░░░░░░░░] STABILIZING',
+    },
+};
+
+// Holds the pending transition config — set when a doc's dialogue completes,
+// cleared when the player leaves that doc's hub node.
+const _pendingWatcherTransition = ref(null);
+
 // Called by SystemUpdate.vue when the install sequence finishes.
 // Cuts music, fires the Watcher intrusion cinematic, then on reboot:
 //   → respawns player near BA-hub, resumes audio, shows boot notification, navigates to TERMINAL.
@@ -1055,6 +1086,35 @@ provide('onInstallComplete', () => {
         id:          'watcher-post-cortex-install',
         signal_text: '[UNKNOWN_PROCESS: INJECTING]\n▓░▓▓░░▓░░▓▓░▓░░▓\n...Knuckles...\n*HIGH_FREQ_INTERFERENCE*\n[SYS_INTEGRITY: FAILING]\n[CONTAINMENT: ░░░░░░░░░░] BREACHED\n...not...stable...\n*SIGNAL DECAY — SOURCE UNKNOWN*\n...speak...with...him...\n[KERNEL_PANIC]\n[MEMORY: CORRUPTING]\n...KNUCKLES...\n*EAR-SPLITTING RING*',
     });
+});
+
+// Called by DocDialoguePage when a doc's dialogue stage closes.
+// Arms the pending Watcher transition for that doc — fires when player leaves the hub.
+provide('onDocDialogueComplete', (docHandle) => {
+    const transition = _WATCHER_TRANSITIONS[docHandle];
+    if (transition) {
+        _pendingWatcherTransition.value = transition;
+    }
+});
+
+// Fire the Watcher intrusion when player leaves a hub node with a pending transition.
+// Player is NOT moved on reboot — they stay wherever they walked to.
+watch(currentNodeId, (newNode, oldNode) => {
+    const t = _pendingWatcherTransition.value;
+    if (!t || oldNode !== t.leaveNode || newNode === t.leaveNode) return;
+
+    _pendingWatcherTransition.value = null;
+    cutAudio();
+
+    _postSignalNav.value = () => {
+        resumeAudio();
+        if (_bootNotifTimer) clearTimeout(_bootNotifTimer);
+        bootNotification.value = true;
+        _bootNotifTimer = setTimeout(() => { bootNotification.value = false; }, 6000);
+        onLaunch(SPLICE.TERMINAL);
+    };
+
+    triggerSignal({ id: t.signalId, signal_text: t.signalText });
 });
 
 // ── Persona selection — shown on first login before boot sequence ─────────────

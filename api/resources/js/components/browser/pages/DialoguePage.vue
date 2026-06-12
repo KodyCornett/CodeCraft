@@ -102,8 +102,23 @@ const isTyping        = ref(false);
 const selectedChoice  = ref(null);
 const scrollEl        = ref(null);
 
-let _entryIdx = 0;
-let _timers   = [];
+let _entryIdx   = 0;
+let _timers     = [];
+let _lineAudio  = null;
+
+function _playLineAudio(relativePath) {
+    if (_lineAudio) {
+        _lineAudio.pause();
+        _lineAudio.src = '';
+        _lineAudio = null;
+    }
+    try {
+        const el = new Audio('/audio/Sound/' + relativePath);
+        el.volume = 0.9;
+        el.play().catch(() => {});
+        _lineAudio = el;
+    } catch (_) {}
+}
 
 // ── Format text — newlines → <br> ────────────────────────────────────────────
 function formatText(text) {
@@ -159,6 +174,7 @@ function _revealNext() {
 
     const t = setTimeout(() => {
         revealedEntries.value.push(entry);
+        if (entry.audio) _playLineAudio(entry.audio);
         isTyping.value = false;
         _scrollBottom();
 
@@ -202,6 +218,11 @@ watch(() => props.entries, (val) => {
 
 onUnmounted(() => {
     _timers.forEach(id => clearTimeout(id));
+    if (_lineAudio) {
+        _lineAudio.pause();
+        _lineAudio.src = '';
+        _lineAudio = null;
+    }
 });
 </script>
 

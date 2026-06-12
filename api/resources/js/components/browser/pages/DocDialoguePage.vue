@@ -113,8 +113,9 @@ const activeStage = computed(() => {
     return null;
 });
 
-// ── Navigation ────────────────────────────────────────────────────────────────
-const spliceNavigate = inject('spliceNavigate', () => {});
+// ── Navigation + callbacks ────────────────────────────────────────────────────
+const spliceNavigate          = inject('spliceNavigate',          () => {});
+const onDocDialogueComplete   = inject('onDocDialogueComplete',   () => {});
 
 // ── On dialogue complete — mark stage done, return to terminal ─────────────────
 async function onDialogueComplete() {
@@ -135,6 +136,7 @@ async function onDialogueComplete() {
         loading.value = false;
     }
 
+    onDocDialogueComplete(docHandle.value);
     spliceNavigate(SPLICE.TERMINAL);
 }
 </script>
