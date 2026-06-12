@@ -106,38 +106,47 @@ let _entryIdx   = 0;
 let _timers     = [];
 let _lineAudio  = null;
 
-// Plays a line's audio file. Calls onEnded when the clip finishes (or on error/block)
-// so the reveal engine can wait for speech before advancing to the next line.
-// Falls back to an estimated reading-time delay if autoplay is blocked.
+// Plays a line's audio file. Calls onEnded when the clip finishes.
+// Guards against double-firing (_fired flag) so error + rejected play
+// can't both trigger onEnded. Missing files fall back to a reading-time
+// pause so the story keeps moving without stampeding into the next line.
 function _playLineAudio(relativePath, onEnded) {
     if (_lineAudio) {
         _lineAudio.pause();
         _lineAudio.src = '';
         _lineAudio = null;
     }
+
     const url = '/audio/Sound/' + relativePath;
-    try {
-        const el = new Audio(url);
-        el.volume = 0.9;
+    const el  = new Audio(url);
+    el.volume = 0.9;
+    _lineAudio = el;
 
-        const done = () => {
-            _lineAudio = null;
-            onEnded?.();
-        };
-
-        el.addEventListener('ended', done);
-        el.addEventListener('error', done);
-
-        el.play().catch(() => {
-            // Autoplay blocked — estimate reading time from filename length as rough fallback
-            const t = setTimeout(done, 4000);
-            _timers.push(t);
-        });
-
-        _lineAudio = el;
-    } catch (_) {
+    let _fired = false;
+    const done = () => {
+        if (_fired) return;
+        _fired = true;
+        if (_lineAudio === el) _lineAudio = null;
         onEnded?.();
-    }
+    };
+
+    // Clean finish
+    el.addEventListener('ended', done);
+
+    // File missing or corrupt — hold for a reading-time estimate, then advance
+    el.addEventListener('error', () => {
+        console.warn('[DIALOGUE] Audio file not found:', url);
+        const holdMs = Math.max(3000, (el.textContent?.length ?? 0) * 40) ;
+        const t = setTimeout(done, holdMs);
+        _timers.push(t);
+    });
+
+    // Autoplay blocked by browser — hold 4s then advance
+    el.play().catch(() => {
+        console.warn('[DIALOGUE] Audio blocked by browser:', url);
+        const t = setTimeout(done, 4000);
+        _timers.push(t);
+    });
 }
 
 // ── Format text — newlines → <br> ────────────────────────────────────────────
