@@ -234,4 +234,33 @@ function toggleMute() {
 }
 
 /**
- * Set master volume (0–1). Takes effect immediately 
+ * Set master volume (0–1). Takes effect immediately on the playing track.
+ * Unmutes automatically if the player was muted.
+ */
+function setVolume(val) {
+    const v   = Math.min(1, Math.max(0, val));
+    VOLUME        = v;
+    volume.value  = v;
+
+    if (v > 0 && muted.value) {
+        muted.value = false;
+    }
+
+    if (_audio && playing.value) {
+        _audio.volume = muted.value ? 0 : v;
+    }
+}
+
+export function useAudio() {
+    return {
+        muted:      readonly(muted),
+        playing:    readonly(playing),
+        volume:     readonly(volume),
+        startAudio,
+        stopAudio,
+        cutAudio,
+        resumeAudio,
+        toggleMute,
+        setVolume,
+    };
+}

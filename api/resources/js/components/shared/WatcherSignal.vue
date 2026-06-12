@@ -487,4 +487,28 @@ onUnmounted(() => {
 .ws-reboot-cursor {
     display: inline-block;
     color: rgba(0, 255, 140, 0.75);
- 
+    animation: ws-blink 0.5s steps(1) infinite;
+    margin-left: 2px;
+}
+
+/* Reboot screen fades away to reveal the game world */
+.ws-reboot-fade-leave-active { transition: opacity 0.9s ease; }
+.ws-reboot-fade-leave-to     { opacity: 0; }
+
+/* ── Transitions ──────────────────────────────────────────────────────────── */
+
+/* Box slams in — no gentle fade, a snap at 2 steps */
+.ws-slam-enter-active { animation: ws-slam-in 0.12s steps(2) forwards; }
+.ws-slam-leave-active { transition: opacity 0.15s ease; }
+.ws-slam-leave-to     { opacity: 0; }
+
+@keyframes ws-slam-in {
+    0%   { opacity: 0; transform: scale(1.05) translateY(-4px); }
+    50%  { opacity: 1; transform: scale(0.98) translateY(1px); }
+    100% { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+/* Body fades in after override hold */
+.ws-body-in-enter-active { transition: opacity 0.18s ease; }
+.ws-body-in-enter-from   { opacity: 0; }
+</style>
