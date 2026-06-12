@@ -9,9 +9,12 @@
         <!-- Doc notifications — identified HUD alerts for arc unlocks and referrals -->
         <DocNotification :queue="docNotifQueue" @dismiss="dismissDocNotif" />
 
+        <!-- World tone — opening cinematic, first login only (after persona selection) -->
+        <WorldTone v-if="showWorldTone" @done="onWorldToneDone" />
+
         <!-- Boot sequence — shown before map loads -->
         <Transition name="boot-fade">
-            <BootSequence v-if="!booted && !needsPersonaSelect" @done="booted = true" />
+            <BootSequence v-if="!booted && !needsPersonaSelect && !showWorldTone" @done="booted = true" />
         </Transition>
 
         <!-- Map row: map canvas + persistent side panel side by side -->
@@ -341,6 +344,7 @@ import HexMapCanvas  from '@/components/map/HexMapCanvas.vue';
 // ── Overlays ──────────────────────────────────────────────────────────────────
 import BootSequence             from '@/components/shared/BootSequence.vue';
 import PersonaSelect            from '@/components/shared/PersonaSelect.vue';
+import WorldTone                from '@/components/shared/WorldTone.vue';
 import WatcherSignal            from '@/components/shared/WatcherSignal.vue';
 import DocNotification          from '@/components/shared/DocNotification.vue';
 import OpenSeasonNotification   from '@/components/shared/OpenSeasonNotification.vue';
@@ -1127,6 +1131,13 @@ function onPersonaDone(persona) {
     needsPersonaSelect.value  = false;
 }
 
+// ── World tone — opening cinematic, fires once after persona selection ─────────
+const showWorldTone = ref(false);
+
+function onWorldToneDone() {
+    showWorldTone.value = false;
+}
+
 // First-login modal
 const showWelcomeModal = computed(() =>
     booted.value && !tutorial.tutorialSeen.value && !tutorial.tutorialSkipped.value
@@ -1823,12 +1834,20 @@ onMounted(async () => {
         // Single call seeds player + rig from the /api/player/me response
         hydrateFromAuth(authPlayer.value, authRig.value);
 
-        // First-login gate — show persona selection before boot sequence runs
+        // First-login gate — show persona selection then world tone before boot
         if (!player.value.persona) {
             needsPersonaSelect.value = true;
-            // Wait until the player confirms their persona before continuing boot
+            // Wait until the player confirms their persona
             await new Promise(resolve => {
                 const stop = watch(needsPersonaSelect, val => {
+                    if (!val) { stop(); resolve(); }
+                });
+            });
+
+            // World tone cinematic — plays once on first login only
+            showWorldTone.value = true;
+            await new Promise(resolve => {
+                const stop = watch(showWorldTone, val => {
                     if (!val) { stop(); resolve(); }
                 });
             });
