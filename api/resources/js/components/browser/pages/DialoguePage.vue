@@ -106,23 +106,37 @@ let _entryIdx   = 0;
 let _timers     = [];
 let _lineAudio  = null;
 
-function _playLineAudio(relativePath) {
+// Plays a line's audio file. Calls onEnded when the clip finishes (or on error/block)
+// so the reveal engine can wait for speech before advancing to the next line.
+// Falls back to an estimated reading-time delay if autoplay is blocked.
+function _playLineAudio(relativePath, onEnded) {
     if (_lineAudio) {
         _lineAudio.pause();
         _lineAudio.src = '';
         _lineAudio = null;
     }
     const url = '/audio/Sound/' + relativePath;
-    console.log('[DIALOGUE] Playing audio:', url);
     try {
         const el = new Audio(url);
         el.volume = 0.9;
-        el.play()
-            .then(() => console.log('[DIALOGUE] Audio playing OK:', url))
-            .catch(err => console.warn('[DIALOGUE] Audio blocked:', url, err.message));
+
+        const done = () => {
+            _lineAudio = null;
+            onEnded?.();
+        };
+
+        el.addEventListener('ended', done);
+        el.addEventListener('error', done);
+
+        el.play().catch(() => {
+            // Autoplay blocked — estimate reading time from filename length as rough fallback
+            const t = setTimeout(done, 4000);
+            _timers.push(t);
+        });
+
         _lineAudio = el;
-    } catch (err) {
-        console.error('[DIALOGUE] Audio error:', url, err.message);
+    } catch (_) {
+        onEnded?.();
     }
 }
 
@@ -174,19 +188,31 @@ function _revealNext() {
         return;
     }
 
-    // Regular entry — show with typing delay
+    // Regular entry — show typing cursor, then reveal line and play audio.
+    // If the entry has audio, the next line is held until the clip finishes.
+    // If no audio, a short reading-time pause is used instead.
     isTyping.value = true;
     const delay = entry.speaker === 'NARRATOR' ? DELAY.NARRATOR : DELAY.NPC;
 
     const t = setTimeout(() => {
         revealedEntries.value.push(entry);
-        console.log('[DIALOGUE] Entry revealed — speaker:', entry.speaker, '| audio key:', entry.audio ?? 'NONE');
-        if (entry.audio) _playLineAudio(entry.audio);
         isTyping.value = false;
         _scrollBottom();
 
-        const next = setTimeout(_revealNext, 120);
-        _timers.push(next);
+        if (entry.audio) {
+            // Show cursor again while audio plays, advance when clip ends
+            isTyping.value = true;
+            _playLineAudio(entry.audio, () => {
+                isTyping.value = false;
+                const next = setTimeout(_revealNext, 400);
+                _timers.push(next);
+            });
+        } else {
+            // No audio — estimate reading time from text length (min 1.5s)
+            const readMs = Math.max(1500, (entry.text?.length ?? 60) * 35);
+            const next = setTimeout(_revealNext, readMs);
+            _timers.push(next);
+        }
     }, delay);
     _timers.push(t);
 }
