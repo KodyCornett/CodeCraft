@@ -235,14 +235,17 @@ function _tokenize(text) {
 
 function _scrambleDuration(token) {
     const t = token.raw;
-    if (/^\[/.test(t) || /^\.{2,}/.test(t)) return 80  + Math.random() * 100;
-    if (t.length <= 2)                        return 100 + Math.random() * 120;
-    return 200 + Math.random() * 380;
+    // Structure tokens resolve quickly — chaos is in the scramble, not the snap
+    if (/^\[/.test(t) || /^\.{2,}/.test(t) || /^\*/.test(t)) return 60 + Math.random() * 80;
+    if (t.length <= 2) return 80 + Math.random() * 100;
+    // Real words snap fast enough to read — player tracks meaning through the noise
+    return 140 + Math.random() * 180;
 }
 
 function _gapAfter(token) {
-    if (token.type === 'newline') return 70 + Math.random() * 100;
-    return 18 + Math.random() * 45;
+    // Wider gaps give the eye time to land before the next word fires
+    if (token.type === 'newline') return 110 + Math.random() * 120;
+    return 35 + Math.random() * 55;
 }
 
 function _scrambleToken(idx, duration) {
@@ -475,40 +478,4 @@ onUnmounted(() => {
 .ws-reboot-line {
     opacity: 0;
     transform: translateY(3px);
-    transition: opacity 0.22s ease, transform 0.22s ease;
-    color: rgba(0, 255, 140, 0.75);
-}
-
-.ws-reboot-line--visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.ws-reboot-cursor {
-    display: inline-block;
-    color: rgba(0, 255, 140, 0.75);
-    animation: ws-blink 0.5s steps(1) infinite;
-    margin-left: 2px;
-}
-
-/* Reboot screen fades away to reveal the game world */
-.ws-reboot-fade-leave-active { transition: opacity 0.9s ease; }
-.ws-reboot-fade-leave-to     { opacity: 0; }
-
-/* ── Transitions ──────────────────────────────────────────────────────────── */
-
-/* Box slams in — no gentle fade, a snap at 2 steps */
-.ws-slam-enter-active { animation: ws-slam-in 0.12s steps(2) forwards; }
-.ws-slam-leave-active { transition: opacity 0.15s ease; }
-.ws-slam-leave-to     { opacity: 0; }
-
-@keyframes ws-slam-in {
-    0%   { opacity: 0; transform: scale(1.05) translateY(-4px); }
-    50%  { opacity: 1; transform: scale(0.98) translateY(1px); }
-    100% { opacity: 1; transform: scale(1)    translateY(0); }
-}
-
-/* Body fades in after override hold */
-.ws-body-in-enter-active { transition: opacity 0.18s ease; }
-.ws-body-in-enter-from   { opacity: 0; }
-</style>
+    transition: opacity 
