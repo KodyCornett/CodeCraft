@@ -128,6 +128,25 @@ const rebootLines = computed(() => {
 // All timer IDs pooled for cleanup
 let _timers = [];
 
+// ── Intrusion audio — plays once at breach start, disposed after ──────────────
+let _intrusionAudio = null;
+
+function _playIntrusionSfx() {
+    try {
+        _intrusionAudio = new Audio('/audio/Sound/Intrusion.mp3');
+        _intrusionAudio.volume = 0.85;
+        _intrusionAudio.play().catch(() => {});
+    } catch (_) {}
+}
+
+function _stopIntrusionSfx() {
+    if (_intrusionAudio) {
+        _intrusionAudio.pause();
+        _intrusionAudio.src  = '';
+        _intrusionAudio      = null;
+    }
+}
+
 watch(() => props.signal, (sig) => {
     if (sig && phase.value === 'idle') _startBreach();
 }, { immediate: true });
@@ -135,6 +154,7 @@ watch(() => props.signal, (sig) => {
 // ── Phase 1a: breach — 0.8 s full glitch + red strobe ────────────────────────
 function _startBreach() {
     phase.value             = 'breach';
+    _playIntrusionSfx();
     textComplete.value      = false;
     renderedTokens.value    = [];
     rebootRevealCount.value = 0;
@@ -145,6 +165,7 @@ function _startBreach() {
 
     _timers.push(setTimeout(() => {
         phase.value = 'override';
+        _stopIntrusionSfx(); // noise cuts as the override box slams in
         _timers.push(setTimeout(() => {
             clearInterval(pidInterval); // PID freezes when text starts
             _startTokenReveal();
@@ -152,38 +173,81 @@ function _startBreach() {
     }, 800));
 }
 
-// ── Phase 1b: intrusion — token scramble reveal, auto-advances after hold ────
-const GLITCH_CHARS = '!@#$%^&*<>{}|\\?~`01░▒▓█▌▐■□▸◈×÷';
+// ── Phase 1b: intrusion — two-pass token engine ───────────────────────────────
+//
+// Pass 1 (corrupt reveal): token scrambles in → snaps to a zalgo-corrupted version
+// Pass 2 (cleanup):        2 s later, token re-scrambles → snaps to the clean word
+//
+// The rolling offset means early words are already cleaning up while later words
+// are still fighting through their corrupt reveal — the signal is pushing through.
+//
+const GLITCH_CHARS   = '!@#$%^&*<>{}|\\?~`01░▒▓█▌▐■□▸◈×÷';
+const CLEAN_DELAY_MS = 2000; // ms after corrupt snap before cleanup scramble fires
+
+// Light combining diacritics — readable but visually disturbed
+const COMBINING = ['̀', '́', '̂', '̈', '̧', '̰', '̲', '̶'];
+
+function _corruptWord(word) {
+    // Structural tokens stay clean — corruption targets only narrative words
+    if (/^\[/.test(word) || /^\*/.test(word) || /^[▓░·]+$/.test(word)) return word;
+    return [...word].map(ch => {
+        if (!/[a-zA-Z]/.test(ch)) return ch;
+        const n     = Math.floor(Math.random() * 2) + 1;
+        const marks = COMBINING.slice().sort(() => Math.random() - 0.5).slice(0, n).join('');
+        return ch + marks;
+    }).join('');
+}
 
 function _startTokenReveal() {
     phase.value = 'intrusion';
 
-    // Accept either signal_text (from DB) or body (from story triggers)
     const text   = props.signal?.signal_text ?? props.signal?.body ?? '';
     const tokens = _tokenize(text);
 
+    // Each token carries both the corrupted first-snap and the clean final-snap
     renderedTokens.value = tokens.map(t => ({
-        raw:     t.raw,
-        type:    t.type,
-        display: (t.type === 'space' || t.type === 'newline') ? t.raw : '',
-        state:   (t.type === 'space' || t.type === 'newline') ? 'revealed' : 'pending',
-        flash:   false,
+        clean:    t.clean,
+        corrupt:  t.corrupt,
+        raw:      t.corrupt,   // _scrambleToken snaps to token.raw — starts pointing at corrupt
+        type:     t.type,
+        display:  (t.type === 'space' || t.type === 'newline') ? t.clean : '',
+        state:    (t.type === 'space' || t.type === 'newline') ? 'revealed' : 'pending',
+        flash:    false,
     }));
 
-    let cumDelay = 250;
+    let cumDelay   = 250;
+    let lastCleanAt = 0;
 
     tokens.forEach((token, i) => {
         if (token.type === 'space' || token.type === 'newline') return;
-        const scrambleDur = _scrambleDuration(token);
-        _timers.push(setTimeout(() => _scrambleToken(i, scrambleDur), cumDelay));
-        cumDelay += scrambleDur + _gapAfter(token);
+
+        const corruptDur = _scrambleDuration(token);
+        const cleanDur   = _cleanDuration(token);
+        const startAt    = cumDelay;
+
+        // Pass 1: scramble → snap corrupted
+        _timers.push(setTimeout(() => _scrambleToken(i, corruptDur), startAt));
+
+        // Pass 2: CLEAN_DELAY_MS after the corrupt snap → re-scramble → snap clean
+        const cleanAt = startAt + corruptDur + CLEAN_DELAY_MS;
+        _timers.push(setTimeout(() => {
+            const tok = renderedTokens.value[i];
+            if (tok) {
+                tok.raw = tok.clean;        // switch snap target to the clean word
+                _scrambleToken(i, cleanDur);
+            }
+        }, cleanAt));
+
+        if (cleanAt + cleanDur > lastCleanAt) lastCleanAt = cleanAt + cleanDur;
+
+        cumDelay += corruptDur + _gapAfter(token);
     });
 
-    // After full reveal: hold 3 s so the player can read it, then cut to blackout
+    // textComplete fires after every word has finished its cleanup pass
     _timers.push(setTimeout(() => {
         textComplete.value = true;
-        _timers.push(setTimeout(_startBlackout, 3000));
-    }, cumDelay + 150));
+        _timers.push(setTimeout(_startBlackout, 2500));
+    }, lastCleanAt + 300));
 }
 
 // ── Phase 2: blackout — pure black, 2.5 s ────────────────────────────────────
@@ -220,30 +284,38 @@ function _tokenize(text) {
     let buf = '';
     for (const ch of text) {
         if (ch === '\n') {
-            if (buf) { tokens.push({ raw: buf, type: 'word' }); buf = ''; }
-            tokens.push({ raw: '\n', type: 'newline' });
+            if (buf) { tokens.push(_buildToken(buf)); buf = ''; }
+            tokens.push({ clean: '\n', corrupt: '\n', raw: '\n', type: 'newline' });
         } else if (ch === ' ') {
-            if (buf) { tokens.push({ raw: buf, type: 'word' }); buf = ''; }
-            tokens.push({ raw: ' ', type: 'space' });
+            if (buf) { tokens.push(_buildToken(buf)); buf = ''; }
+            tokens.push({ clean: ' ', corrupt: ' ', raw: ' ', type: 'space' });
         } else {
             buf += ch;
         }
     }
-    if (buf) tokens.push({ raw: buf, type: 'word' });
+    if (buf) tokens.push(_buildToken(buf));
     return tokens;
 }
 
+function _buildToken(word) {
+    return { clean: word, corrupt: _corruptWord(word), raw: word, type: 'word' };
+}
+
 function _scrambleDuration(token) {
-    const t = token.raw;
-    // Structure tokens resolve quickly — chaos is in the scramble, not the snap
+    const t = token.clean;
     if (/^\[/.test(t) || /^\.{2,}/.test(t) || /^\*/.test(t)) return 60 + Math.random() * 80;
     if (t.length <= 2) return 80 + Math.random() * 100;
-    // Real words snap fast enough to read — player tracks meaning through the noise
     return 140 + Math.random() * 180;
 }
 
+// Cleanup pass is faster — the signal is clarifying, not fighting
+function _cleanDuration(token) {
+    const t = token.clean;
+    if (t.length <= 2) return 60 + Math.random() * 60;
+    return 100 + Math.random() * 120;
+}
+
 function _gapAfter(token) {
-    // Wider gaps give the eye time to land before the next word fires
     if (token.type === 'newline') return 110 + Math.random() * 120;
     return 35 + Math.random() * 55;
 }
@@ -253,7 +325,9 @@ function _scrambleToken(idx, duration) {
     if (!token) return;
 
     token.state = 'scrambling';
-    const len      = token.raw.length;
+    // Always base glitch char count on the clean word length —
+    // combining chars inflate token.raw.length when corrupt
+    const len = token.clean.length;
     const interval = setInterval(() => {
         token.display = Array.from({ length: len }, () =>
             GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]
@@ -263,7 +337,7 @@ function _scrambleToken(idx, duration) {
 
     _timers.push(setTimeout(() => {
         clearInterval(interval);
-        token.display = token.raw;
+        token.display = token.raw;   // snaps to whatever raw currently points at
         token.state   = 'revealed';
         token.flash   = true;
         _timers.push(setTimeout(() => { token.flash = false; }, 160));
@@ -276,6 +350,7 @@ onUnmounted(() => {
         clearTimeout(id);
         clearInterval(id);
     });
+    _stopIntrusionSfx();
 });
 </script>
 
@@ -478,4 +553,40 @@ onUnmounted(() => {
 .ws-reboot-line {
     opacity: 0;
     transform: translateY(3px);
-    transition: opacity 
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    color: rgba(0, 255, 140, 0.75);
+}
+
+.ws-reboot-line--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ws-reboot-cursor {
+    display: inline-block;
+    color: rgba(0, 255, 140, 0.75);
+    animation: ws-blink 0.5s steps(1) infinite;
+    margin-left: 2px;
+}
+
+/* Reboot screen fades away to reveal the game world */
+.ws-reboot-fade-leave-active { transition: opacity 0.9s ease; }
+.ws-reboot-fade-leave-to     { opacity: 0; }
+
+/* ── Transitions ──────────────────────────────────────────────────────────── */
+
+/* Box slams in — no gentle fade, a snap at 2 steps */
+.ws-slam-enter-active { animation: ws-slam-in 0.12s steps(2) forwards; }
+.ws-slam-leave-active { transition: opacity 0.15s ease; }
+.ws-slam-leave-to     { opacity: 0; }
+
+@keyframes ws-slam-in {
+    0%   { opacity: 0; transform: scale(1.05) translateY(-4px); }
+    50%  { opacity: 1; transform: scale(0.98) translateY(1px); }
+    100% { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+/* Body fades in after override hold */
+.ws-body-in-enter-active { transition: opacity 0.18s ease; }
+.ws-body-in-enter-from   { opacity: 0; }
+</style>
