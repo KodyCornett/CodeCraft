@@ -81,12 +81,20 @@ class QuestService
                     $stageProg   = $stageProgressMap[$stage->id] ?? null;
                     $stageStatus = $stageProg?->status ?? 'locked';
 
+                    // Ensure dialogue is always returned as a decoded array, not a JSON string.
+                    // The array cast on QuestStage should handle this, but defensively
+                    // decode here in case the cast returns the raw DB string.
+                    $rawDialogue = $stage->dialogue;
+                    $dialogue    = $stageStatus === 'active'
+                        ? (is_string($rawDialogue) ? json_decode($rawDialogue, true) : $rawDialogue)
+                        : null;
+
                     $stages[] = [
                         'id'                 => $stage->id,
                         'stage_number'       => $stage->stage_number,
                         'title'              => $stage->title,
                         'objective_text'     => $stageStatus !== 'locked' ? $stage->objective_text : null,
-                        'dialogue'           => $stageStatus === 'active' ? $stage->dialogue : null,
+                        'dialogue'           => $dialogue,
                         'status'             => $stageStatus,
                         'rep_reward'         => $stage->rep_reward,
                         'is_branch'          => $stage->is_branch,
@@ -151,11 +159,17 @@ class QuestService
                 continue; // already initialised
             }
 
-            // Only entry arcs auto-unlock on first visit.
-            // Non-entry arcs (rep_required = 0 or otherwise) start locked and
-            // are unlocked via checkAndUnlockArcs (rep threshold) or explicit
-            // story triggers — not merely by the player visiting the CyberDoc.
-            $shouldUnlock = $arc->is_entry_arc;
+            // Entry arcs unlock immediately on first visit.
+            // Non-entry arcs unlock if the player holds a referral to this doc
+            // (i.e. they completed a stage elsewhere whose referral_doc_id = $doc->id).
+            // Without a referral they initialise as 'locked' and wait for a rep threshold
+            // or another explicit trigger via checkAndUnlockArcs.
+            $hasReferral = PlayerStageProgress::where('player_id', $player->id)
+                ->where('status', 'complete')
+                ->whereHas('stage', fn ($q) => $q->where('referral_doc_id', $doc->id))
+                ->exists();
+
+            $shouldUnlock = $arc->is_entry_arc || $hasReferral;
             $status       = $shouldUnlock ? 'active' : 'locked';
 
             PlayerArcProgress::create([
@@ -235,6 +249,12 @@ class QuestService
         // Grant rep
         $rep = $this->reputationService->grantRep($player, $repDocId, $repAmount);
 
+        // Grant wallet_creds reward if the stage defines one.
+        // Goes directly to wallet (safe — not stealable in PvP).
+        if (($stage->reward_creds ?? 0) > 0) {
+            $player->increment('wallet_creds', $stage->reward_creds);
+        }
+
         // Activate next stage
         $nextStage = QuestStage::where('quest_arc_id', $arc->id)
             ->where('stage_number', $stage->stage_number + 1)
@@ -297,6 +317,7 @@ class QuestService
             'rep_doc_id'            => $repDocId,
             'rep_score'             => $rep->score,
             'rep_label'             => $this->reputationService->getRepLabel($rep->score),
+            'creds_granted'         => $stage->reward_creds ?? 0,
             'next_stage_id'         => $nextStage?->id,
             'arcs_unlocked'         => $unlocked,
             'referral_issued'       => $stage->referral_doc_id !== null,

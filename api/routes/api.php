@@ -141,12 +141,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/tutorial/state', [TutorialController::class, 'updateState']);
 
     // Credits quest rewards directly to wallet_creds (safe — not stealable in PvP).
-    // Throttled to prevent reward farming; a new player completes at most 4 quests.
+    // 4 quests max per player; 30/min gives room for dev resets without 429s.
     Route::post('/tutorial/reward', [TutorialController::class, 'reward'])
-        ->middleware('throttle:10,1');
-    // Fired once when all tutorial quests are complete — unlocks the entry arc (Knuckle).
+        ->middleware('throttle:30,1');
+    // Fired once when all quests are rewarded — unlocks the entry arc (Knuckle).
+    // 20/min so dev resets don't throttle the completion flow.
     Route::post('/tutorial/complete', [TutorialController::class, 'complete'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:20,1');
 
 // ---------------------------------------------------------------------------
 // Inventory

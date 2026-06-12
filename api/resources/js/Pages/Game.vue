@@ -869,7 +869,14 @@ watch(activeBrowserUrl, (url) => {
 // mission terminal when the install sequence finishes.
 // justCompleted pulses true→false in a single tick so this fires exactly once.
 watch(tutorial.justCompleted, (val) => {
-    if (val) onLaunch(SPLICE.CORTEX_PATCH);
+    console.log('%c[TUTORIAL] justCompleted watcher fired — val:', 'color:#00FFC8;font-weight:bold', val);
+    if (val) {
+        console.log('%c[TUTORIAL] Launching CORTEX_PATCH SPLICE page', 'color:#00FFC8;font-weight:bold');
+        // Refresh quest log — tutorial/complete just initialised Knuckle's entry arc.
+        // Without this, questDocs is stale and the dialogue button never appears.
+        fetchQuestLog();
+        onLaunch(SPLICE.CORTEX_PATCH);
+    }
 });
 
 // Quest trigger: node inspected (any node click)
@@ -963,10 +970,14 @@ const currentNodeDialogueUrl = computed(() => {
 
     // Only show the button when there's actually dialogue to read
     const doc = questDocs.value.find(d => d.district === node.district);
-    if (!doc) return null;
+    if (!doc) {
+        console.log(`%c[DIALOGUE] ${node.npcHandle} — no quest doc found for district "${node.district}"`, 'color:#FF6B35');
+        return null;
+    }
     const hasDialogue = doc.arcs?.some(arc =>
         arc.stages?.some(s => s.status === 'active' && s.dialogue?.length > 0)
     );
+    console.log(`%c[DIALOGUE] ${node.npcHandle} — met=${doc.met} hasActiveDialogue=${hasDialogue}`, 'color:#00FFC8');
     return hasDialogue ? url : null;
 });
 
@@ -1001,7 +1012,11 @@ provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQ
 // Called by SystemUpdate.vue when the install sequence finishes.
 // Fires the Watcher interrupt, then navigates to the mission terminal.
 provide('onInstallComplete', () => {
-    _postSignalNav.value = () => onLaunch(SPLICE.TERMINAL);
+    console.log('%c[TUTORIAL] onInstallComplete fired — queueing Watcher signal then TERMINAL nav', 'color:#FF6B35;font-weight:bold');
+    _postSignalNav.value = () => {
+        console.log('%c[TUTORIAL] Post-signal nav firing → TERMINAL', 'color:#FF6B35;font-weight:bold');
+        onLaunch(SPLICE.TERMINAL);
+    };
     triggerSignal({
         id:    'watcher-post-cortex-install',
         title: '[NULL]',
@@ -1764,6 +1779,13 @@ onMounted(async () => {
             fetchArchive(),
             tutorial.hydrate(),
         ]);
+        // Re-fetch quest log now that tutorial.hydrate() has completed.
+        // Race condition: if tutorial was already complete, hydrate() posted
+        // tutorial/complete above (initialising Knuckle's entry arc), but
+        // fetchQuestLog() in the parallel batch resolved before that POST —
+        // so questDocs would be missing the arc. This second fetch is cheap
+        // and guarantees questDocs reflects current server state on every boot.
+        await fetchQuestLog();
         // Process archive events for doc notifications (arc unlocks, referrals)
         processDocEvents(archiveEvents.value);
 

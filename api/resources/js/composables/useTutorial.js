@@ -56,6 +56,22 @@ const QUEST_DEFS = [
     },
 ];
 
+// ── Logging helper ────────────────────────────────────────────────────────────
+function log(msg, data) {
+    if (data !== undefined) {
+        console.log(`%c[TUTORIAL] ${msg}`, 'color:#00FFC8;font-weight:bold', data);
+    } else {
+        console.log(`%c[TUTORIAL] ${msg}`, 'color:#00FFC8;font-weight:bold');
+    }
+}
+function warn(msg, data) {
+    if (data !== undefined) {
+        console.warn(`[TUTORIAL] ${msg}`, data);
+    } else {
+        console.warn(`[TUTORIAL] ${msg}`);
+    }
+}
+
 function defaultState() {
     return {
         tutorialSeen:    false,
@@ -73,26 +89,47 @@ export function useTutorial() {
     const _syncing      = ref(false);   // prevents overlapping PATCH calls
     const justCompleted = ref(false);   // pulses true once after tutorial finishes; Game.vue watches this
 
-    // ── Hydration (called once on game boot from useGameState / Game.vue) ─────
+    // ── Hydration (called once on game boot) ──────────────────────────────────
     async function hydrate() {
+        log('hydrate() → GET /api/tutorial/state');
         try {
             const { data } = await axios.get('/api/tutorial/state');
             _state.value = { ...defaultState(), ...(data.tutorial_state ?? {}) };
+            log('hydrate() complete — state loaded', {
+                stepsDone:      _state.value.stepsDone,
+                questsRewarded: _state.value.questsRewarded,
+                tutorialSeen:   _state.value.tutorialSeen,
+                tutorialSkipped: _state.value.tutorialSkipped,
+            });
+
+            // If all quests are already complete on this session load, ensure the
+            // entry arc was initialised server-side (handles 429 failures from a
+            // previous session without requiring a full tutorial redo).
+            const allRewarded = QUEST_DEFS.every(q => _state.value.questsRewarded.includes(q.id));
+            if (allRewarded) {
+                log('hydrate() — tutorial already complete, re-firing complete endpoint to guarantee arc unlock');
+                await _completeTutorial({ silent: true });
+            }
         } catch (e) {
-            console.warn('[TUTORIAL] Failed to load state from server:', e?.message);
+            warn('hydrate() failed to load state from server:', e?.message);
         }
     }
 
     // ── Persist to server ─────────────────────────────────────────────────────
     async function _save() {
-        if (_syncing.value) return;
+        if (_syncing.value) {
+            warn('_save() skipped — sync already in progress');
+            return;
+        }
         _syncing.value = true;
+        log('_save() → PATCH /api/tutorial/state', _state.value);
         try {
-            await axios.patch('/api/tutorial/state', {
+            const { data } = await axios.patch('/api/tutorial/state', {
                 tutorial_state: _state.value,
             });
+            log('_save() confirmed — server echoed back:', data.tutorial_state);
         } catch (e) {
-            console.warn('[TUTORIAL] Failed to persist state:', e?.message);
+            warn('_save() failed to persist state:', e?.message);
         } finally {
             _syncing.value = false;
         }
@@ -128,11 +165,13 @@ export function useTutorial() {
     // ── Actions ───────────────────────────────────────────────────────────────
 
     function markSeen() {
+        log('markSeen()');
         _state.value.tutorialSeen = true;
         _save();
     }
 
     function skip() {
+        log('skip()');
         _state.value.tutorialSeen    = true;
         _state.value.tutorialSkipped = true;
         _save();
@@ -140,60 +179,109 @@ export function useTutorial() {
 
     function clearBadge() {
         if (!_state.value.hasBadge) return;
+        log('clearBadge()');
         _state.value.hasBadge = false;
         _save();
     }
 
     async function markStepDone(stepId) {
-        if (_state.value.tutorialSkipped)   return;
-        if (_state.value.stepsDone[stepId]) return;
+        if (_state.value.tutorialSkipped) {
+            log(`markStepDone('${stepId}') — skipped (tutorial skipped)`);
+            return;
+        }
+        if (_state.value.stepsDone[stepId]) {
+            log(`markStepDone('${stepId}') — already done, no-op`);
+            return;
+        }
 
         const active = activeQuest.value;
-        if (!active) return;
-        if (!active.steps.find(s => s.id === stepId)) return;
+        if (!active) {
+            log(`markStepDone('${stepId}') — no active quest, no-op`);
+            return;
+        }
+        if (!active.steps.find(s => s.id === stepId)) {
+            log(`markStepDone('${stepId}') — step not in active quest '${active.id}', no-op`);
+            return;
+        }
 
+        log(`markStepDone('${stepId}') — marking done in quest '${active.id}'`);
         _state.value.stepsDone[stepId] = true;
         _state.value.hasBadge          = true;
         await _save();
 
         const questNowDone = active.steps.every(s => _state.value.stepsDone[s.id]);
+        log(`markStepDone('${stepId}') — quest '${active.id}' complete: ${questNowDone}`);
+
         if (questNowDone) {
             await _creditReward(active);
         }
     }
 
     async function _creditReward(quest) {
-        if (_state.value.questsRewarded.includes(quest.id)) return;
+        if (_state.value.questsRewarded.includes(quest.id)) {
+            log(`_creditReward('${quest.id}') — already rewarded, skipping`);
+            return;
+        }
+
+        log(`_creditReward('${quest.id}') → POST /api/tutorial/reward`, { amount: quest.reward });
         try {
-            await axios.post('/api/tutorial/reward', {
+            const { data } = await axios.post('/api/tutorial/reward', {
                 quest_id: quest.id,
                 amount:   quest.reward,
             });
+            log(`_creditReward('${quest.id}') — reward credited, wallet_creds now: ${data.wallet_creds}`);
+
             _state.value.questsRewarded.push(quest.id);
             await _save();
 
-            // If every quest is now rewarded, the tutorial is complete.
-            // Fire the complete signal so the server unlocks the Knuckle arc.
             const allRewarded = QUEST_DEFS.every(q => _state.value.questsRewarded.includes(q.id));
+            log(`_creditReward('${quest.id}') — all quests rewarded: ${allRewarded}`, {
+                rewarded: _state.value.questsRewarded,
+            });
+
             if (allRewarded) {
                 await _completeTutorial();
             }
         } catch (e) {
-            console.warn('[TUTORIAL] Reward credit failed:', e?.message);
+            warn(`_creditReward('${quest.id}') failed:`, e?.message);
         }
     }
 
-    async function _completeTutorial() {
+    // silent=true → called from hydrate on reload; skips justCompleted pulse
+    async function _completeTutorial({ silent = false } = {}) {
+        log(`_completeTutorial() → POST /api/tutorial/complete (silent=${silent})`);
         try {
             await axios.post('/api/tutorial/complete');
-            // Signal Game.vue to open the quest terminal so the player sees
-            // Knuckle's newly unlocked arc. Reset to false after one tick so
-            // the watch fires again if needed (e.g. dev hot-reload).
-            justCompleted.value = true;
-            await nextTick();
-            justCompleted.value = false;
+            log('_completeTutorial() — server confirmed arc unlock ✓');
+
+            if (!silent) {
+                log('_completeTutorial() — pulsing justCompleted to trigger Game.vue watcher');
+                justCompleted.value = true;
+                await nextTick();
+                justCompleted.value = false;
+            } else {
+                log('_completeTutorial() — silent mode, skipping justCompleted pulse');
+            }
         } catch (e) {
-            console.warn('[TUTORIAL] Complete signal failed:', e?.message);
+            const status = e?.response?.status;
+            warn(`_completeTutorial() failed (HTTP ${status ?? 'unknown'}):`, e?.message);
+
+            // Retry once after a short delay if throttled
+            if (status === 429) {
+                warn('_completeTutorial() — 429 throttled, retrying in 3 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                try {
+                    await axios.post('/api/tutorial/complete');
+                    log('_completeTutorial() retry — arc unlock confirmed ✓');
+                    if (!silent) {
+                        justCompleted.value = true;
+                        await nextTick();
+                        justCompleted.value = false;
+                    }
+                } catch (retryErr) {
+                    warn('_completeTutorial() retry also failed:', retryErr?.message);
+                }
+            }
         }
     }
 
