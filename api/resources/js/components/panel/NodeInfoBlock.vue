@@ -67,6 +67,13 @@
                         <span>◈</span> BANK
                     </button>
                 </div>
+                <button
+                    v-if="dialogueSpliceUrl && isOnNode"
+                    class="ni-dialogue-btn"
+                    @click="$emit('open-dialogue')"
+                >
+                    [ OPEN DIALOGUE ]
+                </button>
                 <button class="ni-cooldown-btn" :disabled="!isOnNode" @click="$emit('reset-cooldowns')">
                     [ RESET COOLDOWNS ]
                 </button>
@@ -168,11 +175,12 @@ import PanelBlock from './PanelBlock.vue';
 import { getNodeIdentity } from '@/composables/useNodeIdentity.js';
 
 const props = defineProps({
-    node:        { type: Object,  default: null },
-    isOnNode:    { type: Boolean, default: false },
-    nodePlayers: { type: Array,   default: () => [] },
+    node:              { type: Object,  default: null },
+    isOnNode:          { type: Boolean, default: false },
+    nodePlayers:       { type: Array,   default: () => [] },
     // Active hack traces left on this node — see useNodeTraces composable
-    traces:      { type: Array,   default: () => [] },
+    traces:            { type: Array,   default: () => [] },
+    dialogueSpliceUrl: { type: String,  default: null },
     resources: {
         type:    Object,
         default: () => ({
@@ -183,7 +191,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'hack-player']);
+defineEmits(['hack', 'open-store', 'open-bank', 'open-dialogue', 'reset-cooldowns', 'hack-player']);
 
 // Render seconds_remaining as M:SS
 function formatTimer(seconds) {
@@ -282,6 +290,12 @@ const iceColorClass = computed(() => {
     background:rgba(0,255,136,.04); border:1px solid rgba(0,255,136,.3); color:rgba(0,255,136,.8);
     font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; cursor:pointer; transition:all .15s; }
 .ni-bank-btn:hover { background:rgba(0,255,136,.09); border-color:rgba(0,255,136,.65); }
+.ni-dialogue-btn { width:100%; padding:8px 0; background:transparent; border:1px solid rgba(255,107,53,.35);
+    color:rgba(255,107,53,.8); font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.14em;
+    cursor:pointer; transition:all .15s; }
+.ni-dialogue-btn:hover { background:rgba(255,107,53,.07); border-color:rgba(255,107,53,.7); color:#FF6B35;
+    box-shadow:0 0 8px rgba(255,107,53,.15); }
+
 .ni-cooldown-btn { width:100%; padding:6px 0; background:transparent; border:1px solid rgba(255,179,0,.18);
     color:rgba(255,179,0,.45); font-family:'JetBrains Mono',monospace; font-size:7px; letter-spacing:.14em;
     cursor:pointer; transition:all .15s; }

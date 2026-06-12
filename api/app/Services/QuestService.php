@@ -86,6 +86,7 @@ class QuestService
                         'stage_number'       => $stage->stage_number,
                         'title'              => $stage->title,
                         'objective_text'     => $stageStatus !== 'locked' ? $stage->objective_text : null,
+                        'dialogue'           => $stageStatus === 'active' ? $stage->dialogue : null,
                         'status'             => $stageStatus,
                         'rep_reward'         => $stage->rep_reward,
                         'is_branch'          => $stage->is_branch,

@@ -30,6 +30,7 @@ class QuestStage extends Model
         // Triggers
         'node_canvas_id',
         'minigame_type',
+        'dialogue',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class QuestStage extends Model
         'rep_reward'         => 'integer',
         'is_branch'          => 'boolean',
         'branch_options'     => 'array',
+        'dialogue'           => 'array',
         'reward_creds'       => 'integer',
         'reward_tech_points' => 'decimal:2',
     ];

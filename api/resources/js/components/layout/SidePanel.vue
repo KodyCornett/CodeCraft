@@ -24,9 +24,11 @@
                 :node-players="nodePlayers"
                 :traces="traces"
                 :current-player-id="currentPlayerId"
+                :dialogue-splice-url="dialogueSpliceUrl"
                 @hack="$emit('hack', $event)"
                 @open-store="$emit('open-store')"
                 @open-bank="$emit('open-bank')"
+                @open-dialogue="$emit('open-dialogue')"
                 @reset-cooldowns="$emit('reset-cooldowns')"
                 @hack-player="$emit('hack-player', $event)"
             />
@@ -58,12 +60,13 @@ import BountyBlock   from '@/components/panel/BountyBlock.vue';
 
 defineProps({
     // Node Info
-    node:        { type: Object,  default: null },
-    isOnNode:    { type: Boolean, default: false },
-    resources:   { type: Object,  default: null },
-    nodePlayers:     { type: Array,  default: () => [] },
-    traces:          { type: Array,  default: () => [] },
-    currentPlayerId: { type: String, default: null },
+    node:             { type: Object,  default: null },
+    isOnNode:         { type: Boolean, default: false },
+    resources:        { type: Object,  default: null },
+    nodePlayers:      { type: Array,  default: () => [] },
+    traces:           { type: Array,  default: () => [] },
+    currentPlayerId:  { type: String, default: null },
+    dialogueSpliceUrl: { type: String, default: null },
 
     // Loadout + SS
     commands:  { type: Array,   default: () => [] },
@@ -78,7 +81,7 @@ defineProps({
     playerOpenSeason: { type: Boolean, default: false },
 });
 
-defineEmits(['hack', 'open-store', 'open-bank', 'reset-cooldowns', 'use-command', 'hack-player']);
+defineEmits(['hack', 'open-store', 'open-bank', 'open-dialogue', 'reset-cooldowns', 'use-command', 'hack-player']);
 </script>
 
 <style scoped>

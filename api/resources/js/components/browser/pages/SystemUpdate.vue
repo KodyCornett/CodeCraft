@@ -134,7 +134,8 @@ const props = defineProps({
     url: { type: String, default: '' },
 });
 
-const spliceNavigate = inject('spliceNavigate', () => {});
+const spliceNavigate    = inject('spliceNavigate', () => {});
+const onInstallComplete = inject('onInstallComplete', null);
 
 // ── Parse URL params ──────────────────────────────────────────────────────────
 // e.g. splice://sys.tacat/cortex-patch?patch=SPLICE_CONTACT_RELAY&sector=BROWNES_ADDITION
@@ -278,11 +279,16 @@ onMounted(() => {
                 else             phase.value = 'running';
             }
 
-            // Done — brief hold then navigate
+            // Done — brief hold then fire the Watcher interrupt via Game.vue
             if (entry.done) {
                 phase.value = 'complete';
                 const nav = setTimeout(() => {
-                    spliceNavigate(SPLICE.TERMINAL);
+                    if (onInstallComplete) {
+                        onInstallComplete();
+                    } else {
+                        // Fallback if not wired (shouldn't happen in production)
+                        spliceNavigate(SPLICE.TERMINAL);
+                    }
                 }, 1800);
                 _timers.push(nav);
             }

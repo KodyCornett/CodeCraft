@@ -267,8 +267,10 @@
                 :node-players="nodePlayers"
                 :traces="nodeTraces"
                 @hack="onHackSelected"
+                :dialogue-splice-url="currentNodeDialogueUrl"
                 @open-store="onOpenStore"
                 @open-bank="onLaunch(SPLICE.BANK)"
+                @open-dialogue="onLaunch(currentNodeDialogueUrl)"
                 @reset-cooldowns="onResetCooldowns"
                 @use-command="onUseCommand"
                 @hack-player="onHackPlayer"
@@ -940,16 +942,72 @@ const questMarkers = computed(() => {
     return markers;
 });
 
+// Derive the dialogue SPLICE URL for the currently selected cyberdoc node.
+// Returns a URL string when:
+//   - The selected node is a cyberdoc with a known npcHandle
+//   - The matching quest doc has at least one active stage with dialogue data
+// Returns null otherwise — NodeInfoBlock hides the button when null.
+const NPC_DIALOGUE_URL = {
+    KNUCKLE: SPLICE.DIALOGUE_KNUCKLE,
+    PATCH:   SPLICE.DIALOGUE_PATCH,
+    VEIL:    SPLICE.DIALOGUE_VEIL,
+    AXIOM:   SPLICE.DIALOGUE_AXIOM,
+    FLOAT:   SPLICE.DIALOGUE_FLOAT,
+};
+
+const currentNodeDialogueUrl = computed(() => {
+    const node = selectedNode.value;
+    if (!node || node.type !== 'cyberdoc' || !node.npcHandle) return null;
+    const url = NPC_DIALOGUE_URL[node.npcHandle.toUpperCase()];
+    if (!url) return null;
+
+    // Only show the button when there's actually dialogue to read
+    const doc = questDocs.value.find(d => d.district === node.district);
+    if (!doc) return null;
+    const hasDialogue = doc.arcs?.some(arc =>
+        arc.stages?.some(s => s.status === 'active' && s.dialogue?.length > 0)
+    );
+    return hasDialogue ? url : null;
+});
+
 // ── Watcher signal system ─────────────────────────────────────────────────────
 const {
     activeSignal, hasUnread: watcherHasUnread,
     fetchUnread: fetchWatcherUnread,
     markAllRead: watcherMarkAllRead,
-    onSignalComplete,
+    triggerSignal,
+    onSignalComplete: _onSignalComplete,
 } = useWatcher();
+
+// Post-signal navigation — set before triggering a story signal so the
+// handler knows where to go when the sequence finishes.
+const _postSignalNav = ref(null);
+
+function onSignalComplete() {
+    _onSignalComplete();
+    if (_postSignalNav.value) {
+        const nav = _postSignalNav.value;
+        _postSignalNav.value = null;
+        nav();
+    }
+}
 
 // Provide markAllRead to WatcherChannel.vue via inject
 provide('watcherMarkAllRead', watcherMarkAllRead);
+
+// Provide quest log state to SPLICE dialogue pages
+provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQuestLog });
+
+// Called by SystemUpdate.vue when the install sequence finishes.
+// Fires the Watcher interrupt, then navigates to the mission terminal.
+provide('onInstallComplete', () => {
+    _postSignalNav.value = () => onLaunch(SPLICE.TERMINAL);
+    triggerSignal({
+        id:    'watcher-post-cortex-install',
+        title: '[NULL]',
+        body:  "You're leaking.\n\nEvery node you touch. Every packet you crack. I see it — the noise your rig throws off when you work. That patch I pushed wasn't a fix. It was a door.\n\nI've been trying to reach you since before you knew the Frequency existed. The system you're running on isn't yours. It never was.\n\nKnuckle is in Browne's Addition. Get there.\n\nDon't trust the silence.",
+    });
+});
 
 // ── Persona selection — shown on first login before boot sequence ─────────────
 // true once auth has loaded and player has no persona set yet

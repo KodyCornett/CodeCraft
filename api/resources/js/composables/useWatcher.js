@@ -94,6 +94,17 @@ export function useWatcher() {
         activeSignal.value = queue.value[0];
     }
 
+    /**
+     * Push a signal object directly into the queue without an API round-trip.
+     * Used for story-triggered signals (e.g. post-install Watcher interrupt).
+     */
+    function triggerSignal(signal) {
+        if (!queue.value.find(q => q.id === signal.id)) {
+            queue.value.push(signal);
+        }
+        _processQueue();
+    }
+
     return {
         activeSignal:    readonly(activeSignal),
         hasUnread:       readonly(hasUnread),
@@ -101,6 +112,7 @@ export function useWatcher() {
         fetchUnread,
         fetchAll,
         markAllRead,
+        triggerSignal,
         onSignalComplete,
     };
 }

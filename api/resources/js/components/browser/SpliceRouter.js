@@ -33,8 +33,9 @@ import PersonasPage    from './pages/PersonasPage.vue';
 import WatcherChannel  from './pages/WatcherChannel.vue';
 import ArchivePage     from './pages/ArchivePage.vue';
 import BankPage      from './pages/BankPage.vue';
-import SystemUpdate  from './pages/SystemUpdate.vue';
-import NotFound      from './pages/NotFound.vue';
+import SystemUpdate    from './pages/SystemUpdate.vue';
+import DocDialoguePage from './pages/DocDialoguePage.vue';
+import NotFound        from './pages/NotFound.vue';
 
 // ── Route table ───────────────────────────────────────────────────────────────
 // To add a new page: import its component and add one entry here. That's it.
@@ -67,6 +68,13 @@ const ROUTES = [
     { url: 'splice://sys.tacat/cortex-patch',    title: 'CORTEX PATCH // FORCED', component: SystemUpdate   },
     { url: 'splice://sys.local/commands',         title: 'Commands',        component: SysCommands       },
     { url: 'splice://sys.local/inventory', title: 'Inventory',    component: SysInventory },
+
+    // ── Doc dialogue pages ────────────────────────────────────────────────────
+    { url: 'splice://dialogue/knuckle', title: 'KNUCKLE // TRANSMISSION', component: DocDialoguePage },
+    { url: 'splice://dialogue/patch',   title: 'PATCH // TRANSMISSION',   component: DocDialoguePage },
+    { url: 'splice://dialogue/veil',    title: 'VEIL // TRANSMISSION',    component: DocDialoguePage },
+    { url: 'splice://dialogue/axiom',   title: 'AXIOM // TRANSMISSION',   component: DocDialoguePage },
+    { url: 'splice://dialogue/float',   title: 'FLOAT // TRANSMISSION',   component: DocDialoguePage },
 ];
 
 export function resolveRoute(url) {
@@ -107,4 +115,11 @@ export const SPLICE = {
     INVENTORY:    'splice://sys.local/inventory',
     BANK:         'splice://bank.ch/hct',
     CORTEX_PATCH: 'splice://sys.tacat/cortex-patch',   // forced install — story-triggered only
+
+    // Doc dialogue pages — opened via [ OPEN DIALOGUE ] button in NodeInfoBlock
+    DIALOGUE_KNUCKLE: 'splice://dialogue/knuckle',
+    DIALOGUE_PATCH:   'splice://dialogue/patch',
+    DIALOGUE_VEIL:    'splice://dialogue/veil',
+    DIALOGUE_AXIOM:   'splice://dialogue/axiom',
+    DIALOGUE_FLOAT:   'splice://dialogue/float',
 };
