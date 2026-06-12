@@ -71,7 +71,7 @@ const FULL_TEXT =
 // ── Config ────────────────────────────────────────────────────────────────────
 // Tune CHAR_DELAY_MS so text finishes a few seconds BEFORE audio ends.
 // Lower the value if text is falling behind the narrator.
-const CHAR_DELAY_MS = 72;
+const CHAR_DELAY_MS = 50;
 const HOLD_AFTER_MS = 2000;
 const FADE_MS       = 1800;
 
