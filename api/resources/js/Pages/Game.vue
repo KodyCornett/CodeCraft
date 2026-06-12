@@ -4,7 +4,7 @@
         <PersonaSelect v-if="needsPersonaSelect" @done="onPersonaDone" />
 
         <!-- Watcher signal interrupt — renders above everything when active -->
-        <WatcherSignal :signal="activeSignal" @complete="onSignalComplete" />
+        <WatcherSignal :signal="activeSignal" :player="player" @complete="onSignalComplete" />
 
         <!-- Doc notifications — identified HUD alerts for arc unlocks and referrals -->
         <DocNotification :queue="docNotifQueue" @dismiss="dismissDocNotif" />
@@ -39,6 +39,13 @@
 
                 <!-- Active objective tracker — top-left, collapses to header bar -->
                 <ObjectiveTracker v-if="tutorial.allComplete.value" :objective="activeObjective" />
+
+                <!-- Boot notification — shown after Watcher reboot sequence -->
+                <Transition name="ice-alert-fade">
+                    <div v-if="bootNotification" class="boot-notification">
+                        [ SPLICE ] — session resumed — new data logged
+                    </div>
+                </Transition>
 
                 <!-- Mission update toast — fires when active stage changes -->
                 <Transition name="ice-alert-fade">
@@ -403,7 +410,7 @@ const { updatePosition } = usePosition(playerId);
 const { startHeartbeat, stopHeartbeat } = useHeartbeat();
 
 // ── Audio — shuffled background music, starts on first user interaction ───────
-const { startAudio, stopAudio } = useAudio();
+const { startAudio, stopAudio, cutAudio, resumeAudio } = useAudio();
 
 // ── Combat — challenge handshake + result submission ─────────────────────────
 const {
@@ -531,9 +538,13 @@ let   _flashTimer     = null;
 // myTraps:              owned by useTrapSystem (see composable instantiation above).
 // trapHitNotification:  set when position() returns trap_triggered — drives the victim hit popup.
 // trapFiredNotification: set when a WS trap.triggered event arrives — drives the placer popup.
-const trapTargetMode       = ref(null);
-const trapHitNotification  = ref(null);
+const trapTargetMode        = ref(null);
+const trapHitNotification   = ref(null);
 const trapFiredNotification = ref(null);
+
+// Boot notification — shown after Watcher reboot sequence completes
+const bootNotification    = ref(false);
+let   _bootNotifTimer     = null;
 
 function showBountyAlert(message) {
     if (_alertTimer) clearTimeout(_alertTimer);
@@ -1009,18 +1020,40 @@ provide('watcherMarkAllRead', watcherMarkAllRead);
 // Provide quest log state to SPLICE dialogue pages
 provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQuestLog });
 
+// Pool of nodes near BA-hub — random pick so players can't camp a fixed respawn point
+const _WATCHER_RESPAWN_POOL = ['B6', 'E7', 'C10', 'G11', 'H8', 'E5'];
+
 // Called by SystemUpdate.vue when the install sequence finishes.
-// Fires the Watcher interrupt, then navigates to the mission terminal.
+// Cuts music, fires the Watcher intrusion cinematic, then on reboot:
+//   → respawns player near BA-hub, resumes audio, shows boot notification, navigates to TERMINAL.
 provide('onInstallComplete', () => {
-    console.log('%c[TUTORIAL] onInstallComplete fired — queueing Watcher signal then TERMINAL nav', 'color:#FF6B35;font-weight:bold');
+    console.log('%c[TUTORIAL] onInstallComplete fired — cutting audio, queueing Watcher intrusion', 'color:#FF6B35;font-weight:bold');
+
+    // Silence music instantly — the intrusion breaks everything
+    cutAudio();
+
     _postSignalNav.value = () => {
-        console.log('%c[TUTORIAL] Post-signal nav firing → TERMINAL', 'color:#FF6B35;font-weight:bold');
+        // Respawn to a random node near BA-hub (anti-camping pool)
+        const pool     = _WATCHER_RESPAWN_POOL;
+        const respawnId = pool[Math.floor(Math.random() * pool.length)];
+        console.log('%c[TUTORIAL] Watcher reboot complete — respawning to', 'color:#FF6B35;font-weight:bold', respawnId);
+        currentNodeId.value = respawnId;
+
+        // Resume music as if nothing happened
+        resumeAudio();
+
+        // Understated system notification — just enough to direct the player
+        if (_bootNotifTimer) clearTimeout(_bootNotifTimer);
+        bootNotification.value = true;
+        _bootNotifTimer = setTimeout(() => { bootNotification.value = false; }, 6000);
+
+        // Open the mission terminal
         onLaunch(SPLICE.TERMINAL);
     };
+
     triggerSignal({
-        id:    'watcher-post-cortex-install',
-        title: '[NULL]',
-        body:  "You're leaking.\n\nEvery node you touch. Every packet you crack. I see it — the noise your rig throws off when you work. That patch I pushed wasn't a fix. It was a door.\n\nI've been trying to reach you since before you knew the Frequency existed. The system you're running on isn't yours. It never was.\n\nKnuckle is in Browne's Addition. Get there.\n\nDon't trust the silence.",
+        id:          'watcher-post-cortex-install',
+        signal_text: '[UNKNOWN_PROCESS: INJECTING]\n▓░▓▓░░▓░░▓▓░▓░░▓\n...k̷̡n̸͔u̵̗c̷̨k̸͎...\n*HIGH_FREQ_INTERFERENCE*\n[SYS_INTEGRITY: FAILING]\n[CONTAINMENT: ░░░░░░░░░░] BREACHED\n...n̵̨̛o̷͔͝t̸̯̀ ̵̡̾s̴͖͑t̷̰͘a̸͜͝b̷̳͑l̷͇̚e̸̗͠...\n*SIGNAL DECAY — SOURCE UNKNOWN*\n...s̷̛͔p̵̛̣e̶͎͝ȧ̵͜k̷̗̀...\n[KERNEL_PANIC]\n[MEMORY: CORRUPTING]\n...K̵̡̛n̴͔̓ȗ̵͖c̸̡͝k̶̰͑l̸̩͝ȩ̸̛s̵͕͘...\n*EAR-SPLITTING RING*',
     });
 });
 
@@ -2091,6 +2124,24 @@ onUnmounted(() => {
 .ice-alert-fade-leave-to     { opacity: 0; }
 
 /* ── Mission update toast ─────────────────────────────────────────────────── */
+/* Boot notification — understated system tone after Watcher reboot */
+.boot-notification {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    padding: 5px 18px;
+    background: rgba(4, 6, 14, 0.88);
+    border: 1px solid rgba(120, 180, 140, 0.25);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: rgba(140, 210, 170, 0.72);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
 .mission-toast {
     position: absolute;
     top: 88px;           /* sits below the ICE alert slot */
@@ -2196,172 +2247,4 @@ onUnmounted(() => {
 /* ── Incoming challenge ───────────────────────────────────────────────────── */
 .pvp-challenge {
     position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(3, 6, 10, 0.78);
-    z-index: 40;
-    pointer-events: all;
-}
-.pvp-challenge-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 28px 44px;
-    background: rgba(4, 8, 14, 0.97);
-    border: 1px solid rgba(255, 51, 51, 0.45);
-    font-family: 'JetBrains Mono', monospace;
-    box-shadow: 0 0 30px rgba(255, 51, 51, 0.15);
-    animation: pvp-challenge-pulse 1.4s ease-in-out infinite;
-}
-@keyframes pvp-challenge-pulse {
-    0%, 100% { border-color: rgba(255, 51, 51, 0.45); }
-    50%       { border-color: rgba(255, 51, 51, 0.9); }
-}
-.pvp-challenge-icon   { font-size: 22px; color: #FF3333; animation: crit-pulse 0.6s ease-in-out infinite; }
-.pvp-challenge-title  { font-size: 12px; color: #FF3333; letter-spacing: 0.2em; }
-.pvp-challenge-handle { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-.pvp-ch-label  { font-size: 7px; color: rgba(255,51,51,.4); letter-spacing: .12em; }
-.pvp-ch-name   { font-size: 13px; color: #FF69B4; letter-spacing: 0.1em; }
-.pvp-challenge-sub    { font-size: 8px; color: rgba(255,51,51,0.45); letter-spacing: 0.08em; text-align: center; }
-.pvp-challenge-actions { display: flex; gap: 12px; margin-top: 8px; }
-
-.pvp-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.14em;
-    padding: 8px 18px;
-    cursor: pointer;
-    background: transparent;
-    transition: all 0.14s;
-}
-.pvp-btn--accept {
-    border: 1px solid rgba(0, 255, 136, 0.45);
-    color: rgba(0, 255, 136, 0.8);
-}
-.pvp-btn--accept:hover {
-    background: rgba(0, 255, 136, 0.08);
-    border-color: rgba(0, 255, 136, 0.85);
-    color: #00FF88;
-}
-.pvp-btn--decline {
-    border: 1px solid rgba(255, 51, 51, 0.35);
-    color: rgba(255, 51, 51, 0.6);
-}
-.pvp-btn--decline:hover {
-    background: rgba(255, 51, 51, 0.07);
-    border-color: rgba(255, 51, 51, 0.75);
-    color: #FF3333;
-}
-
-/* ── Post-combat result ───────────────────────────────────────────────────── */
-.pvp-result {
-    position: absolute;
-    bottom: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 40;
-    pointer-events: none;
-}
-.pvp-result-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 16px 36px;
-    font-family: 'JetBrains Mono', monospace;
-    white-space: nowrap;
-}
-.pvp-result--won .pvp-result-inner {
-    background: rgba(4, 12, 8, 0.96);
-    border: 1px solid rgba(0, 255, 136, 0.5);
-    box-shadow: 0 0 24px rgba(0, 255, 136, 0.15);
-}
-.pvp-result--lost .pvp-result-inner {
-    background: rgba(12, 4, 4, 0.96);
-    border: 1px solid rgba(255, 51, 51, 0.45);
-    box-shadow: 0 0 24px rgba(255, 51, 51, 0.12);
-}
-.pvp-result-badge {
-    font-size: 10px;
-    letter-spacing: 0.18em;
-}
-.pvp-result--won  .pvp-result-badge { color: #00FF88; }
-.pvp-result--lost .pvp-result-badge { color: #FF3333; }
-.pvp-result-vs     { font-size: 8px; color: rgba(0,255,255,0.35); letter-spacing: 0.1em; }
-.pvp-result-handle { color: #FF69B4; }
-.pvp-result-loot   { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.pvp-loot-label    { font-size: 7px; color: rgba(0,255,136,0.4); letter-spacing: 0.12em; }
-.pvp-loot-val      { font-size: 11px; color: #00FF88; letter-spacing: 0.08em; }
-.pvp-result-lost-msg { font-size: 8px; color: rgba(255,51,51,0.55); letter-spacing: 0.1em; margin-top: 2px; }
-
-/* ── Critical System Failure overlay ─────────────────────────────────────── */
-.critical-failure-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 80;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.88);
-    backdrop-filter: blur(4px);
-}
-.cf-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    padding: 32px 40px;
-    border: 1px solid rgba(255, 51, 51, 0.5);
-    background: rgba(8, 0, 0, 0.95);
-    box-shadow: 0 0 40px rgba(255, 51, 51, 0.25), inset 0 0 30px rgba(255, 51, 51, 0.04);
-    font-family: 'JetBrains Mono', monospace;
-    text-align: center;
-    max-width: 380px;
-    animation: cf-flicker 6s steps(1) infinite;
-}
-@keyframes cf-flicker {
-    0%, 95%, 100% { opacity: 1; }
-    96%            { opacity: 0.85; }
-    97%            { opacity: 1; }
-    98%            { opacity: 0.9; }
-}
-.cf-icon  { font-size: 28px; color: #FF3333; text-shadow: 0 0 20px rgba(255,51,51,0.8); animation: cf-pulse 1s ease-in-out infinite; }
-.cf-title { font-size: 13px; color: #FF3333; letter-spacing: 0.2em; text-shadow: 0 0 12px rgba(255,51,51,0.6); }
-.cf-sub   { font-size: 8px;  color: rgba(255,51,51,0.55); letter-spacing: 0.12em; }
-@keyframes cf-pulse { 0%,100%{text-shadow:0 0 12px rgba(255,51,51,0.6)} 50%{text-shadow:0 0 24px rgba(255,51,51,1)} }
-.cf-details {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    width: 100%;
-    border-top: 1px solid rgba(255,51,51,0.15);
-    border-bottom: 1px solid rgba(255,51,51,0.15);
-    padding: 10px 0;
-    margin: 4px 0;
-}
-.cf-row        { display: flex; justify-content: space-between; align-items: center; }
-.cf-key        { font-size: 7px; color: rgba(0,255,255,0.3); letter-spacing: 0.12em; }
-.cf-val        { font-size: 9px; letter-spacing: 0.08em; }
-.cf-val--wiped { color: #FF3333; }
-.cf-val--cost  { color: #FFB300; }
-.cf-warn       { font-size: 7px; color: rgba(255,179,0,0.6); letter-spacing: 0.08em; line-height: 1.7; max-width: 280px; }
-.cf-btn {
-    margin-top: 4px;
-    background: transparent;
-    border: 1px solid rgba(255,51,51,0.45);
-    color: rgba(255,51,51,0.8);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    padding: 8px 24px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.cf-btn:hover {
-    background: rgba(255,51,51,0.1);
-    border-color: rgba(255,51,51,0.5);
-}
-</style>
+    inset:

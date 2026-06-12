@@ -194,6 +194,30 @@ function stopAudio() {
     console.log('[AUDIO] Stopped');
 }
 
+/**
+ * Instantly silence and pause — for dramatic story interrupts.
+ * Preserves _started and _unlocked state so resumeAudio() can restart.
+ */
+function cutAudio() {
+    clearFade();
+    if (_audio) {
+        _audio.volume = 0;
+        _audio.pause();
+    }
+    playing.value = false;
+    console.log('[AUDIO] cutAudio() — hard stop');
+}
+
+/**
+ * Resume audio after cutAudio(). Starts the next track in the shuffle.
+ */
+function resumeAudio() {
+    if (!_started || !_unlocked) return;
+    if (playing.value) return;
+    console.log('[AUDIO] resumeAudio() — restarting');
+    playNext();
+}
+
 function toggleMute() {
     muted.value = !muted.value;
     console.log('[AUDIO] Mute toggled —', muted.value ? 'MUTED' : 'UNMUTED');
@@ -210,31 +234,4 @@ function toggleMute() {
 }
 
 /**
- * Set master volume (0–1). Takes effect immediately on the playing track.
- * Unmutes automatically if the player was muted.
- */
-function setVolume(val) {
-    const v   = Math.min(1, Math.max(0, val));
-    VOLUME        = v;
-    volume.value  = v;
-
-    if (v > 0 && muted.value) {
-        muted.value = false;
-    }
-
-    if (_audio && playing.value) {
-        _audio.volume = muted.value ? 0 : v;
-    }
-}
-
-export function useAudio() {
-    return {
-        muted:      readonly(muted),
-        playing:    readonly(playing),
-        volume:     readonly(volume),
-        startAudio,
-        stopAudio,
-        toggleMute,
-        setVolume,
-    };
-}
+ * Set master volume (0–1). Takes effect immediately 

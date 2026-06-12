@@ -391,44 +391,4 @@ class QuestService
         foreach ($stages as $i => $stage) {
             PlayerStageProgress::firstOrCreate(
                 ['player_id' => $player->id, 'quest_stage_id' => $stage->id],
-                ['status' => $i === 0 ? 'active' : 'locked'],
-            );
-        }
-    }
-
-    /**
-     * Find completed stages that issued a referral to a doc the player
-     * hasn't initialised yet. Returns ['cyber_doc_id' => referral_text].
-     */
-    private function getPendingReferrals(Player $player, $stageProgressMap): array
-    {
-        $completedStageIds = $stageProgressMap
-            ->where('status', 'complete')
-            ->keys()
-            ->toArray();
-
-        if (empty($completedStageIds)) {
-            return [];
-        }
-
-        $referralStages = QuestStage::whereIn('id', $completedStageIds)
-            ->whereNotNull('referral_doc_id')
-            ->get();
-
-        $initialisedDocIds = PlayerArcProgress::where('player_id', $player->id)
-            ->with('arc')
-            ->get()
-            ->pluck('arc.cyber_doc_id')
-            ->unique()
-            ->toArray();
-
-        $pending = [];
-        foreach ($referralStages as $stage) {
-            if (! in_array($stage->referral_doc_id, $initialisedDocIds)) {
-                $pending[$stage->referral_doc_id] = $stage->referral_text;
-            }
-        }
-
-        return $pending;
-    }
-}
+                ['status' => $i === 0 ? 'activ

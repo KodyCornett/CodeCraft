@@ -2,6 +2,34 @@
 ### Master Design Consistency Document — Do Not Deviate
 ---
 
+## THE SPLICE FREQUENCY
+
+The network in CodeCraft is called **The Splice Frequency**, shortened to **SPLICE**.
+
+> **Terminology rule — enforced across all code, narrative text, comments, and documentation:**
+> Any reference to "the Matrix" (from films or Shadowrun) = The Splice Frequency / SPLICE.
+> "Jacking in" = connecting to SPLICE. "The network" = SPLICE. "The grid" = SPLICE.
+> This applies everywhere. No exceptions.
+
+The Splice Frequency is not the internet. It is not the corporate grid. It is a hidden
+channel carved into the city's existing infrastructure — a secondary layer that exists
+beneath the system the corporations control. No one agrees on who built it. Some say it
+was the original network architects, who embedded it before the current regime locked
+everything down. Others say it grew organically from runners exploiting the same
+vulnerabilities independently until the exploits themselves became a network. The oldest
+runners say it was always there, and the city's builders simply didn't know what they
+were building on top of.
+
+What everyone agrees on: SPLICE exists beneath the corporate layer, invisible to the
+systems that run the city, accessible only to those who know how to tune to its
+frequency. It is the underground. It is the truth layer. It is the only place in Spokane
+where the city's real architecture is still visible.
+
+The Splice browser the player uses is not a browser. It is a direct interface to SPLICE
+itself. The URLs are not web addresses. They are node identities inside the frequency.
+
+---
+
 ## CORE DESIGN MANDATE
 
 This document is the philosophical north star for all quest writing, dialogue, terminal logs, and narrative design in CodeCraft. Every piece of text the player reads must be traceable back to one of the five ideological frameworks defined here.
@@ -14,7 +42,7 @@ The player does not choose a side. They collect lenses. By the end, they are the
 
 ---
 
-## THE FIVE-LAYER STACK — How the Matrix Controls Spokane
+## THE FIVE-LAYER STACK — How SPLICE Reveals Spokane's Control Architecture
 
 The network operates through five distinct layers of systemic control, each targeting a different dimension of human capability. The Cyber Docs are defined by which layer they have dedicated their lives to fighting.
 

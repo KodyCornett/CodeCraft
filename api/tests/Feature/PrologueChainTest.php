@@ -507,10 +507,4 @@ class PrologueChainTest extends TestCase
         // Still only one completion record
         $this->assertEquals(
             1,
-            PlayerStageProgress::where('player_id', $this->player->id)
-                ->where('quest_stage_id', $stages[0]->id)
-                ->where('status', 'complete')
-                ->count()
-        );
-    }
-}
+            PlayerStageProgress::where('player_

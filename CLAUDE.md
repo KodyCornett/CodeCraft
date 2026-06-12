@@ -10,9 +10,18 @@
 
 ---
 
+## Terminology — Important
+
+> **The network in CodeCraft is called The Splice Frequency, shortened to SPLICE.**
+> Any reference to "the Matrix" (from films or Shadowrun) = The Splice Frequency / SPLICE in this codebase.
+> This applies to all narrative text, code comments, variable names, and documentation.
+> "Jacking in" = connecting to SPLICE. "The network" = SPLICE. "The grid" = SPLICE.
+
+---
+
 ## What This Game Is
 
-CodeCraft is a real-time multiplayer cyberpunk hacking game. Players move across a hex node map, hack nodes to earn creds and tech points, manage a bounty system that makes them increasingly visible to ICE and other players, and engage in PvP Grid-Breach combat. The game runs in a browser (Inertia + Vue 3) backed by a Laravel 11 API.
+CodeCraft is a real-time multiplayer cyberpunk hacking game. Players move across a hex node map, hack nodes to earn creds and tech points, manage a bounty system that makes them increasingly visible to ICE and other players, and engage in PvP Grid-Breach combat. The game runs in a browser (Inertia + Vue 3) backed by a Laravel 11 API. The underground network runners operate on is called **The Splice Frequency (SPLICE)** — a hidden channel carved into the city's infrastructure that exists beneath the corporate grid.
 
 ---
 
