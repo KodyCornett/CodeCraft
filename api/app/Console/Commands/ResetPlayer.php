@@ -88,6 +88,8 @@ class ResetPlayer extends Command
                 'current_district'        => 'DOWNTOWN',
                 'last_cyber_doc_id'        => null,
                 'tutorial_state'           => null,
+                'persona'                  => null,
+                'persona_desc'             => null,
                 'updated_at'               => now(),
             ]);
 
@@ -113,6 +115,7 @@ class ResetPlayer extends Command
         $this->info('✓ Inventory wiped     (peripherals, commands, consumables)');
         $this->info('✓ Node traces wiped');
         $this->info('✓ Tutorial state wiped');
+        $this->info('✓ Persona cleared      (will trigger persona selection + world tone on next login)');
         $this->newLine();
         $this->info("Player '{$player->handle}' is ready for a fresh prologue run.");
 
