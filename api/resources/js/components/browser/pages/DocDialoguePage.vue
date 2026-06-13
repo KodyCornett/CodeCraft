@@ -64,7 +64,7 @@ const DOC_CONFIG = {
         locationLabel: 'DT-HUB // VEIL\'S PARLOUR',
         accentColor:   '#B06FFF',
         district:      'Downtown',
-        ambientSrc:    null,
+        ambientSrc:    'v_node_BG.mp3',
     },
     axiom: {
         npcHandle:     'AXIOM',
