@@ -11,6 +11,9 @@
         <span class="qm-stub-tag">[MINIGAME_NOT_FOUND]</span>
         <span class="qm-stub-type">TYPE: {{ skin.gameType?.toUpperCase() }}</span>
         <span class="qm-stub-msg">// This sequence is not yet active in this build.</span>
+        <button class="qm-stub-bypass" @click="$emit('complete')">
+            [ BYPASS // DEV BUILD ]
+        </button>
     </div>
 </template>
 
@@ -53,4 +56,22 @@ const activeComponent = computed(() => GAMES[props.skin.gameType] ?? null);
 .qm-stub-tag  { color: #ff3333; font-size: 14px; letter-spacing: 0.15em; }
 .qm-stub-type { color: #4a9a7a; font-size: 11px; }
 .qm-stub-msg  { color: rgba(0,255,100,0.3); font-size: 10px; }
+
+.qm-stub-bypass {
+    margin-top: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    background: transparent;
+    border: 1px solid rgba(255, 51, 51, 0.4);
+    color: rgba(255, 51, 51, 0.7);
+    padding: 8px 24px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.qm-stub-bypass:hover {
+    background: rgba(255, 51, 51, 0.08);
+    border-color: rgba(255, 51, 51, 0.8);
+    color: #ff3333;
+}
 </style>

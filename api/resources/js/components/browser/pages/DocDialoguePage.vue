@@ -56,7 +56,7 @@ const DOC_CONFIG = {
         locationLabel: 'NS-HUB // PATCH\'S CLINIC',
         accentColor:   '#00FFC8',
         district:      'North Spokane',
-        ambientSrc:    null,
+        ambientSrc:    'p_node_BG.mp3',
     },
     veil: {
         npcHandle:     'VEIL',
@@ -80,7 +80,7 @@ const DOC_CONFIG = {
         locationLabel: 'SV-HUB // FLOAT\'S REPAIR BAY',
         accentColor:   '#00BFFF',
         district:      'Spokane Valley',
-        ambientSrc:    null,
+        ambientSrc:    'f_node_BG.mp3',
     },
 };
 
@@ -137,6 +137,9 @@ async function onDialogueComplete() {
         return;
     }
 
+    // Capture stage number before awaiting — questLog may refresh after completeStage
+    const completedStageNumber = activeStage.value.stage_number ?? null;
+
     loading.value = true;
     try {
         const completeStage = questLog.completeStage ?? questLog.complete;
@@ -149,7 +152,12 @@ async function onDialogueComplete() {
         loading.value = false;
     }
 
-    onDocDialogueComplete(docHandle.value);
+    // Only arm the Watcher transition on the final stage (stage 3).
+    // Arming it on stage 1 causes it to fire prematurely when the player
+    // walks to the minigame node between stages 1 and 3.
+    if (completedStageNumber === 3) {
+        onDocDialogueComplete(docHandle.value);
+    }
     spliceNavigate(SPLICE.TERMINAL);
 }
 </script>
