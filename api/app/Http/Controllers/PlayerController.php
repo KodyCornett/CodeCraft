@@ -56,6 +56,7 @@ class PlayerController extends Controller
                 'pvp_wins_this_run'     => (int)  $player->pvp_wins_this_run,
                 // Status
                 'is_limping'            => (bool)  $player->is_limping,
+                'is_dev'                => (bool)  $request->user()->is_dev,
                 // Economy
                 'wallet_creds'          => (int)  ($player->wallet_creds  ?? 0),
                 'pocket_creds'          => (int)  ($player->pocket_creds  ?? 0),

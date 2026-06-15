@@ -40,7 +40,7 @@
             <g :transform="panTransform">
 
             <!-- Grid lines — one line per deduplicated hex edge -->
-            <g class="hex-grid-layer">
+            <g v-if="props.isDev" class="hex-grid-layer">
                 <line
                     v-for="(edge, i) in GRID_EDGES"
                     :key="i"
@@ -126,7 +126,7 @@
             </g>
 
             <!-- Cell coordinate labels (column letter + row number) -->
-            <g class="hex-labels-layer">
+            <g v-if="props.isDev" class="hex-labels-layer">
                 <text
                     v-for="cell in CELL_LABELS"
                     :key="cell.label"
@@ -328,6 +328,7 @@ const props = defineProps({
     playerUplink:  { type: Number,  default: 3        },
     playerSs:      { type: Number,  default: 100      },
     targetMode:    { type: Boolean, default: false    },
+    isDev:         { type: Boolean, default: false    },
 });
 const emit = defineEmits(['node-clicked', 'player-moved', 'move-blocked']);
 

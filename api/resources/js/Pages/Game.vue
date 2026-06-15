@@ -31,6 +31,7 @@
                     :current-node-id="currentNodeId"
                     :player-uplink="player.uplink"
                     :player-ss="player.currentSS"
+                    :is-dev="player.isDev"
                     :target-mode="!!trapTargetMode"
                     @node-clicked="handleNodeClicked"
                     @player-moved="handlePlayerMoved"
