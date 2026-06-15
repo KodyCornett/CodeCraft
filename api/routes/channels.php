@@ -3,6 +3,7 @@
 use App\Models\CombatChallenge;
 use App\Models\PacketHijackMatch;
 use App\Models\Player;
+use App\Services\BountyService;
 use App\Services\RigService;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -58,7 +59,7 @@ Broadcast::channel('node.{canvasId}', function ($user, string $canvasId) {
     return [
         'id'                 => $player->id,
         'handle'             => $player->handle,
-        'bounty_level'       => (int)   $player->bounty_level,
+        'bounty_level'       => app(BountyService::class)->hackCountToStarLevel((int) ($player->bounty_level ?? 0)),
         'is_open_season'     => (bool)  $player->is_open_season,
         'pocket_creds'       => (int)   ($player->pocket_creds   ?? 0),
         'bounty_multiplier'  => (float) ($player->bounty_multiplier ?? 1.0),
