@@ -63,8 +63,16 @@ class InventoryService
         }
 
         return DB::transaction(function () use ($player, $peripheral, $cost) {
-            $player->wallet_creds = (int) ($player->wallet_creds ?? 0) - $cost;
-            $player->save();
+            // Re-read with a row lock so two concurrent requests cannot both pass
+            // the afford check and double-deduct from the same wallet balance.
+            $locked = Player::where('id', $player->id)->lockForUpdate()->first();
+            if (($locked->wallet_creds ?? 0) < $cost) {
+                throw new \RuntimeException(
+                    "Insufficient creds. Need {$cost}, have " . ($locked->wallet_creds ?? 0) . '.'
+                );
+            }
+            $locked->wallet_creds = (int) $locked->wallet_creds - $cost;
+            $locked->save();
 
             return HardwareEncrypt::create([
                 'player_id'     => $player->id,
@@ -103,8 +111,16 @@ class InventoryService
         }
 
         return DB::transaction(function () use ($player, $consumable, $cost) {
-            $player->wallet_creds = (int) ($player->wallet_creds ?? 0) - $cost;
-            $player->save();
+            // Row-lock the player so concurrent purchase requests cannot both pass
+            // the afford check against the same stale wallet balance.
+            $locked = Player::where('id', $player->id)->lockForUpdate()->first();
+            if (($locked->wallet_creds ?? 0) < $cost) {
+                throw new \RuntimeException(
+                    "Insufficient creds. Need {$cost}, have " . ($locked->wallet_creds ?? 0) . '.'
+                );
+            }
+            $locked->wallet_creds = (int) $locked->wallet_creds - $cost;
+            $locked->save();
 
             $row = PlayerConsumable::firstOrNew([
                 'player_id'     => $player->id,

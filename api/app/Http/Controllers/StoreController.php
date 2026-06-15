@@ -251,9 +251,22 @@ class StoreController extends Controller
         }
 
         DB::transaction(function () use ($player, $command, $credCost, $tpCost) {
-            $player->wallet_creds = (int) ($player->wallet_creds ?? 0) - $credCost;
-            $player->tech_points  = round((float) ($player->tech_points ?? 0) - $tpCost, 2);
-            $player->save();
+            // Row-lock the player so concurrent purchase requests cannot both pass
+            // the afford check against the same stale wallet/TP balance.
+            $locked = Player::where('id', $player->id)->lockForUpdate()->first();
+            if (($locked->wallet_creds ?? 0) < $credCost) {
+                throw new \RuntimeException(
+                    "Insufficient creds. Need {$credCost}, have " . ($locked->wallet_creds ?? 0) . '.'
+                );
+            }
+            if (($locked->tech_points ?? 0) < $tpCost) {
+                throw new \RuntimeException(
+                    "Insufficient Tech Points. Need {$tpCost}, have " . ($locked->tech_points ?? 0) . '.'
+                );
+            }
+            $locked->wallet_creds = (int)   $locked->wallet_creds - $credCost;
+            $locked->tech_points  = round((float) $locked->tech_points - $tpCost, 2);
+            $locked->save();
 
             DB::table('player_commands')->insert([
                 'player_id'  => $player->id,

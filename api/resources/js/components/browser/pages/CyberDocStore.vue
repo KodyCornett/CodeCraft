@@ -420,7 +420,7 @@
                     </div>
                     <div class="insp-footer">
                         <template v-if="inspectedItem.category === 'hardware'">
-                            <span v-if="hardwareOwned(inspectedItem.id)" class="insp-owned">✓ INSTALLED</span>
+                            <span v-if="hardwareOwned(inspectedItem.id)" class="insp-owned">✓ IN INVENTORY</span>
                             <button
                                 v-else
                                 class="insp-buy-btn"
@@ -447,6 +447,8 @@
             </div>
 
         </div>
+
+        <div v-if="purchaseError" class="stat-error">{{ purchaseError }}</div>
 
         </template><!-- end v-else (atCyberDoc) -->
 
@@ -496,7 +498,12 @@ async function visitCyberDoc() {
     visitChecking.value = true;
     atCyberDoc.value    = false;
     try {
-        const res = await axios.post('/api/cyberdoc/visit');
+        // Pass the client's current canvas_id so the server can update current_node_id
+        // atomically if needed — closes the race where the store opens before the
+        // async position save completes.
+        const res = await axios.post('/api/cyberdoc/visit', {
+            canvas_node_id: currentNodeId.value ?? null,
+        });
         atCyberDoc.value = true;
         // Sync uplink — server resets it to chassis base on every visit.
         if (res.data.current_uplink != null && gameState?.player) {
@@ -517,8 +524,10 @@ async function visitCyberDoc() {
 
 const playerCreds      = computed(() => player.value?.creds      ?? 0);
 const playerTechPoints = computed(() => player.value?.techPoints ?? 0);
-const upgradeError = ref(null);
-const upgrading    = ref(false);   // true while a stat upgrade request is in flight
+const upgradeError    = ref(null);
+const upgrading       = ref(false);   // true while a stat upgrade request is in flight
+const purchaseError   = ref(null);    // visible error for item/command/chassis purchases
+const purchasing      = ref(false);   // true while any non-stat purchase is in flight
 
 const { upgradeCost, totalInvested, canUpgrade, effectiveStat } = useUpgradeCosts();
 
@@ -632,8 +641,9 @@ function chassisBtnTitle(chassis) {
 }
 
 async function onPurchaseChassis(chassis) {
-    if (!chassisMaxed.value || !canAffordChassis(chassis)) return;
-
+    if (!chassisMaxed.value || !canAffordChassis(chassis) || purchasing.value) return;
+    purchaseError.value = null;
+    purchasing.value    = true;
     try {
         const res = await axios.post('/api/rig/chassis-upgrade', {
             player_id:    player.value.id,
@@ -660,8 +670,11 @@ async function onPurchaseChassis(chassis) {
                 firewall: r.caps.firewall,
                 storage:  r.caps.storage,
                 os:       r.caps.os,
-                pointCap: r.points.cap,
             },
+            // pointsSpent/pointsCap must be set so chassisMaxed computes correctly
+            // against the new chassis cap (NullTek = 18, not 9).
+            pointsSpent:    r.points.spent,
+            pointsCap:      r.points.cap,
             portSlots:      r.peripheral_slots,
             investedPoints: { cpu: 0, ram: 0, os: 0, storage: 0, firewall: 0 },
             currentSS:      r.current_ss,
@@ -677,7 +690,10 @@ async function onPurchaseChassis(chassis) {
         player.value.maxSS      = r.max_ss;
 
     } catch (e) {
-        console.error('[CYBERDOC] Chassis upgrade failed:', e?.response?.data?.message ?? e.message);
+        purchaseError.value = e?.response?.data?.message ?? 'Chassis upgrade failed.';
+        console.error('[CYBERDOC] Chassis upgrade failed:', purchaseError.value);
+    } finally {
+        purchasing.value = false;
     }
 }
 
@@ -732,8 +748,9 @@ function consumableQty(itemId) {
 }
 
 async function onBuy(item) {
-    if (playerCreds.value < item.price) return;
-
+    if (playerCreds.value < item.price || purchasing.value) return;
+    purchaseError.value = null;
+    purchasing.value    = true;
     try {
         if (item.category === 'hardware') {
             const res = await axios.post('/api/store/purchase-peripheral', {
@@ -776,7 +793,10 @@ async function onBuy(item) {
             }
         }
     } catch (e) {
-        console.error('[STORE] Purchase failed:', e?.response?.data?.message ?? e.message);
+        purchaseError.value = e?.response?.data?.message ?? 'Purchase failed.';
+        console.error('[STORE] Purchase failed:', purchaseError.value);
+    } finally {
+        purchasing.value = false;
     }
 }
 
@@ -809,7 +829,9 @@ function buyBtnTitle(cmd) {
 }
 
 async function onBuyCommand(cmd) {
-    if (!canAfford(cmd)) return;
+    if (!canAfford(cmd) || purchasing.value) return;
+    purchaseError.value = null;
+    purchasing.value    = true;
     try {
         const res = await axios.post('/api/store/purchase-command', {
             player_id:  player.value.id,
@@ -819,7 +841,10 @@ async function onBuyCommand(cmd) {
         player.value.creds      = res.data.wallet_creds;
         player.value.techPoints = res.data.tech_points;
     } catch (e) {
-        console.error('[STORE] Command purchase failed:', e?.response?.data?.message ?? e.message);
+        purchaseError.value = e?.response?.data?.message ?? 'Command purchase failed.';
+        console.error('[STORE] Command purchase failed:', purchaseError.value);
+    } finally {
+        purchasing.value = false;
     }
 }
 

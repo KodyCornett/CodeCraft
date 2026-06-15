@@ -137,14 +137,12 @@ async function onDialogueComplete() {
         return;
     }
 
-    // Capture stage number before awaiting — questLog may refresh after completeStage
-    const completedStageNumber = activeStage.value.stage_number ?? null;
-
     loading.value = true;
+    let stageResult = null;
     try {
         const completeStage = questLog.completeStage ?? questLog.complete;
         if (completeStage) {
-            await completeStage(activeStage.value.id);
+            stageResult = await completeStage(activeStage.value.id);
         }
     } catch (e) {
         console.warn('[DocDialogue] completeStage failed:', e.message ?? e);
@@ -152,10 +150,14 @@ async function onDialogueComplete() {
         loading.value = false;
     }
 
-    // Only arm the Watcher transition on the final stage (stage 3).
-    // Arming it on stage 1 causes it to fire prematurely when the player
-    // walks to the minigame node between stages 1 and 3.
-    if (completedStageNumber === 3) {
+    // Arm the Watcher transition when the arc just ended — detected by the server
+    // returning next_stage_id: null (no further stage exists in this arc).
+    // Checking arc completion via the server response is more reliable than hard-coding
+    // a stage number, and works correctly when arcs have varying stage counts.
+    //
+    // Arming on a mid-arc stage (stage 1 → stage 2 minigame) is safe here because
+    // next_stage_id will be non-null whenever there is a following stage.
+    if (!stageResult?.next_stage_id) {
         onDocDialogueComplete(docHandle.value);
     }
     spliceNavigate(SPLICE.TERMINAL);

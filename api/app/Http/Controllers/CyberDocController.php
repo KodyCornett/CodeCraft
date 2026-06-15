@@ -41,13 +41,33 @@ class CyberDocController extends Controller
      * Validates that the player is physically at a CyberDoc node, then
      * resets current_uplink to chassis base and returns the new value.
      *
-     * Body: {} (empty — identity comes from session)
+     * Body:
+     *   canvas_node_id  string|null  — client's current canvas ID (optional).
+     *                                  If provided and the resolved node is a cyberdoc,
+     *                                  current_node_id is updated atomically before the
+     *                                  access check. This closes the race window where
+     *                                  the player opens the storefront before their async
+     *                                  position save has completed.
      */
     public function visit(Request $request): JsonResponse
     {
+        $data = $request->validate([
+            'canvas_node_id' => ['nullable', 'string'],
+        ]);
+
         $player = Player::where('user_id', $request->user()->id)->first();
         if ($player === null) {
             return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        // If the client reports a canvas_id and the server-side node type is cyberdoc,
+        // update current_node_id now. This is safe: the type check is server-authoritative.
+        if (!empty($data['canvas_node_id'])) {
+            $candidate = Node::where('canvas_id', $data['canvas_node_id'])->first();
+            if ($candidate && $candidate->type === 'cyberdoc') {
+                $player->current_node_id = $candidate->id;
+                $player->save();
+            }
         }
 
         if ($err = $this->assertAtCyberDoc($player)) return $err;
@@ -59,7 +79,7 @@ class CyberDocController extends Controller
         }
 
         // Initialise quest arcs for this doc on first visit (or if a referral is pending).
-        $node    = Node::find($player->current_node_id);
+        $node     = Node::find($player->current_node_id);
         $cyberDoc = $node ? CyberDoc::where('node_id', $node->id)->first() : null;
         if ($cyberDoc) {
             $this->questService->initArcForDoc($player, $cyberDoc);

@@ -194,9 +194,18 @@ class RigController extends Controller
         // capped, all others at minimum, etc.) rolls back the cred/TP spend.
         try {
             ['rig' => $rig, 'tax' => $tax] = DB::transaction(function () use ($player, $rig, $data, $credCost, $tpCost) {
-                $player->wallet_creds = (int)   ($player->wallet_creds ?? 0) - $credCost;
-                $player->tech_points  = round((float) ($player->tech_points ?? 0) - $tpCost, 2);
-                $player->save();
+                // Row-lock so two rapid upgrade requests cannot both pass the afford
+                // check above and double-deduct from the same stale balance.
+                $locked = Player::where('id', $player->id)->lockForUpdate()->first();
+                if (($locked->wallet_creds ?? 0) < $credCost) {
+                    throw new \RuntimeException('Insufficient creds to upgrade this stat.');
+                }
+                if (($locked->tech_points ?? 0) < $tpCost) {
+                    throw new \RuntimeException('Insufficient Tech Points to upgrade this stat.');
+                }
+                $locked->wallet_creds = (int)   $locked->wallet_creds - $credCost;
+                $locked->tech_points  = round((float) $locked->tech_points - $tpCost, 2);
+                $locked->save();
 
                 return $this->rigService->upgradeStat($rig, $data['stat']);
             });
@@ -299,9 +308,17 @@ class RigController extends Controller
         // Wrap cost deduction + chassis swap in a transaction so a failed rig save
         // cannot permanently orphan the wallet deduction (same pattern as upgrade()).
         DB::transaction(function () use ($player, $rig, $newChassis, $credCost, $tpCost) {
-            $player->wallet_creds = max(0, (int)   ($player->wallet_creds ?? 0) - $credCost);
-            $player->tech_points  = max(0, (float) ($player->tech_points  ?? 0) - $tpCost);
-            $player->save();
+            // Row-lock so a rapid double-submission cannot deduct the chassis cost twice.
+            $locked = Player::where('id', $player->id)->lockForUpdate()->first();
+            if (($locked->wallet_creds ?? 0) < $credCost) {
+                throw new \RuntimeException('Insufficient creds.');
+            }
+            if (($locked->tech_points ?? 0) < $tpCost) {
+                throw new \RuntimeException('Insufficient Tech Points.');
+            }
+            $locked->wallet_creds = max(0, (int)   $locked->wallet_creds - $credCost);
+            $locked->tech_points  = max(0, (float) $locked->tech_points  - $tpCost);
+            $locked->save();
 
             // Swap chassis — reset invested levels, recalculate SS, clear limp
             $rig->chassis_template_id = $newChassis->id;

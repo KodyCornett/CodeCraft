@@ -39,8 +39,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/rig',                  [RigController::class, 'show']);
     Route::post('/rig/damage',          [RigController::class, 'damage']);
-    Route::post('/rig/upgrade',         [RigController::class, 'upgrade']);
-    Route::post('/rig/chassis-upgrade', [RigController::class, 'chassisUpgrade']);
+    // upgrade/chassis-upgrade: 20/min — a player can invest several points in a session
+    // but bursting faster than once per 3s is never legitimate
+    Route::post('/rig/upgrade',         [RigController::class, 'upgrade'])
+        ->middleware('throttle:20,1');
+    Route::post('/rig/chassis-upgrade', [RigController::class, 'chassisUpgrade'])
+        ->middleware('throttle:5,1');
     Route::post('/rig/repair',          [RigController::class, 'repair']);
 
 // ---------------------------------------------------------------------------
@@ -114,22 +118,36 @@ Route::middleware('auth:sanctum')->group(function () {
 // CyberDoc
 // ---------------------------------------------------------------------------
 
-    Route::post('/cyberdoc/visit',           [CyberDocController::class, 'visit']);
-    Route::post('/cyberdoc/bank',            [CyberDocController::class, 'bank']);
-    Route::post('/cyberdoc/repair',          [CyberDocController::class, 'repair']);
-    Route::post('/cyberdoc/install',         [CyberDocController::class, 'install']);
+    // visit/bank/repair: 10/min — once per node arrival; any faster is a UI bug or replay
+    Route::post('/cyberdoc/visit',           [CyberDocController::class, 'visit'])
+        ->middleware('throttle:10,1');
+    Route::post('/cyberdoc/bank',            [CyberDocController::class, 'bank'])
+        ->middleware('throttle:10,1');
+    Route::post('/cyberdoc/repair',          [CyberDocController::class, 'repair'])
+        ->middleware('throttle:10,1');
+    // install: 20/min — players may slot multiple peripherals in one visit
+    Route::post('/cyberdoc/install',         [CyberDocController::class, 'install'])
+        ->middleware('throttle:20,1');
     Route::post('/cyberdoc/loadout',         [CyberDocController::class, 'loadout']);
-    Route::post('/cyberdoc/reallocate',      [CyberDocController::class, 'reallocate']);
-    Route::post('/cyberdoc/upgrade-command', [CyberDocController::class, 'upgradeCommand']);
+    Route::post('/cyberdoc/reallocate',      [CyberDocController::class, 'reallocate'])
+        ->middleware('throttle:20,1');
+    // upgrade-command: 20/min — same cadence as stat upgrades
+    Route::post('/cyberdoc/upgrade-command', [CyberDocController::class, 'upgradeCommand'])
+        ->middleware('throttle:20,1');
 
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
     Route::get('/store/catalog',                  [StoreController::class, 'catalog']);
-    Route::post('/store/purchase-peripheral',     [StoreController::class, 'purchasePeripheral']);
-    Route::post('/store/purchase-consumable',     [StoreController::class, 'purchaseConsumable']);
-    Route::post('/store/purchase-command',        [StoreController::class, 'purchaseCommand']);
+    // purchase-*: 10/min — one purchase every 6s is already fast for legitimate play;
+    // blocks double-tap floods and scripted purchase loops
+    Route::post('/store/purchase-peripheral',     [StoreController::class, 'purchasePeripheral'])
+        ->middleware('throttle:10,1');
+    Route::post('/store/purchase-consumable',     [StoreController::class, 'purchaseConsumable'])
+        ->middleware('throttle:10,1');
+    Route::post('/store/purchase-command',        [StoreController::class, 'purchaseCommand'])
+        ->middleware('throttle:10,1');
 
 // ---------------------------------------------------------------------------
 // Tutorial
@@ -154,7 +172,9 @@ Route::middleware('auth:sanctum')->group(function () {
 // ---------------------------------------------------------------------------
 
     Route::get('/inventory',      [InventoryController::class, 'index']);
-    Route::post('/inventory/use', [InventoryController::class, 'use']);
+    // inventory/use: 20/min — consumables can be chained quickly but not spammed
+    Route::post('/inventory/use', [InventoryController::class, 'use'])
+        ->middleware('throttle:20,1');
 
 // ---------------------------------------------------------------------------
 // Quests & Reputation
