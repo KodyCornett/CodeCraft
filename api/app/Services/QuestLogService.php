@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
  * This is the feed the Archive Splice page renders.
  *
  * Event types:
- *   stage_complete  — payload: stage_id, stage_title, arc_title, doc_name, rep_granted
+ *   stage_complete  — payload: stage_id, stage_title, arc_title, doc_name
  *   branch_choice   — payload: stage_id, stage_title, arc_title, doc_name, chosen_doc_name
  *   watcher_signal  — payload: signal_text (already token-resolved)
  *   arc_unlocked    — payload: arc_id, arc_title, doc_name
@@ -25,14 +25,12 @@ class QuestLogService
         string $stageTitle,
         string $arcTitle,
         string $docName,
-        int    $repGranted,
     ): void {
         $this->write($player, 'stage_complete', [
             'stage_id'    => $stageId,
             'stage_title' => $stageTitle,
             'arc_title'   => $arcTitle,
             'doc_name'    => $docName,
-            'rep_granted' => $repGranted,
         ]);
     }
 

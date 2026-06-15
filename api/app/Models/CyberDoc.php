@@ -25,8 +25,4 @@ class CyberDoc extends Model
         return $this->hasMany(QuestArc::class)->orderBy('sequence_order');
     }
 
-    public function playerReputations(): HasMany
-    {
-        return $this->hasMany(PlayerReputation::class);
-    }
 }

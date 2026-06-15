@@ -1,7 +1,7 @@
 /**
  * useQuestLog
  *
- * Fetches GET /api/quests and exposes reactive quest + reputation state
+ * Fetches GET /api/quests and exposes reactive quest state
  * for the Splice QuestLog terminal page.
  *
  * Shape of `docs`:
@@ -12,32 +12,23 @@
  *     district:     string,
  *     met:          boolean,     // true once the player has visited this doc
  *     referral:     string|null, // pending intro text before first visit
- *     rep: {
- *       score:          number,
- *       label:          string,  // NULL / RESOLVED / ROUTED / ENCRYPTED / ROOT
- *       tier_index:     number,  // 0–4
- *       next_threshold: number|null,
- *       bar_pct:        number,  // 0.0–1.0 progress within current tier
- *     },
  *     arcs: [
  *       {
  *         id:             string,
  *         sequence_order: number,
  *         title:          string,
- *         rep_required:   number,
  *         status:         'locked'|'active'|'complete',
  *         stages: [
  *           {
- *             id:               string,
- *             stage_number:     number,
- *             title:            string,
- *             objective_text:   string|null,  // null when locked
- *             status:           'locked'|'active'|'complete',
- *             rep_reward:       number,
- *             is_branch:        boolean,
- *             branch_options:   array|null,
+ *             id:                 string,
+ *             stage_number:       number,
+ *             title:              string,
+ *             objective_text:     string|null,  // null when locked
+ *             status:             'locked'|'active'|'complete',
+ *             is_branch:          boolean,
+ *             branch_options:     array|null,
  *             turned_into_doc_id: string|null,
- *             completed_at:     string|null,
+ *             completed_at:       string|null,
  *           }
  *         ]
  *       }

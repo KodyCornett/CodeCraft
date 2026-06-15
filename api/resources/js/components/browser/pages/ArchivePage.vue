@@ -43,9 +43,6 @@
                         <span class="ap-entry-time">{{ fmtTime(event.occurred_at) }}</span>
                     </div>
                     <div class="ap-entry-title">{{ event.payload.stage_title }}</div>
-                    <div v-if="event.payload.rep_granted > 0" class="ap-entry-rep">
-                        +{{ event.payload.rep_granted }} REP
-                    </div>
                 </template>
 
                 <!-- Branch choice -->

@@ -94,11 +94,6 @@ class Player extends Model
         return $this->hasMany(PlayerConsumable::class);
     }
 
-    public function reputations(): HasMany
-    {
-        return $this->hasMany(PlayerReputation::class);
-    }
-
     public function arcProgress(): HasMany
     {
         return $this->hasMany(PlayerArcProgress::class);

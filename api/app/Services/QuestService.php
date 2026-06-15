@@ -13,9 +13,8 @@ use Illuminate\Support\Carbon;
 class QuestService
 {
     public function __construct(
-        private readonly ReputationService $reputationService,
-        private readonly WatcherService    $watcherService,
-        private readonly QuestLogService   $questLogService,
+        private readonly WatcherService  $watcherService,
+        private readonly QuestLogService $questLogService,
     ) {}
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -30,14 +29,13 @@ class QuestService
      * [
      *   'docs' => [
      *     [
-     *       'cyber_doc_id'   => string,
-     *       'name'           => string,
-     *       'district'       => string,
-     *       'splice_url'     => string,
-     *       'rep'            => [...],  // from ReputationService::getRepStateForPlayer
-     *       'met'            => bool,   // has the player initialised this doc's arc?
-     *       'referral'       => string|null,  // pending referral text if not yet met
-     *       'arcs'           => [...],
+     *       'cyber_doc_id' => string,
+     *       'name'         => string,
+     *       'district'     => string,
+     *       'splice_url'   => string,
+     *       'met'          => bool,
+     *       'referral'     => string|null,
+     *       'arcs'         => [...],
      *     ],
      *     ...
      *   ]
@@ -45,8 +43,6 @@ class QuestService
      */
     public function getPlayerQuestState(Player $player): array
     {
-        $repState = $this->reputationService->getRepStateForPlayer($player);
-
         $arcProgressMap = PlayerArcProgress::where('player_id', $player->id)
             ->get()
             ->keyBy('quest_arc_id');
@@ -57,8 +53,6 @@ class QuestService
 
         $docs = CyberDoc::with(['questArcs.stages'])->get();
 
-        // Collect any pending referrals — stages the player completed that
-        // introduced a doc the player hasn't initialised yet
         $pendingReferrals = $this->getPendingReferrals($player, $stageProgressMap);
 
         $result = [];
@@ -69,7 +63,6 @@ class QuestService
             foreach ($doc->questArcs as $arc) {
                 $arcProg = $arcProgressMap[$arc->id] ?? null;
 
-                // If the player has any progress record for this arc, they've met this doc
                 if ($arcProg) {
                     $met = true;
                 }
@@ -81,9 +74,6 @@ class QuestService
                     $stageProg   = $stageProgressMap[$stage->id] ?? null;
                     $stageStatus = $stageProg?->status ?? 'locked';
 
-                    // Ensure dialogue is always returned as a decoded array, not a JSON string.
-                    // The array cast on QuestStage should handle this, but defensively
-                    // decode here in case the cast returns the raw DB string.
                     $rawDialogue = $stage->dialogue;
                     $dialogue    = $stageStatus === 'active'
                         ? (is_string($rawDialogue) ? json_decode($rawDialogue, true) : $rawDialogue)
@@ -96,7 +86,6 @@ class QuestService
                         'objective_text'     => $stageStatus !== 'locked' ? $stage->objective_text : null,
                         'dialogue'           => $dialogue,
                         'status'             => $stageStatus,
-                        'rep_reward'         => $stage->rep_reward,
                         'is_branch'          => $stage->is_branch,
                         'branch_options'     => $stage->branch_options,
                         'turned_into_doc_id' => $stageProg?->turned_into_doc_id,
@@ -112,7 +101,6 @@ class QuestService
                     'id'             => $arc->id,
                     'sequence_order' => $arc->sequence_order,
                     'title'          => $arc->title,
-                    'rep_required'   => $arc->rep_required,
                     'status'         => $arcStatus,
                     'unlocked_at'    => $arcProg?->unlocked_at,
                     'completed_at'   => $arcProg?->completed_at,
@@ -124,7 +112,6 @@ class QuestService
                 'cyber_doc_id' => $doc->id,
                 'name'         => $doc->name,
                 'district'     => $doc->district,
-                'rep'          => $repState[$doc->id] ?? null,
                 'met'          => $met,
                 'referral'     => $pendingReferrals[$doc->id] ?? null,
                 'arcs'         => $docArcs,
@@ -139,12 +126,12 @@ class QuestService
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Called when a player visits a CyberDoc for the first time (or if a referral
-     * has been issued). Initialises all arcs that should be active for this doc.
+     * Called when a player visits a CyberDoc for the first time (or after a
+     * referral has been issued). Initialises all arcs for this doc.
      *
      * - Entry arcs (is_entry_arc = true) unlock immediately on first visit.
-     * - Non-entry arcs initialise as 'locked' so they appear in the log grayed out.
-     * - Sets the first stage of unlocked arcs to 'active'.
+     * - Non-entry arcs whose sequence_order follows a completed arc are unlocked.
+     * - All others initialise as 'locked'.
      */
     public function initArcForDoc(Player $player, CyberDoc $doc): void
     {
@@ -156,14 +143,9 @@ class QuestService
                 ->first();
 
             if ($existing) {
-                continue; // already initialised
+                continue;
             }
 
-            // Entry arcs unlock immediately on first visit.
-            // Non-entry arcs unlock if the player holds a referral to this doc
-            // (i.e. they completed a stage elsewhere whose referral_doc_id = $doc->id).
-            // Without a referral they initialise as 'locked' and wait for a rep threshold
-            // or another explicit trigger via checkAndUnlockArcs.
             $hasReferral = PlayerStageProgress::where('player_id', $player->id)
                 ->where('status', 'complete')
                 ->whereHas('stage', fn ($q) => $q->where('referral_doc_id', $doc->id))
@@ -192,15 +174,13 @@ class QuestService
     /**
      * Mark a stage as complete for a player.
      *
-     * For branch stages, $turnedIntoDocId indicates which doc the job was turned into.
-     * Rep is granted to that doc (or the owning doc if no branch choice was made).
-     *
      * After completing:
-     *   - Grants rep
-     *   - Activates the next stage if one exists
-     *   - Marks the arc complete if all stages are done
-     *   - Issues referral log entry if stage has a referral_doc_id
-     *   - Checks if any locked arcs are now unlockable (rep threshold crossed)
+     *   - Activates the next stage if one exists in the same arc.
+     *   - If no next stage: marks the arc complete, then unlocks the next arc
+     *     in sequence_order for the same doc (sequence-based, no rep gate).
+     *   - Issues referral log entry if stage has a referral_doc_id.
+     *   - Delivers a Watcher signal if one is attached.
+     *   - Grants wallet_creds reward if the stage defines one.
      *
      * Returns an array describing what changed (for the API response).
      */
@@ -215,25 +195,9 @@ class QuestService
             ->where('quest_stage_id', $stage->id)
             ->where('status', 'complete')
             ->first();
+
         if ($existing) {
-            return [
-                'stage_id'       => $stage->id,
-                'already_complete' => true,
-            ];
-        }
-
-        // Resolve which doc gets the rep and how much
-        $repDocId  = $turnedIntoDocId ?? $doc->id;
-        $repAmount = $stage->rep_reward;
-
-        // For branch stages, rep amount comes from the chosen branch option
-        if ($stage->is_branch && $turnedIntoDocId && $stage->branch_options) {
-            foreach ($stage->branch_options as $opt) {
-                if (($opt['cyber_doc_id'] ?? null) === $turnedIntoDocId) {
-                    $repAmount = (int) ($opt['rep_reward'] ?? 0);
-                    break;
-                }
-            }
+            return ['stage_id' => $stage->id, 'already_complete' => true];
         }
 
         // Upsert stage progress
@@ -246,19 +210,17 @@ class QuestService
             ],
         );
 
-        // Grant rep
-        $rep = $this->reputationService->grantRep($player, $repDocId, $repAmount);
-
-        // Grant wallet_creds reward if the stage defines one.
-        // Goes directly to wallet (safe — not stealable in PvP).
+        // Grant wallet_creds reward if the stage defines one
         if (($stage->reward_creds ?? 0) > 0) {
             $player->increment('wallet_creds', $stage->reward_creds);
         }
 
-        // Activate next stage
+        // Activate next stage in this arc, or complete the arc and unlock next
         $nextStage = QuestStage::where('quest_arc_id', $arc->id)
             ->where('stage_number', $stage->stage_number + 1)
             ->first();
+
+        $arcsUnlocked = [];
 
         if ($nextStage) {
             PlayerStageProgress::updateOrCreate(
@@ -266,18 +228,18 @@ class QuestService
                 ['status' => 'active'],
             );
         } else {
-            // No more stages — mark arc complete
+            // Last stage of arc — mark arc complete
             PlayerArcProgress::where('player_id', $player->id)
                 ->where('quest_arc_id', $arc->id)
                 ->update(['status' => 'complete', 'completed_at' => Carbon::now()]);
-        }
 
-        // Check if rep unlocks any other locked arcs for this player
-        $unlocked = $this->checkAndUnlockArcs($player);
+            // Unlock the next arc in sequence_order for this doc
+            $arcsUnlocked = $this->unlockNextArc($player, $doc, $arc->sequence_order);
+        }
 
         // Write archive log entry
         if ($stage->is_branch && $turnedIntoDocId) {
-            $chosenDoc = \App\Models\CyberDoc::find($turnedIntoDocId);
+            $chosenDoc = CyberDoc::find($turnedIntoDocId);
             $this->questLogService->logBranchChoice(
                 $player,
                 $stage->id,
@@ -293,13 +255,12 @@ class QuestService
                 $stage->title,
                 $arc->title,
                 $doc->name,
-                $repAmount,
             );
         }
 
         // Log referral if issued
         if ($stage->referral_doc_id) {
-            $referralDoc = \App\Models\CyberDoc::find($stage->referral_doc_id);
+            $referralDoc = CyberDoc::find($stage->referral_doc_id);
             $this->questLogService->logReferral(
                 $player,
                 $referralDoc?->name ?? 'Unknown',
@@ -311,67 +272,67 @@ class QuestService
         $watcherDelivery = $this->watcherService->deliverForStage($player, $stage->id);
 
         return [
-            'stage_id'              => $stage->id,
-            'already_complete'      => false,
-            'rep_granted'           => $repAmount,
-            'rep_doc_id'            => $repDocId,
-            'rep_score'             => $rep->score,
-            'rep_label'             => $this->reputationService->getRepLabel($rep->score),
-            'creds_granted'         => $stage->reward_creds ?? 0,
-            'next_stage_id'         => $nextStage?->id,
-            'arcs_unlocked'         => $unlocked,
-            'referral_issued'       => $stage->referral_doc_id !== null,
-            'referral_doc_id'       => $stage->referral_doc_id,
-            'watcher_signal'        => $watcherDelivery !== null,
-            'watcher_message_id'    => $watcherDelivery?->watcher_message_id,
+            'stage_id'           => $stage->id,
+            'already_complete'   => false,
+            'creds_granted'      => $stage->reward_creds ?? 0,
+            'next_stage_id'      => $nextStage?->id,
+            'arcs_unlocked'      => $arcsUnlocked,
+            'referral_issued'    => $stage->referral_doc_id !== null,
+            'referral_doc_id'    => $stage->referral_doc_id,
+            'watcher_signal'     => $watcherDelivery !== null,
+            'watcher_message_id' => $watcherDelivery?->watcher_message_id,
         ];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Arc unlock sweep
+    // Arc unlock — sequence order
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Scan all locked arcs for this player and unlock any whose rep_required
-     * threshold has been crossed. Initialises stages for newly unlocked arcs.
+     * Unlock the next arc in sequence_order for the given doc, after the
+     * arc at $completedOrder was just finished.
      *
      * Returns array of newly unlocked arc IDs.
      */
-    public function checkAndUnlockArcs(Player $player): array
+    public function unlockNextArc(Player $player, CyberDoc $doc, int $completedOrder): array
     {
-        $lockedProgress = PlayerArcProgress::where('player_id', $player->id)
-            ->where('status', 'locked')
-            ->with('arc.cyberDoc')
-            ->get();
+        $nextArc = QuestArc::where('cyber_doc_id', $doc->id)
+            ->where('sequence_order', '>', $completedOrder)
+            ->orderBy('sequence_order')
+            ->first();
 
-        $unlocked = [];
-
-        foreach ($lockedProgress as $prog) {
-            $arc      = $prog->arc;
-            $repScore = $this->reputationService->getScore($player, $arc->cyber_doc_id);
-
-            // rep_required = 0 arcs are NOT auto-unlocked via rep sweep —
-            // they need an explicit story trigger (referral, tutorial complete, etc).
-            // Only arcs with a genuine positive threshold unlock here.
-            if ($arc->rep_required > 0 && $repScore >= $arc->rep_required) {
-                $prog->update([
-                    'status'      => 'active',
-                    'unlocked_at' => Carbon::now(),
-                ]);
-                $this->initStagesForArc($player, $arc);
-                $unlocked[] = $arc->id;
-
-                // Log the unlock so the archive and doc notification system pick it up
-                $this->questLogService->logArcUnlocked(
-                    $player,
-                    $arc->id,
-                    $arc->title,
-                    $arc->cyberDoc->name,
-                );
-            }
+        if (! $nextArc) {
+            return [];
         }
 
-        return $unlocked;
+        $prog = PlayerArcProgress::where('player_id', $player->id)
+            ->where('quest_arc_id', $nextArc->id)
+            ->first();
+
+        if ($prog) {
+            if ($prog->status !== 'locked') {
+                return []; // already active or complete
+            }
+            $prog->update(['status' => 'active', 'unlocked_at' => Carbon::now()]);
+        } else {
+            PlayerArcProgress::create([
+                'player_id'    => $player->id,
+                'quest_arc_id' => $nextArc->id,
+                'status'       => 'active',
+                'unlocked_at'  => Carbon::now(),
+            ]);
+        }
+
+        $this->initStagesForArc($player, $nextArc);
+
+        $this->questLogService->logArcUnlocked(
+            $player,
+            $nextArc->id,
+            $nextArc->title,
+            $doc->name,
+        );
+
+        return [$nextArc->id];
     }
 
     // ─────────────────────────────────────────────────────────────────────────

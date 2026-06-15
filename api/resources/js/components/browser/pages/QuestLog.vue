@@ -41,32 +41,12 @@
                 >
                     <span class="ql-doc-chevron">{{ isOpen(doc.cyber_doc_id) ? '▼' : '▶' }}</span>
                     <span class="ql-doc-name">{{ docHandle(doc.name) }}</span>
-                    <span v-if="doc.met && doc.rep" class="ql-rep-label" :class="repClass(doc.rep.tier_index)">
-                        [{{ doc.rep.label }}]
-                    </span>
-                    <span v-if="doc.met && doc.rep" class="ql-rep-score">· {{ doc.rep.score }} REP</span>
-                    <span v-if="doc.met && doc.rep" class="ql-rep-bar-wrap">
-                        <span
-                            class="ql-rep-bar-fill"
-                            :class="repClass(doc.rep.tier_index)"
-                            :style="{ width: (doc.rep.bar_pct * 100).toFixed(0) + '%' }"
-                        />
-                    </span>
                     <span v-if="!doc.met && !doc.referral" class="ql-unmet-tag">UNKNOWN</span>
                     <span v-if="!doc.met && doc.referral"  class="ql-referral-tag">INTRODUCTION PENDING</span>
                 </div>
 
                 <!-- Doc body — only when open -->
                 <div v-if="isOpen(doc.cyber_doc_id)" class="ql-doc-body">
-
-                    <!-- Rep threshold progress -->
-                    <div v-if="doc.met && doc.rep && doc.rep.next_threshold" class="ql-rep-threshold">
-                        <span class="ql-thresh-label">NEXT TIER</span>
-                        <span class="ql-thresh-val">{{ doc.rep.next_threshold }} REP REQUIRED</span>
-                    </div>
-                    <div v-else-if="doc.met && doc.rep && !doc.rep.next_threshold" class="ql-rep-threshold">
-                        <span class="ql-thresh-label ql-thresh-label--root">▸ MAX TIER REACHED</span>
-                    </div>
 
                     <!-- Referral pending (not yet visited) -->
                     <div v-if="!doc.met && doc.referral" class="ql-referral-msg">
@@ -88,7 +68,7 @@
                                 <span class="ql-arc-status-icon">{{ arcIcon(arc.status) }}</span>
                                 {{ arc.title }}
                                 <span v-if="arc.status === 'locked'" class="ql-lock-tag">
-                                    LOCKED — {{ arc.rep_required }} REP REQUIRED
+                                    LOCKED
                                 </span>
                             </div>
 
@@ -141,7 +121,6 @@
                                         @click="onBranchSelect(stage.id, opt.cyber_doc_id)"
                                     >
                                         {{ opt.label }}
-                                        <span class="ql-branch-rep">+{{ opt.rep_reward }} REP</span>
                                     </button>
                                 </div>
                             </div>
@@ -217,12 +196,6 @@ function autoOpen() {
 function docHandle(name) {
     const match = name.match(/^([A-Za-z]+)/);
     return match ? match[1].toUpperCase() : name.toUpperCase();
-}
-
-const REP_CLASSES = ['ql-rep--null', 'ql-rep--resolved', 'ql-rep--routed', 'ql-rep--encrypted', 'ql-rep--root'];
-
-function repClass(tierIndex) {
-    return REP_CLASSES[tierIndex] ?? REP_CLASSES[0];
 }
 
 function arcIcon(status) {
@@ -314,36 +287,6 @@ onMounted(async () => {
 .ql-doc-header--active { background: #0a1a12; }
 .ql-doc-chevron { color: #4a9a7a; width: 10px; flex-shrink: 0; }
 .ql-doc-name    { color: #d0f0e0; font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
-.ql-rep-label   { font-size: 10px; font-weight: 700; }
-.ql-rep-score   { color: #4a7a6a; font-size: 10px; }
-
-/* Rep bar */
-.ql-rep-bar-wrap {
-    flex: 1;
-    height: 4px;
-    background: #0d2a1e;
-    position: relative;
-    overflow: hidden;
-    max-width: 80px;
-}
-.ql-rep-bar-fill {
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    transition: width 0.4s ease;
-}
-
-/* Rep tier colours */
-.ql-rep--null      { color: #3a5a52; }
-.ql-rep--resolved  { color: #5a9a7a; }
-.ql-rep--routed    { color: #00c87a; }
-.ql-rep--encrypted { color: #00ff9d; }
-.ql-rep--root      { color: #ff9d00; }
-.ql-rep--null.ql-rep-bar-fill      { background: #3a5a52; }
-.ql-rep--resolved.ql-rep-bar-fill  { background: #5a9a7a; }
-.ql-rep--routed.ql-rep-bar-fill    { background: #00c87a; }
-.ql-rep--encrypted.ql-rep-bar-fill { background: #00ff9d; }
-.ql-rep--root.ql-rep-bar-fill      { background: #ff9d00; }
-
 .ql-unmet-tag    { color: #3a5a52; font-size: 10px; margin-left: auto; }
 .ql-referral-tag { color: #d0a020; font-size: 10px; margin-left: auto; animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.5; } }
@@ -356,18 +299,6 @@ onMounted(async () => {
     gap: 6px;
     border-top: 1px solid #0e2a1e;
 }
-
-.ql-rep-threshold {
-    display: flex;
-    gap: 8px;
-    font-size: 10px;
-    color: #3a6a52;
-    padding-bottom: 2px;
-    border-bottom: 1px solid #0a1e14;
-}
-.ql-thresh-label { color: #6a9a82; }
-.ql-thresh-val   { color: #80b898; }
-.ql-thresh-label--root { color: #ff9d00; }
 
 .ql-referral-msg {
     color: #d0a020;

@@ -15,7 +15,6 @@ class QuestStage extends Model
         'stage_number',
         'title',
         'objective_text',
-        'rep_reward',
         'is_branch',
         'branch_options',
         'referral_doc_id',
@@ -35,7 +34,6 @@ class QuestStage extends Model
 
     protected $casts = [
         'stage_number'       => 'integer',
-        'rep_reward'         => 'integer',
         'is_branch'          => 'boolean',
         'branch_options'     => 'array',
         'dialogue'           => 'array',

@@ -7,7 +7,6 @@ use App\Models\Node;
 use App\Models\Player;
 use App\Services\CyberDocService;
 use App\Services\QuestService;
-use App\Services\ReputationService;
 use App\Services\RigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,10 +14,9 @@ use Illuminate\Http\Request;
 class CyberDocController extends Controller
 {
     public function __construct(
-        private readonly CyberDocService   $cyberDocService,
-        private readonly RigService        $rigService,
-        private readonly QuestService      $questService,
-        private readonly ReputationService $reputationService,
+        private readonly CyberDocService $cyberDocService,
+        private readonly RigService      $rigService,
+        private readonly QuestService    $questService,
     ) {}
 
     /**
@@ -115,13 +113,6 @@ class CyberDocController extends Controller
 
         $result = $this->cyberDocService->bankCreds($player, $cyberdocCanvasId);
         $fresh  = $player->fresh();
-
-        // Grant bounty-extract rep to the doc the player is currently at
-        $node     = Node::find($player->current_node_id);
-        $cyberDoc = $node ? CyberDoc::where('node_id', $node->id)->first() : null;
-        if ($cyberDoc && $bountyLevelBeforeBank > 0) {
-            $this->reputationService->grantBountyExtractRep($player, $cyberDoc->id, $bountyLevelBeforeBank);
-        }
 
         return response()->json([
             'message'       => 'Creds banked.',

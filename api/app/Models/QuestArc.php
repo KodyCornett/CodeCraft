@@ -15,13 +15,11 @@ class QuestArc extends Model
         'cyber_doc_id',
         'sequence_order',
         'title',
-        'rep_required',
         'is_entry_arc',
     ];
 
     protected $casts = [
         'sequence_order' => 'integer',
-        'rep_required'   => 'integer',
         'is_entry_arc'   => 'boolean',
     ];
 
