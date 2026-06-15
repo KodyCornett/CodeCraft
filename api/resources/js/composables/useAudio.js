@@ -1,20 +1,27 @@
 /**
  * useAudio
  *
- * Background music player for CodeCraft.
+ * Background music + story audio player for CodeCraft.
  *
- * Tracks live at /audio/music/track1.mp3 – track4.mp3
- * (drop files into api/public/audio/music/).
+ * Music tracks live at /audio/music/track1.mp3 – track4.mp3.
+ * Story clips are one-shot files played via playStory(url).
+ *
+ * Two independent volume channels:
+ *   musicVolume  — background ambient tracks (0–1, default 0.35)
+ *   storyVolume  — dialogue / NPC narration clips (0–1, default 0.80)
+ *
+ * Both are persisted to localStorage (cc_music_vol / cc_story_vol)
+ * so settings survive reload.
  *
  * Behaviour:
- *   • Shuffles the playlist on start, re-shuffles when all tracks have played.
- *   • Fades between tracks using setInterval (reliable across tab states).
- *   • Mute/unmute preserves playback position.
+ *   • Music shuffles on start, re-shuffles when all tracks have played.
+ *   • Fades between music tracks using setInterval (reliable across tab states).
+ *   • Mute/unmute preserves both volumes and restores them on unmute.
  *   • Autoplay unlock: tries to play immediately on startAudio(); if the
  *     browser blocks it, waits for the first user click then starts automatically.
  *
  * Singleton pattern — module-level state is shared across all component
- * instances so GameMenu and Game.vue see the same muted/playing state.
+ * instances so GameMenu and Game.vue see the same state.
  */
 
 import { ref, readonly } from 'vue';
@@ -27,19 +34,32 @@ const TRACKS = [
     '/audio/music/track4.mp3',
 ];
 
-let VOLUME            = 0.35;  // master volume 0–1 — adjustable via setVolume()
-const FADE_IN_MS      = 1500;  // fade-in duration when a track starts
-const FADE_OUT_MS     = 1000;  // fade-out duration before switching tracks
-const FADE_TICK_MS    = 50;    // setInterval tick — 20 steps/sec, smooth enough
+// ── Volume defaults + localStorage persistence ────────────────────────────────
+const LS_MUSIC_VOL = 'cc_music_vol';
+const LS_STORY_VOL = 'cc_story_vol';
+
+function loadVol(key, fallback) {
+    const v = parseFloat(localStorage.getItem(key));
+    return isNaN(v) ? fallback : Math.min(1, Math.max(0, v));
+}
+
+let MUSIC_VOL = loadVol(LS_MUSIC_VOL, 0.35);
+let STORY_VOL = loadVol(LS_STORY_VOL, 0.80);
+
+// ── Fade constants ────────────────────────────────────────────────────────────
+const FADE_IN_MS   = 1500;
+const FADE_OUT_MS  = 1000;
+const FADE_TICK_MS = 50;
 
 // ── Module-level singleton state ──────────────────────────────────────────────
-const muted   = ref(false);
-const playing = ref(false);
-const volume  = ref(VOLUME);
+const muted       = ref(false);
+const playing     = ref(false);
+const musicVolume = ref(MUSIC_VOL);
+const storyVolume = ref(STORY_VOL);
 
-let _audio        = null;   // active HTMLAudioElement
-let _fadeInterval = null;   // setInterval id for current fade
-let _playlist     = [];     // shuffled track list
+let _audio        = null;   // active music HTMLAudioElement
+let _fadeInterval = null;
+let _playlist     = [];
 let _trackIndex   = 0;
 let _started      = false;
 let _unlocked     = false;
@@ -59,11 +79,8 @@ function nextTrackUrl() {
     if (_trackIndex >= _playlist.length) {
         _playlist   = shuffle(TRACKS);
         _trackIndex = 0;
-        console.log('[AUDIO] Playlist reshuffled');
     }
-    const url = _playlist[_trackIndex++];
-    console.log('[AUDIO] Next track:', url);
-    return url;
+    return _playlist[_trackIndex++];
 }
 
 function clearFade() {
@@ -73,11 +90,6 @@ function clearFade() {
     }
 }
 
-/**
- * Smoothly move audioEl.volume toward targetVol over durationMs,
- * then call onComplete. Uses setInterval so it works even in
- * background tabs where requestAnimationFrame is throttled.
- */
 function fadeTo(audioEl, targetVol, durationMs, onComplete) {
     clearFade();
 
@@ -98,7 +110,7 @@ function fadeTo(audioEl, targetVol, durationMs, onComplete) {
     }, FADE_TICK_MS);
 }
 
-// ── Core playback ─────────────────────────────────────────────────────────────
+// ── Core music playback ───────────────────────────────────────────────────────
 function playNext() {
     const url   = nextTrackUrl();
     const audio = new Audio(url);
@@ -107,30 +119,25 @@ function playNext() {
     audio.preload = 'auto';
     audio.addEventListener('ended', onTrackEnded);
 
-    console.log('[AUDIO] Attempting play...');
-
     audio.play()
         .then(() => {
-            console.log('[AUDIO] Playing:', url);
             _audio        = audio;
             _unlocked     = true;
             playing.value = true;
 
             if (!muted.value) {
-                fadeTo(audio, VOLUME, FADE_IN_MS, null);
+                fadeTo(audio, MUSIC_VOL, FADE_IN_MS, null);
             }
         })
         .catch((err) => {
             console.warn('[AUDIO] Blocked by browser — waiting for first click.', err.message);
             audio.removeEventListener('ended', onTrackEnded);
-            // Re-attach unlock listener so the SAME url plays on next click
-            _trackIndex--;   // step back so nextTrackUrl() returns the same track
+            _trackIndex--;
             attachUnlockListener();
         });
 }
 
 function onTrackEnded() {
-    console.log('[AUDIO] Track ended — fading to next');
     if (_audio === null) { playNext(); return; }
 
     const outgoing = _audio;
@@ -148,11 +155,8 @@ function onTrackEnded() {
 function attachUnlockListener() {
     if (_clickHandler) return;
 
-    console.log('[AUDIO] Waiting for first user interaction...');
-
     _clickHandler = () => {
         if (_unlocked) return;
-        console.log('[AUDIO] User interaction detected — starting music');
         window.removeEventListener('click', _clickHandler, { capture: true });
         _clickHandler = null;
         if (_started && !playing.value) playNext();
@@ -165,11 +169,9 @@ function attachUnlockListener() {
 
 function startAudio() {
     if (_started) return;
-    _started  = true;
-    _playlist = shuffle(TRACKS);
+    _started    = true;
+    _playlist   = shuffle(TRACKS);
     _trackIndex = 0;
-
-    console.log('[AUDIO] startAudio() called — attempting immediate play');
     playNext();
 }
 
@@ -191,7 +193,17 @@ function stopAudio() {
     }
 
     playing.value = false;
-    console.log('[AUDIO] Stopped');
+}
+
+/**
+ * Play a one-shot story / dialogue audio clip at the current story volume.
+ * Returns the HTMLAudioElement so the caller can stop it early if needed.
+ */
+function playStory(url) {
+    const el = new Audio(url);
+    el.volume = muted.value ? 0 : STORY_VOL;
+    el.play().catch((e) => console.warn('[AUDIO] Story clip blocked:', e.message));
+    return el;
 }
 
 /**
@@ -211,7 +223,6 @@ function fadeOutForDialogue() {
 
 /**
  * Fade music back in after a dialogue scene (1.5s).
- * Resumes the paused track at position; starts a new track if none is loaded.
  */
 function fadeInAfterDialogue() {
     if (!_started || !_unlocked) return;
@@ -222,12 +233,11 @@ function fadeInAfterDialogue() {
     clearFade();
     _audio.play().catch(() => {});
     playing.value = true;
-    fadeTo(_audio, muted.value ? 0 : VOLUME, 1500, null);
+    fadeTo(_audio, muted.value ? 0 : MUSIC_VOL, 1500, null);
 }
 
 /**
  * Instantly silence and pause — for dramatic story interrupts.
- * Preserves _started and _unlocked state so resumeAudio() can restart.
  */
 function cutAudio() {
     clearFade();
@@ -236,28 +246,29 @@ function cutAudio() {
         _audio.pause();
     }
     playing.value = false;
-    console.log('[AUDIO] cutAudio() — hard stop');
 }
 
 /**
- * Resume audio after cutAudio(). Starts the next track in the shuffle.
+ * Resume after cutAudio().
  */
 function resumeAudio() {
     if (!_started || !_unlocked) return;
     if (playing.value) return;
-    console.log('[AUDIO] resumeAudio() — restarting');
     playNext();
 }
 
+/**
+ * Master mute toggle — silences both music and story channels.
+ * Restores volumes on unmute.
+ */
 function toggleMute() {
     muted.value = !muted.value;
-    console.log('[AUDIO] Mute toggled —', muted.value ? 'MUTED' : 'UNMUTED');
 
     if (muted.value) {
         if (_audio) fadeTo(_audio, 0, 600, null);
     } else {
         if (_audio && playing.value) {
-            fadeTo(_audio, VOLUME, 600, null);
+            fadeTo(_audio, MUSIC_VOL, 600, null);
         } else if (_started && _unlocked && !playing.value) {
             playNext();
         }
@@ -265,28 +276,40 @@ function toggleMute() {
 }
 
 /**
- * Set master volume (0–1). Takes effect immediately on the playing track.
- * Unmutes automatically if the player was muted.
+ * Set music volume (0–1). Persists to localStorage.
  */
-function setVolume(val) {
+function setMusicVolume(val) {
     const v   = Math.min(1, Math.max(0, val));
-    VOLUME        = v;
-    volume.value  = v;
+    MUSIC_VOL         = v;
+    musicVolume.value = v;
+    localStorage.setItem(LS_MUSIC_VOL, String(v));
 
-    if (v > 0 && muted.value) {
-        muted.value = false;
-    }
-
-    if (_audio && playing.value) {
-        _audio.volume = muted.value ? 0 : v;
+    if (_audio && playing.value && !muted.value) {
+        _audio.volume = v;
     }
 }
 
+/**
+ * Set story volume (0–1). Persists to localStorage.
+ * Affects all future playStory() calls.
+ */
+function setStoryVolume(val) {
+    const v   = Math.min(1, Math.max(0, val));
+    STORY_VOL         = v;
+    storyVolume.value = v;
+    localStorage.setItem(LS_STORY_VOL, String(v));
+}
+
+// ── Legacy alias — kept so existing callers of setVolume() don't break ────────
+function setVolume(val) { setMusicVolume(val); }
+
 export function useAudio() {
     return {
-        muted:      readonly(muted),
-        playing:    readonly(playing),
-        volume:     readonly(volume),
+        muted:            readonly(muted),
+        playing:          readonly(playing),
+        musicVolume:      readonly(musicVolume),
+        storyVolume:      readonly(storyVolume),
+        /** @deprecated use musicVolume */ volume: readonly(musicVolume),
         startAudio,
         stopAudio,
         cutAudio,
@@ -294,6 +317,9 @@ export function useAudio() {
         fadeOutForDialogue,
         fadeInAfterDialogue,
         toggleMute,
-        setVolume,
+        setMusicVolume,
+        setStoryVolume,
+        /** @deprecated use setMusicVolume */ setVolume,
+        playStory,
     };
 }

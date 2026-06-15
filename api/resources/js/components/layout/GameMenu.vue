@@ -22,34 +22,62 @@
 
                 <div class="menu-items">
 
-                    <!-- Audio toggle -->
-                    <button class="menu-item" @click="toggleAudio">
-                        <span class="mi-icon">{{ !muted ? '◉' : '○' }}</span>
-                        <span class="mi-label">AUDIO</span>
-                        <span class="mi-state" :class="!muted ? 'mi-state--on' : 'mi-state--off'">
-                            {{ !muted ? 'ON' : 'OFF' }}
-                        </span>
-                    </button>
+                    <!-- ── Audio settings ─────────────────────────────────── -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <span class="ss-icon">◉</span>
+                            <span class="ss-label">AUDIO</span>
+                            <button class="mute-btn" @click="toggleMute" :class="{ 'mute-btn--muted': muted }">
+                                {{ muted ? 'MUTED' : 'LIVE' }}
+                            </button>
+                        </div>
 
-                    <!-- Volume slider — only visible when not muted -->
-                    <div v-if="!muted" class="volume-row">
-                        <span class="vol-icon">▼</span>
-                        <input
-                            class="vol-slider"
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.01"
-                            :value="volume"
-                            @input="onVolumeInput"
-                        />
-                        <span class="vol-icon">▲</span>
-                        <span class="vol-pct">{{ Math.round(volume * 100) }}%</span>
+                        <!-- Music volume -->
+                        <div class="vol-row">
+                            <span class="vol-label">MUSIC</span>
+                            <input
+                                class="vol-slider vol-slider--music"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                :value="musicVolume"
+                                :disabled="muted"
+                                @input="e => setMusicVolume(parseFloat(e.target.value))"
+                            />
+                            <span class="vol-pct" :class="{ 'vol-pct--dim': muted }">
+                                {{ muted ? '—' : Math.round(musicVolume * 100) + '%' }}
+                            </span>
+                        </div>
+
+                        <!-- Story volume -->
+                        <div class="vol-row">
+                            <span class="vol-label">STORY</span>
+                            <input
+                                class="vol-slider vol-slider--story"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                :value="storyVolume"
+                                :disabled="muted"
+                                @input="e => setStoryVolume(parseFloat(e.target.value))"
+                            />
+                            <span class="vol-pct" :class="{ 'vol-pct--dim': muted }">
+                                {{ muted ? '—' : Math.round(storyVolume * 100) + '%' }}
+                            </span>
+                        </div>
+
+                        <!-- Story volume warning -->
+                        <div class="story-warning">
+                            <span class="story-warning-icon">⚠</span>
+                            CodeCraft is a narrated story. Lowering story volume may diminish the experience the game is designed to deliver.
+                        </div>
                     </div>
 
                     <div class="menu-divider" />
 
-                    <!-- Tutorial toggle -->
+                    <!-- Tutorial -->
                     <button class="menu-item" @click="onTutorial">
                         <span class="mi-icon">◈</span>
                         <span class="mi-label">TUTORIAL</span>
@@ -86,15 +114,7 @@ const emit = defineEmits(['tutorial']);
 const open    = ref(false);
 const version = 'v0.1-alpha';
 
-const { muted, volume, toggleMute, setVolume } = useAudio();
-
-function toggleAudio() {
-    toggleMute();
-}
-
-function onVolumeInput(e) {
-    setVolume(parseFloat(e.target.value));
-}
+const { muted, musicVolume, storyVolume, toggleMute, setMusicVolume, setStoryVolume } = useAudio();
 
 function onTutorial() {
     open.value = false;
@@ -104,17 +124,16 @@ function onTutorial() {
 async function onLogout() {
     open.value = false;
     try {
-        // Laravel's web logout route — clears the session cookie
         await axios.post('/logout');
     } catch {
-        // If the request fails the session may already be dead; navigate anyway
+        // session may already be expired
     }
     window.location.href = '/login';
 }
 </script>
 
 <style scoped>
-/* ── Trigger button — styled to match the taskbar ────────────────────────── */
+/* ── Trigger button ───────────────────────────────────────────────────────── */
 .menu-btn {
     display: flex;
     flex-direction: row;
@@ -131,9 +150,7 @@ async function onLogout() {
     flex-shrink: 0;
 }
 
-.menu-btn:hover {
-    background: rgba(0, 255, 255, 0.05);
-}
+.menu-btn:hover { background: rgba(0, 255, 255, 0.05); }
 
 .menu-btn--open {
     background: rgba(0, 255, 255, 0.07);
@@ -148,16 +165,16 @@ async function onLogout() {
 .menu-btn--open .menu-btn-icon,
 .menu-btn--open .menu-btn-label  { color: #00FFFF; }
 
-/* ── Panel — floats above the taskbar ────────────────────────────────────── */
+/* ── Panel ────────────────────────────────────────────────────────────────── */
 .menu-panel {
     position: absolute;
-    bottom: 42px;   /* taskbar height */
+    bottom: 42px;
     right: 0;
     z-index: 60;
 }
 
 .menu-inner {
-    width: 240px;
+    width: 260px;
     background: #08080f;
     border: 1px solid rgba(0, 255, 255, 0.2);
     border-bottom: none;
@@ -215,13 +232,8 @@ async function onLogout() {
     transition: background 0.12s;
 }
 
-.menu-item:hover {
-    background: rgba(0, 255, 255, 0.05);
-}
-
-.menu-item--danger:hover {
-    background: rgba(255, 51, 51, 0.07);
-}
+.menu-item:hover { background: rgba(0, 255, 255, 0.05); }
+.menu-item--danger:hover { background: rgba(255, 51, 51, 0.07); }
 
 .mi-icon {
     font-size: 12px;
@@ -231,9 +243,7 @@ async function onLogout() {
     line-height: 1;
 }
 
-.menu-item--danger .mi-icon {
-    color: rgba(255, 51, 51, 0.5);
-}
+.menu-item--danger .mi-icon { color: rgba(255, 51, 51, 0.5); }
 
 .mi-label {
     font-size: 10px;
@@ -242,17 +252,7 @@ async function onLogout() {
     flex: 1;
 }
 
-.menu-item--danger .mi-label {
-    color: rgba(255, 51, 51, 0.75);
-}
-
-.mi-state {
-    font-size: 8px;
-    letter-spacing: 0.12em;
-    flex-shrink: 0;
-}
-.mi-state--on  { color: #00FF88; }
-.mi-state--off { color: rgba(255, 255, 255, 0.2); }
+.menu-item--danger .mi-label { color: rgba(255, 51, 51, 0.75); }
 
 .mi-hint {
     font-size: 8px;
@@ -261,23 +261,73 @@ async function onLogout() {
     flex-shrink: 0;
 }
 
-.menu-item--danger .mi-hint {
-    color: rgba(255, 51, 51, 0.3);
+.menu-item--danger .mi-hint { color: rgba(255, 51, 51, 0.3); }
+
+/* ── Audio settings section ──────────────────────────────────────────────── */
+.settings-section {
+    padding: 10px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-/* ── Volume slider ───────────────────────────────────────────────────────── */
-.volume-row {
+.settings-section-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 16px 10px;
+    margin-bottom: 2px;
 }
 
-.vol-icon {
-    font-size: 7px;
-    color: rgba(0, 255, 255, 0.25);
-    flex-shrink: 0;
+.ss-icon {
+    font-size: 11px;
+    color: rgba(0, 255, 255, 0.4);
     line-height: 1;
+    width: 16px;
+    flex-shrink: 0;
+}
+
+.ss-label {
+    font-size: 10px;
+    color: rgba(0, 255, 255, 0.75);
+    letter-spacing: 0.1em;
+    flex: 1;
+}
+
+.mute-btn {
+    background: transparent;
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    color: #00FF88;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+    flex-shrink: 0;
+}
+
+.mute-btn:hover {
+    border-color: rgba(0, 255, 255, 0.4);
+}
+
+.mute-btn--muted {
+    color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Volume rows ─────────────────────────────────────────────────────────── */
+.vol-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vol-label {
+    font-size: 8px;
+    color: rgba(0, 255, 255, 0.35);
+    letter-spacing: 0.1em;
+    width: 36px;
+    flex-shrink: 0;
 }
 
 .vol-slider {
@@ -285,12 +335,21 @@ async function onLogout() {
     -webkit-appearance: none;
     appearance: none;
     height: 2px;
-    background: rgba(0, 255, 255, 0.15);
     outline: none;
     cursor: pointer;
+    border-radius: 1px;
 }
 
-.vol-slider::-webkit-slider-thumb {
+.vol-slider:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+/* Music slider — cyan */
+.vol-slider--music {
+    background: rgba(0, 255, 255, 0.15);
+}
+.vol-slider--music::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 10px;
@@ -300,8 +359,7 @@ async function onLogout() {
     box-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
     cursor: pointer;
 }
-
-.vol-slider::-moz-range-thumb {
+.vol-slider--music::-moz-range-thumb {
     width: 10px;
     height: 10px;
     border-radius: 50%;
@@ -311,13 +369,59 @@ async function onLogout() {
     cursor: pointer;
 }
 
+/* Story slider — amber */
+.vol-slider--story {
+    background: rgba(255, 179, 0, 0.15);
+}
+.vol-slider--story::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #FFB300;
+    box-shadow: 0 0 6px rgba(255, 179, 0, 0.5);
+    cursor: pointer;
+}
+.vol-slider--story::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: none;
+    background: #FFB300;
+    box-shadow: 0 0 6px rgba(255, 179, 0, 0.5);
+    cursor: pointer;
+}
+
 .vol-pct {
     font-size: 8px;
     color: rgba(0, 255, 255, 0.35);
-    letter-spacing: 0.08em;
-    width: 28px;
+    letter-spacing: 0.06em;
+    width: 30px;
     text-align: right;
     flex-shrink: 0;
+}
+
+.vol-pct--dim { color: rgba(255, 255, 255, 0.15); }
+
+/* ── Story volume warning ─────────────────────────────────────────────────── */
+.story-warning {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    border-left: 2px solid rgba(255, 179, 0, 0.35);
+    background: rgba(255, 179, 0, 0.04);
+    font-size: 8px;
+    color: rgba(255, 179, 0, 0.55);
+    line-height: 1.5;
+    letter-spacing: 0.03em;
+}
+
+.story-warning-icon {
+    flex-shrink: 0;
+    font-size: 9px;
+    color: rgba(255, 179, 0, 0.5);
+    margin-top: 1px;
 }
 
 /* ── Divider ─────────────────────────────────────────────────────────────── */
