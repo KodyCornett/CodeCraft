@@ -110,7 +110,7 @@ class NodeController extends Controller
         $players = $players->map(fn ($p) => [
                 'id'                 => $p->id,
                 'handle'             => $p->handle,
-                'bounty_level'       => (int)   $p->bounty_level,
+                'bounty_level'       => $this->bountyService->hackCountToStarLevel((int) ($p->bounty_level ?? 0)),
                 'is_open_season'     => (bool)  $p->is_open_season,
                 'pocket_creds'       => (int)   ($p->pocket_creds   ?? 0),
                 'bounty_multiplier'  => (float) ($p->bounty_multiplier ?? 1.0),

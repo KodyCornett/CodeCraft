@@ -140,7 +140,7 @@
                             {{ p.handle }}
                         </span>
                         <span class="ni-player-meta">
-                            <span class="ni-player-stars">{{ '★'.repeat(p.bounty_level) }}{{ '☆'.repeat(5 - p.bounty_level) }}</span>
+                            <span class="ni-player-stars">{{ '★'.repeat(p.bounty_level ?? 0) }}{{ '☆'.repeat(5 - (p.bounty_level ?? 0)) }}</span>
                             <span class="ni-player-pocket" v-if="p.pocket_creds > 0">◈{{ p.pocket_creds.toLocaleString() }}</span>
                         </span>
                     </div>
