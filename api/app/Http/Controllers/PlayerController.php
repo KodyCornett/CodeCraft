@@ -42,6 +42,7 @@ class PlayerController extends Controller
             'player' => [
                 'id'                      => $player->id,
                 'handle'                  => $player->handle,
+                'is_dev'                  => (bool) $request->user()->is_dev,
                 'persona'                 => $player->persona,
                 'persona_desc'            => $player->persona_desc,
                 'current_node_id'         => $player->current_node_id,

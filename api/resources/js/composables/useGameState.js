@@ -47,6 +47,9 @@ export function useGameState() {
         currentSS:           0,
         maxSS:               0,
         isLimping:           false,
+
+        // Dev flag — controls access to in-development features (hex map, etc.)
+        isDev:               false,
     });
 
     // ── Rig ───────────────────────────────────────────────────────────────────
@@ -125,6 +128,7 @@ export function useGameState() {
             player.value.nodesHackedThisRun  = authPlayer.nodes_hacked_this_run   ?? 0;
             player.value.pvpWinsThisRun      = authPlayer.pvp_wins_this_run       ?? 0;
             player.value.isLimping           = authPlayer.is_limping              ?? false;
+            player.value.isDev               = authPlayer.is_dev                  ?? false;
         }
 
         if (authRig) {
