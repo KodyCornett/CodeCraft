@@ -4,6 +4,8 @@
         :class="{ 'is-panning': isPanning }"
         @mousedown="onPanStart"
     >
+        <!-- Particle drift layer — rendered behind the node map -->
+        <canvas ref="particleCanvas" class="particle-layer" />
         <svg
             ref="svgEl"
             class="hex-map-svg"
@@ -275,6 +277,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 // Template ref — bound to the <svg> element so getNodeScreenPos can convert
 // SVG coordinates to stage-relative screen pixels.
 const svgEl = ref(null);
+
+// ─── Particle canvas ref ──────────────────────────────────────────────────────
+const particleCanvas = ref(null);
+let   particleRaf    = null;
 
 // ─── Pan state ────────────────────────────────────────────────────────────────
 const panOffset  = ref({ x: 0, y: 0 });
@@ -1335,11 +1341,84 @@ function getNodeScreenPos(nodeId) {
 onMounted(() => {
     window.addEventListener('mousemove', onPanMove);
     window.addEventListener('mouseup',   onPanEnd);
+    initParticles();
 });
 onUnmounted(() => {
     window.removeEventListener('mousemove', onPanMove);
     window.removeEventListener('mouseup',   onPanEnd);
+    if (particleRaf) cancelAnimationFrame(particleRaf);
 });
+
+// ─── Particle system ──────────────────────────────────────────────────────────
+function initParticles() {
+    const canvas = particleCanvas.value;
+    if (!canvas) return;
+
+    const ctx    = canvas.getContext('2d');
+    const COUNT  = 80;
+
+    function resize() {
+        canvas.width  = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Each particle: position, velocity, opacity, size, type ('dot' | 'dash')
+    const particles = Array.from({ length: COUNT }, () => spawn(canvas));
+
+    function spawn(c, randomY = true) {
+        const type  = Math.random() < 0.3 ? 'dash' : 'dot';
+        const speed = 0.15 + Math.random() * 0.35;
+        const angle = (Math.random() * 40 - 20) * (Math.PI / 180); // slight drift
+        return {
+            x:    Math.random() * c.width,
+            y:    randomY ? Math.random() * c.height : -4,
+            vx:   Math.sin(angle) * speed,
+            vy:   speed,
+            size: type === 'dash' ? 1 + Math.random() * 1.5 : 1 + Math.random(),
+            len:  type === 'dash' ? 4 + Math.random() * 8 : 0,
+            op:   0.08 + Math.random() * 0.18,
+            type,
+        };
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (const p of particles) {
+            ctx.globalAlpha = p.op;
+            ctx.fillStyle   = '#00FFFF';
+            ctx.strokeStyle = '#00FFFF';
+
+            if (p.type === 'dash') {
+                ctx.lineWidth = p.size * 0.6;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x + p.vx * p.len, p.y + p.vy * p.len);
+                ctx.stroke();
+            } else {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Respawn off the top when a particle exits the bottom
+            if (p.y > canvas.height + 10) {
+                Object.assign(p, spawn(canvas, false));
+                p.x = Math.random() * canvas.width;
+            }
+        }
+
+        ctx.globalAlpha = 1;
+        particleRaf = requestAnimationFrame(draw);
+    }
+
+    draw();
+}
 
 defineExpose({
     animatePlayerTo,
@@ -1360,6 +1439,32 @@ defineExpose({
     user-select: none;
 }
 
+/* Scanline overlay */
+.hex-map-wrapper::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Particle canvas — sits behind the SVG */
+.particle-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
 .hex-map-wrapper.is-panning {
     cursor: grabbing;
 }
@@ -1368,6 +1473,8 @@ defineExpose({
     width: 100%;
     height: 100%;
     overflow: visible;
+    position: relative;
+    z-index: 1;
 }
 
 .hex-grid-edge {
