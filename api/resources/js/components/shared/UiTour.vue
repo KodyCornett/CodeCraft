@@ -10,6 +10,47 @@
     @dismiss="skip()"
   >
 
+    <!-- ── SPLICE stop ────────────────────────────────────────────────────── -->
+    <div v-if="currentStep.id === 'splice'" class="ts-content">
+
+      <p class="ts-body">
+        <span class="ts-em">SPLICE</span> is the Frequency's internal browser —
+        a hidden channel layered beneath the corporate grid.
+        Every tool you need to run, upgrade, and survive lives here.
+      </p>
+
+      <div class="ts-rule">// WHAT'S INSIDE</div>
+      <div class="ts-table">
+        <div class="ts-trow">
+          <span class="ts-tcell ts-tcell--key">◈ STATUS</span>
+          <span class="ts-tcell">Full runner profile — economy, bounty run stats, active effects.</span>
+        </div>
+        <div class="ts-trow">
+          <span class="ts-tcell ts-tcell--key">⬡ RIG</span>
+          <span class="ts-tcell">Your hardware stats and upgrade state. Links to the full Stat Reference.</span>
+        </div>
+        <div class="ts-trow">
+          <span class="ts-tcell ts-tcell--key">▶ CMDS</span>
+          <span class="ts-tcell">Command catalog, loadout management, and Grid-Breach reference.</span>
+        </div>
+        <div class="ts-trow">
+          <span class="ts-tcell ts-tcell--key">▣ INV</span>
+          <span class="ts-tcell">Consumable inventory — use stims and hardware from here.</span>
+        </div>
+        <div class="ts-trow">
+          <span class="ts-tcell ts-tcell--key">⌨ TERMINAL</span>
+          <span class="ts-tcell">Mission log and active quest tracker. Check here for your next objective.</span>
+        </div>
+      </div>
+
+      <div class="ts-rule">// CYBERDOC STORES</div>
+      <p class="ts-body">
+        Move to any <span class="ts-em">CyberDoc node</span> on the map and open SPLICE —
+        the store loads automatically. Buy hardware, repair SS, and bank your pocket creds without leaving the interface.
+      </p>
+
+    </div>
+
     <!-- ── UPLINK stop ─────────────────────────────────────────────────────── -->
     <div v-if="currentStep.id === 'uplink'" class="ts-content">
 
@@ -81,6 +122,42 @@
 
     </div>
 
+    <!-- ── POCKET vs WALLET stop ─────────────────────────────────────────── -->
+    <div v-else-if="currentStep.id === 'pocket-wallet'" class="ts-content">
+
+      <div class="ts-two-col">
+        <div class="ts-economy-box ts-economy-box--pocket">
+          <span class="ts-econ-label">POCKET CREDS</span>
+          <span class="ts-econ-icon">⚠</span>
+          <span class="ts-econ-desc">At risk — earned from hacking</span>
+        </div>
+        <div class="ts-economy-box ts-economy-box--wallet">
+          <span class="ts-econ-label">WALLET CREDS</span>
+          <span class="ts-econ-icon">◈</span>
+          <span class="ts-econ-desc">Safe — banked at CyberDoc</span>
+        </div>
+      </div>
+
+      <p class="ts-body">
+        Every hack pays out to your <span class="ts-em ts-em--red">pocket</span> — not your wallet.
+        Pocket creds are wiped if you're killed in PvP or hit Critical System Failure.
+      </p>
+
+      <div class="ts-rule">// HOW TO KEEP IT</div>
+      <p class="ts-body">
+        Move to any <span class="ts-em">CyberDoc node</span> and hit <span class="ts-em">[ BANK ]</span>.
+        Your pocket transfers to your <span class="ts-em">wallet</span> — safe from every threat in the game.
+        Banking also resets your bounty to zero.
+      </p>
+
+      <div class="ts-rule">// STORES USE WALLET ONLY</div>
+      <p class="ts-body">
+        CyberDoc upgrades and hardware are purchased from your wallet.
+        You can't spend pocket creds directly — bank first, then shop.
+      </p>
+
+    </div>
+
     <!-- ── SS stop ─────────────────────────────────────────────────────────── -->
     <div v-else-if="currentStep.id === 'ss'" class="ts-content">
 
@@ -92,9 +169,12 @@
       </div>
 
       <p class="ts-body">
-        Your rig's health pool. Failed node breaches deal damage — the formula is
-        <span class="ts-em">max(1, nodeICE − yourFirewall)</span>.
-        High Firewall means less damage per hit.
+        Your rig's health pool. Failed node breaches always deal a minimum of
+        <span class="ts-em">15 damage</span>, scaled by
+        <span class="ts-em">nodeICE − yourFirewall</span>.
+        High Firewall reduces the hit, but you will always take at least 15.
+        In PvP the floor rises to <span class="ts-em">20</span>, scaled by
+        <span class="ts-em">your CPU − opponent's Firewall</span>.
       </p>
 
       <div class="ts-rule">// DEGRADATION</div>
@@ -144,6 +224,65 @@
       </p>
 
     </div>
+    <!-- ── LOADOUT stop ───────────────────────────────────────────────────── -->
+    <div v-else-if="currentStep.id === 'loadout'" class="ts-content">
+
+      <p class="ts-body">
+        Commands are programs you install into your rig's loadout slots.
+        They modify what you can do on the map and inside breach sequences.
+      </p>
+
+      <div class="ts-rule">// USING MAP COMMANDS</div>
+      <p class="ts-body">
+        Click any equipped command here to select it, then hit
+        <span class="ts-em">[ USE ON MAP ]</span> to activate it.
+        Effects like <span class="ts-em">Ghost Protocol</span> suppress ICE pings for several moves.
+        <span class="ts-em">Signal Noise</span> plants false pings to confuse tracking.
+      </p>
+
+      <div class="ts-rule">// HACK COMMANDS</div>
+      <p class="ts-body">
+        Commands marked <span class="ts-em">HACK</span> activate automatically inside
+        Grid-Breach and Packet Hijack — they don't appear in this panel during a breach.
+      </p>
+
+      <div class="ts-rule">// COOLDOWNS</div>
+      <p class="ts-body">
+        Used commands go on cooldown until your next <span class="ts-em">CyberDoc visit</span>.
+        Plan your run around how many commands you can afford to burn before banking.
+      </p>
+
+    </div>
+
+    <!-- ── TERMINAL stop ──────────────────────────────────────────────────── -->
+    <div v-else-if="currentStep.id === 'terminal'" class="ts-content">
+
+      <p class="ts-body">
+        The <span class="ts-em">TERMINAL</span> is your mission log.
+        Every active objective, NPC contact, and story update appears here.
+        If you're ever unsure what to do next — open this first.
+      </p>
+
+      <div class="ts-rule">// THE BADGE</div>
+      <p class="ts-body">
+        The <span class="ts-em ts-em--green">green dot</span> on this button lights up whenever
+        a quest step completes. It clears as soon as you open TERMINAL.
+      </p>
+
+      <div class="ts-rule">// HOW MISSIONS WORK</div>
+      <p class="ts-body">
+        Each arc is tied to a specific <span class="ts-em">CyberDoc contact</span>.
+        You'll need to visit them in person — move to their node on the map and
+        open the dialogue from the side panel to progress the story.
+      </p>
+
+      <p class="ts-body">
+        Completed missions move to the <span class="ts-em">archive</span>,
+        accessible from the TERMINAL page if you want to review past events.
+      </p>
+
+    </div>
+
     <!-- Add more step id blocks here as the tour grows -->
 
     <!-- ── Footer nav ─────────────────────────────────────────────────────── -->
@@ -241,7 +380,7 @@ const ssClass = computed(() => {
 .ts-rule {
     font-size: 8px;
     letter-spacing: 0.16em;
-    color: rgba(255, 179, 0, 0.35);
+    color: rgba(255, 179, 0, 0.55);
     margin: 10px 0 5px;
 }
 
@@ -250,7 +389,7 @@ const ssClass = computed(() => {
     margin: 0 0 4px;
     font-size: 11px;
     line-height: 1.65;
-    color: rgba(255, 255, 255, 0.70);
+    color: rgba(255, 255, 255, 0.88);
 }
 
 .ts-em {
@@ -260,6 +399,58 @@ const ssClass = computed(() => {
 
 .ts-em--red {
     color: #FF3333;
+}
+
+.ts-em--green {
+    color: #00FF88;
+}
+
+/* ── Pocket / Wallet two-col ──────────────────────────────────────────────── */
+.ts-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ts-economy-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 8px;
+    border: 1px solid;
+    text-align: center;
+}
+
+.ts-economy-box--pocket {
+    border-color: rgba(255, 51, 51, 0.35);
+    background: rgba(255, 51, 51, 0.05);
+}
+
+.ts-economy-box--wallet {
+    border-color: rgba(0, 255, 136, 0.35);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.ts-econ-label {
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.ts-econ-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.ts-economy-box--pocket .ts-econ-icon  { color: #FF3333; }
+.ts-economy-box--wallet  .ts-econ-icon  { color: #00FF88; }
+
+.ts-econ-desc {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.72);
+    line-height: 1.4;
 }
 
 /* ── Bounty stars ─────────────────────────────────────────────────────────── */
@@ -300,13 +491,13 @@ const ssClass = computed(() => {
     border-left: 2px solid rgba(255, 179, 0, 0.15);
     font-size: 10px;
     line-height: 1.5;
-    color: rgba(255, 255, 255, 0.60);
+    color: rgba(255, 255, 255, 0.82);
 }
 
 .ts-trow--warn {
     border-left-color: rgba(255, 51, 51, 0.45);
     background: rgba(255, 51, 51, 0.04);
-    color: rgba(255, 200, 200, 0.70);
+    color: rgba(255, 210, 210, 0.88);
 }
 
 .ts-tcell {
@@ -316,7 +507,7 @@ const ssClass = computed(() => {
 .ts-tcell--key {
     flex: 0 0 auto;
     width: 110px;
-    color: rgba(255, 179, 0, 0.60);
+    color: rgba(255, 179, 0, 0.80);
     letter-spacing: 0.04em;
     font-size: 9px;
 }

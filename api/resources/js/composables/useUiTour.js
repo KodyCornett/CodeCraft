@@ -21,6 +21,12 @@ import { ref, computed } from 'vue';
 //
 const STEPS = [
     {
+        id:        'splice',
+        target:    '#nav-splice',
+        title:     'SPLICE BROWSER',
+        placement: 'top',
+    },
+    {
         id:        'uplink',
         target:    '#hud-uplink',
         title:     'UPLINK',
@@ -33,6 +39,12 @@ const STEPS = [
         placement: 'bottom',
     },
     {
+        id:        'pocket-wallet',
+        target:    '#nav-status',
+        title:     'POCKET vs WALLET',
+        placement: 'top',
+    },
+    {
         id:        'ss',
         target:    '#panel-ss',
         title:     'SYS.STABILITY',
@@ -43,6 +55,18 @@ const STEPS = [
         target:    '#panel-node-info',
         title:     'NODE INFO',
         placement: 'left',
+    },
+    {
+        id:        'loadout',
+        target:    '#panel-loadout',
+        title:     'LOADOUT',
+        placement: 'left',
+    },
+    {
+        id:        'terminal',
+        target:    '#nav-terminal',
+        title:     'MISSION TERMINAL',
+        placement: 'top',
     },
     // More stops will be added here as the tour expands.
 ];

@@ -3,6 +3,7 @@
 
         <!-- SPLICE home button -->
         <button
+            id="nav-splice"
             class="tb-btn tb-home"
             :class="{ 'tb-btn--active': isActive(SPLICE.HOME) }"
             title="SPLICE Home"
@@ -18,6 +19,7 @@
         <button
             v-for="app in APPS"
             :key="app.url"
+            :id="app.tourId ?? undefined"
             class="tb-btn tb-app"
             :class="{ 'tb-btn--active': isActive(app.url) }"
             :title="app.url"
@@ -54,11 +56,11 @@ const props = defineProps({
 const emit = defineEmits(['launch', 'tutorial']);
 
 const APPS = [
-    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS'    },
-    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'       },
-    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'      },
-    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'       },
-    { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true },
+    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS',   tourId: 'nav-status'   },
+    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'                              },
+    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'                             },
+    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'                              },
+    { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true, tourId: 'nav-terminal' },
 ];
 
 // Active when the browser is open on this app's URL

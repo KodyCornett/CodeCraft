@@ -35,6 +35,7 @@
             />
 
             <LoadoutBlock
+                id="panel-loadout"
                 :commands="commands"
                 :current-s-s="currentSS"
                 :max-s-s="maxSS"
