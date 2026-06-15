@@ -135,7 +135,14 @@ class CombatChallengeController extends Controller
             'expires_at'     => now()->addSeconds(self::TTL_SECONDS),
         ]);
 
-        CombatChallengeReceived::dispatch($challenge);
+        try {
+            CombatChallengeReceived::dispatch($challenge);
+        } catch (\Throwable $e) {
+            \Log::warning('[CombatChallenge] broadcast failed — target will discover via polling', [
+                'challenge_id' => $challenge->id,
+                'error'        => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'challenge_id' => $challenge->id,
@@ -252,8 +259,12 @@ class CombatChallengeController extends Controller
         $challenge->status = 'accepted';
         $challenge->save();
 
-        PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, true);
-        PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, true);
+        try {
+            PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, true);
+            PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, true);
+        } catch (\Throwable $e) {
+            \Log::warning('[CombatChallenge] accept broadcast failed', ['error' => $e->getMessage()]);
+        }
 
         // ── Create Packet Hijack match ────────────────────────────────────────
         $challenger = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
@@ -333,17 +344,21 @@ class CombatChallengeController extends Controller
         ]);
 
         // ── Broadcast started events — blank terminal, player types netstat ───
-        PacketHijackStarted::dispatch(
-            matchId:  $match->id,
-            playerId: $challenge->challenger_id,
-            role:     'challenger',
-        );
+        try {
+            PacketHijackStarted::dispatch(
+                matchId:  $match->id,
+                playerId: $challenge->challenger_id,
+                role:     'challenger',
+            );
 
-        PacketHijackStarted::dispatch(
-            matchId:  $match->id,
-            playerId: $challenge->target_id,
-            role:     'defender',
-        );
+            PacketHijackStarted::dispatch(
+                matchId:  $match->id,
+                playerId: $challenge->target_id,
+                role:     'defender',
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('[CombatChallenge] PacketHijackStarted broadcast failed', ['error' => $e->getMessage()]);
+        }
 
         return response()->json([
             'match_id'     => $match->id,
@@ -419,8 +434,12 @@ class CombatChallengeController extends Controller
         $challenge->status = 'declined';
         $challenge->save();
 
-        PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, false);
-        PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, false);
+        try {
+            PlayerCombatStateChanged::dispatch($challenge->challenger_id, $challenge->node_canvas_id, false);
+            PlayerCombatStateChanged::dispatch($challenge->target_id,     $challenge->node_canvas_id, false);
+        } catch (\Throwable $e) {
+            \Log::warning('[CombatChallenge] decline broadcast failed', ['error' => $e->getMessage()]);
+        }
 
         $response = [
             'ok'          => true,

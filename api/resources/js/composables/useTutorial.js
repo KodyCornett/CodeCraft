@@ -87,6 +87,7 @@ export function useTutorial() {
 
     const _state        = ref(defaultState());
     const _syncing      = ref(false);   // prevents overlapping PATCH calls
+    let   _dirty        = false;        // true if a save was skipped while _syncing — triggers retry
     const justCompleted = ref(false);   // pulses true once after tutorial finishes; Game.vue watches this
 
     // ── Hydration (called once on game boot) ──────────────────────────────────
@@ -118,9 +119,12 @@ export function useTutorial() {
     // ── Persist to server ─────────────────────────────────────────────────────
     async function _save() {
         if (_syncing.value) {
-            warn('_save() skipped — sync already in progress');
+            // Mark dirty so the in-flight save triggers a retry with the latest state.
+            // Without this, rapid calls (markSeen → markStepDone) silently drop saves.
+            _dirty = true;
             return;
         }
+        _dirty = false;
         _syncing.value = true;
         log('_save() → PATCH /api/tutorial/state', _state.value);
         try {
@@ -132,6 +136,10 @@ export function useTutorial() {
             warn('_save() failed to persist state:', e?.message);
         } finally {
             _syncing.value = false;
+            if (_dirty) {
+                log('_save() — dirty flag set, retrying with latest state');
+                await _save();
+            }
         }
     }
 
