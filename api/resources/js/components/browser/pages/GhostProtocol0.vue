@@ -75,7 +75,7 @@
                         </div>
 
                         <div v-if="!activeQuest.allDone" class="gp0-action-hint">
-                            Close SPLICE and complete the step above — this page updates automatically.
+                            {{ activeQuest.hint ?? 'Close SPLICE and complete the step above — this page updates automatically.' }}
                         </div>
 
                         <div class="gp0-reward-row">

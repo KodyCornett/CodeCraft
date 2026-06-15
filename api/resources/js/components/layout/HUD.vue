@@ -22,7 +22,7 @@
         <div class="hud-divider" />
 
         <!-- Uplink -->
-        <div class="hud-item">
+        <div id="hud-uplink" class="hud-item">
             <span class="hud-key">UPLINK</span>
             <span class="hud-sep">:</span>
             <span class="hud-val" :class="uplinkClass">
@@ -42,7 +42,7 @@
         <div class="hud-divider" />
 
         <!-- Bounty — ticker + stars + multiplier -->
-        <div class="hud-item hud-item--bounty">
+        <div id="hud-bounty" class="hud-item hud-item--bounty">
             <span class="hud-key">BOUNTY</span>
             <span class="hud-sep">:</span>
 

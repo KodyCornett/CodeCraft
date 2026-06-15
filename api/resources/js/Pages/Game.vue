@@ -326,6 +326,9 @@
             :seconds-left="idle.secondsLeft.value"
             @cancel="idle.cancel()"
         />
+
+        <!-- UI orientation tour — Teleports to body, pointer-safe -->
+        <UiTour :player="player" />
     </GameScreen>
 </template>
 
@@ -352,6 +355,7 @@ import CommandHitNotification  from '@/components/shared/CommandHitNotification.
 import IdleWarning              from '@/components/shared/IdleWarning.vue';
 import ObjectiveTracker         from '@/components/shared/ObjectiveTracker.vue';
 import TrapFiredNotification   from '@/components/shared/TrapFiredNotification.vue';
+import UiTour                  from '@/components/shared/UiTour.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
 import GridBreach    from '@/components/minigame/GridBreach.vue';
 import PacketHijack  from '@/components/minigame/PacketHijack.vue';
@@ -374,6 +378,7 @@ import { useGameState }      from '@/composables/useGameState.js';
 import { useHeartbeat }      from '@/composables/useHeartbeat.js';
 import { useAudio }          from '@/composables/useAudio.js';
 import { useTutorial }       from '@/composables/useTutorial.js';
+import { useUiTour }         from '@/composables/useUiTour.js';
 import { useRigDamage }      from '@/composables/useRigDamage.js';
 import { useCyberDoc }       from '@/composables/useCyberDoc.js';
 import { useTrapSystem }     from '@/composables/useTrapSystem.js';
@@ -864,6 +869,9 @@ function onResetCooldowns() {
 // ── Tutorial ──────────────────────────────────────────────────────────────────
 const tutorial = useTutorial();
 
+// ── UI orientation tour ───────────────────────────────────────────────────────
+const tour = useUiTour();
+
 // ── Inactivity auto-logout ────────────────────────────────────────────────────
 const idle = useInactivityTimer();
 
@@ -872,25 +880,64 @@ const idle = useInactivityTimer();
 // GridBreachGuide calls markStepDone('read_manual') on mount.
 provide('tutorial', tutorial);
 
-// Clear badge when the player opens the tutorial or terminal page
+// Clear badge + fire URL-based tutorial step triggers when SPLICE navigates.
 watch(activeBrowserUrl, (url) => {
-    if (url?.startsWith(SPLICE.TERMINAL) || url?.startsWith(SPLICE.TUTORIAL)) {
+    if (!url) return;
+
+    if (url.startsWith(SPLICE.TERMINAL) || url.startsWith(SPLICE.TUTORIAL)) {
         tutorial.clearBadge();
+    }
+
+    // q2_rig — player opened the Rig read-out
+    if (url.startsWith(SPLICE.RIG)) {
+        tutorial.markStepDone('open_rig');
+    }
+
+    // q3_stat_guide — player visited the Stat Reference
+    if (url.startsWith(SPLICE.STAT_GUIDE)) {
+        tutorial.markStepDone('read_stat_guide');
+    }
+
+    // q4_cyberdoc (step 2) — player opened any CyberDoc store page
+    if (url.startsWith('splice://cyberdoc')) {
+        tutorial.markStepDone('open_cyberdoc_store');
     }
 });
 
-// When all tutorial quests are rewarded and the server has unlocked Knuckle's arc,
-// navigate to the forced CyberWare update SPLICE page, which auto-advances to the
-// mission terminal when the install sequence finishes.
-// justCompleted pulses true→false in a single tick so this fires exactly once.
-watch(tutorial.justCompleted, (val) => {
-    console.log('%c[TUTORIAL] justCompleted watcher fired — val:', 'color:#00FFC8;font-weight:bold', val);
-    if (val) {
+// Launch the CORTEX_PATCH update sequence whenever the tutorial is complete
+// (or skipped) but the player hasn't yet seen the full sequence + Watcher intrusion.
+// Using [booted, needsCortexInstall] covers three cases:
+//   1. Normal completion this session — tutorialComplete flips to true after boot.
+//   2. Skip this session — same: tutorialComplete set during skip(), booted already true.
+//   3. Reload before sequence finished — booted transitions to true; needsCortexInstall
+//      was true from hydration. Fires naturally without any special hydrate logic.
+// markCortexInstall() (called in _postSignalNav below) sets cortexInstallSeen = true,
+// which drops needsCortexInstall to false and prevents the watcher re-firing.
+watch([booted, tutorial.needsCortexInstall], ([isBooted, needsInstall]) => {
+    console.log('%c[TUTORIAL] cortex-install watcher — booted:', 'color:#00FFC8;font-weight:bold', isBooted, 'needsInstall:', needsInstall);
+    if (isBooted && needsInstall) {
         console.log('%c[TUTORIAL] Launching CORTEX_PATCH SPLICE page', 'color:#00FFC8;font-weight:bold');
         // Refresh quest log — tutorial/complete just initialised Knuckle's entry arc.
         // Without this, questDocs is stale and the dialogue button never appears.
         fetchQuestLog();
         onLaunch(SPLICE.CORTEX_PATCH);
+    }
+});
+
+// UI tour trigger:
+//   Case 1 — cortex sequence just completed this session: needsCortexInstall flips false.
+//   Case 2 — returning player (cortex already done, tour not yet seen): fires on boot.
+// tour.start() is a no-op when localStorage already has cc_ui_tour_seen.
+watch(tutorial.needsCortexInstall, (needs, wasNeeded) => {
+    if (wasNeeded && !needs && booted.value) {
+        // Small delay so the boot notification settles before the tour appears.
+        setTimeout(() => tour.start(), 1800);
+    }
+});
+
+watch(booted, (isBooted) => {
+    if (isBooted && !tutorial.needsCortexInstall.value) {
+        tour.start();
     }
 });
 
@@ -1076,6 +1123,11 @@ provide('onInstallComplete', () => {
 
         // Resume music as if nothing happened
         resumeAudio();
+
+        // Mark the full sequence (CORTEX_PATCH + Watcher intrusion) as seen.
+        // This drops needsCortexInstall to false, preventing the sequence from
+        // replaying on subsequent reloads.
+        tutorial.markCortexInstall();
 
         // Understated system notification — just enough to direct the player
         if (_bootNotifTimer) clearTimeout(_bootNotifTimer);

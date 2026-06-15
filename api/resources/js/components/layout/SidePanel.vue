@@ -18,6 +18,7 @@
         <div class="sp-body">
 
             <NodeInfoBlock
+                id="panel-node-info"
                 :node="node"
                 :is-on-node="isOnNode"
                 :resources="resources"

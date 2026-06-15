@@ -185,6 +185,15 @@
             </section>
 
         </div>
+
+        <!-- ── Stat reference link ──────────────────────────────────────── -->
+        <div class="rig-ref-footer">
+            <span class="rig-ref-label">// FULL STAT REFERENCE</span>
+            <button class="rig-ref-link" @click="spliceNavigate('splice://sys.local/guide/stats')">
+                splice://sys.local/guide/stats ›
+            </button>
+        </div>
+
     </div>
 </template>
 
@@ -193,7 +202,8 @@ import { ref, computed, inject } from 'vue';
 
 defineProps({ url: { type: String, default: '' } });
 
-const gameState = inject('gameState', null);
+const gameState      = inject('gameState', null);
+const spliceNavigate = inject('spliceNavigate', () => {});
 const rig    = gameState?.rig    ?? ref({ os:0, ram:0, cpu:0, storage:0, firewall:0, uplink:3, peripherals:[], portSlots:0, chassis:'UNKNOWN', tier:1, caps:{}, investedPoints:{} });
 const player = gameState?.player ?? ref({ uplink:3, maxUplink:3 });
 
@@ -666,4 +676,27 @@ function toggleStat(key) {
 .peri-row--active  .peri-status { color: #00FF88; }
 .peri-row--damaged .peri-status { color: #FFB300; }
 .peri-status--empty { color: rgba(0,255,255,0.5); }
+
+/* ── Stat reference footer ───────────────────────────────────────────────────── */
+.rig-ref-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-top: 1px solid rgba(0,255,255,0.06);
+    flex-shrink: 0;
+}
+.rig-ref-label { font-size: 8px; color: rgba(0,255,255,0.2); letter-spacing: 0.14em; }
+.rig-ref-link {
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 8px;
+    color: rgba(0,255,255,0.35);
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.12s;
+}
+.rig-ref-link:hover { color: #00FFFF; }
 </style>

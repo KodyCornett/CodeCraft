@@ -96,7 +96,7 @@
         </div>
 
         <!-- System Stability — always-visible rig health -->
-        <div class="lb-ss-section" :class="ssSectionClass">
+        <div id="panel-ss" class="lb-ss-section" :class="ssSectionClass">
             <div class="lb-ss-header">
                 <span class="lb-ss-label">SYS.STABILITY</span>
                 <span class="lb-ss-readout" :class="ssValClass">

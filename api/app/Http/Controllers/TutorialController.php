@@ -41,13 +41,14 @@ class TutorialController extends Controller
     public function updateState(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'tutorial_state'                  => ['required', 'array'],
-            'tutorial_state.tutorialSeen'     => ['boolean'],
-            'tutorial_state.tutorialSkipped'  => ['boolean'],
-            'tutorial_state.tutorialComplete' => ['boolean'],
-            'tutorial_state.stepsDone'        => ['array'],
-            'tutorial_state.questsRewarded'   => ['array'],
-            'tutorial_state.hasBadge'         => ['boolean'],
+            'tutorial_state'                       => ['required', 'array'],
+            'tutorial_state.tutorialSeen'          => ['boolean'],
+            'tutorial_state.tutorialSkipped'       => ['boolean'],
+            'tutorial_state.tutorialComplete'      => ['boolean'],
+            'tutorial_state.cortexInstallSeen'     => ['boolean'],
+            'tutorial_state.stepsDone'             => ['array'],
+            'tutorial_state.questsRewarded'        => ['array'],
+            'tutorial_state.hasBadge'              => ['boolean'],
         ]);
 
         $player = Player::where('user_id', $request->user()->id)->first();

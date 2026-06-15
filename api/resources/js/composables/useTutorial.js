@@ -16,11 +16,18 @@ import { ref, computed, nextTick } from 'vue';
 import axios from 'axios';
 
 // ── Quest definitions ─────────────────────────────────────────────────────────
+//
+// Quest order is the unlock order — each quest unlocks when the previous is complete.
+// To add a new quest: append or insert an entry here. Step IDs must be globally unique.
+// Existing step IDs must NOT be changed — they are persisted in stepsDone on the server.
+// Existing quest IDs must NOT be changed — they are persisted in questsRewarded.
+//
 const QUEST_DEFS = [
     {
         id:       'q1_movement',
         label:    'FIRST STEPS',
         subtitle: 'Learn to move across the grid',
+        hint:     'Click any node on the map, then press [JACK IN] in the panel that appears.',
         steps: [
             { id: 'inspect', label: 'Click any node on the map' },
             { id: 'move',    label: 'Press [JACK IN] to move to that node' },
@@ -28,9 +35,30 @@ const QUEST_DEFS = [
         reward: 50,
     },
     {
+        id:       'q2_rig',
+        label:    'KNOW YOUR RIG',
+        subtitle: 'Check your Uplink — every move costs one. Know what you have left.',
+        hint:     'Click the ⬡ RIG button in the NavBar. From there you can also jump to the full Stat Reference.',
+        steps: [
+            { id: 'open_rig', label: 'Open your Rig read-out in SPLICE  ( ⬡ RIG )' },
+        ],
+        reward: 25,
+    },
+    {
+        id:       'q3_stat_guide',
+        label:    'READ THE LIMITS',
+        subtitle: 'CPU gates which nodes you can crack. Read the table before you breach anything.',
+        hint:     'Navigate to splice://sys.local/guide/stats — or find it via SPLICE → RIG → the reference link.',
+        steps: [
+            { id: 'read_stat_guide', label: 'Visit the Stat Reference  ( splice://sys.local/guide/stats )' },
+        ],
+        reward: 25,
+    },
+    {
         id:       'q2_manual',
         label:    'PRE-BREACH PROTOCOL',
         subtitle: 'Know the breach engine before you hit a node',
+        hint:     'Navigate to splice://sys.local/guide/gridbreach — or find it via SPLICE home → Grid-Breach Manual.',
         steps: [
             { id: 'read_manual', label: 'Open the Grid-Breach Manual in SPLICE' },
         ],
@@ -39,20 +67,23 @@ const QUEST_DEFS = [
     {
         id:       'q3_hack',
         label:    'FIRST BREACH',
-        subtitle: 'Hit a node and take its cache',
+        subtitle: 'Hit a node and take its cache. Check the ICE rating first.',
+        hint:     'Close SPLICE, select a node you are standing on, and press [INITIATE HACK].',
         steps: [
-            { id: 'hack', label: "Attempt a hack on any node you're standing on" },
+            { id: 'hack', label: "Initiate a hack on any node you're standing on" },
         ],
         reward: 100,
     },
     {
         id:       'q4_cyberdoc',
         label:    'FIND A SAFE HARBOUR',
-        subtitle: 'Pocket creds are lost on a PvP kill — bank them first',
+        subtitle: 'Pocket creds are lost on a PvP kill. Bank them at a CyberDoc before someone takes them.',
+        hint:     'Move to a CyberDoc node (marked on the map), then open SPLICE. The store loads automatically.',
         steps: [
-            { id: 'visit_cyberdoc', label: 'Move to any CyberDoc node on the map' },
+            { id: 'visit_cyberdoc',      label: 'Move to any CyberDoc node on the map' },
+            { id: 'open_cyberdoc_store', label: 'Open the CyberDoc store in SPLICE' },
         ],
-        reward: 50,
+        reward: 75,
     },
 ];
 
@@ -74,12 +105,13 @@ function warn(msg, data) {
 
 function defaultState() {
     return {
-        tutorialSeen:     false,
-        tutorialSkipped:  false,
-        tutorialComplete: false,   // set once, server-persisted — prevents all re-triggers
-        stepsDone:        {},
-        questsRewarded:   [],
-        hasBadge:         false,
+        tutorialSeen:       false,
+        tutorialSkipped:    false,
+        tutorialComplete:   false,   // set once, server-persisted — prevents all re-triggers
+        cortexInstallSeen:  false,   // true once the full update + Watcher intrusion sequence has completed
+        stepsDone:          {},
+        questsRewarded:     [],
+        hasBadge:           false,
     };
 }
 
@@ -180,12 +212,27 @@ export function useTutorial() {
         && !allComplete.value
     );
 
-    const tutorialSeen     = computed(() => _state.value.tutorialSeen);
-    const tutorialSkipped  = computed(() => _state.value.tutorialSkipped);
-    const tutorialComplete = computed(() => _state.value.tutorialComplete);
-    const hasBadge         = computed(() => _state.value.hasBadge);
+    const tutorialSeen      = computed(() => _state.value.tutorialSeen);
+    const tutorialSkipped   = computed(() => _state.value.tutorialSkipped);
+    const tutorialComplete  = computed(() => _state.value.tutorialComplete);
+    const hasBadge          = computed(() => _state.value.hasBadge);
+
+    // true whenever the player has completed or skipped the tutorial but has NOT
+    // yet seen the full CORTEX_PATCH update sequence + Watcher intrusion.
+    // Game.vue watches [booted, needsCortexInstall] and launches CORTEX_PATCH
+    // as soon as both are true — covering both the in-session and reload cases.
+    const needsCortexInstall = computed(() =>
+        _state.value.tutorialComplete && !_state.value.cortexInstallSeen
+    );
 
     // ── Actions ───────────────────────────────────────────────────────────────
+
+    function markCortexInstall() {
+        if (_state.value.cortexInstallSeen) return;
+        log('markCortexInstall() — CORTEX_PATCH + Watcher intrusion complete');
+        _state.value.cortexInstallSeen = true;
+        _save();
+    }
 
     function markSeen() {
         log('markSeen()');
@@ -336,6 +383,7 @@ export function useTutorial() {
         tutorialSeen,
         tutorialSkipped,
         tutorialComplete,
+        needsCortexInstall,
         hasBadge,
         justCompleted,
         hydrate,
@@ -343,5 +391,6 @@ export function useTutorial() {
         skip,
         clearBadge,
         markStepDone,
+        markCortexInstall,
     };
 }
