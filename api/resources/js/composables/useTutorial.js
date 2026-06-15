@@ -90,6 +90,7 @@ export function useTutorial() {
     const _syncing      = ref(false);   // prevents overlapping PATCH calls
     let   _dirty        = false;        // true if a save was skipped while _syncing — triggers retry
     const justCompleted = ref(false);   // pulses true once after tutorial finishes; Game.vue watches this
+    let   _hydrated     = false;        // true once hydrate() has replaced _state with server data
 
     // ── Hydration (called once on game boot) ──────────────────────────────────
     async function hydrate() {
@@ -97,11 +98,13 @@ export function useTutorial() {
         try {
             const { data } = await axios.get('/api/tutorial/state');
             _state.value = { ...defaultState(), ...(data.tutorial_state ?? {}) };
+            _hydrated = true;
             log('hydrate() complete — state loaded', {
-                stepsDone:      _state.value.stepsDone,
-                questsRewarded: _state.value.questsRewarded,
-                tutorialSeen:   _state.value.tutorialSeen,
+                stepsDone:       _state.value.stepsDone,
+                questsRewarded:  _state.value.questsRewarded,
+                tutorialSeen:    _state.value.tutorialSeen,
                 tutorialSkipped: _state.value.tutorialSkipped,
+                tutorialComplete: _state.value.tutorialComplete,
             });
 
             // If the tutorial was already completed (authoritative flag), or all
@@ -121,6 +124,7 @@ export function useTutorial() {
             }
         } catch (e) {
             warn('hydrate() failed to load state from server:', e?.message);
+            _hydrated = true;   // unblock markStepDone even on network failure
         }
     }
 
@@ -208,6 +212,13 @@ export function useTutorial() {
     }
 
     async function markStepDone(stepId) {
+        if (!_hydrated) {
+            // Watchers on currentNodeId and selectedNode fire during initial position
+            // restore — before hydrate() has loaded authoritative server state.
+            // Ignore all step triggers until we know the real state.
+            log(`markStepDone('${stepId}') — hydrate not complete, ignoring boot-time trigger`);
+            return;
+        }
         if (_state.value.tutorialSkipped || _state.value.tutorialComplete) {
             log(`markStepDone('${stepId}') — skipped (tutorial skipped/complete)`);
             return;
