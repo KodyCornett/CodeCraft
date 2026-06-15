@@ -1,61 +1,86 @@
 <template>
     <QuestMinigameChrome v-bind="chrome">
         <div class="dl-wrap">
-            <!-- Rerouting flash -->
-            <Transition name="dl-reroute">
-                <div v-if="rerouting" class="dl-rerouting">⟳ REROUTING...</div>
-            </Transition>
+            <div class="dl-content">
 
-            <svg class="dl-svg" viewBox="0 0 620 280" xmlns="http://www.w3.org/2000/svg">
+                <!-- Info bar -->
+                <div class="dl-infobar">
+                    <div class="dl-info-block">
+                        <span class="dl-info-label">GOV_TARGET</span>
+                        <span class="dl-info-val dl-info-val--target">{{ displayTarget }}mah</span>
+                    </div>
+                    <div class="dl-info-block">
+                        <span class="dl-info-label">LOAD_SUM</span>
+                        <span class="dl-info-val" :class="sumClass">{{ displaySum }}mah</span>
+                    </div>
+                    <div class="dl-info-block">
+                        <span class="dl-info-label">ATTEMPTS</span>
+                        <span class="dl-att-pips">
+                            <span
+                                v-for="i in MAX_ATTEMPTS"
+                                :key="i"
+                                class="dl-att-pip"
+                                :class="i <= wrongAttempts ? 'dl-att-pip--used' : 'dl-att-pip--free'"
+                            >◉</span>
+                        </span>
+                    </div>
+                    <button
+                        class="dl-inject-btn"
+                        :class="{ 'dl-inject-btn--ready': pathComplete && !result && !resetting }"
+                        :disabled="!pathComplete || !!result || resetting"
+                        @click="onInject"
+                    >[ INJECT // ]</button>
+                </div>
 
-                <!-- Invisible fat hit areas for edges (makes clicking reliable) -->
-                <line
-                    v-for="e in edges"
-                    :key="`hit-${e.id}`"
-                    :x1="NODES[e.from].x" :y1="NODES[e.from].y"
-                    :x2="NODES[e.to].x"   :y2="NODES[e.to].y"
-                    stroke="transparent" stroke-width="22"
-                    :style="{ cursor: e.cut ? 'default' : 'pointer' }"
-                    @click="onEdgeClick(e)"
-                />
+                <!-- Grid SVG -->
+                <svg
+                    class="dl-svg"
+                    :class="{ 'dl-svg--resetting': resetting }"
+                    viewBox="0 0 820 360"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <!-- Path segments between consecutive selected nodes -->
+                    <line
+                        v-for="seg in pathSegments"
+                        :key="seg.key"
+                        :x1="seg.x1" :y1="seg.y1"
+                        :x2="seg.x2" :y2="seg.y2"
+                        class="dl-path-line"
+                    />
 
-                <!-- Visible edges -->
-                <line
-                    v-for="e in edges"
-                    :key="`edge-${e.id}`"
-                    :x1="NODES[e.from].x" :y1="NODES[e.from].y"
-                    :x2="NODES[e.to].x"   :y2="NODES[e.to].y"
-                    v-bind="edgeAttrs(e)"
-                    pointer-events="none"
-                />
+                    <!-- STATE label -->
+                    <text x="15" y="178" class="dl-side-label dl-side-label--state">STATE</text>
 
-                <!-- Data pulses travelling along the governor chain -->
-                <circle
-                    v-for="p in pulses"
-                    :key="p.id"
-                    :cx="p.sx + (p.ex - p.sx) * p.t"
-                    :cy="p.sy + (p.ey - p.sy) * p.t"
-                    r="4"
-                    class="dl-pulse"
-                    pointer-events="none"
-                />
+                    <!-- GOV label -->
+                    <text x="806" y="178" class="dl-side-label dl-side-label--gov">GOV</text>
 
-                <!-- Nodes (rendered last — on top of edges) -->
-                <g v-for="n in NODES" :key="`node-${n.id}`" pointer-events="none">
-                    <circle :cx="n.x" :cy="n.y" r="16" v-bind="nodeAttrs(n.id)" />
-                    <text  :x="n.x"  :y="n.y + 4" class="dl-node-text">
-                        {{ n.label ?? n.id }}
-                    </text>
-                </g>
+                    <!-- Nodes -->
+                    <g v-for="(rowArr, r) in grid" :key="`row-${r}`">
+                        <g
+                            v-for="(val, c) in rowArr"
+                            :key="`node-${r}-${c}`"
+                            class="dl-node-g"
+                            @click="onNodeClick(r, c)"
+                        >
+                            <circle
+                                :cx="nx(c)"
+                                :cy="ny(r)"
+                                :r="NODE_R"
+                                v-bind="nodeCircleAttrs(r, c)"
+                            />
+                            <text :x="nx(c)" :y="ny(r) + 4" class="dl-node-text">{{ displayVal(val) }}</text>
+                        </g>
+                    </g>
+                </svg>
 
-            </svg>
-
-            <!-- Legend -->
-            <div class="dl-legend">
-                <span class="dl-leg dl-leg--chain">── GOVERNOR</span>
-                <span class="dl-leg dl-leg--idle">── IDLE</span>
-                <span class="dl-leg dl-leg--cut">╌╌ SEVERED</span>
             </div>
+
+            <!-- Error flash banner -->
+            <Transition name="dl-err">
+                <div v-if="showError" class="dl-error-banner">
+                    ⚠ INCORRECT SEQUENCE — GRID RANDOMIZED
+                </div>
+            </Transition>
         </div>
     </QuestMinigameChrome>
 </template>
@@ -65,79 +90,161 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
 import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
 
-const props = defineProps({
-    skin: { type: Object, required: true },
-});
-const emit = defineEmits(['complete', 'fail']);
+const props = defineProps({ skin: { type: Object, required: true } });
+const emit  = defineEmits(['complete', 'fail']);
 
-// ── Network definition ────────────────────────────────────────────────────────
+// ── Grid constants ────────────────────────────────────────────────────────────
 
-const SOURCE = 0;
-const TARGET = 10;
+const ROWS         = 7;
+const COLS         = 14;
+const NODE_R       = 16;
+const COL_SPACING  = 52;
+const ROW_SPACING  = 46;
+const GRID_START_X = 58;
+const GRID_START_Y = 36;
+const MAX_ATTEMPTS = 3;
 
-const NODES = [
-    { id: 0,  x: 42,  y: 140, label: 'SRC' },
-    { id: 1,  x: 155, y: 58  },
-    { id: 2,  x: 155, y: 140 },
-    { id: 3,  x: 155, y: 222 },
-    { id: 4,  x: 278, y: 58  },
-    { id: 5,  x: 278, y: 140 },
-    { id: 6,  x: 278, y: 222 },
-    { id: 7,  x: 400, y: 58  },
-    { id: 8,  x: 400, y: 140 },
-    { id: 9,  x: 400, y: 222 },
-    { id: 10, x: 570, y: 140, label: 'GOV' },
-];
+function nx(col) { return GRID_START_X + col * COL_SPACING; }
+function ny(row) { return GRID_START_Y + row * ROW_SPACING; }
 
-// Undirected edge definitions
-const EDGES_DEF = [
-    [0,1],[0,2],[0,3],
-    [1,2],[1,4],
-    [2,3],[2,5],
-    [3,6],
-    [4,5],[4,7],
-    [5,6],[5,8],
-    [6,9],
-    [7,8],[7,10],
-    [8,9],[8,10],
-    [9,10],
-];
-
-function eid(a, b) { return `${Math.min(a,b)}-${Math.max(a,b)}`; }
-
-// ── Game state ────────────────────────────────────────────────────────────────
+// ── Shared minigame state ─────────────────────────────────────────────────────
 
 const {
     stability, primaryProgress, timeLeft, result, failReason,
     glitchActive, glitchType, glitchIntensity,
     stabilityClass, timerClass,
-    tickShared, endGame,
+    tickShared, applyHit, endGame,
 } = useQuestMinigameState(props.skin);
 
-const edges = ref(
-    EDGES_DEF.map(([a, b]) => ({ id: eid(a, b), from: a, to: b, cut: false }))
+// ── Grid state ────────────────────────────────────────────────────────────────
+
+// Node values are stored as integers 1–99 representing 0.1–9.9mah.
+// govTarget is the integer sum of one valid path (naturally a double-digit display value).
+
+const grid          = ref([]);
+const govTarget     = ref(0);
+const selectedPath  = ref(Array(COLS).fill(null));  // row index per column, or null
+const wrongAttempts = ref(0);
+const showError     = ref(false);
+const resetting     = ref(false);
+
+function randomIntVal() { return Math.floor(Math.random() * 99) + 1; }
+function displayVal(v)  { return (v / 10).toFixed(1); }
+
+function generateGrid() {
+    grid.value = Array.from({ length: ROWS }, () =>
+        Array.from({ length: COLS }, () => randomIntVal())
+    );
+}
+
+// Target range by difficulty — higher cap = harder match.
+// D1: 10.0–39.9mah  D2: 30.0–79.9mah  D3: 50.0–138.6mah (triple digits possible)
+const TARGET_RANGE = {
+    1: { min: 100, max: 399 },
+    2: { min: 300, max: 799 },
+    3: { min: 500, max: 1386 },
+};
+
+function generateTarget() {
+    const { min, max } = TARGET_RANGE[props.skin.difficulty ?? 1];
+    let t;
+    do {
+        const path = Array.from({ length: COLS }, () => Math.floor(Math.random() * ROWS));
+        t = path.reduce((s, row, col) => s + grid.value[row][col], 0);
+    } while (t < min || t > max);
+    govTarget.value = t;
+}
+
+function resetGrid() {
+    generateGrid();
+    generateTarget();
+    selectedPath.value = Array(COLS).fill(null);
+}
+
+// ── Display computed ──────────────────────────────────────────────────────────
+
+const displayTarget = computed(() => (govTarget.value / 10).toFixed(1));
+
+const runningSum = computed(() =>
+    selectedPath.value.reduce((s, row, col) => {
+        if (row === null) return s;
+        return s + grid.value[row][col];
+    }, 0)
 );
 
-const governorPath = ref([]);   // node ID array — current active chain
-const pulses       = ref([]);   // { id, sx, sy, ex, ey, t }
-const rerouting    = ref(false);
+const displaySum = computed(() => (runningSum.value / 10).toFixed(1));
 
-let rerouteTimer   = 0;
-let rerouteCount   = 0;
-let pulseIdSeq     = 0;
-let pulseSpawnTimer = 0;
-let animFrame      = null;
-let lastTs         = null;
+const pathComplete = computed(() => selectedPath.value.every(r => r !== null));
 
-// Edge IDs that form the current governor chain
-const chainEdgeIds = computed(() => {
-    const path = governorPath.value;
-    return new Set(
-        path.slice(0, -1).map((n, i) => eid(n, path[i + 1]))
-    );
+const sumClass = computed(() => {
+    if (!pathComplete.value)                    return 'dl-sum--neutral';
+    if (runningSum.value === govTarget.value)   return 'dl-sum--match';
+    if (runningSum.value > govTarget.value)     return 'dl-sum--over';
+    return 'dl-sum--under';
 });
 
-const chainNodeIds = computed(() => new Set(governorPath.value));
+// ── Path segments ─────────────────────────────────────────────────────────────
+
+const pathSegments = computed(() => {
+    const segs = [];
+    for (let c = 0; c < COLS - 1; c++) {
+        const r1 = selectedPath.value[c];
+        const r2 = selectedPath.value[c + 1];
+        if (r1 !== null && r2 !== null) {
+            segs.push({
+                key: `seg-${c}`,
+                x1: nx(c),     y1: ny(r1),
+                x2: nx(c + 1), y2: ny(r2),
+            });
+        }
+    }
+    return segs;
+});
+
+// ── Node interaction ──────────────────────────────────────────────────────────
+
+function onNodeClick(row, col) {
+    if (result.value || resetting.value) return;
+    const next = selectedPath.value[col] === row ? null : row;
+    selectedPath.value = selectedPath.value.map((r, c) => c === col ? next : r);
+}
+
+function nodeCircleAttrs(row, col) {
+    if (selectedPath.value[col] === row) {
+        return { fill: '#0a2018', stroke: '#00ff9d', 'stroke-width': 2 };
+    }
+    return { fill: '#040c07', stroke: 'rgba(0,255,100,0.18)', 'stroke-width': 1 };
+}
+
+// ── Inject / submit ───────────────────────────────────────────────────────────
+
+function onInject() {
+    if (!pathComplete.value || result.value || resetting.value) return;
+
+    if (runningSum.value === govTarget.value) {
+        endGame('success');
+        setTimeout(() => emit('complete'), 2200);
+        return;
+    }
+
+    // Wrong answer
+    wrongAttempts.value++;
+    applyHit(0.33);
+    showError.value = true;
+    resetting.value = true;
+
+    if (wrongAttempts.value >= MAX_ATTEMPTS) {
+        endGame('fail', '[SEQUENCE REJECTED] — Inject threshold exceeded. Connection terminated.');
+        setTimeout(() => emit('fail'), 2200);
+        return;
+    }
+
+    setTimeout(() => {
+        resetGrid();
+        resetting.value = false;
+        showError.value = false;
+    }, 1200);
+}
 
 // ── Chrome passthrough ────────────────────────────────────────────────────────
 
@@ -155,116 +262,16 @@ const chrome = computed(() => ({
     failReason:      failReason.value,
 }));
 
-// ── Pathfinding (BFS) ─────────────────────────────────────────────────────────
+// ── Game loop (shared bars tick) ──────────────────────────────────────────────
 
-function bfs() {
-    const adj = {};
-    for (const e of edges.value) {
-        if (e.cut) continue;
-        (adj[e.from] ??= []).push(e.to);
-        (adj[e.to]   ??= []).push(e.from);
-    }
-    const queue = [[SOURCE]];
-    const seen  = new Set([SOURCE]);
-    while (queue.length) {
-        const path = queue.shift();
-        const node = path.at(-1);
-        if (node === TARGET) return path;
-        for (const nb of (adj[node] ?? [])) {
-            if (!seen.has(nb)) { seen.add(nb); queue.push([...path, nb]); }
-        }
-    }
-    return null;
-}
-
-function applyPath(path) {
-    governorPath.value = path;
-    pulses.value       = [];
-    pulseSpawnTimer    = 0;
-}
-
-function triggerReroute() {
-    rerouting.value = true;
-    // Reroute window shrinks as the governor adapts (min 0.4s)
-    rerouteTimer = Math.max(0.4, 1.1 - rerouteCount * 0.1);
-    pulses.value = [];
-}
-
-// ── Edge interaction ──────────────────────────────────────────────────────────
-
-function onEdgeClick(edge) {
-    if (edge.cut || result.value || rerouting.value) return;
-    edge.cut = true;
-    pulses.value = pulses.value.filter(p => p.edgeId !== edge.id);
-    if (chainEdgeIds.value.has(edge.id)) {
-        triggerReroute();
-    }
-}
-
-// ── Pulse helpers ─────────────────────────────────────────────────────────────
-
-const PULSE_SPEED = 0.65;   // t-units per second
-
-function spawnPulse(edgeId) {
-    const e = edges.value.find(e => e.id === edgeId);
-    if (!e || e.cut) return;
-    const path = governorPath.value;
-    const fromIdx = path.indexOf(e.from);
-    const forward = fromIdx >= 0 && path[fromIdx + 1] === e.to;
-    const [sn, en] = forward ? [NODES[e.from], NODES[e.to]] : [NODES[e.to], NODES[e.from]];
-    pulses.value.push({
-        id: pulseIdSeq++, edgeId,
-        sx: sn.x, sy: sn.y,
-        ex: en.x, ey: en.y,
-        t: 0,
-    });
-}
-
-function seedPulses() {
-    // Spread 4 pulses across chain edges at staggered starting positions
-    const path = governorPath.value;
-    if (path.length < 2) return;
-    const edgeCount = path.length - 1;
-    for (let i = 0; i < Math.min(4, edgeCount * 2); i++) {
-        const edgeIdx = i % edgeCount;
-        const a = path[edgeIdx], b = path[edgeIdx + 1];
-        const edgeId = eid(a, b);
-        const e = edges.value.find(e => e.id === edgeId);
-        if (!e || e.cut) continue;
-        const forward = true;
-        const [sn, en] = [NODES[a], NODES[b]];
-        pulses.value.push({
-            id: pulseIdSeq++, edgeId,
-            sx: sn.x, sy: sn.y,
-            ex: en.x, ey: en.y,
-            t: (i / 4),    // stagger them across the chain
-        });
-    }
-}
-
-// ── SVG attribute helpers ─────────────────────────────────────────────────────
-
-function edgeAttrs(e) {
-    if (e.cut)                        return { stroke: 'rgba(60,100,80,0.2)', 'stroke-width': 1, 'stroke-dasharray': '4 4' };
-    if (chainEdgeIds.value.has(e.id)) return { stroke: '#ff6600',             'stroke-width': 2 };
-    return                                   { stroke: 'rgba(0,255,100,0.15)', 'stroke-width': 1.5 };
-}
-
-function nodeAttrs(id) {
-    if (id === SOURCE) return { fill: '#001a10', stroke: '#00ff9d', 'stroke-width': 2 };
-    if (id === TARGET) return { fill: '#1a0800', stroke: '#ff6600', 'stroke-width': 2 };
-    if (chainNodeIds.value.has(id)) return { fill: '#0d0800', stroke: '#ff6600', 'stroke-width': 1.5 };
-    return { fill: '#050e08', stroke: 'rgba(0,255,100,0.3)', 'stroke-width': 1 };
-}
-
-// ── Game loop ─────────────────────────────────────────────────────────────────
+let animFrame = null;
+let lastTs    = null;
 
 function tick(ts) {
     if (result.value) return;
     const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
     lastTs = ts;
 
-    // Shared bars
     const failCause = tickShared(dt);
     if (failCause) {
         const reason = failCause === 'stability'
@@ -275,47 +282,16 @@ function tick(ts) {
         return;
     }
 
-    // Reroute countdown
-    if (rerouting.value) {
-        rerouteTimer -= dt;
-        if (rerouteTimer <= 0) {
-            rerouting.value = false;
-            const path = bfs();
-            if (!path) {
-                endGame('success');
-                setTimeout(() => emit('complete'), 2200);
-                return;
-            }
-            rerouteCount++;
-            applyPath(path);
-            seedPulses();
-        }
-        animFrame = requestAnimationFrame(tick);
-        return;
-    }
-
-    // Advance pulses; wrap finished ones back to t=0 (continuous flow)
-    pulses.value.forEach(p => { p.t += PULSE_SPEED * dt; });
-    pulses.value.forEach(p => { if (p.t >= 1) p.t = 0; });
-
-    // Spawn a new pulse periodically on the chain start
-    pulseSpawnTimer -= dt;
-    if (pulseSpawnTimer <= 0 && governorPath.value.length >= 2) {
-        const path = governorPath.value;
-        spawnPulse(eid(path[0], path[1]));
-        // Cap pulse count to avoid overcrowding
-        if (pulses.value.length > 12) pulses.value.shift();
-        pulseSpawnTimer = 0.38 + Math.random() * 0.12;
-    }
-
     animFrame = requestAnimationFrame(tick);
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
+// Generate initial grid in setup so there's no flash before onMounted.
+generateGrid();
+generateTarget();
+
 onMounted(() => {
-    const path = bfs();
-    if (path) { applyPath(path); seedPulses(); }
     animFrame = requestAnimationFrame(tick);
 });
 
@@ -331,64 +307,177 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     position: relative;
+    padding: 6px 0;
+    box-sizing: border-box;
 }
 
-/* Rerouting banner */
-.dl-rerouting {
-    position: absolute;
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
+.dl-content {
+    width: 100%;
+    max-width: 880px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 0 12px;
+    box-sizing: border-box;
+}
+
+/* ── Info bar ──────────────────────────────────────────────────────────────── */
+
+.dl-infobar {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 6px 0 8px;
+    border-bottom: 1px solid rgba(0,255,100,0.07);
+    margin-bottom: 6px;
+    flex-shrink: 0;
+}
+
+.dl-info-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dl-info-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: rgba(0,255,100,0.28);
+    letter-spacing: 0.15em;
+}
+
+.dl-info-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.dl-info-val--target { color: #ff6600; }
+.dl-sum--neutral     { color: rgba(0,255,100,0.35); }
+.dl-sum--match       { color: #00ff9d; animation: dl-pulse-text 0.9s ease infinite alternate; }
+.dl-sum--over        { color: #ff3333; }
+.dl-sum--under       { color: #FFB300; }
+
+/* Attempt pips */
+.dl-att-pips { display: flex; gap: 7px; margin-top: 2px; }
+.dl-att-pip  { font-size: 13px; transition: color 0.25s; }
+.dl-att-pip--free { color: rgba(0,255,100,0.25); }
+.dl-att-pip--used { color: #ff3333; text-shadow: 0 0 6px rgba(255,51,51,0.5); }
+
+/* Inject button */
+.dl-inject-btn {
+    margin-left: auto;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    color: #ff6600;
-    letter-spacing: 0.15em;
-    z-index: 10;
-    animation: dl-flash 0.3s steps(1) infinite;
+    letter-spacing: 0.2em;
+    background: transparent;
+    border: 1px solid rgba(0,255,100,0.12);
+    color: rgba(0,255,100,0.2);
+    padding: 8px 22px;
+    cursor: not-allowed;
+    transition: all 0.15s;
+    flex-shrink: 0;
 }
-.dl-reroute-enter-active, .dl-reroute-leave-active { transition: opacity 0.15s; }
-.dl-reroute-enter-from,   .dl-reroute-leave-to     { opacity: 0; }
 
-/* SVG */
+.dl-inject-btn--ready {
+    border-color: rgba(0,255,100,0.55);
+    color: #00ff9d;
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(0,255,100,0.1);
+}
+
+.dl-inject-btn--ready:hover {
+    background: rgba(0,255,100,0.07);
+    box-shadow: 0 0 22px rgba(0,255,100,0.2);
+}
+
+/* ── SVG grid ──────────────────────────────────────────────────────────────── */
+
 .dl-svg {
     width: 100%;
-    max-width: 640px;
     height: auto;
+    flex: 1;
     display: block;
+    transition: opacity 0.25s;
 }
 
-/* Pulses */
-.dl-pulse {
-    fill: #ff6600;
-    filter: drop-shadow(0 0 4px #ff6600);
-    opacity: 0.9;
+.dl-svg--resetting {
+    opacity: 0.2;
 }
 
-/* Node labels */
+/* Path connection lines between selected nodes */
+.dl-path-line {
+    stroke: #00ff9d;
+    stroke-width: 1.5;
+    stroke-opacity: 0.65;
+    filter: drop-shadow(0 0 3px rgba(0,255,100,0.55));
+    pointer-events: none;
+}
+
+/* Node groups */
+.dl-node-g {
+    cursor: pointer;
+}
+
+.dl-node-g:hover circle {
+    stroke: rgba(0,255,100,0.6);
+    stroke-width: 1.5;
+}
+
+.dl-node-g:hover text {
+    fill: rgba(0,255,100,0.9);
+}
+
+/* Node value text */
 .dl-node-text {
-    fill: rgba(0,255,100,0.7);
+    fill: rgba(0,255,100,0.55);
     font-family: 'JetBrains Mono', monospace;
     font-size: 8px;
     text-anchor: middle;
     pointer-events: none;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.03em;
 }
 
-/* Legend */
-.dl-legend {
-    display: flex;
-    gap: 20px;
-    margin-top: 8px;
+/* STATE / GOV labels */
+.dl-side-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    opacity: 0.6;
+    font-size: 7px;
+    text-anchor: middle;
+    letter-spacing: 0.12em;
+    pointer-events: none;
 }
-.dl-leg         { letter-spacing: 0.08em; }
-.dl-leg--chain  { color: #ff6600; }
-.dl-leg--idle   { color: rgba(0,255,100,0.5); }
-.dl-leg--cut    { color: rgba(60,100,80,0.6); }
 
-@keyframes dl-flash { 0%,49%{opacity:1} 50%,100%{opacity:0.3} }
+.dl-side-label--state { fill: rgba(0,255,100,0.35); }
+.dl-side-label--gov   { fill: rgba(255,102,0,0.65); }
+
+/* ── Error banner ──────────────────────────────────────────────────────────── */
+
+.dl-error-banner {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #ff3333;
+    letter-spacing: 0.15em;
+    background: rgba(20,0,0,0.92);
+    border: 1px solid rgba(255,51,51,0.3);
+    padding: 6px 18px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.dl-err-enter-active, .dl-err-leave-active { transition: opacity 0.2s; }
+.dl-err-enter-from,   .dl-err-leave-to     { opacity: 0; }
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+
+@keyframes dl-pulse-text {
+    from { text-shadow: 0 0 6px rgba(0,255,100,0.3); }
+    to   { text-shadow: 0 0 18px rgba(0,255,100,0.75); }
+}
 </style>

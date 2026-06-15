@@ -51,7 +51,6 @@ class ResetPlayer extends Command
             DB::table('player_stage_progress')->where('player_id', $playerId)->delete();
             DB::table('player_quest_log')->where('player_id', $playerId)->delete();
             DB::table('player_watcher_messages')->where('player_id', $playerId)->delete();
-            DB::table('player_reputation')->where('player_id', $playerId)->delete();
 
             // ── Inventory ─────────────────────────────────────────────────────
             DB::table('player_peripherals')->where('player_id', $playerId)->delete();
@@ -111,7 +110,7 @@ class ResetPlayer extends Command
         $this->info('✓ Bounty reset        (level, multiplier, open_season → cleared)');
         $this->info('✓ Position reset      (node, district → DOWNTOWN)');
         $this->info('✓ Rig reset           (all invested levels → 0, SS → 100)');
-        $this->info('✓ Quest progress wiped (arc, stage, log, watcher messages, reputation)');
+        $this->info('✓ Quest progress wiped (arc, stage, log, watcher messages)');
         $this->info('✓ Inventory wiped     (peripherals, commands, consumables)');
         $this->info('✓ Node traces wiped');
         $this->info('✓ Tutorial state wiped');
