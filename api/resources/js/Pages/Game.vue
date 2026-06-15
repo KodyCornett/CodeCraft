@@ -123,11 +123,15 @@
                         :player-firewall="rig.firewall"
                         :player-max-uplink="player.maxUplink"
                         :bounty-multiplier="player.bountyMultiplier"
+                        :paused="gbTour.active.value"
                         @complete="onHackComplete"
                         @failed="onHackFailed"
                         @abort="onHackAbort"
                     />
                 </Transition>
+
+                <!-- Grid-Breach first-time orientation tour -->
+                <GridBreachTour v-if="activeHack" />
 
                 <!-- Packet Hijack terminal (PvP) — replaces GridBreach for PvP combat -->
                 <Transition name="breach-fade">
@@ -166,9 +170,13 @@
                         @submit-auth="ph.submitAuth"
                         @submit-transfer="ph.submitTransfer"
                         @use-rig-command="ph.submitRigCommand"
+                        :is-practice="ph.isPractice"
                         @match-complete="onPacketHijackMatchComplete"
                     />
                 </Transition>
+
+                <!-- Packet Hijack first-time orientation tour (practice match only) -->
+                <PacketHijackTour v-if="activePacketHijack" />
 
                 <!-- Quest minigame — launched from QuestLog via useQuestMinigame -->
                 <Transition name="breach-fade">
@@ -358,8 +366,10 @@ import ObjectiveTracker         from '@/components/shared/ObjectiveTracker.vue';
 import TrapFiredNotification   from '@/components/shared/TrapFiredNotification.vue';
 import UiTour                  from '@/components/shared/UiTour.vue';
 import InGameBrowser from '@/components/browser/InGameBrowser.vue';
-import GridBreach    from '@/components/minigame/GridBreach.vue';
-import PacketHijack  from '@/components/minigame/PacketHijack.vue';
+import GridBreach     from '@/components/minigame/GridBreach.vue';
+import GridBreachTour    from '@/components/minigame/GridBreachTour.vue';
+import PacketHijack      from '@/components/minigame/PacketHijack.vue';
+import PacketHijackTour  from '@/components/minigame/PacketHijackTour.vue';
 import QuestMinigame from '@/components/minigame/QuestMinigame.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
@@ -380,6 +390,8 @@ import { useHeartbeat }      from '@/composables/useHeartbeat.js';
 import { useAudio }          from '@/composables/useAudio.js';
 import { useTutorial }       from '@/composables/useTutorial.js';
 import { useUiTour }         from '@/composables/useUiTour.js';
+import { useGridBreachTour }    from '@/composables/useGridBreachTour.js';
+import { usePacketHijackTour }  from '@/composables/usePacketHijackTour.js';
 import { useRigDamage }      from '@/composables/useRigDamage.js';
 import { useCyberDoc }       from '@/composables/useCyberDoc.js';
 import { useTrapSystem }     from '@/composables/useTrapSystem.js';
@@ -873,6 +885,20 @@ const tutorial = useTutorial();
 // ── UI orientation tour ───────────────────────────────────────────────────────
 const tour = useUiTour();
 
+// ── Grid-Breach first-time tour ───────────────────────────────────────────────
+const gbTour = useGridBreachTour();
+
+// ── Packet Hijack orientation tour (practice match only) ──────────────────────
+const phTour = usePacketHijackTour();
+
+// Fire Phase 1 tour when a practice match opens; Phase 2 tour on phase transition.
+watch(() => ph.isPractice && activePacketHijack.value, (active) => {
+    if (active) phTour.startPhase1();
+});
+watch(() => ph.phase, (phase) => {
+    if (phase === 2 && ph.isPractice) phTour.startPhase2();
+});
+
 // ── Inactivity auto-logout ────────────────────────────────────────────────────
 const idle = useInactivityTimer();
 
@@ -1272,6 +1298,10 @@ function onHackSelected(resource) {
         node: { ...selectedNode.value, ice },
         resource,
     };
+
+    // First-time breach during tutorial — start the GridBreach orientation tour.
+    // gbTour.start() is a no-op once the player has seen it (localStorage flag).
+    if (tutorial.isTutorialActive.value) gbTour.start();
 }
 
 function applyHackReward(resource, amount) {
@@ -1823,6 +1853,11 @@ function applyPvpResult(result, opponentHandle) {
 // Called when PacketHijack.vue emits 'match-complete' (player clicked DISCONNECT).
 // Mirrors applyPvpResult() — syncs local economy state from the WS payload.
 function onPacketHijackMatchComplete(result) {
+    // Mark tutorial step done before destroy() resets state
+    if (ph.isPractice) {
+        tutorial.markStepDone('ph_practice');
+    }
+
     activePacketHijack.value = false;
     ph.destroy();
 
@@ -1862,6 +1897,14 @@ async function onUseConsumable(consumableId) {
 
 // ── Provide game state to SPLICE browser pages ────────────────────────────────
 provide('gameState', { player, rig, commands, inventory, bounties, bankCreds, currentNodeId, useConsumable: onUseConsumable });
+
+// Expose practice Packet Hijack launcher so PacketHijackGuide can trigger it
+// without knowing about activePacketHijack or the SPLICE browser state.
+provide('launchPracticeHijack', async () => {
+    activeBrowserUrl.value = null;
+    await ph.launchPractice();
+    activePacketHijack.value = true;
+});
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 function onKeyDown(e) {

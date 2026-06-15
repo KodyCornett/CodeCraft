@@ -76,6 +76,19 @@
                     <span class="rule-key hl-red">LOSER</span>
                     <span class="rule-val hl-red">Pocket creds wiped. Standard PvP SS damage applied. Bounty retained.</span>
                 </div>
+                <!-- Practice launch CTA — shown during tutorial when quest is active -->
+                <div v-if="launchPractice && tutorial?.activeQuest?.value?.id === 'q5_packet_hijack'" class="ph-practice-cta">
+                    <div class="ph-practice-label">// TUTORIAL — PRACTICE RUN AVAILABLE</div>
+                    <p class="ph-practice-body">
+                        You have an active tutorial objective: complete a practice breach.
+                        This is a solo run — no opponent, no economy consequences.
+                        You will be walked through all three phases with on-screen guidance.
+                    </p>
+                    <button class="ph-practice-btn" @click="launchPractice">
+                        [ LAUNCH PRACTICE BREACH ]
+                    </button>
+                </div>
+
                 <div class="sec-rule">
                     <span class="rule-key">DECLINE / ABORT</span>
                     <span class="rule-val">Either player can decline a challenge before it starts. Attacker can abort mid-match. No penalty in either case.</span>
@@ -376,7 +389,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, inject } from 'vue';
 
 defineProps({ url: { type: String, default: '' } });
 
@@ -389,6 +402,10 @@ const sections = [
     { id: 'phase3',   label: 'PHASE 3'      },
     { id: 'stats',    label: 'STATS'        },
 ];
+
+// Injected from Game.vue
+const tutorial        = inject('tutorial', null);
+const launchPractice  = inject('launchPracticeHijack', null);
 </script>
 
 <style scoped>
@@ -649,6 +666,46 @@ const sections = [
 .stat--ram      { color: #FF69B4 !important; }
 .stat--os       { color: #00FF88 !important; }
 .stat--firewall { color: #FF6B00 !important; }
+
+/* ── Practice launch CTA ────────────────────────────────────────────────────── */
+.ph-practice-cta {
+    margin: 20px 0 4px;
+    padding: 16px 18px;
+    border: 1px solid rgba(255,179,0,0.3);
+    background: rgba(255,179,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.ph-practice-label {
+    font-size: 8px;
+    letter-spacing: 0.16em;
+    color: rgba(255,179,0,0.6);
+}
+.ph-practice-body {
+    font-size: 9px;
+    color: rgba(255,255,255,0.72);
+    line-height: 1.75;
+    margin: 0;
+    letter-spacing: 0.03em;
+}
+.ph-practice-btn {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px solid rgba(255,179,0,0.5);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: rgba(255,179,0,0.9);
+    cursor: pointer;
+    padding: 8px 16px;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.ph-practice-btn:hover {
+    border-color: #FFB300;
+    color: #FFB300;
+    background: rgba(255,179,0,0.07);
+}
 
 /* ── Colour helpers ─────────────────────────────────────────────────────────── */
 .hl-cyan   { color: #00FFFF !important; }

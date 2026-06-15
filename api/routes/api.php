@@ -167,6 +167,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tutorial/complete', [TutorialController::class, 'complete'])
         ->middleware('throttle:20,1');
 
+    // Creates a solo practice Packet Hijack match for the tutorial.
+    Route::post('/tutorial/packet-hijack/start', [TutorialController::class, 'practiceStart'])
+        ->middleware('throttle:10,1');
+
 // ---------------------------------------------------------------------------
 // Inventory
 // ---------------------------------------------------------------------------

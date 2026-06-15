@@ -5,7 +5,7 @@
             <!-- ── Top bar ───────────────────────────────────────────────────── -->
             <div class="gb-topbar">
                 <span>MATCH ID: #{{ matchId }}</span>
-                <span class="gb-timer" :class="{ 'timer--critical': timeLeft <= 5, 'timer--warn': timeLeft <= 10 && timeLeft > 5 }">
+                <span id="gb-timer" class="gb-timer" :class="{ 'timer--critical': timeLeft <= 5, 'timer--warn': timeLeft <= 10 && timeLeft > 5 }">
                     TIME REMAINING: {{ timeDisplay }}
                 </span>
                 <span v-if="pvpMode && pvpOpponent" class="gb-topbar-pvp">
@@ -16,7 +16,7 @@
             <div class="gb-rule" />
 
             <!-- ── Target sequence ───────────────────────────────────────────── -->
-            <div class="gb-seq-section">
+            <div id="gb-seq-section" class="gb-seq-section">
                 <div class="gb-seq-row">
                     <span class="gb-seq-label">[ TARGET SEQUENCE ] &gt;&gt;&gt;</span>
                     <template v-for="(val, i) in sequence" :key="i">
@@ -31,7 +31,7 @@
                 </div>
 
                 <!-- Score / threshold bar -->
-                <div class="gb-score-row">
+                <div id="gb-score-row" class="gb-score-row">
                     <span class="gb-score-label">{{ pvpMode ? 'SEQUENCES BREACHED:' : 'BREACH SCORE:' }}</span>
                     <div v-if="!pvpMode" class="gb-score-bar-wrap">
                         <div class="gb-score-bar-fill" :style="{ width: Math.min(100, (score / threshold) * 100) + '%' }" />
@@ -49,7 +49,7 @@
             <div class="gb-rule gb-rule--light" />
 
             <!-- ── Grid ─────────────────────────────────────────────────────── -->
-            <div class="gb-grid-section" :class="{ 'gb-grid-section--flicker': gridFlicker }">
+            <div id="gb-grid-section" class="gb-grid-section" :class="{ 'gb-grid-section--flicker': gridFlicker }">
 
                 <!-- Column headers -->
                 <div class="gb-col-row">
@@ -87,7 +87,7 @@
             <div class="gb-rule gb-rule--light" />
 
             <!-- ── Coordinate input ──────────────────────────────────────────── -->
-            <div class="gb-input-section">
+            <div id="gb-input-section" class="gb-input-section">
                 <span class="gb-input-prompt">&gt;&gt;</span>
                 <span class="gb-input-label">ENTER COORDINATE:</span>
                 <input
@@ -99,11 +99,11 @@
                     placeholder="e.g. F6"
                     autocomplete="off"
                     spellcheck="false"
-                    :disabled="status !== 'playing'"
+                    :disabled="status !== 'playing' || paused"
                     @keydown.enter="submitCoord"
                     @input="onCoordInput"
                 />
-                <button class="gb-submit-btn" :disabled="status !== 'playing'" @click="submitCoord">
+                <button class="gb-submit-btn" :disabled="status !== 'playing' || paused" @click="submitCoord">
                     [ SUBMIT ]
                 </button>
                 <Transition name="scramble-flash">
@@ -231,6 +231,7 @@ const props = defineProps({
     pvpMode:          { type: Boolean, default: false   },
     pvpOpponent:      { type: Object,  default: null    },
     pvpCommands:      { type: Array,   default: () => [] },  // equipped commands, passed only in pvpMode
+    paused:           { type: Boolean, default: false   },   // true while a tour overlay is active
 });
 
 const emit = defineEmits(['complete', 'failed', 'abort', 'pvp-command-used']);
@@ -1100,7 +1101,7 @@ onMounted(() => {
 
     // Countdown
     tickInterval = setInterval(() => {
-        if (status.value !== 'playing') return;
+        if (status.value !== 'playing' || props.paused) return;
         timeLeft.value--;
         if (timeLeft.value <= 0) {
             if (props.pvpMode) {
@@ -1115,6 +1116,7 @@ onMounted(() => {
 
     // Board scramble every 5 seconds
     scrambleInterval = setInterval(() => {
+        if (props.paused) return;
         scrambleGrid();
     }, 5000);
 });

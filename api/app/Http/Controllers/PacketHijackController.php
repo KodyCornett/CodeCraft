@@ -457,8 +457,15 @@ class PacketHijackController extends Controller
                 $targetRig = $opponent ? $this->rigService->getRigForPlayer($opponent) : null;
             }
 
-            $targetFw  = $targetRig ? $this->rigService->effectiveStats($targetRig, $opponent ?? $me)['firewall']['effective'] : 3;
-            $targetOs  = $targetRig ? $this->rigService->effectiveStats($targetRig, $opponent ?? $me)['os']['effective'] : 3;
+            // Practice matches have no real opponent — use easy fixed stats so
+            // the chain stays short and learnable for new players.
+            if ($match->is_practice) {
+                $targetFw = 1;
+                $targetOs = 2;
+            } else {
+                $targetFw = $targetRig ? $this->rigService->effectiveStats($targetRig, $opponent ?? $me)['firewall']['effective'] : 3;
+                $targetOs = $targetRig ? $this->rigService->effectiveStats($targetRig, $opponent ?? $me)['os']['effective'] : 3;
+            }
 
             $myRig         = $this->rigService->getRigForPlayer($me);
             $attackerCpu   = $myRig ? $this->rigService->effectiveStats($myRig, $me)['cpu']['effective'] : 3;
@@ -1143,6 +1150,22 @@ class PacketHijackController extends Controller
 
     private function resolveMatch(PacketHijackMatch $match, Player $winner, string $winnerRole, string $raw): JsonResponse
     {
+        // ── Practice branch — no economy, no opponent required ────────────────
+        if ($match->is_practice) {
+            $match->winner_id    = $winner->id;
+            $match->status       = 'complete';
+            $match->completed_at = now();
+            $match->save();
+
+            return response()->json([
+                'practice'    => true,
+                'is_winner'   => true,
+                'creds_stolen'=> 0,
+                'winner_id'   => $winner->id,
+                'loser_id'    => null,
+            ]);
+        }
+
         $loserId = $match->opponentIdOf($winner->id);
         $loser   = Player::find($loserId);
 

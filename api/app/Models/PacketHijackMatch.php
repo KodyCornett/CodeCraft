@@ -14,6 +14,7 @@ class PacketHijackMatch extends Model
         'challenger_id',
         'defender_id',
         'status',
+        'is_practice',
         'winner_id',
         'challenger_target_ip',
         'defender_target_ip',

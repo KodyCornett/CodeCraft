@@ -3,14 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\CyberDoc;
+use App\Models\PacketHijackMatch;
 use App\Models\Player;
+use App\Services\PacketHijackLifecycleService;
+use App\Services\PacketHijackMatchSetupService;
 use App\Services\QuestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class TutorialController extends Controller
 {
-    public function __construct(private readonly QuestService $questService) {}
+    public function __construct(
+        private readonly QuestService                $questService,
+        private readonly PacketHijackLifecycleService $lifecycleService,
+        private readonly PacketHijackMatchSetupService $setupService,
+    ) {}
 
     /**
      * GET /api/tutorial/state
@@ -91,6 +99,69 @@ class TutorialController extends Controller
         return response()->json([
             'wallet_creds' => $player->fresh()->wallet_creds,
             'quest_id'     => $data['quest_id'],
+        ]);
+    }
+
+    /**
+     * POST /api/tutorial/packet-hijack/start
+     *
+     * Creates a solo practice PacketHijackMatch for the tutorial.
+     * No real opponent — defender_id is null, is_practice is true.
+     * Challenger data is seeded with easy difficulty stats (FW 1, OS 2).
+     *
+     * The player runs the full Phase 1 → Phase 2 → Phase 3 sequence solo.
+     * On transfer, the economy is skipped and a practice-complete response is
+     * returned inline (no WebSocket needed).
+     */
+    public function practiceStart(Request $request): JsonResponse
+    {
+        $player = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (! $player) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        // Cancel any stale practice match so the player always gets a fresh one.
+        PacketHijackMatch::where('challenger_id', $player->id)
+            ->where('is_practice', true)
+            ->whereIn('status', ['phase1', 'phase2'])
+            ->update(['status' => 'abandoned', 'completed_at' => now()]);
+
+        // Seed the challenger's board (the only side that exists in practice).
+        // We use a dummy target with low FW (1) and low OS (2) so the exploit
+        // chain is short and the suspect board is easy to scan.
+        $practiceTargetIp = $this->lifecycleService->generateRigIp();
+
+        $suspects = $this->lifecycleService->generateNodeConnections($practiceTargetIp, /* os */ 2);
+
+        $rig   = $player->rig;
+        $ports = $rig ? $this->setupService->generatePortTopology($rig, $player) : [];
+
+        // Fingerprint describes the *target* system — use dummy stat context.
+        $fingerprint = $this->setupService->generatePracticeFingerprint();
+        $filesystem  = $this->setupService->generateFilesystem();
+
+        $match = PacketHijackMatch::create([
+            'id'                     => (string) Str::uuid(),
+            'challenger_id'          => $player->id,
+            'defender_id'            => null,
+            'status'                 => 'phase1',
+            'is_practice'            => true,
+            'challenger_target_ip'   => $practiceTargetIp,
+            'challenger_suspects'    => $suspects,
+            'challenger_ports'       => $ports,
+            'challenger_fingerprint' => $fingerprint,
+            'challenger_filesystem'  => $filesystem,
+            'challenger_phase'       => 1,
+            'started_at'             => now(),
+            'expires_at'             => now()->addMinutes(30),
+        ]);
+
+        return response()->json([
+            'match_id' => $match->id,
+            'role'     => 'challenger',
         ]);
     }
 

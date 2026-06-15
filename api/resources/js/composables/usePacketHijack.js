@@ -24,6 +24,7 @@ export function usePacketHijack(playerId) {
     const defenderAlertActive = ref(false);
     const matchResult         = ref(null);
     const isAbandoned         = ref(false);   // true when server returns 410 (expired/disconnect)
+    const isPractice          = ref(false);   // true for the tutorial solo practice match
     const usedRigCommands     = ref([]);
     const echoChannel         = ref(null);
 
@@ -97,6 +98,7 @@ export function usePacketHijack(playerId) {
         lockCountdown.value       = 0;
         defenderAlertActive.value = false;
         matchResult.value         = null;
+        isPractice.value          = false;
         usedRigCommands.value     = [];
         clearInterval(lockTimer);
 
@@ -333,11 +335,34 @@ export function usePacketHijack(playerId) {
         }
     }
 
+    /**
+     * Start a solo practice Packet Hijack match for the tutorial.
+     * Creates the match server-side and calls init() to hydrate local state.
+     */
+    async function launchPractice() {
+        try {
+            const { data } = await axios.post('/api/tutorial/packet-hijack/start');
+            isPractice.value = true;
+            init(data.match_id, data.role);
+        } catch (e) {
+            console.error('[PacketHijack] practiceStart failed:', e?.message);
+        }
+    }
+
     async function submitTransfer() {
         if (!matchId.value || transferring.value) return;
         transferring.value = true;
         try {
-            await axios.post(`/api/packet-hijack/${matchId.value}/transfer`);
+            const { data } = await axios.post(`/api/packet-hijack/${matchId.value}/transfer`);
+            // Practice matches resolve inline (no WS) — handle the response directly.
+            if (data?.practice) {
+                matchResult.value = {
+                    isWinner:    true,
+                    credsStolen: 0,
+                    winnerId:    data.winner_id,
+                    loserId:     null,
+                };
+            }
         } catch (e) {
             const status = e?.response?.status;
             if (status === 410) {
@@ -464,8 +489,10 @@ export function usePacketHijack(playerId) {
         currentPath,
         directoryEntries,
         exploredPaths,
+        isPractice,
         // Actions
         init,
+        launchPractice,
         submitCommand,
         submitAuth,
         submitRigCommand,

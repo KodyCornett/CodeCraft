@@ -10,8 +10,16 @@
 
         <!-- ── Match complete screen ────────────────────────────────────────── -->
         <div v-if="isComplete" class="ph-complete">
-            <div class="ph-complete-box" :class="matchResult.isWinner ? 'complete--win' : 'complete--loss'">
-                <template v-if="matchResult.isWinner">
+            <div class="ph-complete-box" :class="isPractice ? 'complete--practice' : matchResult.isWinner ? 'complete--win' : 'complete--loss'">
+                <template v-if="isPractice">
+                    <div class="ph-complete-title">[ PRACTICE BREACH COMPLETE ]</div>
+                    <div class="ph-complete-line">SYSTEM COMPROMISED. FUNDS EXTRACTED.</div>
+                    <div class="ph-complete-note">
+                        In a live match your opponent runs the same sequence against your system
+                        simultaneously. First to reach the wallet and transfer wins.
+                    </div>
+                </template>
+                <template v-else-if="matchResult.isWinner">
                     <div class="ph-complete-title">[ BREACH COMPLETE ]</div>
                     <div class="ph-complete-line">NODE FULLY PURGED. CRED BUFFER ACQUIRED.</div>
                     <div class="ph-complete-creds">+{{ (matchResult.credsStolen ?? 0).toLocaleString() }} ₡ TRANSFERRED</div>
@@ -66,7 +74,7 @@
         <div v-else class="ph-terminal" tabindex="-1" @click="refocusInput">
 
             <!-- Top bar -->
-            <div class="ph-topbar">
+            <div id="ph-topbar" class="ph-topbar">
                 <span class="ph-topbar-id">MATCH_ID: {{ matchId?.slice(0, 8).toUpperCase() }}</span>
                 <span class="ph-topbar-role">ROLE: <span class="ph-role-val">{{ role?.toUpperCase() }}</span></span>
                 <span class="ph-topbar-phase" :class="phase === 3 ? 'phase--three' : phase === 2 ? 'phase--two' : 'phase--one'">
@@ -78,7 +86,7 @@
             <!-- ── Phase data zone (top, full width) ───────────────────────── -->
 
             <!-- Phase 1: 3×5 suspect grid -->
-            <div v-if="phase === 1" class="ph-data-zone ph-data-zone--p1">
+            <div v-if="phase === 1" id="ph-data-zone" class="ph-data-zone ph-data-zone--p1">
                 <div v-if="!boardReady" class="ph-data-empty">
                     RUN <span class="ph-boot-cmd">netstat --active</span> TO BEGIN TRACE
                 </div>
@@ -130,7 +138,7 @@
             </div>
 
             <!-- Phase 2: exploit chain board -->
-            <div v-else-if="phase === 2" class="ph-data-zone ph-data-zone--p2">
+            <div v-else-if="phase === 2" id="ph-data-zone" class="ph-data-zone ph-data-zone--p2">
                 <!-- Locked target IP tag — always visible once phase 2 starts -->
                 <div v-if="targetIp" class="ph-target-tag">
                     <span class="ph-target-label">TARGET</span>
@@ -141,7 +149,7 @@
                 </div>
                 <template v-else>
                     <!-- Credential strip — fills as chain ports are exploited -->
-                    <div class="ph-cred-strip">
+                    <div id="ph-cred-strip" class="ph-cred-strip">
                         <div class="ph-cred-item">
                             <span class="ph-cred-label">HOST</span>
                             <span class="ph-cred-val" :class="credentialState.hostname && !credentialState.hostname.includes('????') ? 'cred--complete' : ''">
@@ -202,7 +210,7 @@
             <div class="ph-body" @mousedown.self="refocusInput">
 
                 <!-- Left: history + input -->
-                <div class="ph-main-col">
+                <div id="ph-terminal-col" class="ph-main-col">
 
                     <!-- Tension boot screen — shown until netstat is run -->
                     <div v-if="!boardReady && phase === 1" class="ph-boot">
@@ -296,7 +304,7 @@
                 </div>
 
                 <!-- Right: CMD ref (always visible, phase-aware) + rig cmds -->
-                <div class="ph-ref-panel">
+                <div id="ph-ref-panel" class="ph-ref-panel">
 
                     <!-- CMD REF — Phase 1 -->
                     <div v-if="phase === 1" class="ph-cmd-ref-section">
@@ -433,6 +441,7 @@ const props = defineProps({
     busy:                { type: Boolean, default: false },
     hackCommands:        { type: Array,   default: () => [] },
     usedRigCommands:     { type: Array,   default: () => [] },
+    isPractice:          { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['submit-command', 'submit-auth', 'submit-transfer', 'match-complete', 'use-rig-command']);
@@ -846,14 +855,16 @@ function lineClass(line) {
     background: rgba(8,8,15,0.95);
 }
 
-.complete--win  { border-color: rgba(0,255,136,0.5); }
-.complete--loss { border-color: rgba(255,50,50,0.4); }
+.complete--win      { border-color: rgba(0,255,136,0.5); }
+.complete--loss     { border-color: rgba(255,50,50,0.4); }
+.complete--practice { border-color: rgba(255,179,0,0.5); }
 
 .ph-complete-title       { font-size: 20px; letter-spacing: 0.2em; color: #00ff88; margin-bottom: 16px; }
 .ph-complete-title--loss { color: #FF4444; }
 .ph-complete-line        { font-size: 11px; color: rgba(0,255,255,0.6); letter-spacing: 0.1em; margin-bottom: 12px; }
 .ph-complete-creds       { font-size: 16px; color: #00ff88; letter-spacing: 0.12em; margin-bottom: 28px; }
 .ph-complete-creds--loss { color: #FF4444; }
+.ph-complete-note        { font-size: 11px; color: rgba(255,179,0,0.75); line-height: 1.65; max-width: 380px; text-align: center; margin-bottom: 24px; }
 
 .ph-complete-btn {
     background: transparent;

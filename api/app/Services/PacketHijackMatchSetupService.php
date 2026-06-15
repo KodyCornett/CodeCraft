@@ -227,6 +227,29 @@ class PacketHijackMatchSetupService
     // =========================================================================
 
     /**
+     * Generate a fingerprint for the practice target using fixed easy stats.
+     * Skips the real rig dependency so TutorialController needs no RigService.
+     */
+    public function generatePracticeFingerprint(): array
+    {
+        // Fixed low-difficulty target: FW 1 (short chain), OS 2 (short banners).
+        $prefixes      = self::STAT_PREFIXES['os'];   // arbitrary deterministic prefix
+        $hostnameTier2 = self::HOSTNAME_WORDS[array_rand(self::HOSTNAME_WORDS)];
+        $hostnameTier3 = strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
+        $osTier2       = self::OS_VERSIONS[array_rand(self::OS_VERSIONS)];
+        $osTier3       = strtoupper(substr(bin2hex(random_bytes(2)), 0, 3));
+
+        return [
+            'hostname_prefix' => $prefixes['hostname'],
+            'hostname_tier2'  => $hostnameTier2,
+            'hostname_tier3'  => $hostnameTier3,
+            'os_prefix'       => $prefixes['os'],
+            'os_tier2'        => $osTier2,
+            'os_tier3'        => $osTier3,
+        ];
+    }
+
+    /**
      * Generate the Phase 3 filesystem tree for one player's side.
      * Wallet is placed at a randomised path within the tree.
      */

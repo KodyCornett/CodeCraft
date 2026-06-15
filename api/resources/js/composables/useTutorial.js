@@ -75,6 +75,16 @@ const QUEST_DEFS = [
         reward: 100,
     },
     {
+        id:       'q5_packet_hijack',
+        label:    'KNOW YOUR WEAPONS',
+        subtitle: 'Packet Hijack is how PvP works. Run a practice breach before you face a live opponent.',
+        hint:     'Open SPLICE → Packet Hijack Manual ( splice://sys.local/guide/packethijack ) and hit [ LAUNCH PRACTICE BREACH ].',
+        steps: [
+            { id: 'ph_practice', label: 'Complete a practice Packet Hijack breach' },
+        ],
+        reward: 75,
+    },
+    {
         id:       'q4_cyberdoc',
         label:    'FIND A SAFE HARBOUR',
         subtitle: 'Pocket creds are lost on a PvP kill. Bank them at a CyberDoc before someone takes them.',
