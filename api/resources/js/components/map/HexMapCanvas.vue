@@ -1349,13 +1349,12 @@ onUnmounted(() => {
     if (particleRaf) cancelAnimationFrame(particleRaf);
 });
 
-// ─── Particle system ──────────────────────────────────────────────────────────
+// ─── Particle system — horizontal network traffic ─────────────────────────────
 function initParticles() {
     const canvas = particleCanvas.value;
     if (!canvas) return;
 
-    const ctx    = canvas.getContext('2d');
-    const COUNT  = 80;
+    const ctx = canvas.getContext('2d');
 
     function resize() {
         canvas.width  = canvas.offsetWidth;
@@ -1364,52 +1363,93 @@ function initParticles() {
     resize();
     window.addEventListener('resize', resize);
 
-    // Each particle: position, velocity, opacity, size, type ('dot' | 'dash')
-    const particles = Array.from({ length: COUNT }, () => spawn(canvas));
+    // Colours: mostly cyan, occasional green accent
+    const COLORS  = ['#00FFFF', '#00FFFF', '#00FFFF', '#00FF9C'];
+    // Lane count scales with canvas height — one lane per ~40px
+    const LANE_COUNT = 28;
 
-    function spawn(c, randomY = true) {
-        const type  = Math.random() < 0.3 ? 'dash' : 'dot';
-        const speed = 0.15 + Math.random() * 0.35;
-        const angle = (Math.random() * 40 - 20) * (Math.PI / 180); // slight drift
+    function makeLane(c, index) {
+        const y       = (index / LANE_COUNT) * c.height + (c.height / LANE_COUNT) * 0.5;
+        const dir     = Math.random() < 0.5 ? 1 : -1;   // left or right
+        const burst   = Math.random() < 0.12;            // occasional fast packet
+        const speed   = burst
+            ? 2.5 + Math.random() * 2.0
+            : 0.4 + Math.random() * 0.8;
+        const color   = COLORS[Math.floor(Math.random() * COLORS.length)];
+        // Packet length — bursts are longer, normal traffic is short dashes
+        const len     = burst
+            ? 18 + Math.random() * 30
+            : 6  + Math.random() * 14;
+        const opacity = burst
+            ? 0.35 + Math.random() * 0.25
+            : 0.08 + Math.random() * 0.12;
+
         return {
-            x:    Math.random() * c.width,
-            y:    randomY ? Math.random() * c.height : -4,
-            vx:   Math.sin(angle) * speed,
-            vy:   speed,
-            size: type === 'dash' ? 1 + Math.random() * 1.5 : 1 + Math.random(),
-            len:  type === 'dash' ? 4 + Math.random() * 8 : 0,
-            op:   0.08 + Math.random() * 0.18,
-            type,
+            x:       dir === 1 ? -len : c.width + len,
+            y,
+            dir,
+            speed,
+            len,
+            color,
+            opacity,
+            burst,
+            // Delay before this packet enters — staggers lanes so they don't all fire at once
+            delay: Math.random() * 300,
         };
     }
+
+    // Build one packet per lane; when a packet exits, recycle the lane
+    const packets = Array.from({ length: LANE_COUNT }, (_, i) => makeLane(canvas, i));
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        for (const p of particles) {
-            ctx.globalAlpha = p.op;
-            ctx.fillStyle   = '#00FFFF';
-            ctx.strokeStyle = '#00FFFF';
+        for (let i = 0; i < packets.length; i++) {
+            const p = packets[i];
 
-            if (p.type === 'dash') {
-                ctx.lineWidth = p.size * 0.6;
+            // Respect initial delay
+            if (p.delay > 0) {
+                p.delay--;
+                continue;
+            }
+
+            // Draw the packet as a horizontal dash with a fading trail
+            const trailLen = p.burst ? p.len * 2.5 : p.len * 1.2;
+            const grad = ctx.createLinearGradient(
+                p.x - p.dir * trailLen, p.y,
+                p.x,                    p.y
+            );
+            grad.addColorStop(0,   'transparent');
+            grad.addColorStop(0.6, `${p.color}22`);
+            grad.addColorStop(1,   p.color);
+
+            ctx.globalAlpha = p.opacity;
+            ctx.strokeStyle = grad;
+            ctx.lineWidth   = p.burst ? 1.5 : 1;
+            ctx.beginPath();
+            ctx.moveTo(p.x - p.dir * p.len, p.y);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+
+            // Leading dot for non-burst packets
+            if (!p.burst) {
+                ctx.globalAlpha = p.opacity * 1.8;
+                ctx.fillStyle   = p.color;
                 ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x + p.vx * p.len, p.y + p.vy * p.len);
-                ctx.stroke();
-            } else {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            p.x += p.vx;
-            p.y += p.vy;
+            p.x += p.dir * p.speed;
 
-            // Respawn off the top when a particle exits the bottom
-            if (p.y > canvas.height + 10) {
-                Object.assign(p, spawn(canvas, false));
-                p.x = Math.random() * canvas.width;
+            // Recycle when fully off-screen
+            const offscreen = p.dir === 1
+                ? p.x - p.len > canvas.width
+                : p.x + p.len < 0;
+
+            if (offscreen) {
+                packets[i] = makeLane(canvas, i);
+                packets[i].delay = Math.random() * 120; // short re-entry delay
             }
         }
 
