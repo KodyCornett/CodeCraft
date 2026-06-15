@@ -170,11 +170,15 @@ export function useTutorial() {
         _save();
     }
 
-    function skip() {
+    async function skip() {
         log('skip()');
         _state.value.tutorialSeen    = true;
         _state.value.tutorialSkipped = true;
-        _save();
+        await _save();
+        // Fire tutorial/complete so the entry arc (Knuckle) is initialised
+        // even when the player skips. Without this, questDocs stays stale
+        // and the dialogue button never appears at BA-hub.
+        await _completeTutorial();
     }
 
     function clearBadge() {

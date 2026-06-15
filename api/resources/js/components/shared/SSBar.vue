@@ -25,9 +25,10 @@ const pct = computed(() =>
     props.max > 0 ? Math.round((props.current / props.max) * 100) : 0,
 );
 
-const filledCount = computed(() =>
-    Math.round((props.current / props.max) * BAR_WIDTH),
-);
+const filledCount = computed(() => {
+    if (!props.max || props.max <= 0) return 0;
+    return Math.min(BAR_WIDTH, Math.max(0, Math.round((props.current / props.max) * BAR_WIDTH)));
+});
 
 const filledChars = computed(() => '█'.repeat(filledCount.value));
 const emptyChars  = computed(() => '░'.repeat(BAR_WIDTH - filledCount.value));

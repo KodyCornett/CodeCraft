@@ -475,6 +475,7 @@ const props = defineProps({
 
 // ── Splice navigation (provided by InGameBrowser) ────────────────────────────
 const spliceNavigate = inject('spliceNavigate', () => {});
+const questLog       = inject('questLog', null);
 
 // ── Real player state from Game.vue ──────────────────────────────────────────
 const gameState     = inject('gameState', null);
@@ -502,6 +503,9 @@ async function visitCyberDoc() {
             gameState.player.value.uplink    = res.data.current_uplink;
             gameState.player.value.maxUplink = res.data.current_uplink;
         }
+        // initArcForDoc ran server-side — refresh quest log so the dialogue
+        // button appears at this node without needing a full page reload.
+        questLog?.fetchQuestLog?.();
         console.log('[CYBERDOC] Terminal accessed. Uplink restored.');
     } catch (e) {
         atCyberDoc.value = false;
