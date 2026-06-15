@@ -21,9 +21,8 @@
         <div class="map-row" :class="{ 'map-hidden': !booted }">
 
             <div class="map-stage">
-                <!-- Hex node map — dev accounts only -->
+                <!-- Hex node map -->
                 <HexMapCanvas
-                    v-if="player.isDev"
                     ref="mapCanvasRef"
                     :nodes="nodes"
                     :pings="pings"
@@ -37,21 +36,6 @@
                     @player-moved="handlePlayerMoved"
                     @move-blocked="onMoveBlocked"
                 />
-
-                <!-- Restricted map placeholder — shown to non-dev players -->
-                <div v-else class="map-restricted">
-                    <div class="map-restricted-inner">
-                        <div class="mr-glyph">◈</div>
-                        <div class="mr-title">SPLICE FREQUENCY</div>
-                        <div class="mr-sub">SECTOR MAP — ACCESS RESTRICTED</div>
-                        <div class="mr-rule" />
-                        <div class="mr-body">
-                            The city is still coming online.<br />
-                            Runner access will be granted soon.
-                        </div>
-                        <div class="mr-blink">▌ AWAITING CLEARANCE</div>
-                    </div>
-                </div>
 
                 <!-- HUD overlay -->
                 <HUD :player="player" :rig="rig" :current-node="currentNode" :bounty-ticker="bountyTicker" :flash="hudFlash" />
@@ -2167,75 +2151,6 @@ onUnmounted(() => {
 .map-hidden {
     opacity: 0;
     pointer-events: none;
-}
-
-/* ── Restricted map placeholder ──────────────────────────────────────────── */
-.map-restricted {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #03040a;
-    background-image:
-        radial-gradient(ellipse at 50% 40%, rgba(0,255,255,0.04) 0%, transparent 70%);
-}
-
-.map-restricted-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    font-family: 'JetBrains Mono', monospace;
-    text-align: center;
-    user-select: none;
-}
-
-.mr-glyph {
-    font-size: 32px;
-    color: rgba(0, 255, 255, 0.25);
-    text-shadow: 0 0 30px rgba(0, 255, 255, 0.15);
-    margin-bottom: 4px;
-}
-
-.mr-title {
-    font-size: 14px;
-    letter-spacing: 0.3em;
-    color: rgba(0, 255, 255, 0.5);
-    text-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
-}
-
-.mr-sub {
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: rgba(0, 255, 255, 0.2);
-}
-
-.mr-rule {
-    width: 120px;
-    height: 1px;
-    background: rgba(0, 255, 255, 0.1);
-    margin: 6px 0;
-}
-
-.mr-body {
-    font-size: 11px;
-    line-height: 1.8;
-    color: rgba(255, 255, 255, 0.3);
-    letter-spacing: 0.04em;
-}
-
-.mr-blink {
-    font-size: 9px;
-    color: rgba(0, 255, 255, 0.2);
-    letter-spacing: 0.15em;
-    margin-top: 8px;
-    animation: mr-cursor 1.2s step-end infinite;
-}
-
-@keyframes mr-cursor {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
 }
 
 .map-loading {
