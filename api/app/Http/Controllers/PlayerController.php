@@ -251,11 +251,15 @@ class PlayerController extends Controller
             $effectiveMax = (int) ($rig->chassis->base_uplink ?? 3)
                           + ($this->rigService->peripheralBoosts($player)['uplink'] ?? 0);
             $curUplink    = $rig->current_uplink ?? $effectiveMax;
-            if ($curUplink <= 0) {
-                return response()->json(['message' => 'No uplink remaining — bank your run at a Street Doc first.'], 422);
-            }
-            if ($uplinkCost > $curUplink) {
-                return response()->json(['message' => 'Not enough uplink remaining for this move.'], 422);
+            // CyberDoc nodes are always reachable — players must be able to bank
+            // their run even when uplink is exhausted.
+            if ($node->type !== 'cyberdoc') {
+                if ($curUplink <= 0) {
+                    return response()->json(['message' => 'No uplink remaining — bank your run at a Street Doc first.'], 422);
+                }
+                if ($uplinkCost > $curUplink) {
+                    return response()->json(['message' => 'Not enough uplink remaining for this move.'], 422);
+                }
             }
         }
 

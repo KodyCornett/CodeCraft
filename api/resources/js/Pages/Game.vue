@@ -836,7 +836,7 @@ const { activeBrowserUrl, onLaunch: _onLaunch, onCloseBrowser } = useBrowserStat
 
 // Intercept TERMINAL launches — redirect to the tutorial page until it's complete.
 function onLaunch(url) {
-    if (url === SPLICE.TERMINAL && !tutorial.allComplete.value) {
+    if (url === SPLICE.TERMINAL && !tutorial.allComplete.value && !tutorial.tutorialComplete.value) {
         return _onLaunch(SPLICE.TUTORIAL);
     }
     _onLaunch(url);

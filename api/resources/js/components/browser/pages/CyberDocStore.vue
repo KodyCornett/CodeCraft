@@ -208,7 +208,7 @@
                     <button
                         v-if="s.canUp"
                         class="sr-btn"
-                        :disabled="!atCyberDoc || !canAffordStat(s.cost) || chassisMaxed"
+                        :disabled="!atCyberDoc || !canAffordStat(s.cost) || chassisMaxed || upgrading"
                         :title="!atCyberDoc ? 'Navigate to a CyberDoc node' : chassisMaxed ? 'Chassis maxed — buy NullTek to continue' : statBtnTitle(s)"
                         @click="onUpgradeStat(s.key, s.cost)"
                     >INVEST</button>
@@ -518,6 +518,7 @@ async function visitCyberDoc() {
 const playerCreds      = computed(() => player.value?.creds      ?? 0);
 const playerTechPoints = computed(() => player.value?.techPoints ?? 0);
 const upgradeError = ref(null);
+const upgrading    = ref(false);   // true while a stat upgrade request is in flight
 
 const { upgradeCost, totalInvested, canUpgrade, effectiveStat } = useUpgradeCosts();
 
@@ -887,8 +888,9 @@ function statBtnTitle(s) {
 }
 
 async function onUpgradeStat(stat, cost) {
-    if (!canAffordStat(cost) || chassisMaxed.value) return;
+    if (!canAffordStat(cost) || chassisMaxed.value || upgrading.value) return;
     upgradeError.value = null;
+    upgrading.value    = true;
     try {
         const res = await axios.post('/api/rig/upgrade', {
             player_id: player.value.id,
@@ -926,6 +928,8 @@ async function onUpgradeStat(stat, cost) {
     } catch (e) {
         upgradeError.value = e?.response?.data?.message ?? 'Upgrade failed — check your wallet balance.';
         console.error('[STATS] Upgrade failed:', upgradeError.value);
+    } finally {
+        upgrading.value = false;
     }
 }
 

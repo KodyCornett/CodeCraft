@@ -74,11 +74,12 @@ function warn(msg, data) {
 
 function defaultState() {
     return {
-        tutorialSeen:    false,
-        tutorialSkipped: false,
-        stepsDone:       {},
-        questsRewarded:  [],
-        hasBadge:        false,
+        tutorialSeen:     false,
+        tutorialSkipped:  false,
+        tutorialComplete: false,   // set once, server-persisted — prevents all re-triggers
+        stepsDone:        {},
+        questsRewarded:   [],
+        hasBadge:         false,
     };
 }
 
@@ -103,11 +104,18 @@ export function useTutorial() {
                 tutorialSkipped: _state.value.tutorialSkipped,
             });
 
-            // If all quests are already complete on this session load, ensure the
-            // entry arc was initialised server-side (handles 429 failures from a
-            // previous session without requiring a full tutorial redo).
-            const allRewarded = QUEST_DEFS.every(q => _state.value.questsRewarded.includes(q.id));
-            if (allRewarded) {
+            // If the tutorial was already completed (authoritative flag), or all
+            // quests are rewarded, fire the complete endpoint silently to guarantee
+            // the entry arc is unlocked. tutorialComplete is the primary gate —
+            // questsRewarded is a fallback for sessions saved before this flag existed.
+            const alreadyDone = _state.value.tutorialComplete
+                || QUEST_DEFS.every(q => _state.value.questsRewarded.includes(q.id));
+            if (alreadyDone) {
+                // Make sure the flag is written if this is a legacy save (pre-flag).
+                if (!_state.value.tutorialComplete) {
+                    _state.value.tutorialComplete = true;
+                    await _save();
+                }
                 log('hydrate() — tutorial already complete, re-firing complete endpoint to guarantee arc unlock');
                 await _completeTutorial({ silent: true });
             }
@@ -163,12 +171,15 @@ export function useTutorial() {
     const allComplete = computed(() => quests.value.every(q => q.allDone));
 
     const isTutorialActive = computed(() =>
-        !_state.value.tutorialSkipped && !allComplete.value
+        !_state.value.tutorialSkipped
+        && !_state.value.tutorialComplete
+        && !allComplete.value
     );
 
-    const tutorialSeen    = computed(() => _state.value.tutorialSeen);
-    const tutorialSkipped = computed(() => _state.value.tutorialSkipped);
-    const hasBadge        = computed(() => _state.value.hasBadge);
+    const tutorialSeen     = computed(() => _state.value.tutorialSeen);
+    const tutorialSkipped  = computed(() => _state.value.tutorialSkipped);
+    const tutorialComplete = computed(() => _state.value.tutorialComplete);
+    const hasBadge         = computed(() => _state.value.hasBadge);
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -197,8 +208,8 @@ export function useTutorial() {
     }
 
     async function markStepDone(stepId) {
-        if (_state.value.tutorialSkipped) {
-            log(`markStepDone('${stepId}') — skipped (tutorial skipped)`);
+        if (_state.value.tutorialSkipped || _state.value.tutorialComplete) {
+            log(`markStepDone('${stepId}') — skipped (tutorial skipped/complete)`);
             return;
         }
         if (_state.value.stepsDone[stepId]) {
@@ -262,6 +273,15 @@ export function useTutorial() {
     // silent=true → called from hydrate on reload; skips justCompleted pulse
     async function _completeTutorial({ silent = false } = {}) {
         log(`_completeTutorial() → POST /api/tutorial/complete (silent=${silent})`);
+
+        // Save the authoritative completion flag BEFORE doing anything else.
+        // This must be persisted first so that even if the pulse or arc-unlock
+        // call fails, the flag is on the server and prevents replay on reload.
+        if (!silent && !_state.value.tutorialComplete) {
+            _state.value.tutorialComplete = true;
+            await _save();
+        }
+
         try {
             await axios.post('/api/tutorial/complete');
             log('_completeTutorial() — server confirmed arc unlock ✓');
@@ -304,6 +324,7 @@ export function useTutorial() {
         isTutorialActive,
         tutorialSeen,
         tutorialSkipped,
+        tutorialComplete,
         hasBadge,
         justCompleted,
         hydrate,

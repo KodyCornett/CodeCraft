@@ -44,6 +44,7 @@ class TutorialController extends Controller
             'tutorial_state'                  => ['required', 'array'],
             'tutorial_state.tutorialSeen'     => ['boolean'],
             'tutorial_state.tutorialSkipped'  => ['boolean'],
+            'tutorial_state.tutorialComplete' => ['boolean'],
             'tutorial_state.stepsDone'        => ['array'],
             'tutorial_state.questsRewarded'   => ['array'],
             'tutorial_state.hasBadge'         => ['boolean'],
