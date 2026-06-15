@@ -255,7 +255,7 @@ onMounted(async () => {
 .ql-page {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    color: #a0c4b8;
+    color: #c0ddd4;
     background: transparent;
     padding: 10px 12px;
     display: flex;
@@ -365,8 +365,8 @@ onMounted(async () => {
     padding-bottom: 2px;
     border-bottom: 1px solid #0a1e14;
 }
-.ql-thresh-label { color: #4a7a6a; }
-.ql-thresh-val   { color: #5a9a7a; }
+.ql-thresh-label { color: #6a9a82; }
+.ql-thresh-val   { color: #80b898; }
 .ql-thresh-label--root { color: #ff9d00; }
 
 .ql-referral-msg {
@@ -385,7 +385,7 @@ onMounted(async () => {
     font-size: 11px;
     font-weight: 700;
     padding: 2px 0 4px;
-    color: #a0d0b8;
+    color: #c0e8d4;
 }
 .ql-arc--locked .ql-arc-title { color: #2a4a3a; }
 .ql-arc--complete .ql-arc-title { color: #4a7a6a; }
@@ -434,7 +434,7 @@ onMounted(async () => {
 
 .ql-stage-obj {
     font-size: 10px;
-    color: #6a9a82;
+    color: #a8c8b8;
     padding-left: 16px;
     line-height: 1.5;
 }
