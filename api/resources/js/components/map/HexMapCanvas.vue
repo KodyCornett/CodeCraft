@@ -4,8 +4,6 @@
         :class="{ 'is-panning': isPanning }"
         @mousedown="onPanStart"
     >
-        <!-- Particle drift layer — rendered behind the node map -->
-        <canvas ref="particleCanvas" class="particle-layer" />
         <svg
             ref="svgEl"
             class="hex-map-svg"
@@ -146,6 +144,9 @@
                     <circle :cx="pt.x" :cy="pt.y" r="4" class="route-node" />
                 </g>
             </g>
+
+            <!-- Traffic dots — move along NET_LINKS routes -->
+            <g ref="trafficLayerEl" class="traffic-layer" />
 
             <!-- Cell coordinate labels (column letter + row number) -->
             <g v-if="props.isDev" class="hex-labels-layer">
@@ -298,9 +299,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 // SVG coordinates to stage-relative screen pixels.
 const svgEl = ref(null);
 
-// ─── Particle canvas ref ──────────────────────────────────────────────────────
-const particleCanvas = ref(null);
-let   particleRaf    = null;
+// ─── Traffic layer ref ────────────────────────────────────────────────────────
+const trafficLayerEl = ref(null);
+let   trafficRaf     = null;
+let   trafficAgents  = [];
 
 // ─── Pan state ────────────────────────────────────────────────────────────────
 const panOffset  = ref({ x: 0, y: 0 });
@@ -1426,123 +1428,119 @@ function getNodeScreenPos(nodeId) {
 onMounted(() => {
     window.addEventListener('mousemove', onPanMove);
     window.addEventListener('mouseup',   onPanEnd);
-    initParticles();
+    initTraffic();
 });
 onUnmounted(() => {
     window.removeEventListener('mousemove', onPanMove);
     window.removeEventListener('mouseup',   onPanEnd);
-    if (particleRaf) cancelAnimationFrame(particleRaf);
+    if (trafficRaf) cancelAnimationFrame(trafficRaf);
+    trafficAgents = [];
 });
 
-// ─── Particle system — horizontal network traffic ─────────────────────────────
-function initParticles() {
-    const canvas = particleCanvas.value;
-    if (!canvas) return;
+// ─── Traffic system — dots travel along NET_LINKS routes ──────────────────────
+function initTraffic() {
+    const layer = trafficLayerEl.value;
+    if (!layer) return;
 
-    const ctx = canvas.getContext('2d');
-
-    function resize() {
-        canvas.width  = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    // Colours: mostly cyan, occasional green accent
-    const COLORS  = ['#00FFFF', '#00FFFF', '#00FFFF', '#00FF9C'];
-    // Lane count scales with canvas height — one lane per ~40px
-    const LANE_COUNT = 28;
-
-    function makeLane(c, index) {
-        const y       = (index / LANE_COUNT) * c.height + (c.height / LANE_COUNT) * 0.5;
-        const dir     = Math.random() < 0.5 ? 1 : -1;   // left or right
-        const burst   = Math.random() < 0.12;            // occasional fast packet
-        const speed   = burst
-            ? 2.5 + Math.random() * 2.0
-            : 0.4 + Math.random() * 0.8;
-        const color   = COLORS[Math.floor(Math.random() * COLORS.length)];
-        // Packet length — bursts are longer, normal traffic is short dashes
-        const len     = burst
-            ? 18 + Math.random() * 30
-            : 6  + Math.random() * 14;
-        const opacity = burst
-            ? 0.35 + Math.random() * 0.25
-            : 0.08 + Math.random() * 0.12;
-
-        return {
-            x:       dir === 1 ? -len : c.width + len,
-            y,
-            dir,
-            speed,
-            len,
-            color,
-            opacity,
-            burst,
-            // Delay before this packet enters — staggers lanes so they don't all fire at once
-            delay: Math.random() * 300,
-        };
-    }
-
-    // Build one packet per lane; when a packet exits, recycle the lane
-    const packets = Array.from({ length: LANE_COUNT }, (_, i) => makeLane(canvas, i));
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        for (let i = 0; i < packets.length; i++) {
-            const p = packets[i];
-
-            // Respect initial delay
-            if (p.delay > 0) {
-                p.delay--;
-                continue;
-            }
-
-            // Draw the packet as a horizontal dash with a fading trail
-            const trailLen = p.burst ? p.len * 2.5 : p.len * 1.2;
-            const grad = ctx.createLinearGradient(
-                p.x - p.dir * trailLen, p.y,
-                p.x,                    p.y
-            );
-            grad.addColorStop(0,   'transparent');
-            grad.addColorStop(0.6, `${p.color}22`);
-            grad.addColorStop(1,   p.color);
-
-            ctx.globalAlpha = p.opacity;
-            ctx.strokeStyle = grad;
-            ctx.lineWidth   = p.burst ? 1.5 : 1;
-            ctx.beginPath();
-            ctx.moveTo(p.x - p.dir * p.len, p.y);
-            ctx.lineTo(p.x, p.y);
-            ctx.stroke();
-
-            // Leading dot for non-burst packets
-            if (!p.burst) {
-                ctx.globalAlpha = p.opacity * 1.8;
-                ctx.fillStyle   = p.color;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            p.x += p.dir * p.speed;
-
-            // Recycle when fully off-screen
-            const offscreen = p.dir === 1
-                ? p.x - p.len > canvas.width
-                : p.x + p.len < 0;
-
-            if (offscreen) {
-                packets[i] = makeLane(canvas, i);
-                packets[i].delay = Math.random() * 120; // short re-entry delay
+    // Build route list from NET_LINKS segments.
+    // Each segment is an ordered array of {x, y, ...} nodes — ready to follow.
+    const routes = [];
+    for (const link of NET_LINKS) {
+        for (const seg of link.segments) {
+            if (seg.length >= 2) {
+                routes.push({
+                    pts:   seg.map(n => ({ x: n.x, y: n.y })),
+                    color: link.color ?? '#00FFFF',
+                });
             }
         }
+    }
+    if (!routes.length) return;
 
-        ctx.globalAlpha = 1;
-        particleRaf = requestAnimationFrame(draw);
+    const NS     = 'http://www.w3.org/2000/svg';
+    const COUNT  = 22; // low density — feels like sparse traffic, not a swarm
+
+    function segLen(pts, i) {
+        const dx = pts[i+1].x - pts[i].x;
+        const dy = pts[i+1].y - pts[i].y;
+        return Math.sqrt(dx*dx + dy*dy) || 1;
     }
 
-    draw();
+    // Spawn agents spread across random routes and random positions within them
+    for (let i = 0; i < COUNT; i++) {
+        const route  = routes[Math.floor(Math.random() * routes.length)];
+        const dir    = Math.random() < 0.5 ? 1 : -1;
+        const speed  = 18 + Math.random() * 28;  // px per second — car-like pace
+        const segIdx = Math.floor(Math.random() * (route.pts.length - 1));
+        const pos    = Math.random();
+
+        // Leading dot
+        const dot = document.createElementNS(NS, 'circle');
+        dot.setAttribute('r', '2.2');
+        dot.setAttribute('fill', route.color);
+        dot.setAttribute('fill-opacity', (0.55 + Math.random() * 0.35).toFixed(2));
+        layer.appendChild(dot);
+
+        // Soft glow halo behind the dot
+        const halo = document.createElementNS(NS, 'circle');
+        halo.setAttribute('r', '4.5');
+        halo.setAttribute('fill', route.color);
+        halo.setAttribute('fill-opacity', '0.12');
+        layer.insertBefore(halo, dot);
+
+        trafficAgents.push({ dot, halo, route, segIdx, pos, speed, dir });
+    }
+
+    let last = null;
+
+    function tick(now) {
+        if (last === null) last = now;
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+
+        for (const a of trafficAgents) {
+            const { pts } = a.route;
+            const sl = segLen(pts, a.segIdx);
+
+            a.pos += (a.speed / sl) * dt * a.dir;
+
+            // Advance or reverse at segment ends
+            if (a.pos >= 1) {
+                a.pos -= 1;
+                a.segIdx += 1;
+                if (a.segIdx >= pts.length - 1) {
+                    // End of route — reverse direction
+                    a.dir    = -1;
+                    a.segIdx = Math.max(0, pts.length - 2);
+                }
+            } else if (a.pos < 0) {
+                a.segIdx -= 1;
+                if (a.segIdx < 0) {
+                    a.dir    = 1;
+                    a.segIdx = 0;
+                    a.pos    = 0;
+                } else {
+                    a.pos += 1;
+                }
+            }
+
+            a.segIdx = Math.max(0, Math.min(pts.length - 2, a.segIdx));
+
+            const p0 = pts[a.segIdx];
+            const p1 = pts[a.segIdx + 1];
+            const x  = (p0.x + (p1.x - p0.x) * a.pos).toFixed(1);
+            const y  = (p0.y + (p1.y - p0.y) * a.pos).toFixed(1);
+
+            a.dot.setAttribute('cx', x);
+            a.dot.setAttribute('cy', y);
+            a.halo.setAttribute('cx', x);
+            a.halo.setAttribute('cy', y);
+        }
+
+        trafficRaf = requestAnimationFrame(tick);
+    }
+
+    trafficRaf = requestAnimationFrame(tick);
 }
 
 defineExpose({
@@ -1603,14 +1601,8 @@ defineExpose({
     z-index: 10;
 }
 
-/* Particle canvas — sits behind the SVG */
-.particle-layer {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+.traffic-layer {
     pointer-events: none;
-    z-index: 0;
 }
 
 .hex-map-wrapper.is-panning {
