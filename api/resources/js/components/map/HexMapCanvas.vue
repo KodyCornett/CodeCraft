@@ -41,6 +41,26 @@
             <!-- Pan group — all content shifts with drag offset -->
             <g :transform="panTransform">
 
+            <!-- City fill — building footprints in empty hex cells -->
+            <g class="city-fill-layer">
+                <g
+                    v-for="cell in CITY_CELLS"
+                    :key="cell.label"
+                    class="city-cell"
+                    :style="{ animationDelay: cell.delay + 'ms' }"
+                >
+                    <polygon :points="cell.hexPoints" class="city-hex-fill" />
+                    <rect
+                        v-for="(b, bi) in cell.buildings"
+                        :key="bi"
+                        :x="b.x" :y="b.y"
+                        :width="b.w" :height="b.h"
+                        class="city-building"
+                        :style="{ opacity: b.op }"
+                    />
+                </g>
+            </g>
+
             <!-- Grid lines — one line per deduplicated hex edge -->
             <g v-if="props.isDev" class="hex-grid-layer">
                 <line
@@ -433,6 +453,71 @@ const CELL_LABELS = (() => {
         const colIdx = q + Math.floor(r / 2) - minCol;
         const rowNum = r - minRow + 1;
         return { label: `${String.fromCharCode(65 + colIdx)}${rowNum}`, x, y };
+    });
+})();
+
+// ─── City fill cells — building footprints for every background hex ───────────
+const CITY_CELLS = (() => {
+    const S    = HEX_SIZE;
+    const PAD  = 0.82;   // inset factor — leaves a thin street gap at each edge
+    const INSET = S * (1 - PAD);
+
+    // Pointy-top hex vertex offsets (angle = 60*i - 30 degrees)
+    function hexPoints(cx, cy, r) {
+        const pts = [];
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 6;
+            pts.push(`${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`);
+        }
+        return pts.join(' ');
+    }
+
+    // Simple deterministic pseudo-random keyed by cell position
+    function rand(x, y, salt = 0) {
+        const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.3) * 43758.5453;
+        return n - Math.floor(n);
+    }
+
+    // Point-in-inset-hex test (XY plane, pointy-top, centered at cx,cy)
+    function inHex(px, py, cx, cy, r) {
+        const dx = px - cx, dy = py - cy;
+        // Cube-coord containment for pointy-top hex
+        const q  = (dx * Math.sqrt(3) / 3 - dy / 3) / r;
+        const rr = (dy * 2 / 3) / r;
+        const s  = -q - rr;
+        return Math.max(Math.abs(q), Math.abs(rr), Math.abs(s)) <= 1.0;
+    }
+
+    return CELL_LABELS.map(({ label, x, y }, idx) => {
+        const r     = S * PAD;
+        const bStep = S * 0.38;
+        const half  = bStep * 0.43;
+        const buildings = [];
+
+        let si = 0;
+        for (let gx = x - S; gx <= x + S; gx += bStep) {
+            for (let gy = y - S; gy <= y + S; gy += bStep) {
+                if (!inHex(gx, gy, x, y, r * 0.9)) { si++; continue; }
+                const r1 = rand(x, y, si);
+                const r2 = rand(x, y, si + 100);
+                const r3 = rand(x, y, si + 200);
+                si++;
+                // Occasionally skip a slot — creates organic gaps like real city blocks
+                if (r1 < 0.18) continue;
+                const bw = half * (0.5 + r2 * 0.9);
+                const bh = half * (0.5 + r3 * 0.9);
+                // Vary opacity so some blocks read as taller (darker = taller)
+                const op = 0.25 + r1 * 0.45;
+                buildings.push({ x: gx - bw, y: gy - bh, w: bw * 2, h: bh * 2, op });
+            }
+        }
+
+        return {
+            label,
+            hexPoints: hexPoints(x, y, r),
+            buildings,
+            delay: Math.floor(rand(x, y, 999) * 4000), // stagger pulse per cell
+        };
     });
 })();
 
@@ -1477,6 +1562,29 @@ defineExpose({
     background: #05050A;
     cursor: grab;
     user-select: none;
+}
+
+/* ── City fill ────────────────────────────────────────────────────────────── */
+.city-hex-fill {
+    fill: #030C12;
+    stroke: #00FFFF;
+    stroke-width: 0.4;
+    stroke-opacity: 0.12;
+}
+
+.city-building {
+    fill: #00AACC;
+    rx: 1;
+}
+
+.city-cell {
+    animation: city-pulse 5s ease-in-out infinite;
+}
+
+@keyframes city-pulse {
+    0%   { opacity: 0.30; }
+    50%  { opacity: 0.55; }
+    100% { opacity: 0.30; }
 }
 
 /* Scanline overlay */
