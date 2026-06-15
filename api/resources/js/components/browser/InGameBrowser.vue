@@ -83,7 +83,7 @@ const props = defineProps({
     initialUrl: { type: String, default: 'splice://home' },
 });
 
-defineEmits(['close']);
+const emit = defineEmits(['close', 'url-change']);
 
 // ── Browser state (all navigation logic lives in the composable) ──────────────
 const {
@@ -104,6 +104,11 @@ function toDisplayUrl(url) { return url.replace(/^splice:\/\//, ''); }
 
 // Keep address bar in sync when navigation happens (tab switch, back, etc.)
 watch(currentUrl, (url) => { addressInput.value = toDisplayUrl(url); });
+
+// Notify Game.vue of every internal navigation so it can fire tutorial step triggers.
+// Without this, activeBrowserUrl stays at the launch URL and the watcher in Game.vue
+// never sees pages reached by clicking links inside the browser.
+watch(currentUrl, (url) => { emit('url-change', url); });
 
 // When the taskbar launches a different page while the browser is already open,
 // navigate the active tab to the new URL instead of requiring a close + reopen.

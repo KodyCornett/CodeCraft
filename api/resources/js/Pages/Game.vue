@@ -108,6 +108,7 @@
                         v-if="activeBrowserUrl"
                         :initial-url="activeBrowserUrl"
                         @close="onCloseBrowser"
+                        @url-change="(url) => { activeBrowserUrl.value = url; }"
                     />
                 </Transition>
 
@@ -908,8 +909,12 @@ const idle = useInactivityTimer();
 provide('tutorial', tutorial);
 
 // Clear badge + fire URL-based tutorial step triggers when SPLICE navigates.
+// activeBrowserUrl is updated both on launch (useBrowserState.onLaunch) and on
+// every internal navigation (InGameBrowser emits url-change → this ref is synced).
 watch(activeBrowserUrl, (url) => {
     if (!url) return;
+
+    console.log('%c[TUTORIAL:nav] activeBrowserUrl →', 'color:#00FFC8;font-weight:bold', url);
 
     if (url.startsWith(SPLICE.TERMINAL) || url.startsWith(SPLICE.TUTORIAL)) {
         tutorial.clearBadge();
@@ -917,16 +922,19 @@ watch(activeBrowserUrl, (url) => {
 
     // q2_rig — player opened the Rig read-out
     if (url.startsWith(SPLICE.RIG)) {
+        console.log('%c[TUTORIAL:nav] matched RIG — calling markStepDone(open_rig)', 'color:#00FFC8');
         tutorial.markStepDone('open_rig');
     }
 
     // q3_stat_guide — player visited the Stat Reference
     if (url.startsWith(SPLICE.STAT_GUIDE)) {
+        console.log('%c[TUTORIAL:nav] matched STAT_GUIDE — calling markStepDone(read_stat_guide)', 'color:#00FFC8');
         tutorial.markStepDone('read_stat_guide');
     }
 
     // q4_cyberdoc (step 2) — player opened any CyberDoc store page
     if (url.startsWith('splice://cyberdoc')) {
+        console.log('%c[TUTORIAL:nav] matched cyberdoc — calling markStepDone(open_cyberdoc_store)', 'color:#00FFC8');
         tutorial.markStepDone('open_cyberdoc_store');
     }
 });

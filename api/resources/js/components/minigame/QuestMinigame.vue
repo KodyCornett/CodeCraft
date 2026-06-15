@@ -21,13 +21,15 @@
 import { computed } from 'vue';
 import DisconnectLayer from './DisconnectLayer.vue';
 import FlushBuffer     from './FlushBuffer.vue';
+import ToxicSoak       from './ToxicSoak.vue';
 
 // Register game components here as they are built.
 // Key = minigame_type string from quest_stages.minigame_type
 const GAMES = {
     disconnect_layer: DisconnectLayer,
     flush_buffer:     FlushBuffer,
-    // toxic_soak:         ToxicSoak,         -- not yet built
+    toxic_soak:       ToxicSoak,
+    // archive_extraction: ArchiveExtraction, -- not yet built
     // archive_extraction: ArchiveExtraction, -- not yet built
     // calibration_tether: CalibrationTether, -- not yet built
 };
