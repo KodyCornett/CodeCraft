@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_dev')->default(false)->after('remember_token');
-        });
+        if (!Schema::hasColumn('users', 'is_dev')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->boolean('is_dev')->default(false)->after('remember_token');
+            });
+        }
     }
 
     public function down(): void
