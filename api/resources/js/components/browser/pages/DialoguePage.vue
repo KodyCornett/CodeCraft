@@ -91,7 +91,7 @@ const props = defineProps({
     ambientSrc:    { type: String, default: null },
 });
 
-const emit = defineEmits(['complete']);
+const emit = defineEmits(['complete', 'reached-end']);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const revealedEntries = ref([]);   // entries visible so far (excluding PLAYER_CHOICE)
@@ -233,6 +233,7 @@ function _revealNext() {
         isTyping.value = false;
         _ambientOut();
         _scrollBottom();
+        emit('reached-end');
         return;
     }
 
@@ -319,15 +320,23 @@ watch(() => props.entries, (val) => {
     }
 }, { immediate: true });
 
-onUnmounted(() => {
+// ── Stop all playback — called on unmount and by parent when browser closes ───
+function _stopAll() {
     _timers.forEach(id => clearTimeout(id));
+    _timers.length = 0;
     if (_lineAudio) {
         _lineAudio.pause();
         _lineAudio.src = '';
         _lineAudio = null;
     }
     _ambientStop();
-});
+}
+
+onUnmounted(_stopAll);
+
+// Expose stop() so DocDialoguePage can kill audio the moment the browser
+// signals it is closing — before the leave-transition fires onUnmounted.
+defineExpose({ stop: _stopAll });
 </script>
 
 <style scoped>

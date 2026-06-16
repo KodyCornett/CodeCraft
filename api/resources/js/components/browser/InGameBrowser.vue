@@ -1,18 +1,18 @@
 <template>
     <!-- Dim backdrop — click outside window to close -->
-    <div class="splice-overlay" @click.self="$emit('close')">
+    <div class="splice-overlay" @click.self="handleClose">
 
         <div class="splice-window">
 
             <!-- ── Title bar ───────────────────────────────────────────────── -->
             <div class="splice-titlebar">
                 <div class="traffic-lights">
-                    <button class="tl tl-close" title="Close"    @click="$emit('close')" />
+                    <button class="tl tl-close" title="Close"    @click="handleClose" />
                     <button class="tl tl-min"   title="Minimize" />
                     <button class="tl tl-max"   title="Maximize" />
                 </div>
                 <span class="splice-appname">SPLICE BROWSER</span>
-                <button class="titlebar-close" @click="$emit('close')">✕ CLOSE</button>
+                <button class="titlebar-close" @click="handleClose">✕ CLOSE</button>
             </div>
 
             <!-- ── Tab bar ─────────────────────────────────────────────────── -->
@@ -136,6 +136,16 @@ function onNavigate() {
 // ── Provide navigate to all page components via inject ────────────────────────
 // Pages call:  const spliceNavigate = inject('spliceNavigate', () => {})
 provide('spliceNavigate', navigate);
+
+// ── Closing signal — lets nested page components react before the leave
+//    transition starts (e.g. stop dialogue audio immediately) ─────────────────
+const isClosing = ref(false);
+provide('browserIsClosing', isClosing);
+
+function handleClose() {
+    isClosing.value = true;
+    emit('close');
+}
 </script>
 
 <style scoped>

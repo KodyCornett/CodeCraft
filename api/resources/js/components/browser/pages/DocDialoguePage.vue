@@ -1,13 +1,7 @@
 <template>
     <div class="ddp-root">
-        <!-- Loading state -->
-        <div v-if="loading" class="ddp-loading">
-            <span class="ddp-loading-cursor">█</span>
-            <span>RETRIEVING TRANSMISSION...</span>
-        </div>
-
         <!-- No active dialogue for this doc -->
-        <div v-else-if="!activeStage" class="ddp-no-dialogue">
+        <div v-if="!activeStage" class="ddp-no-dialogue">
             <div class="ddp-no-dialogue-icon">◈</div>
             <div class="ddp-no-dialogue-title">NO ACTIVE TRANSMISSION</div>
             <div class="ddp-no-dialogue-sub">{{ config.npcHandle }} has nothing to say right now.</div>
@@ -18,20 +12,22 @@
 
         <!-- Active dialogue — render through DialoguePage -->
         <DialoguePage
-            v-else
+            v-else-if="activeStage"
+            ref="dialoguePageRef"
             :entries="activeStage.dialogue"
             :npc-handle="config.npcHandle"
             :npc-subtitle="config.npcSubtitle"
             :location-label="config.locationLabel"
             :accent-color="config.accentColor"
             :ambient-src="config.ambientSrc"
+            @reached-end="onDialogueReachedEnd"
             @complete="onDialogueComplete"
         />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
+import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue';
 import DialoguePage from './DialoguePage.vue';
 import { SPLICE } from '../SpliceRouter.js';
 import { useAudio } from '../../../composables/useAudio.js';
@@ -101,8 +97,6 @@ const config = computed(() => DOC_CONFIG[docHandle.value] ?? {
 // ── Quest log injected from Game.vue ──────────────────────────────────────────
 const questLog = inject('questLog', null);
 
-const loading = ref(false);
-
 // Find the active stage with dialogue for this doc
 const activeStage = computed(() => {
     if (!questLog || !docHandle.value) return null;
@@ -130,38 +124,49 @@ onUnmounted(() => fadeInAfterDialogue());
 const spliceNavigate          = inject('spliceNavigate',          () => {});
 const onDocDialogueComplete   = inject('onDocDialogueComplete',   () => {});
 
-// ── On dialogue complete — mark stage done, return to terminal ─────────────────
-async function onDialogueComplete() {
-    if (!activeStage.value || !questLog) {
-        spliceNavigate(SPLICE.TERMINAL);
-        return;
-    }
+// ── DialoguePage ref — used to stop audio and read completion state ───────────
+const dialoguePageRef = ref(null);
 
-    loading.value = true;
-    let stageResult = null;
+// ── Stage completion guard — prevents double-completing if the player clicks
+//    [CLOSE TRANSMISSION] and the browser close signal both fire. ──────────────
+const stageCompleted = ref(false);
+
+// ── Core stage-complete API call — fire-and-forget, no loading state ───────────
+async function _doCompleteStage() {
+    if (!activeStage.value || !questLog) return;
     try {
         const completeStage = questLog.completeStage ?? questLog.complete;
-        if (completeStage) {
-            stageResult = await completeStage(activeStage.value.id);
+        const stageResult   = completeStage ? await completeStage(activeStage.value.id) : null;
+        // Arm the Watcher transition when the arc just ended — detected by the server
+        // returning next_stage_id: null (no further stage exists in this arc).
+        if (!stageResult?.next_stage_id) {
+            onDocDialogueComplete(docHandle.value);
         }
     } catch (e) {
         console.warn('[DocDialogue] completeStage failed:', e.message ?? e);
-    } finally {
-        loading.value = false;
     }
+}
 
-    // Arm the Watcher transition when the arc just ended — detected by the server
-    // returning next_stage_id: null (no further stage exists in this arc).
-    // Checking arc completion via the server response is more reliable than hard-coding
-    // a stage number, and works correctly when arcs have varying stage counts.
-    //
-    // Arming on a mid-arc stage (stage 1 → stage 2 minigame) is safe here because
-    // next_stage_id will be non-null whenever there is a following stage.
-    if (!stageResult?.next_stage_id) {
-        onDocDialogueComplete(docHandle.value);
-    }
+// ── Stage complete — fires as soon as the last entry is revealed (button appears).
+//    The [CLOSE TRANSMISSION] button and clicking outside are now pure close
+//    actions — the stage has already been marked done server-side. ───────────────
+function onDialogueReachedEnd() {
+    if (stageCompleted.value) return;
+    stageCompleted.value = true;
+    _doCompleteStage(); // fire-and-forget — player is still reading the final line
+}
+
+// ── [CLOSE TRANSMISSION] button / @complete — just navigate away ───────────────
+function onDialogueComplete() {
     spliceNavigate(SPLICE.TERMINAL);
 }
+
+// ── Browser-close signal — stop audio immediately before the leave transition ──
+const browserIsClosing = inject('browserIsClosing', ref(false));
+watch(browserIsClosing, (closing) => {
+    if (!closing) return;
+    dialoguePageRef.value?.stop();
+}, { flush: 'sync' });
 </script>
 
 <style scoped>
@@ -172,27 +177,6 @@ async function onDialogueComplete() {
     display: flex;
     flex-direction: column;
     font-family: 'JetBrains Mono', monospace;
-}
-
-/* ── Loading ──────────────────────────────────────────────────────────────── */
-.ddp-loading {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: rgba(0, 255, 200, 0.5);
-}
-
-.ddp-loading-cursor {
-    animation: ddp-blink 0.55s steps(1) infinite;
-}
-
-@keyframes ddp-blink {
-    0%, 49%  { opacity: 1; }
-    50%, 100% { opacity: 0; }
 }
 
 /* ── No dialogue ──────────────────────────────────────────────────────────── */
