@@ -405,6 +405,7 @@ import { useDocNotifications }   from '@/composables/useDocNotifications.js';
 import { useQuestArchive }       from '@/composables/useQuestArchive.js';
 import { useInactivityTimer }    from '@/composables/useInactivityTimer.js';
 import { useActiveObjective }    from '@/composables/useActiveObjective.js';
+import { useDialogue }           from '@/composables/useDialogue.js';
 import { docColorByName }        from '@/constants/docColors.js';
 import { SPLICE }            from '@/components/browser/SpliceRouter.js';
 
@@ -435,6 +436,9 @@ const { startHeartbeat, stopHeartbeat } = useHeartbeat();
 
 // ── Audio — shuffled background music, starts on first user interaction ───────
 const { startAudio, stopAudio, cutAudio, resumeAudio } = useAudio();
+
+// ── Dialogue — NPC conversation state + localStorage persistence ──────────────
+const { initDialogue } = useDialogue();
 
 // ── Combat — challenge handshake + result submission ─────────────────────────
 const {
@@ -2061,6 +2065,10 @@ onMounted(async () => {
         // Queue background music — plays automatically on first user click
         // (browser autoplay policy requires a user gesture before audio starts).
         startAudio();
+
+        // Restore any mid-session dialogue — validates saved ID against known NPCs
+        // and discards stale state if the dialogue tree no longer exists.
+        initDialogue(NPC_DIALOGUE_URL);
 
         console.log(`[BOOT] Auth OK — playing as ${player.value.handle} (${playerId.value})`);
     }
