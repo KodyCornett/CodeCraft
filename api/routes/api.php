@@ -81,9 +81,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/player/position', [PlayerController::class, 'position'])
         ->middleware('throttle:120,1');
 
-    // heartbeat: 10/min — one every 45s is the expected rate; burst allowed for sendBeacon
+    // heartbeat: 30/min — one every 45s is the expected rate; generous burst for sendBeacon
+    //            and rapid page reloads during dev/testing without false throttling
     Route::post('/player/heartbeat', [PlayerController::class, 'heartbeat'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:30,1');
 
 // ---------------------------------------------------------------------------
 // Combat
