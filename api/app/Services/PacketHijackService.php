@@ -442,7 +442,7 @@ class PacketHijackService
 
             $portPool[$i]['probed'] = true;
 
-            $svcData = self::PORT_SERVICES[$portNumber] ?? ['service' => 'UNKNOWN', 'versions' => ['1.0']];
+            $svcData = PacketHijackConstants::PORT_SERVICES[$portNumber] ?? ['service' => 'UNKNOWN', 'versions' => ['1.0']];
             $ver     = $svcData['versions'][array_rand($svcData['versions'])];
 
             // Header line
