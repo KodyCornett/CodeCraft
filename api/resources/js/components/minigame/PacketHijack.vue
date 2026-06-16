@@ -401,11 +401,18 @@
             </div><!-- end ph-body -->
         </div>
 
+        <!-- ── Packet Hijack orientation tour ───────────────────────────────── -->
+        <PacketHijackTour />
+
     </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import PacketHijackTour          from '@/components/minigame/PacketHijackTour.vue';
+import { usePacketHijackTour }   from '@/composables/usePacketHijackTour.js';
+
+const { startPhase1, startPhase2 } = usePacketHijackTour();
 
 const props = defineProps({
     matchId:             { type: String,  required: true },
@@ -723,9 +730,10 @@ watch(() => props.awaitingAuth, (auth) => {
     }
 });
 
-watch(() => props.phase, () => {
+watch(() => props.phase, (phase) => {
     _resetDropdown();
     nextTick(() => inputEl.value?.focus());
+    if (phase === 2) startPhase2();
 });
 
 // Enter dropdown mode once the board for each phase is populated
@@ -743,6 +751,7 @@ watch(() => props.busy, (b) => {
 onMounted(() => {
     document.addEventListener('keydown', _onDocumentKeydown);
     nextTick(() => inputEl.value?.focus());
+    startPhase1();
 });
 
 onBeforeUnmount(() => {

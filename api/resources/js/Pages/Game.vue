@@ -911,6 +911,14 @@ watch(() => ph.phase, (phase) => {
     if (phase === 2 && ph.isPractice) phTour.startPhase2();
 });
 
+// Mark the tutorial step as soon as the practice transfer resolves — don't gate
+// it on the DISCONNECT click, which the player may miss or skip.
+watch(() => ph.isComplete, (complete) => {
+    if (complete && ph.isPractice) {
+        tutorial.markStepDone('ph_practice');
+    }
+});
+
 // ── Logout — flush tutorial state before destroying the session ───────────────
 // Called by both the manual logout button (GameMenu → NavBar → here) and wired
 // into the inactivity timer via setBeforeLogout below.
