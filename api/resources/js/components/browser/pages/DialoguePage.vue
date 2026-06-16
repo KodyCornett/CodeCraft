@@ -81,6 +81,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
+import { useAudio } from '../../../composables/useAudio.js';
 
 const props = defineProps({
     entries:       { type: Array,  required: true },
@@ -92,6 +93,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['complete', 'reached-end']);
+
+const { storyVolume, muted } = useAudio();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const revealedEntries = ref([]);   // entries visible so far (excluding PLAYER_CHOICE)
@@ -173,7 +176,7 @@ function _playLineAudio(relativePath, onEnded) {
 
     const url = '/audio/Sound/' + relativePath;
     const el  = new Audio(url);
-    el.volume = 0.9;
+    el.volume  = muted.value ? 0 : storyVolume.value;
     _lineAudio = el;
 
     let _fired = false;
@@ -304,6 +307,20 @@ function selectChoice(opt) {
     }, DELAY.PLAYER_SAID);
     _timers.push(t1);
 }
+
+// ── Keep audio in sync with volume/mute changes made during playback ──────────
+// storyVolume change — update line audio only (ambient is fixed at AMBIENT_VOL)
+watch(storyVolume, (vol) => {
+    if (_lineAudio && !muted.value) _lineAudio.volume = vol;
+});
+// muted toggle — update both line audio and ambient in one pass
+watch(muted, (isMuted) => {
+    if (_lineAudio) _lineAudio.volume = isMuted ? 0 : storyVolume.value;
+    if (_ambient) {
+        if (isMuted) _ambient.volume = 0;
+        else if (!_ambient.paused) _ambient.volume = AMBIENT_VOL;
+    }
+});
 
 // ── Start when entries are provided ───────────────────────────────────────────
 watch(() => props.entries, (val) => {
