@@ -1422,11 +1422,9 @@ async function onHackComplete({ resource, amount }) {
             if (patch.currentUplink != null) {
                 player.value.uplink = patch.currentUplink;
             }
-            // Sync server-authoritative bounty state so STATUS page stays accurate
-            // (client-side checkBountyEscalation handles UI alerts; server is truth)
-            if (patch.player?.bounty_level !== undefined) {
-                player.value.bountyLevel = patch.player.bounty_level;
-            }
+            // bountyLevel (0–5 stars) is managed by checkBountyEscalation below —
+            // the server's bounty_level is the raw hack count, not a star level.
+            // bounty_multiplier and is_open_season are synced here as server is authoritative.
             if (patch.player?.bounty_multiplier !== undefined) {
                 player.value.bountyMultiplier = patch.player.bounty_multiplier;
             }
@@ -1864,7 +1862,6 @@ function applyPvpResult(result, opponentHandle) {
         // Use the server-authoritative pocket balance rather than adding stolen
         // locally — avoids compounding any drift in the local state.
         player.value.pocketCreds      = result.winner?.pocket_creds      ?? player.value.pocketCreds;
-        player.value.bountyLevel      = result.winner?.bounty_level      ?? player.value.bountyLevel;
         player.value.bountyMultiplier = result.winner?.bounty_multiplier ?? player.value.bountyMultiplier;
         player.value.isOpenSeason     = result.winner?.is_open_season    ?? player.value.isOpenSeason;
         // PvP win increments the run counter server-side — mirror it locally.
@@ -1930,7 +1927,6 @@ function onPacketHijackMatchComplete(result) {
     // Sync full state from the server to pick up bounty escalation, SS changes, and limp flag
     resyncPlayer().then(data => {
         if (data?.player) {
-            player.value.bountyLevel      = data.player.bounty_level      ?? player.value.bountyLevel;
             player.value.bountyMultiplier = data.player.bounty_multiplier ?? player.value.bountyMultiplier;
             player.value.isOpenSeason     = data.player.is_open_season    ?? player.value.isOpenSeason;
             player.value.isLimping        = data.player.is_limping        ?? player.value.isLimping;
