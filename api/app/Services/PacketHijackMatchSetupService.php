@@ -229,23 +229,36 @@ class PacketHijackMatchSetupService
     /**
      * Generate a fingerprint for the practice target using fixed easy stats.
      * Skips the real rig dependency so TutorialController needs no RigService.
+     *
+     * Returns the same nested structure as generateFingerprint() so that
+     * initialCredentialState() can read hostname.full / os.full correctly.
      */
     public function generatePracticeFingerprint(): array
     {
         // Fixed low-difficulty target: FW 1 (short chain), OS 2 (short banners).
         $prefixes      = self::STAT_PREFIXES['os'];   // arbitrary deterministic prefix
+        $tier1h        = $prefixes['hostname'];
+        $tier1o        = $prefixes['os'];
         $hostnameTier2 = self::HOSTNAME_WORDS[array_rand(self::HOSTNAME_WORDS)];
         $hostnameTier3 = strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
         $osTier2       = self::OS_VERSIONS[array_rand(self::OS_VERSIONS)];
         $osTier3       = strtoupper(substr(bin2hex(random_bytes(2)), 0, 3));
 
         return [
-            'hostname_prefix' => $prefixes['hostname'],
-            'hostname_tier2'  => $hostnameTier2,
-            'hostname_tier3'  => $hostnameTier3,
-            'os_prefix'       => $prefixes['os'],
-            'os_tier2'        => $osTier2,
-            'os_tier3'        => $osTier3,
+            'hostname' => [
+                'full'    => "{$tier1h}-{$hostnameTier2}-{$hostnameTier3}",
+                'tier1'   => $tier1h,
+                'tier2'   => $hostnameTier2,
+                'tier3'   => $hostnameTier3,
+                'display' => "{$tier1h}-????-????",
+            ],
+            'os' => [
+                'full'    => "{$tier1o}-{$osTier2}-{$osTier3}",
+                'tier1'   => $tier1o,
+                'tier2'   => $osTier2,
+                'tier3'   => $osTier3,
+                'display' => "{$tier1o}-???-???",
+            ],
         ];
     }
 
