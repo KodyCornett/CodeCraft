@@ -543,6 +543,7 @@ const BOUNTY_THRESHOLDS = [
 // Level 0: counts to 10. Each level after counts to 5.
 const STAR_HACK_THRESHOLDS = [10, 15, 20, 25, 30]; // absolute hack counts per star
 
+
 // Total successful hacks this session — drives the ticker + bounty escalation
 const hackCount = ref(0);
 
@@ -600,25 +601,11 @@ function showBountyAlert(message) {
     _alertTimer = setTimeout(() => { bountyAlert.value = null; }, 5000);
 }
 
-// Ticker: how far into the current star are we?
+// Ticker: raw hack count toward the next star threshold.
 const bountyTicker = computed(() => {
-    const n   = hackCount.value;
-    const lvl = player.value.bountyLevel; // 0–5
-
-    if (lvl === 0) {
-        return { current: Math.min(n, 10), max: 10 };
-    }
-    if (lvl >= 5) {
-        return { current: 5, max: 5 }; // maxed
-    }
-
-    const prevThreshold = STAR_HACK_THRESHOLDS[lvl - 1]; // absolute hacks at current star
-    const nextThreshold = STAR_HACK_THRESHOLDS[lvl];     // absolute hacks for next star
-
-    return {
-        current: Math.min(n - prevThreshold, nextThreshold - prevThreshold),
-        max:     nextThreshold - prevThreshold, // always 5
-    };
+    const n    = hackCount.value;
+    const next = STAR_HACK_THRESHOLDS.find(t => n < t) ?? STAR_HACK_THRESHOLDS.at(-1);
+    return { current: Math.min(n, next), max: next };
 });
 
 function checkBountyEscalation(nodeIce = null) {
