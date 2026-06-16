@@ -260,6 +260,7 @@ const chrome = computed(() => ({
     glitchIntensity: glitchIntensity.value,
     result:          result.value,
     failReason:      failReason.value,
+    hideBars:        props.skin.hideBars ?? false,
 }));
 
 // ── Game loop (shared bars tick) ──────────────────────────────────────────────
@@ -272,12 +273,10 @@ function tick(ts) {
     const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
     lastTs = ts;
 
-    const failCause = tickShared(dt);
-    if (failCause) {
-        const reason = failCause === 'stability'
-            ? '[STABILITY CRITICAL] — System failure.'
-            : (props.skin.failText ?? 'Trace complete. Connection lost.');
-        endGame('fail', reason);
+    timeLeft.value = Math.max(0, timeLeft.value - dt);
+
+    if (timeLeft.value <= 0) {
+        endGame('fail', props.skin.failText ?? 'Trace complete. Connection lost.');
         setTimeout(() => emit('fail'), 2200);
         return;
     }

@@ -142,27 +142,30 @@ import { useQuestMinigame } from '../../../composables/useQuestMinigame.js';
 const { docs, loading, error, fetchQuestLog, completeStage } = useQuestLog();
 const { currentNodeCanvasId, launch } = useQuestMinigame();
 
-// Per-type skin defaults — labels and brief objective text
+// Per-type skin defaults — labels, brief objective text, and mechanic flags
 const MINIGAME_SKIN = {
-    disconnect_layer:   { primary: 'TRACE',       stability: 'SYSTEM HEAT', brief: 'Sever the governor chain before it reroutes.'           },
-    flush_buffer:       { primary: 'SIGNAL LOAD', stability: 'STABILITY',   brief: 'Cancel the ghost signal before buffer overflow.'        },
-    toxic_soak:         { primary: 'ABSORPTION',  stability: 'OVERLOAD',    brief: 'Hold position. Anchor until saturation threshold.'      },
-    archive_extraction: { primary: 'DETECTION',   stability: 'SUPPRESSION', brief: 'Extract the packet. Avoid triggering live ICE.'         },
-    calibration_tether: { primary: 'PAYLOAD',     stability: 'INTEGRITY',   brief: 'Deliver the sub-routines. Do not let the chain cascade.' },
+    disconnect_layer:   { primary: 'TRACE',       stability: 'SYSTEM HEAT', brief: 'Sever the governor chain before it reroutes.',            timeLimit: 90, hideBars: true,  dealsDamageOnFail: true  },
+    flush_buffer:       { primary: 'SIGNAL LOAD', stability: 'STABILITY',   brief: 'Cancel the ghost signal before buffer overflow.',         timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
+    toxic_soak:         { primary: 'ABSORPTION',  stability: 'OVERLOAD',    brief: 'Hold position. Anchor until saturation threshold.',       timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
+    archive_extraction: { primary: 'DETECTION',   stability: 'SUPPRESSION', brief: 'Extract the packet. Avoid triggering live ICE.',          timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
+    calibration_tether: { primary: 'PAYLOAD',     stability: 'INTEGRITY',   brief: 'Deliver the sub-routines. Do not let the chain cascade.', timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
 };
 
 function onLaunchMinigame(stage) {
-    const meta = MINIGAME_SKIN[stage.minigame_type] ?? { primary: 'TRACE', stability: 'STABILITY', brief: '' };
+    const meta = MINIGAME_SKIN[stage.minigame_type] ?? { primary: 'TRACE', stability: 'STABILITY', brief: '', timeLimit: 30, hideBars: false, dealsDamageOnFail: false };
     const skin = {
-        gameType:        stage.minigame_type,
-        fileName:        (stage.node_canvas_id ?? 'UNKNOWN').toUpperCase() + '.sys',
-        objectiveText:   meta.brief,
-        successText:     'Objective complete. Disconnecting.',
-        failText:        'Connection lost.',
-        primaryBarLabel: meta.primary,
-        stabilityLabel:  meta.stability,
-        timeLimit:       30,
-        difficulty:      1,
+        gameType:          stage.minigame_type,
+        fileName:          (stage.node_canvas_id ?? 'UNKNOWN').toUpperCase() + '.sys',
+        nodeCanvasId:      stage.node_canvas_id ?? null,
+        objectiveText:     meta.brief,
+        successText:       'Objective complete. Disconnecting.',
+        failText:          'Connection lost.',
+        primaryBarLabel:   meta.primary,
+        stabilityLabel:    meta.stability,
+        timeLimit:         meta.timeLimit,
+        hideBars:          meta.hideBars,
+        dealsDamageOnFail: meta.dealsDamageOnFail,
+        difficulty:        1,
     };
     launch(stage.id, stage.minigame_type, skin);
 }

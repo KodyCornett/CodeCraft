@@ -17,7 +17,7 @@
         </div>
 
         <!-- Primary threat bar -->
-        <div class="qmc-bar-row">
+        <div v-if="!hideBars" class="qmc-bar-row">
             <span class="qmc-bar-label">{{ skin.primaryBarLabel ?? 'TRACE' }}</span>
             <div class="qmc-bar-track">
                 <div class="qmc-bar-fill qmc-fill--primary" :style="{ width: (primaryProgress * 100) + '%' }" />
@@ -25,7 +25,7 @@
         </div>
 
         <!-- Stability bar -->
-        <div class="qmc-bar-row qmc-bar-row--stab">
+        <div v-if="!hideBars" class="qmc-bar-row qmc-bar-row--stab">
             <span class="qmc-bar-label qmc-bar-label--stab">{{ skin.stabilityLabel ?? 'STABILITY' }}</span>
             <div class="qmc-bar-track qmc-bar-track--stab">
                 <div class="qmc-bar-fill qmc-fill--stab" :class="stabilityClass"
@@ -71,6 +71,7 @@ const props = defineProps({
     glitchIntensity: { type: Number,  default: 0 },
     result:          { type: String,  default: null },
     failReason:      { type: String,  default: '' },
+    hideBars:        { type: Boolean, default: false },
 });
 
 const LABELS = {

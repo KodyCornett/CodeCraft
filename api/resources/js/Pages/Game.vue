@@ -483,8 +483,32 @@ async function onQuestMinigameComplete() {
     }
 }
 
-function onQuestMinigameFail() {
+async function onQuestMinigameFail() {
+    if (!activeMinigame.value) { clearMinigame(); return; }
+    const { skin } = activeMinigame.value;
     clearMinigame();
+
+    if (skin.dealsDamageOnFail && skin.nodeCanvasId) {
+        const res = await applyDamage(skin.nodeCanvasId, 'pve');
+        if (res) {
+            player.value.currentSS = res.current_ss;
+            player.value.maxSS     = res.max_ss;
+
+            if (res.event === 'critical_failure') {
+                const cf = res.critical_failure ?? {};
+                player.value.pocketCreds        = 0;
+                player.value.bountyLevel        = 0;
+                player.value.bountyMultiplier   = 1.0;
+                player.value.isOpenSeason       = false;
+                player.value.isLimping          = false;
+                hackCount.value                 = 0;
+                player.value.nodesHackedThisRun = 0;
+                player.value.pvpWinsThisRun     = 0;
+                if (cf.respawn_canvas_id) currentNodeId.value = cf.respawn_canvas_id;
+                criticalFailure.value = { repairCost: cf.repair_cost ?? 0 };
+            }
+        }
+    }
 }
 
 // Equipped hack- and map-context commands passed into the PH terminal as the rig loadout strip.
