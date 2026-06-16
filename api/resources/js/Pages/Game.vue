@@ -1961,6 +1961,7 @@ function onKeyDown(e) {
 
 onMounted(async () => {
     window.addEventListener('keydown', onKeyDown);
+    window.__tutorial = tutorial;
     idle.start();
 
     // Drive the replenish countdown in nodeResources — 1 s resolution is enough.
@@ -2120,6 +2121,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('keydown', onKeyDown);
+    delete window.__tutorial;
     idle.destroy();
     ws.disconnect();
     stopBountyPolling();

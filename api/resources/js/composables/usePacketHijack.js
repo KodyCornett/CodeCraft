@@ -301,7 +301,16 @@ export function usePacketHijack(playerId) {
 
         busy.value = true;
         try {
-            await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
+            const { data } = await axios.post(`/api/packet-hijack/${matchId.value}/command`, { input: trimmed });
+            // Practice matches resolve inline via extract (no WS broadcast) — mirror submitTransfer().
+            if (data?.practice) {
+                matchResult.value = {
+                    isWinner:    true,
+                    credsStolen: 0,
+                    winnerId:    data.winner_id,
+                    loserId:     null,
+                };
+            }
         } catch (e) {
             const status = e?.response?.status;
             if (status === 410) {
