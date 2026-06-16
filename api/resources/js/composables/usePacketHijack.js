@@ -342,8 +342,8 @@ export function usePacketHijack(playerId) {
     async function launchPractice() {
         try {
             const { data } = await axios.post('/api/tutorial/packet-hijack/start');
-            isPractice.value = true;
             init(data.match_id, data.role);
+            isPractice.value = true;
         } catch (e) {
             console.error('[PacketHijack] practiceStart failed:', e?.message);
         }
