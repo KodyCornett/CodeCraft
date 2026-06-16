@@ -503,13 +503,15 @@ class PacketHijackController extends Controller
                 targetIp:  $targetIp,
             );
 
-            // Notify the opponent: critical alert
+            // Notify the opponent: critical alert (skipped for practice matches — no real opponent)
             $opponentId = $match->opponentIdOf($me->id);
-            PacketHijackPhaseTransition::dispatch(
-                matchId:   $match->id,
-                playerId:  $opponentId,
-                alertOnly: true,
-            );
+            if ($opponentId !== null) {
+                PacketHijackPhaseTransition::dispatch(
+                    matchId:   $match->id,
+                    playerId:  $opponentId,
+                    alertOnly: true,
+                );
+            }
 
             PacketHijackCommandResult::dispatch(
                 matchId:     $match->id,
