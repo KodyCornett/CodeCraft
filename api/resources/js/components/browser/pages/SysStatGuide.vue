@@ -347,7 +347,14 @@
 </template>
 
 <script setup>
+import { inject, onMounted } from 'vue';
+
 defineProps({ url: { type: String, default: '' } });
+
+// Mark tutorial step on mount — fires regardless of how the player navigated here
+// (direct launch via NavBar OR internal link from another SPLICE page).
+const tutorial = inject('tutorial', null);
+onMounted(() => tutorial?.markStepDone('read_stat_guide'));
 </script>
 
 <style scoped>

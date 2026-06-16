@@ -198,12 +198,17 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue';
+import { ref, computed, inject, onMounted } from 'vue';
 
 defineProps({ url: { type: String, default: '' } });
 
 const gameState      = inject('gameState', null);
 const spliceNavigate = inject('spliceNavigate', () => {});
+
+// Mark tutorial step on mount — fires regardless of how the player navigated here
+// (direct launch via NavBar OR internal link from another SPLICE page).
+const tutorial = inject('tutorial', null);
+onMounted(() => tutorial?.markStepDone('open_rig'));
 const rig    = gameState?.rig    ?? ref({ os:0, ram:0, cpu:0, storage:0, firewall:0, uplink:3, peripherals:[], portSlots:0, chassis:'UNKNOWN', tier:1, caps:{}, investedPoints:{} });
 const player = gameState?.player ?? ref({ uplink:3, maxUplink:3 });
 

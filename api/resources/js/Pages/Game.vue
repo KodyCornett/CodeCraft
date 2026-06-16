@@ -108,7 +108,7 @@
                         v-if="activeBrowserUrl"
                         :initial-url="activeBrowserUrl"
                         @close="onCloseBrowser"
-                        @url-change="(url) => { activeBrowserUrl.value = url; }"
+                        @url-change="onBrowserUrlChange"
                     />
                 </Transition>
 
@@ -859,6 +859,16 @@ function onLaunch(url) {
         return _onLaunch(SPLICE.TUTORIAL);
     }
     _onLaunch(url);
+}
+
+// Called by InGameBrowser's url-change emit whenever the player navigates internally
+// (clicks a link inside the browser). Updates activeBrowserUrl so the tutorial
+// step watcher below sees the actual current page, not just the launch URL.
+// NOTE: This must be a named function — inline template handlers auto-unwrap refs,
+// turning activeBrowserUrl into a plain string where .value = url would be a no-op.
+function onBrowserUrlChange(url) {
+    console.log('%c[TUTORIAL:nav] onBrowserUrlChange →', 'color:#00FFC8;font-weight:bold', url);
+    activeBrowserUrl.value = url;
 }
 
 // Maps each CyberDoc hub node ID to its named SPLICE page.
