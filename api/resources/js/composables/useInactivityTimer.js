@@ -30,8 +30,9 @@ export function useInactivityTimer() {
         return `${m}:${s}`;
     });
 
-    let idleTimer    = null;
-    let tickInterval = null;
+    let idleTimer      = null;
+    let tickInterval   = null;
+    let _beforeLogout  = null;   // optional async hook — set via setBeforeLogout()
 
     // ── Activity listeners ────────────────────────────────────────────────────
 
@@ -62,12 +63,20 @@ export function useInactivityTimer() {
 
     async function _logout() {
         _clearAll();
+        if (_beforeLogout) {
+            try { await _beforeLogout(); } catch {}
+        }
         try {
             await axios.post('/logout');
         } catch {
             // Session may already be gone — proceed to redirect regardless
         }
         window.location.href = '/login';
+    }
+
+    /** Register an async callback that runs before session destruction. */
+    function setBeforeLogout(fn) {
+        _beforeLogout = fn;
     }
 
     function _clearAll() {
@@ -104,5 +113,6 @@ export function useInactivityTimer() {
         start,
         cancel,
         destroy,
+        setBeforeLogout,
     };
 }

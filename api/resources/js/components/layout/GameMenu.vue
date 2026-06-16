@@ -106,10 +106,9 @@
 
 <script setup>
 import { ref } from 'vue';
-import axios from 'axios';
 import { useAudio } from '@/composables/useAudio.js';
 
-const emit = defineEmits(['tutorial']);
+const emit = defineEmits(['tutorial', 'logout']);
 
 const open    = ref(false);
 const version = 'v0.1-alpha';
@@ -121,14 +120,9 @@ function onTutorial() {
     emit('tutorial');
 }
 
-async function onLogout() {
+function onLogout() {
     open.value = false;
-    try {
-        await axios.post('/logout');
-    } catch {
-        // session may already be expired
-    }
-    window.location.href = '/login';
+    emit('logout');
 }
 </script>
 

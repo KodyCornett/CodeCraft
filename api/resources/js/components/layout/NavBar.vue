@@ -38,7 +38,7 @@
         <div class="tb-sep" />
 
         <!-- System menu — logout, audio, tutorial -->
-        <GameMenu @tutorial="$emit('tutorial')" />
+        <GameMenu @tutorial="$emit('tutorial')" @logout="$emit('logout')" />
 
     </div>
 </template>
@@ -53,7 +53,7 @@ const props = defineProps({
     hasTutorialBadge:  { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['launch', 'tutorial']);
+const emit = defineEmits(['launch', 'tutorial', 'logout']);
 
 const APPS = [
     { url: SPLICE.STATS,     icon: '◈', label: 'STATUS',   tourId: 'nav-status'   },

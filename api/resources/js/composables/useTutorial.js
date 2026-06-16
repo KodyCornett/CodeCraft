@@ -12,7 +12,7 @@
  * quest's steps are all complete.
  */
 
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 
 // ── Quest definitions ─────────────────────────────────────────────────────────
@@ -171,12 +171,23 @@ export function useTutorial() {
     }
 
     // ── Persist to server ─────────────────────────────────────────────────────
+    //
+    // Guarantees: `await _save()` only resolves AFTER the state is confirmed on
+    // the server.  If another PATCH is already in flight, we wait for it to finish
+    // and then fire a second one with the latest state (coalesced into one retry).
+    //
+    // Concurrent callers each wait independently via watch(_syncing).  When the
+    // in-flight PATCH completes, ALL waiters wake up; only the first one to run
+    // sees _dirty = true and triggers the retry — the rest return immediately.
     async function _save() {
         if (_syncing.value) {
-            // Mark dirty so the in-flight save triggers a retry with the latest state.
-            // Without this, rapid calls (markSeen → markStepDone) silently drop saves.
             _dirty = true;
-            return;
+            // Block until the in-flight PATCH finishes, then retry with latest state.
+            await new Promise(resolve => {
+                const unwatch = watch(_syncing, (v) => { if (!v) { unwatch(); resolve(); } });
+            });
+            if (!_dirty) return;   // another concurrent caller already fired the retry
+            return _save();
         }
         _dirty = false;
         _syncing.value = true;
@@ -191,7 +202,9 @@ export function useTutorial() {
         } finally {
             _syncing.value = false;
             if (_dirty) {
-                log('_save() — dirty flag set, retrying with latest state');
+                // Fallback for non-awaited callers whose watch callbacks fire after
+                // the finally block. Prevents any edge-case state from being silently dropped.
+                log('_save() — dirty flag in finally, retrying with latest state');
                 await _save();
             }
         }
@@ -299,6 +312,7 @@ export function useTutorial() {
         _state.value.stepsDone[stepId] = true;
         _state.value.hasBadge          = true;
         await _save();
+        log(`markStepDone('${stepId}') — checkpoint saved to server ✓`);
 
         const questNowDone = active.steps.every(s => _state.value.stepsDone[s.id]);
         log(`markStepDone('${stepId}') — quest '${active.id}' complete: ${questNowDone}`);
@@ -324,6 +338,7 @@ export function useTutorial() {
 
             _state.value.questsRewarded.push(quest.id);
             await _save();
+            log(`_creditReward('${quest.id}') — quest reward saved to server ✓`);
 
             const allRewarded = QUEST_DEFS.every(q => _state.value.questsRewarded.includes(q.id));
             log(`_creditReward('${quest.id}') — all quests rewarded: ${allRewarded}`, {
@@ -385,6 +400,44 @@ export function useTutorial() {
         }
     }
 
+    // ── Flush — guarantee state is on the server before session ends ─────────
+    // Sets _dirty so _save() always fires (even if state looks clean), then
+    // awaits _save() which now blocks until the PATCH is confirmed. Safe to
+    // call even when nothing is pending — costs one extra PATCH at most.
+    async function flush() {
+        log('flush() — ensuring tutorial state is persisted before session ends');
+        _dirty = true;
+        await _save();
+        log('flush() — done ✓');
+    }
+
+    // ── beforeunload safety net ───────────────────────────────────────────────
+    // Fires a keepalive PATCH on tab close, refresh, or any unload. This is the
+    // last-resort guard — flush() should have already handled clean logouts.
+    // keepalive: true lets the request complete even after the page is gone.
+    function _onBeforeUnload() {
+        if (!_hydrated) return;
+        const rawToken = document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1];
+        if (!rawToken) return;
+        fetch('/api/tutorial/state', {
+            method:    'PATCH',
+            keepalive: true,
+            headers: {
+                'Content-Type':  'application/json',
+                'X-XSRF-TOKEN':  decodeURIComponent(rawToken),
+            },
+            body: JSON.stringify({ tutorial_state: _state.value }),
+        }).catch(() => {});   // silent — session may already be gone
+    }
+
+    onMounted(() => {
+        log('registering beforeunload save beacon');
+        window.addEventListener('beforeunload', _onBeforeUnload);
+    });
+    onUnmounted(() => {
+        window.removeEventListener('beforeunload', _onBeforeUnload);
+    });
+
     return {
         quests,
         activeQuest,
@@ -402,5 +455,6 @@ export function useTutorial() {
         clearBadge,
         markStepDone,
         markCortexInstall,
+        flush,
     };
 }

@@ -222,6 +222,16 @@ class NodeController extends Controller
 
         $player = Player::where('user_id', $request->user()->id)->first();
 
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        // Location check — player must be standing on this node.
+        // current_node_id is the DB primary key; $nodeId from the route is also the PK.
+        if ($player->current_node_id !== $nodeId) {
+            return response()->json(['message' => 'You are not at this node.'], 403);
+        }
+
         // All mutations run in a transaction with a pessimistic lock on the
         // node row, preventing double-deplete from a rapid double-tap or retry.
         [

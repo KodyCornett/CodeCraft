@@ -86,10 +86,17 @@ class CombatChallengeController extends Controller
             return response()->json(['message' => 'Cannot challenge yourself.'], 422);
         }
 
-        // Block challenge if the node is a safe zone
+        // Block challenge if the node doesn't exist, is a safe zone, or the
+        // challenger isn't actually standing there.
         $node = Node::where('canvas_id', $data['node_canvas_id'])->first();
-        if ($node?->is_safe_zone) {
+        if ($node === null) {
+            return response()->json(['message' => 'Node not found.'], 404);
+        }
+        if ($node->is_safe_zone) {
             return response()->json(['message' => 'PvP is not permitted in safe zones.'], 422);
+        }
+        if ($me->current_node_id !== $node->id) {
+            return response()->json(['message' => 'You are not at this node.'], 422);
         }
 
         // Block challenge if target is already in an active combat.

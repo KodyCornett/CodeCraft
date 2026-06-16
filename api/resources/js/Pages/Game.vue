@@ -304,6 +304,7 @@
             :has-tutorial-badge="tutorial.hasBadge.value"
             @launch="onLaunch"
             @tutorial="onTutorial"
+            @logout="onLogout"
         />
 
         <!-- First-login welcome modal — shown once after boot for new players -->
@@ -676,7 +677,7 @@ function handlePlayerMoved(event) {
         }
         // Refresh our own trap list (a trap may have ticked down server-side)
         fetchMyTraps();
-    }, event.uplinkCost ?? 1);
+    });
 
     // ── Decrement active command effects ──────────────────────────────────────
     // Mirror the server-side decrement in position() so the client stays in sync.
@@ -910,8 +911,29 @@ watch(() => ph.phase, (phase) => {
     if (phase === 2 && ph.isPractice) phTour.startPhase2();
 });
 
+// ── Logout — flush tutorial state before destroying the session ───────────────
+// Called by both the manual logout button (GameMenu → NavBar → here) and wired
+// into the inactivity timer via setBeforeLogout below.
+async function onLogout() {
+    try {
+        await tutorial.flush();
+    } catch (e) {
+        console.warn('[LOGOUT] tutorial flush failed:', e?.message);
+    }
+    try {
+        await axios.post('/logout');
+    } catch {
+        // session may already be expired
+    }
+    window.location.href = '/login';
+}
+
 // ── Inactivity auto-logout ────────────────────────────────────────────────────
 const idle = useInactivityTimer();
+// Flush tutorial state before the inactivity timer kills the session, same as
+// the manual logout path. Registered here (not inside the timer) so it has
+// access to the tutorial composable without coupling the two.
+idle.setBeforeLogout(() => tutorial.flush());
 
 // Provide tutorial state to all SPLICE page components via inject('tutorial').
 // GhostProtocol0 reads it to render quest status.

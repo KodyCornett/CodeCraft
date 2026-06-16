@@ -58,7 +58,7 @@ export function useMapInteraction(player, getByCanvasId = null) {
 
     // ── Handlers ──────────────────────────────────────────────────────────────
 
-    function onPlayerMoved({ nodeId, district, x, y, uplinkCost = 1 }) {
+    function onPlayerMoved({ nodeId, district, x, y }) {
         currentNodeId.value = nodeId;   // canvas ID
 
         // Store position for ping generation and other callers
@@ -76,8 +76,8 @@ export function useMapInteraction(player, getByCanvasId = null) {
         if (district != null) {
             player.value.district = district.toUpperCase();
         }
-        // Deduct actual hop cost — a 3-hop move costs 3 uplink
-        player.value.uplink = Math.max(0, (player.value.uplink ?? 0) - uplinkCost);
+        // Each move costs exactly 1 uplink
+        player.value.uplink = Math.max(0, (player.value.uplink ?? 0) - 1);
     }
 
     function onNodeClicked({ node, isAdjacent = false }) {

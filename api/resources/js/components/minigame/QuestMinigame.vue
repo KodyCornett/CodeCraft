@@ -30,7 +30,6 @@ const GAMES = {
     flush_buffer:     FlushBuffer,
     toxic_soak:       ToxicSoak,
     // archive_extraction: ArchiveExtraction, -- not yet built
-    // archive_extraction: ArchiveExtraction, -- not yet built
     // calibration_tether: CalibrationTether, -- not yet built
 };
 

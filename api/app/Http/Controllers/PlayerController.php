@@ -215,15 +215,16 @@ class PlayerController extends Controller
      * Security guards:
      *   1. Destination node must exist in the DB.
      *   2. Destination must be adjacent to the player's current node
-     *      (or a spawn node when the player has no current position yet).
+     *      (verified via NodeConnection — CyberDoc nodes are exempt so
+     *       players can always reach a doc to bank when uplink runs out).
      *   3. Player must have at least 1 uplink remaining (not 0).
+     *      Movement always costs exactly 1 uplink per hop.
      */
     public function position(Request $request): JsonResponse
     {
         $data = $request->validate([
             'canvas_node_id' => ['required', 'string'],
             'district'       => ['nullable', 'string'],
-            'uplink_cost'    => ['nullable', 'integer', 'min:1', 'max:10'],
         ]);
 
         $player = Player::where('user_id', $request->user()->id)->first();
@@ -243,24 +244,31 @@ class PlayerController extends Controller
             if (!$node->is_spawn) {
                 return response()->json(['message' => 'First move must be to a spawn node.'], 422);
             }
+        } else {
+            // ── 2b. Adjacency guard ───────────────────────────────────────────
+            // CyberDoc nodes are exempt — players must always be able to bank
+            // even when uplink is exhausted or they are far from a doc.
+            if ($node->type !== 'cyberdoc') {
+                $isAdjacent = \App\Models\NodeConnection::where('node_id', $player->current_node_id)
+                    ->where('connected_node_id', $node->id)
+                    ->exists();
+
+                if (!$isAdjacent) {
+                    return response()->json(['message' => 'Destination is not adjacent to your current node.'], 422);
+                }
+            }
         }
 
-        // ── 3. Uplink check ───────────────────────────────────────────────────
-        $uplinkCost = (int) ($data['uplink_cost'] ?? 1);
+        // ── 3. Uplink check — always 1 per hop ───────────────────────────────
+        $uplinkCost = 1;
         $rig = $player->rig()->with('chassis')->first();
         if ($rig !== null) {
             $effectiveMax = (int) ($rig->chassis->base_uplink ?? 3)
                           + ($this->rigService->peripheralBoosts($player)['uplink'] ?? 0);
             $curUplink    = $rig->current_uplink ?? $effectiveMax;
-            // CyberDoc nodes are always reachable — players must be able to bank
-            // their run even when uplink is exhausted.
-            if ($node->type !== 'cyberdoc') {
-                if ($curUplink <= 0) {
-                    return response()->json(['message' => 'No uplink remaining — bank your run at a Street Doc first.'], 422);
-                }
-                if ($uplinkCost > $curUplink) {
-                    return response()->json(['message' => 'Not enough uplink remaining for this move.'], 422);
-                }
+            // CyberDoc nodes are always reachable regardless of uplink.
+            if ($node->type !== 'cyberdoc' && $curUplink <= 0) {
+                return response()->json(['message' => 'No uplink remaining — bank your run at a Street Doc first.'], 422);
             }
         }
 

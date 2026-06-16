@@ -200,6 +200,25 @@ class QuestService
             return ['stage_id' => $stage->id, 'already_complete' => true];
         }
 
+        // Guard: previous stage in this arc must be complete before this one can be.
+        // Prevents skipping to later stages to collect rewards out of sequence.
+        if ($stage->stage_number > 1) {
+            $prevStage = QuestStage::where('quest_arc_id', $arc->id)
+                ->where('stage_number', $stage->stage_number - 1)
+                ->first();
+
+            if ($prevStage !== null) {
+                $prevComplete = PlayerStageProgress::where('player_id', $player->id)
+                    ->where('quest_stage_id', $prevStage->id)
+                    ->where('status', 'complete')
+                    ->exists();
+
+                if (!$prevComplete) {
+                    return ['stage_id' => $stage->id, 'error' => 'Previous stage not complete.'];
+                }
+            }
+        }
+
         // Upsert stage progress
         PlayerStageProgress::updateOrCreate(
             ['player_id' => $player->id, 'quest_stage_id' => $stage->id],

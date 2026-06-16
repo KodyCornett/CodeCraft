@@ -1248,17 +1248,11 @@ const dbNodeMap = computed(() => {
 });
 
 // ── BFS reachable set ─────────────────────────────────────────────────────────
-// Range is determined by the zone_type of the player's current node:
-//   district     → 1 step
-//   neighborhood → 2 steps
-//   netlink      → full uplink value
+// Movement is locked to 1 hop per move. The reachable set is always the
+// immediate neighbours of the player's current node.
 const reachableNames = computed(() => {
     const currentId = playerToken.value.id;
-    const db        = dbNodeMap.value.get(currentId);
-    const zoneType  = db?.zoneType ?? 'netlink';
-    const maxSteps  = zoneType === 'district'     ? 1
-                    : zoneType === 'neighborhood'  ? 2
-                    : props.playerUplink;  // netlink: 0 uplink → empty set
+    const maxSteps  = props.playerUplink > 0 ? 1 : 0;
 
     if (maxSteps <= 0) return new Set();
 
@@ -1339,25 +1333,6 @@ function onNodeClick(nodeId) {
 }
 
 // ─── BFS shortest-path distance between two node IDs ─────────────────────────
-function bfsDistance(fromId, toId) {
-    if (fromId === toId) return 0;
-    const visited  = new Set([fromId]);
-    let   frontier = [fromId];
-    let   dist     = 0;
-    while (frontier.length > 0) {
-        dist++;
-        const next = [];
-        for (const id of frontier) {
-            for (const nb of (NODE_ADJACENCY.get(id) ?? [])) {
-                if (nb === toId) return dist;
-                if (!visited.has(nb)) { visited.add(nb); next.push(nb); }
-            }
-        }
-        frontier = next;
-    }
-    return dist; // unreachable — shouldn't happen for a valid move
-}
-
 // ─── Commit move — called by Game.vue when player confirms via JACK IN ────────
 function commitMove(nodeId) {
     const node = ALL_NODES.get(nodeId);
@@ -1375,11 +1350,8 @@ function commitMove(nodeId) {
     // Only allow moving to a reachable node
     if (!reachableNames.value.has(nodeId)) return;
 
-    // Calculate actual hop cost so uplink is decremented correctly for multi-hop moves
-    const uplinkCost = bfsDistance(playerToken.value.id, nodeId);
-
     playerToken.value = createPlayerToken(node);
-    emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y, uplinkCost });
+    emit('player-moved', { nodeId: node.id, district: node.district ?? null, x: node.x, y: node.y });
     // Keep the right panel anchored to the new current node.
     // isAdjacent is false — the player IS on this node, not adjacent to it.
     emit('node-clicked', { node: { ...node }, isAdjacent: false });

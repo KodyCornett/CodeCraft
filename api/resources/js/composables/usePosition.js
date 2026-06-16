@@ -14,7 +14,7 @@ import axios from 'axios';
 
 export function usePosition(playerId) {
 
-    async function updatePosition(canvasNodeId, district = null, onSuccess = null, uplinkCost = 1) {
+    async function updatePosition(canvasNodeId, district = null, onSuccess = null) {
         const pid = typeof playerId === 'object' ? playerId.value : playerId;
         if (!pid || !canvasNodeId) return;
 
@@ -22,7 +22,6 @@ export function usePosition(playerId) {
             const res = await axios.post('/api/player/position', {
                 canvas_node_id: canvasNodeId,
                 district:       district ?? null,
-                uplink_cost:    uplinkCost,
             });
             // Pass the full response payload to the caller so they can sync
             // remaining_uplink, trap_triggered, active_effects, etc.

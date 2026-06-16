@@ -89,13 +89,26 @@ Route::middleware('auth:sanctum')->group(function () {
 // Combat
 // ---------------------------------------------------------------------------
 
-    Route::post('/combat/result',                         [CombatController::class, 'result']);
-    Route::get('/combat/result/{id}',                     [CombatController::class, 'getResult']);
-    Route::post('/combat/challenge',                      [CombatChallengeController::class, 'challenge']);
-    Route::get('/combat/pending',                         [CombatChallengeController::class, 'pending']);
-    Route::get('/combat/challenge/{id}/status',           [CombatChallengeController::class, 'status']);
-    Route::post('/combat/challenge/{id}/accept',          [CombatChallengeController::class, 'accept']);
-    Route::post('/combat/challenge/{id}/decline',         [CombatChallengeController::class, 'decline']);
+    // result: 10/min — each player submits once per duel; any faster is a replay attempt
+    Route::post('/combat/result',                         [CombatController::class, 'result'])
+        ->middleware('throttle:10,1');
+    // getResult: 60/min — polled while waiting for opponent score (~1/s is normal)
+    Route::get('/combat/result/{id}',                     [CombatController::class, 'getResult'])
+        ->middleware('throttle:60,1');
+    // challenge: 10/min — one challenge per node encounter; burst headroom for fast play
+    Route::post('/combat/challenge',                      [CombatChallengeController::class, 'challenge'])
+        ->middleware('throttle:10,1');
+    // pending: 60/min — polled every 2s; 60 gives 30s of headroom without 429s
+    Route::get('/combat/pending',                         [CombatChallengeController::class, 'pending'])
+        ->middleware('throttle:60,1');
+    // status: 60/min — same cadence as pending poll
+    Route::get('/combat/challenge/{id}/status',           [CombatChallengeController::class, 'status'])
+        ->middleware('throttle:60,1');
+    // accept/decline: 10/min — one action per challenge; any faster is a UI bug or flood
+    Route::post('/combat/challenge/{id}/accept',          [CombatChallengeController::class, 'accept'])
+        ->middleware('throttle:10,1');
+    Route::post('/combat/challenge/{id}/decline',         [CombatChallengeController::class, 'decline'])
+        ->middleware('throttle:10,1');
 
 // ---------------------------------------------------------------------------
 // Packet Hijack
