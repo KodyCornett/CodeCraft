@@ -2,20 +2,32 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="fb-wrap">
 
-            <!-- ── LEFT COLUMN: waveforms ──────────────────────────────────── -->
-            <div class="fb-col-left">
-
-                <div class="fb-status-bar">
+            <div class="fb-status-bar">
                     <span class="fb-status-chip" :class="isScanning ? 'fb-chip--live' : 'fb-chip--dead'">
-                        {{ isScanning ? '[cite: LIVE_FEED: ACTIVE]' : '[cite: LIVE_FEED: DE-ACTIVATED]' }}
+                        <span class="fb-cite-tag">CITE</span> {{ isScanning ? 'LIVE FEED: ACTIVE' : 'LIVE FEED: DE-ACTIVATED' }}
                     </span>
                     <span class="fb-status-sep">|</span>
-                    <span class="fb-status-item">[cite: ACTIVE_STREAM: MONITOR_ONLY]</span>
+                    <span class="fb-status-item"><span class="fb-cite-tag fb-cite-tag--dim">CITE</span> ACTIVE STREAM: MONITOR_ONLY</span>
                     <span class="fb-status-sep">|</span>
                     <span class="fb-status-item" :class="isBufferFull ? 'fb-status--warn' : ''">BUFFER: {{ capturedSignals.length }}/{{ MAX_BUFFER }}</span>
                     <span class="fb-status-sep">|</span>
                     <span class="fb-status-item">SIGNAL_LOCKED: {{ anomalousFlushed }}/{{ locksRequired }}</span>
                     <div class="fb-scan-dot" :class="isScanning ? 'fb-dot--live' : 'fb-dot--dead'" />
+                </div>
+
+                <div class="fb-sig-panel">
+                    <span class="fb-sig-label">SIGNAL LVL</span>
+                    <div class="fb-sig-bar"><div class="fb-sig-fill fb-fill--warn fb-sig-anim"></div></div>
+                    <span class="fb-sig-val fb-val--warn">~20%</span>
+                </div>
+                <div class="fb-sig-panel">
+                    <span class="fb-sig-label">STABILITY</span>
+                    <div class="fb-sig-bar">
+                        <div class="fb-sig-fill"
+                            :class="stability > 50 ? 'fb-fill--ok' : stability > 25 ? 'fb-fill--warn' : 'fb-fill--crit'"
+                            :style="{ width: stability + '%' }"></div>
+                    </div>
+                    <span class="fb-sig-val" :class="stability > 50 ? '' : stability > 25 ? 'fb-val--warn' : 'fb-val--crit'">{{ Math.round(stability) }}%</span>
                 </div>
 
                 <div class="fb-waveforms">
@@ -62,7 +74,6 @@
                     </div>
                 </div>
 
-            <!-- ── SIGNAL INSPECT PANEL ─────────────────────────────────────── -->
             <Transition name="fb-inspect">
                 <div v-if="inspectedSignal" class="fb-inspect-panel">
 
@@ -131,11 +142,7 @@
                 </div>
             </Transition>
 
-            </div><!-- /fb-col-left -->
-
-            <!-- ── RIGHT COLUMN: data ───────────────────────────────────────── -->
-            <div class="fb-col-right">
-
+            <div class="fb-body">
                 <div class="fb-audit-main">
 
                     <div class="fb-audit-banner">
@@ -232,7 +239,7 @@
                     >{{ line.text }}</div>
                 </div>
 
-            </div>
+            </div><!-- /fb-body -->
 
             <!-- CRT overlay — scanlines + vignette, pointer-events: none -->
             <div class="fb-crt-overlay" aria-hidden="true" />
@@ -745,29 +752,19 @@ onUnmounted(() => {
     overflow: hidden;
     width: 100%;
     height: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr;
+    display: flex;
+    flex-direction: column;
     font-family: 'JetBrains Mono', monospace;
     box-sizing: border-box;
     background: #020802;
 }
 
-/* ── 50 / 50 columns ──────────────────────────────────────────────────────── */
+/* ── Body row: table + log ────────────────────────────────────────────────── */
 
-.fb-col-left {
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid rgba(0,200,0,0.10);
-    overflow: hidden;
-    min-width: 0;
-    min-height: 0;
-}
-
-.fb-col-right {
+.fb-body {
+    flex: 1;
     display: flex;
     flex-direction: row;
-    min-width: 0;
     min-height: 0;
     overflow: hidden;
 }
@@ -803,10 +800,31 @@ onUnmounted(() => {
 }
 
 .fb-status-chip {
-    font-size: 6px;
-    letter-spacing: 0.10em;
+    font-size: 8px;
+    letter-spacing: 0.08em;
     padding: 1px 3px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.fb-cite-tag {
+    display: inline-block;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #002800;
+    background: #00cc00;
+    padding: 0 3px;
+    line-height: 1.4;
+    flex-shrink: 0;
+    border-radius: 0;
+}
+
+.fb-cite-tag--dim {
+    background: rgba(0,160,0,0.30);
+    color: #001800;
 }
 
 .fb-chip--live {
@@ -821,10 +839,13 @@ onUnmounted(() => {
 }
 
 .fb-status-item {
-    font-size: 6px;
+    font-size: 8px;
     color: rgba(0,170,0,0.40);
     letter-spacing: 0.06em;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 3px;
 }
 
 .fb-status--warn {
@@ -853,13 +874,66 @@ onUnmounted(() => {
     background: rgba(255,136,0,0.35);
 }
 
+/* ── SIGNAL / STABILITY BARS ─────────────────────────────────────────────── */
+
+.fb-sig-panel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    border-bottom: 1px solid rgba(0,180,0,0.06);
+    flex-shrink: 0;
+    background: #010e01;
+}
+
+.fb-sig-label {
+    font-size: 6px;
+    color: rgba(0,140,0,0.38);
+    letter-spacing: 0.16em;
+    width: 64px;
+    flex-shrink: 0;
+}
+
+.fb-sig-bar {
+    flex: 1;
+    height: 5px;
+    background: rgba(0,160,0,0.06);
+    border: 1px solid rgba(0,160,0,0.10);
+    overflow: hidden;
+}
+
+.fb-sig-fill {
+    height: 100%;
+    transition: width 0.5s linear;
+}
+
+.fb-fill--ok   { background: #00cc00; box-shadow: 0 0 4px rgba(0,204,0,0.50); }
+.fb-fill--warn { background: #ff8800; box-shadow: 0 0 4px rgba(255,136,0,0.50); }
+.fb-fill--crit { background: #ff2200; box-shadow: 0 0 4px rgba(255,34,0,0.50); }
+
+.fb-sig-val {
+    font-size: 8px;
+    font-weight: 700;
+    color: #00cc00;
+    letter-spacing: 0.06em;
+    width: 32px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.fb-val--warn { color: #ff8800; }
+.fb-val--crit { color: #ff2200; }
+
+.fb-sig-anim { animation: fb-sig-oscillate 4.8s ease-in-out infinite; }
+
 /* ── WAVEFORMS ────────────────────────────────────────────────────────────── */
 
 .fb-waveforms {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 0;
+    flex-shrink: 0;
+    height: 174px;
+    border-bottom: 1px solid rgba(0,180,0,0.10);
     padding: 0;
     gap: 0;
 }
@@ -870,6 +944,7 @@ onUnmounted(() => {
     flex: 1;
     border-bottom: 1px solid rgba(0,180,0,0.06);
     min-height: 0;
+    max-height: 58px;
 }
 
 .fb-row-label {
@@ -1144,6 +1219,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
     border-right: 1px solid rgba(0,180,0,0.07);
 }
 
@@ -1341,6 +1417,7 @@ onUnmounted(() => {
     gap: 6px;
     border: none;
     border-right: 1px solid rgba(0,180,0,0.06);
+    border-radius: 0;
 }
 
 .fb-action-btn:disabled {
@@ -1456,5 +1533,15 @@ onUnmounted(() => {
 @keyframes fb-dot-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.25; }
+}
+
+@keyframes fb-sig-oscillate {
+    0%   { width: 20%; }
+    12%  { width: 22%; }
+    28%  { width: 17%; }
+    44%  { width: 24%; }
+    60%  { width: 18%; }
+    76%  { width: 23%; }
+    100% { width: 20%; }
 }
 </style>
