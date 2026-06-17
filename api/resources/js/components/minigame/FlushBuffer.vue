@@ -2,8 +2,8 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="fb-wrap">
 
-            <!-- ── CAPTURE SECTION ──────────────────────────────────────────── -->
-            <div class="fb-capture-section">
+            <!-- ── LEFT COLUMN: waveforms ──────────────────────────────────── -->
+            <div class="fb-col-left">
 
                 <div class="fb-status-bar">
                     <span class="fb-status-chip" :class="isScanning ? 'fb-chip--live' : 'fb-chip--dead'">
@@ -61,8 +61,6 @@
                         </div>
                     </div>
                 </div>
-
-            </div>
 
             <!-- ── SIGNAL INSPECT PANEL ─────────────────────────────────────── -->
             <Transition name="fb-inspect">
@@ -133,8 +131,10 @@
                 </div>
             </Transition>
 
-            <!-- ── AUDIT SECTION ────────────────────────────────────────────── -->
-            <div class="fb-audit-section">
+            </div><!-- /fb-col-left -->
+
+            <!-- ── RIGHT COLUMN: data ───────────────────────────────────────── -->
+            <div class="fb-col-right">
 
                 <div class="fb-audit-main">
 
@@ -353,6 +353,7 @@ const chrome = computed(() => ({
     glitchIntensity: glitchIntensity.value,
     result:          result.value,
     failReason:      failReason.value,
+    hideTimer:       true,
 }));
 
 // ── Scan toggle ───────────────────────────────────────────────────────────────
@@ -586,8 +587,7 @@ function onFlush() {
     const cleanCount = selectedIds.value.length - anomCount;
 
     if (cleanCount > 0) {
-        applyHit(config.validFlushHit);
-        addLog(`> FLUSH_ERROR: ${cleanCount} clean signal(s) incorrectly flagged — stability hit`, 'warn');
+        addLog(`> FLUSH_ERROR: ${cleanCount} clean signal(s) incorrectly flagged — trace spiked`, 'warn');
     }
 
     // Remove flushed signals from buffer
@@ -642,10 +642,15 @@ function tick(ts) {
     if (result.value) return;
 
     // Shared tick — slower when feed paused.
-    // FlushBuffer only fails on stability collapse; the trace/timer bar
-    // is atmosphere only and does NOT end this game.
+    // Stability drains passively; ICE trace filling = lose; stability emptying = lose.
     const traceDt = isScanning.value ? dt : dt * 0.5;
     const failCause = tickShared(traceDt);
+    if (failCause === 'trace') {
+        addLog('> ICE_TRACE_LOCKED: connection terminated by defensive layer', 'error');
+        endGame('fail', 'ICE TRACE LOCKED — ABORT');
+        setTimeout(() => emit('fail'), 1800);
+        return;
+    }
     if (failCause === 'stability') {
         addLog('> SYSTEM_FAILURE: stability collapse — ICE locked the channel', 'error');
         endGame('fail', 'STABILITY COLLAPSE');
@@ -694,9 +699,9 @@ function tick(ts) {
         row.path = buildPath(ri);
     }
 
-    // Buffer overflow penalty
-    if (isBufferFull.value) {
-        applyHit(config.bufferOverflowHit * dt);
+    // Buffer overflow — log only; stability is a passive timer, not hit by gameplay
+    if (isBufferFull.value && Math.floor(scrollT * 2) % 90 === 0) {
+        addLog('> BUFFER_OVERFLOW: capture stalled — flush required', 'warn');
     }
 }
 
@@ -743,10 +748,29 @@ onUnmounted(() => {
     width: 100%;
     height: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     font-family: 'JetBrains Mono', monospace;
     box-sizing: border-box;
     background: #010804;
+}
+
+/* ── 50 / 50 columns ──────────────────────────────────────────────────────── */
+
+.fb-col-left {
+    flex: 0 0 50%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(0,255,157,0.08);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.fb-col-right {
+    flex: 0 0 50%;
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* ── CRT overlay — scanlines + vignette ──────────────────────────────────── */
@@ -776,14 +800,7 @@ onUnmounted(() => {
         inset 0 0 120px 50px rgba(0,0,0,0.40);
 }
 
-/* ── CAPTURE SECTION ──────────────────────────────────────────────────────── */
-
-.fb-capture-section {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    border-bottom: 1px solid rgba(0,255,157,0.07);
-}
+/* .fb-capture-section removed — contents now live directly in .fb-col-left */
 
 /* ── STATUS BAR ───────────────────────────────────────────────────────────── */
 
@@ -862,6 +879,9 @@ onUnmounted(() => {
     flex-direction: column;
     gap: 2px;
     padding: 4px 10px 4px;
+    flex: 1;
+    min-height: 0;
+    justify-content: space-around;
 }
 
 .fb-row {
@@ -1144,13 +1164,7 @@ onUnmounted(() => {
 .fb-inspect-enter-from,
 .fb-inspect-leave-to { max-height: 0; opacity: 0; }
 
-/* ── AUDIT SECTION ────────────────────────────────────────────────────────── */
-
-.fb-audit-section {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-}
+/* .fb-audit-section replaced by .fb-col-right */
 
 .fb-audit-main {
     flex: 1;
@@ -1172,7 +1186,7 @@ onUnmounted(() => {
 }
 
 .fb-audit-title {
-    font-size: 8px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.20em;
     color: #00e5ff;
@@ -1181,11 +1195,11 @@ onUnmounted(() => {
 
 .fb-audit-sep {
     color: rgba(0,229,255,0.20);
-    font-size: 7px;
+    font-size: 9px;
 }
 
 .fb-audit-meta {
-    font-size: 7px;
+    font-size: 9px;
     color: rgba(0,200,180,0.50);
     letter-spacing: 0.10em;
 }
@@ -1220,13 +1234,13 @@ onUnmounted(() => {
 }
 
 .fb-ref-key {
-    font-size: 7.5px;
-    color: rgba(0,160,70,0.40);
+    font-size: 9px;
+    color: rgba(0,160,70,0.50);
     letter-spacing: 0.16em;
 }
 
 .fb-ref-val {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     color: #00ff9d;
     letter-spacing: 0.04em;
@@ -1243,7 +1257,7 @@ onUnmounted(() => {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 11px;
+    font-size: 13px;
     letter-spacing: 0.04em;
 }
 
@@ -1260,9 +1274,9 @@ onUnmounted(() => {
 
 .fb-grid th {
     text-align: left;
-    padding: 4px 8px;
-    font-size: 7px;
-    color: rgba(0,160,70,0.32);
+    padding: 5px 8px;
+    font-size: 9px;
+    color: rgba(0,160,70,0.45);
     letter-spacing: 0.18em;
     font-weight: normal;
     white-space: nowrap;
@@ -1285,7 +1299,7 @@ onUnmounted(() => {
 }
 
 .fb-grid td {
-    padding: 4px 8px;
+    padding: 5px 8px;
     color: #00ff9d;
     white-space: nowrap;
     overflow: hidden;
@@ -1329,7 +1343,7 @@ onUnmounted(() => {
 }
 
 .fb-status-col {
-    font-size: 7.5px;
+    font-size: 10px;
     letter-spacing: 0.10em;
 }
 
@@ -1449,10 +1463,10 @@ onUnmounted(() => {
 }
 
 .fb-log-header {
-    font-size: 6.5px;
-    color: rgba(0,200,180,0.55);
+    font-size: 9px;
+    color: rgba(0,200,180,0.65);
     letter-spacing: 0.24em;
-    padding: 4px 8px;
+    padding: 5px 8px;
     border-bottom: 1px solid rgba(0,180,70,0.08);
     flex-shrink: 0;
     background: rgba(0,229,255,0.018);
@@ -1460,12 +1474,12 @@ onUnmounted(() => {
 }
 
 .fb-log-line {
-    font-size: 7px;
-    color: rgba(0,200,80,0.42);
+    font-size: 9px;
+    color: rgba(0,200,80,0.55);
     letter-spacing: 0.03em;
-    line-height: 1.50;
+    line-height: 1.55;
     word-break: break-all;
-    padding: 1px 8px;
+    padding: 2px 8px;
 }
 
 .fb-log--warn  { color: rgba(255,153,0,0.70); }

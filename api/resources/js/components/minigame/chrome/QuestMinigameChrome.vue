@@ -13,7 +13,7 @@
         <div class="qmc-header">
             <span class="qmc-logo">◈ {{ gameTypeLabel }}</span>
             <span class="qmc-file">{{ skin.fileName }}</span>
-            <span class="qmc-timer" :class="timerClass">{{ timeLeft.toFixed(1) }}s</span>
+            <span v-if="!hideTimer" class="qmc-timer" :class="timerClass">{{ timeLeft.toFixed(1) }}s</span>
         </div>
 
         <!-- Primary threat bar -->
@@ -72,6 +72,7 @@ const props = defineProps({
     result:          { type: String,  default: null },
     failReason:      { type: String,  default: '' },
     hideBars:        { type: Boolean, default: false },
+    hideTimer:       { type: Boolean, default: false },
 });
 
 const LABELS = {
