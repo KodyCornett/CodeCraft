@@ -2,93 +2,78 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="fb-wrap">
 
-            <!-- Wave lane labels -->
-            <div class="fb-lane-labels">
-                <span class="fb-lane-label fb-lane-label--ghost">GHOST SIGNAL</span>
-                <span class="fb-lane-label fb-lane-label--composite"
-                    :class="syncing ? 'fb-composite-label--syncing' : ''">
-                    COMPOSITE {{ syncing ? '// CANCELLATION LOCKED' : '' }}
-                </span>
-                <span class="fb-lane-label fb-lane-label--carrier">FLUSH CARRIER</span>
-            </div>
+            <!-- Waveform rows -->
+            <div
+                v-for="(row, ri) in rows"
+                :key="ri"
+                class="fb-row"
+            >
+                <span class="fb-row-label">W{{ ri + 1 }}</span>
 
-            <!-- Full-width waveform display -->
-            <svg class="fb-svg" viewBox="0 0 960 270" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Lane dividers -->
-                <line x1="0" y1="90"  x2="960" y2="90"  class="fb-lane-div" />
-                <line x1="0" y1="180" x2="960" y2="180" class="fb-lane-div" />
+                <div class="fb-wave-area">
+                    <svg
+                        class="fb-svg"
+                        viewBox="0 0 960 80"
+                        preserveAspectRatio="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <!-- Wave path -->
+                        <path :d="row.path" class="fb-wave-path" />
 
-                <!-- Zero-axis lines -->
-                <line x1="0" y1="45"  x2="960" y2="45"  class="fb-zero" />
-                <line x1="0" y1="135" x2="960" y2="135" class="fb-zero fb-zero--composite" />
-                <line x1="0" y1="225" x2="960" y2="225" class="fb-zero" />
+                        <!-- Block dividers -->
+                        <line
+                            v-for="b in BLOCKS - 1"
+                            :key="`div-${b}`"
+                            :x1="b * BLOCK_W" y1="0"
+                            :x2="b * BLOCK_W" y2="80"
+                            class="fb-block-div"
+                        />
 
-                <!-- Ghost wave — top lane, centre 45 -->
-                <path :d="ghostPath"     class="fb-wave fb-wave--ghost" />
+                        <!-- Block overlays — clickable, highlighted when spiking -->
+                        <rect
+                            v-for="b in BLOCKS"
+                            :key="`block-${b}`"
+                            :x="(b - 1) * BLOCK_W + 1"
+                            y="1"
+                            :width="BLOCK_W - 2"
+                            height="78"
+                            class="fb-block-rect"
+                            :class="{
+                                'fb-block--spike': row.blocks[b - 1].active,
+                                'fb-block--lock':  row.blocks[b - 1].locking,
+                            }"
+                            @click="onBlockClick(ri, b - 1)"
+                        />
+                    </svg>
 
-                <!-- Composite wave — middle lane, centre 135 -->
-                <path :d="compositePath" class="fb-wave fb-wave--composite"
-                    :class="syncing ? 'fb-wave--syncing' : ''" />
-
-                <!-- Carrier wave — bottom lane, centre 225 -->
-                <path :d="carrierPath"   class="fb-wave fb-wave--carrier" />
-            </svg>
-
-            <!-- Controls row -->
-            <div class="fb-controls">
-
-                <!-- Phase display -->
-                <div class="fb-phase-block">
-                    <span class="fb-ctrl-label">CARRIER PHASE</span>
-                    <span class="fb-phase-val">{{ phaseDisplay }}°</span>
-                </div>
-
-                <!-- Flush sync meter -->
-                <div class="fb-sync-block">
-                    <span class="fb-ctrl-label">FLUSH SYNC</span>
-                    <div class="fb-sync-track">
+                    <!-- Spike window bar — runs under each waveform -->
+                    <div class="fb-window-track">
                         <div
-                            class="fb-sync-fill"
-                            :class="syncing ? 'fb-sync--locked' : ''"
-                            :style="{ width: (flushMeter * 100) + '%' }"
+                            class="fb-window-fill"
+                            :style="{ width: rowWindowPct(row) + '%', opacity: rowWindowPct(row) > 0 ? 1 : 0 }"
                         />
                     </div>
-                    <span class="fb-sync-pct" :class="syncing ? 'fb-sync-pct--locked' : ''">
-                        {{ Math.round(flushMeter * 100) }}%
-                    </span>
                 </div>
-
-                <!-- Recursion depth pips -->
-                <div class="fb-layer-block">
-                    <span class="fb-ctrl-label">RECURSION DEPTH</span>
-                    <div class="fb-layer-pips">
-                        <span
-                            v-for="i in totalLayers"
-                            :key="i"
-                            class="fb-pip"
-                            :class="i <= currentLayer ? 'fb-pip--flushed' : (i === currentLayer + 1 ? 'fb-pip--active' : '')"
-                        >█</span>
-                    </div>
-                    <span class="fb-layer-count">{{ currentLayer }} / {{ totalLayers }}</span>
-                </div>
-
-                <!-- Phase advance button -->
-                <button
-                    class="fb-advance-btn"
-                    :class="{ 'fb-advance--held': advancing }"
-                    @mousedown="advancing = true"
-                    @mouseup="advancing = false"
-                    @mouseleave="advancing = false"
-                    @touchstart.prevent="advancing = true"
-                    @touchend.prevent="advancing = false"
-                >[ ADVANCE PHASE ]</button>
-
             </div>
 
-            <!-- Layer flush confirmation -->
-            <Transition name="fb-flash">
-                <div v-if="layerFlash" class="fb-flash-msg">
-                    ✓ LAYER FLUSHED — RECURSION COLLAPSING
+            <!-- Locks progress footer -->
+            <div class="fb-footer">
+                <span class="fb-footer-label">SIGNALS ISOLATED</span>
+                <div class="fb-lock-pips">
+                    <span
+                        v-for="i in locksRequired"
+                        :key="i"
+                        class="fb-lock-pip"
+                        :class="i <= locksCount ? 'fb-lock-pip--done' : ''"
+                    >◆</span>
+                </div>
+                <span class="fb-lock-count">{{ locksCount }} / {{ locksRequired }}</span>
+            </div>
+
+            <!-- Lock confirmation flash -->
+            <Transition name="fb-confirm">
+                <div v-if="confirmFlash" class="fb-confirm-msg">
+                    ✓ SIGNAL ISOLATED
                 </div>
             </Transition>
 
@@ -104,24 +89,26 @@ import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
 const props = defineProps({ skin: { type: Object, required: true } });
 const emit  = defineEmits(['complete', 'fail']);
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const BLOCKS  = 10;
+const BLOCK_W = 96;    // 960 / 10
+const SVG_W   = 960;
+const BASE_AMP  = 18;  // normal wave amplitude (px in viewBox)
+const SPIKE_AMP = 36;  // spiked wave amplitude
+
 // ── Difficulty config ─────────────────────────────────────────────────────────
-//
-// advanceRate   — phase radians advanced per second while button is held
-// syncThreshold — alignment (0–1) required to start filling the flush meter
-// fillRate      — flush meter fill per second while syncing
-// drainRate     — flush meter drain per second while out of sync
-// freqBase      — ghost signal base frequency (cycles visible on screen)
-// freqStep      — frequency added per layer (signal gets faster each collapse)
-// totalLayers   — recursion depth to unwind
+// Tune these after test run. Higher diff = shorter window, faster spawn, harder miss penalty.
 
 const CONFIGS = {
-    1: { advanceRate: 2.2,  syncThreshold: 0.78, fillRate: 0.30, drainRate: 0.12, freqBase: 1.0, freqStep: 0.10, totalLayers: 3 },
-    2: { advanceRate: 1.8,  syncThreshold: 0.86, fillRate: 0.22, drainRate: 0.18, freqBase: 1.3, freqStep: 0.18, totalLayers: 5 },
-    3: { advanceRate: 1.4,  syncThreshold: 0.93, fillRate: 0.16, drainRate: 0.25, freqBase: 1.7, freqStep: 0.25, totalLayers: 7 },
+    1: { spawnInterval: { min: 3.5, max: 5.5 }, windowDuration: 2.5, missHit: 0.18, scrollSpeed: 1.2, freq: 1.2 },
+    2: { spawnInterval: { min: 2.0, max: 3.5 }, windowDuration: 1.8, missHit: 0.22, scrollSpeed: 1.5, freq: 1.5 },
+    3: { spawnInterval: { min: 1.0, max: 2.0 }, windowDuration: 1.2, missHit: 0.26, scrollSpeed: 1.8, freq: 1.8 },
 };
 
-const diffLevel = props.skin.difficulty ?? 1;
-const config    = CONFIGS[diffLevel] ?? CONFIGS[1];
+const diffLevel    = props.skin.difficulty ?? 1;
+const config       = CONFIGS[diffLevel] ?? CONFIGS[1];
+const locksRequired = props.skin.locksRequired ?? 5;
 
 // ── Shared minigame state ─────────────────────────────────────────────────────
 
@@ -132,118 +119,99 @@ const {
     tickShared, applyHit, endGame,
 } = useQuestMinigameState(props.skin);
 
-// ── Wave / phase state ────────────────────────────────────────────────────────
+// ── Game state ────────────────────────────────────────────────────────────────
 
-// Phase offset of carrier relative to ghost (radians).
-// Player needs to push this toward π for destructive interference.
-// Starts at a random value far from π so there's always something to do.
-const phase        = ref(randomStartPhase());
-const advancing    = ref(false);
-const flushMeter   = ref(0);
-const currentLayer = ref(0);
-const layerFlash   = ref(false);
-let   layerCooldown = 0;
+const locksCount   = ref(0);
+const confirmFlash = ref(false);
+let   confirmTimer = null;
 
-// Current ghost frequency — increases each layer
-let ghostFreq = config.freqBase;
+function makeBlock() {
+    return {
+        active:     false,   // spike is currently firing
+        windowLeft: 0,       // seconds remaining in window
+        windowMax:  0,       // window duration for this spike
+        locking:    false,   // brief green flash after successful lock
+    };
+}
 
-// Scroll offset drives the waveforms scrolling in real time
+function randSpawnTimer() {
+    return config.spawnInterval.min +
+        Math.random() * (config.spawnInterval.max - config.spawnInterval.min);
+}
+
+// Rows — one per waveform (W1/W2/W3)
+const rows = ref([0, 1, 2].map(() => ({
+    path:        '',
+    blocks:      Array.from({ length: BLOCKS }, makeBlock),
+    spawnTimer:  randSpawnTimer(),
+})));
+
 let scrollT = 0;
 
-// SVG path strings — updated directly each frame
-const ghostPath     = ref('');
-const carrierPath   = ref('');
-const compositePath = ref('');
+// ── Waveform path builder ─────────────────────────────────────────────────────
+// Draws the wave block-by-block so each block's amplitude can differ independently.
 
-const totalLayers = config.totalLayers;
+const STEPS_PER_BLOCK = 14;
 
-function randomStartPhase() {
-    // Pick a random phase that is at least π/3 away from the target (π)
-    // to ensure the player always has to do real work.
-    const candidates = [
-        Math.random() * (Math.PI * 0.6),                      // 0 – 0.6π
-        Math.PI * 1.4 + Math.random() * (Math.PI * 0.6),      // 1.4π – 2π
-    ];
-    return candidates[Math.floor(Math.random() * candidates.length)];
-}
-
-// ── Alignment ─────────────────────────────────────────────────────────────────
-// Peaks at 1.0 when phase = π (perfect destructive interference).
-// Formula: (1 − cos(phase)) / 2
-
-function computeAlignment(p) {
-    const norm = ((p % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    return (1 - Math.cos(norm)) / 2;
-}
-
-const syncing = computed(() => computeAlignment(phase.value) >= config.syncThreshold);
-
-const phaseDisplay = computed(() =>
-    Math.round(((phase.value % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI))
-);
-
-// ── Waveform path generation ──────────────────────────────────────────────────
-// viewBox is 960 × 270. Three lanes, each 90px tall.
-// Centre lines: ghost=45, composite=135, carrier=225.
-
-const W         = 960;
-const STEPS     = 160;   // sample points — smooth without killing performance
-const GHOST_CY  = 45;
-const COMP_CY   = 135;
-const CARRIER_CY = 225;
-const GHOST_AMP  = 32;
-const COMP_AMP   = 64;   // 2× when fully in phase, 0 when cancelled
-const CARRIER_AMP = 32;
-
-function buildPath(centerY, amplitude, freq, phaseOffset) {
+function buildPath(rowIdx) {
+    const row = rows.value[rowIdx];
     let d = '';
-    for (let i = 0; i <= STEPS; i++) {
-        const x = (i / STEPS) * W;
-        // scrollT drives the leftward scroll; freq controls how many cycles show
-        const t = scrollT + (i / STEPS) * Math.PI * 2 * freq;
-        const y = centerY + amplitude * Math.sin(t + phaseOffset);
-        d += i === 0 ? `M ${x.toFixed(1)} ${y.toFixed(2)}` : ` L ${x.toFixed(1)} ${y.toFixed(2)}`;
+
+    for (let b = 0; b < BLOCKS; b++) {
+        const amp = row.blocks[b].active ? SPIKE_AMP : BASE_AMP;
+
+        for (let s = 0; s <= STEPS_PER_BLOCK; s++) {
+            const x = (b + s / STEPS_PER_BLOCK) * BLOCK_W;
+            const t = scrollT + (x / SVG_W) * Math.PI * 2 * config.freq;
+            const y = 40 + amp * Math.sin(t);
+            const isFirst = b === 0 && s === 0;
+            d += isFirst
+                ? `M ${x.toFixed(1)} ${y.toFixed(2)}`
+                : ` L ${x.toFixed(1)} ${y.toFixed(2)}`;
+        }
     }
+
     return d;
 }
 
-function updatePaths() {
-    const p = phase.value;
-    const f = ghostFreq;
+// ── Window bar helper ─────────────────────────────────────────────────────────
+// Returns the most urgent active block's window percentage for a row.
 
-    // Ghost: reference signal, phase 0
-    ghostPath.value = buildPath(GHOST_CY, GHOST_AMP, f, 0);
-
-    // Carrier: same frequency, player-controlled phase offset
-    carrierPath.value = buildPath(CARRIER_CY, CARRIER_AMP, f, p);
-
-    // Composite: sum of both — amplitude shrinks as p approaches π
-    // sin(t) + sin(t + p) = 2·cos(p/2)·sin(t + p/2)
-    // We render it as a wave with amplitude scaled by |2·cos(p/2)|
-    const compAmpScale = Math.abs(2 * Math.cos(p / 2));
-    const compPhase    = p / 2; // composite peak sits halfway between
-    compositePath.value = buildPath(COMP_CY, COMP_AMP * (compAmpScale / 2), f, compPhase);
+function rowWindowPct(row) {
+    let best = 0;
+    for (const block of row.blocks) {
+        if (block.active && block.windowMax > 0) {
+            const pct = (block.windowLeft / block.windowMax) * 100;
+            if (pct > best) best = pct;
+        }
+    }
+    return best;
 }
 
-// ── Layer management ──────────────────────────────────────────────────────────
+// ── Interaction ───────────────────────────────────────────────────────────────
 
-function onLayerFlushed() {
-    currentLayer.value++;
+function onBlockClick(rowIdx, blockIdx) {
+    if (result.value) return;
+    const block = rows.value[rowIdx].blocks[blockIdx];
+    if (!block.active) return;
 
-    if (currentLayer.value >= totalLayers) {
+    // Successful lock
+    block.active     = false;
+    block.windowLeft = 0;
+    block.locking    = true;
+    setTimeout(() => { rows.value[rowIdx].blocks[blockIdx].locking = false; }, 500);
+
+    locksCount.value++;
+
+    // Brief global confirm flash
+    if (confirmTimer) clearTimeout(confirmTimer);
+    confirmFlash.value = true;
+    confirmTimer = setTimeout(() => { confirmFlash.value = false; }, 700);
+
+    if (locksCount.value >= locksRequired) {
         endGame('success');
         setTimeout(() => emit('complete'), 2200);
-        return;
     }
-
-    // Flash, then reset for next layer
-    layerFlash.value = true;
-    layerCooldown    = 1.0;
-    flushMeter.value = 0;
-    ghostFreq       += config.freqStep;
-
-    // Randomise starting phase for next layer so player can't just sit at π
-    phase.value = randomStartPhase();
 }
 
 // ── Chrome passthrough ────────────────────────────────────────────────────────
@@ -273,10 +241,10 @@ function tick(ts) {
     const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
     lastTs = ts;
 
-    // Scroll the waveforms left
-    scrollT -= dt * 1.4;
+    // Scroll waveform
+    scrollT -= dt * config.scrollSpeed;
 
-    // Shared trace + stability
+    // Shared trace + stability — treat both as fail conditions
     const failCause = tickShared(dt);
     if (failCause) {
         const reason = failCause === 'stability'
@@ -287,35 +255,43 @@ function tick(ts) {
         return;
     }
 
-    // Layer cooldown — pause between flush and next layer starting
-    if (layerCooldown > 0) {
-        layerCooldown -= dt;
-        if (layerCooldown <= 0) layerFlash.value = false;
-        updatePaths();
-        animFrame = requestAnimationFrame(tick);
-        return;
-    }
+    // Update each row
+    for (let ri = 0; ri < rows.value.length; ri++) {
+        const row = rows.value[ri];
 
-    // Phase advance while button held
-    if (advancing.value) {
-        phase.value += config.advanceRate * dt;
-    }
+        // Tick active block windows — handle expiry
+        for (let b = 0; b < BLOCKS; b++) {
+            const block = row.blocks[b];
+            if (!block.active) continue;
 
-    // Alignment drives the flush meter
-    const alignment = computeAlignment(phase.value);
-    if (alignment >= config.syncThreshold) {
-        flushMeter.value = Math.min(1, flushMeter.value + config.fillRate * dt);
-    } else {
-        flushMeter.value = Math.max(0, flushMeter.value - config.drainRate * dt);
-    }
+            block.windowLeft -= dt;
+            if (block.windowLeft <= 0) {
+                // Missed — stability hit
+                block.active     = false;
+                block.windowLeft = 0;
+                applyHit(config.missHit);
+            }
+        }
 
-    if (flushMeter.value >= 1) {
-        flushMeter.value = 0;
-        onLayerFlushed();
-    }
+        // Spawn timer — fire a new spike if no block is already active in this row
+        row.spawnTimer -= dt;
+        if (row.spawnTimer <= 0) {
+            row.spawnTimer = randSpawnTimer();
 
-    // Update SVG paths
-    updatePaths();
+            // Only spawn if no active spike in this row (one per row at a time)
+            const hasActive = row.blocks.some(b => b.active);
+            if (!hasActive && !result.value) {
+                const targetBlock        = Math.floor(Math.random() * BLOCKS);
+                const block              = row.blocks[targetBlock];
+                block.active             = true;
+                block.windowMax          = config.windowDuration;
+                block.windowLeft         = config.windowDuration;
+            }
+        }
+
+        // Rebuild wave path
+        row.path = buildPath(ri);
+    }
 
     animFrame = requestAnimationFrame(tick);
 }
@@ -323,12 +299,21 @@ function tick(ts) {
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 onMounted(() => {
-    updatePaths();
+    // Stagger initial spawn timers so all 3 rows don't fire simultaneously on load
+    rows.value[1].spawnTimer += 1.2;
+    rows.value[2].spawnTimer += 2.4;
+
+    // Build initial paths
+    for (let ri = 0; ri < rows.value.length; ri++) {
+        rows.value[ri].path = buildPath(ri);
+    }
+
     animFrame = requestAnimationFrame(tick);
 });
 
 onUnmounted(() => {
     if (animFrame) cancelAnimationFrame(animFrame);
+    if (confirmTimer) clearTimeout(confirmTimer);
 });
 </script>
 
@@ -338,228 +323,174 @@ onUnmounted(() => {
     height: 100%;
     display: flex;
     flex-direction: column;
+    justify-content: space-evenly;
+    padding: 10px 16px;
     box-sizing: border-box;
     font-family: 'JetBrains Mono', monospace;
-    gap: 0;
+    gap: 6px;
 }
 
-/* ── Lane labels ─────────────────────────────────────────────────────────────── */
+/* ── Waveform row ─────────────────────────────────────────────────────────── */
 
-.fb-lane-labels {
+.fb-row {
     display: flex;
-    flex-direction: column;
-    position: absolute;
-    left: 14px;
-    top: 0;
-    bottom: 0;
-    justify-content: space-around;
-    pointer-events: none;
-    z-index: 2;
-    padding: 8px 0;
-}
-
-.fb-lane-label {
-    font-size: 8px;
-    letter-spacing: 0.18em;
-    opacity: 0.5;
-}
-
-.fb-lane-label--ghost     { color: #ff6600; }
-.fb-lane-label--composite { color: rgba(0,255,100,0.6); transition: color 0.3s; }
-.fb-lane-label--carrier   { color: #00ff9d; }
-
-.fb-composite-label--syncing {
-    color: #00ff9d;
-    opacity: 1;
-    animation: fb-label-pulse 0.8s ease infinite alternate;
-}
-
-/* ── SVG waveform ────────────────────────────────────────────────────────────── */
-
-.fb-svg {
+    align-items: center;
+    gap: 10px;
     flex: 1;
-    width: 100%;
-    display: block;
     min-height: 0;
 }
 
-.fb-lane-div {
-    stroke: rgba(0,255,100,0.06);
-    stroke-width: 1;
-}
-
-.fb-zero {
-    stroke: rgba(0,255,100,0.08);
-    stroke-width: 1;
-    stroke-dasharray: 4 8;
-}
-
-.fb-zero--composite {
-    stroke: rgba(0,255,100,0.12);
-}
-
-.fb-wave {
-    fill: none;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.fb-wave--ghost {
-    stroke: rgba(255,102,0,0.65);
-    filter: drop-shadow(0 0 3px rgba(255,102,0,0.3));
-}
-
-.fb-wave--composite {
-    stroke: rgba(0,255,100,0.35);
-    stroke-width: 2.5;
-    transition: stroke 0.2s;
-}
-
-.fb-wave--syncing {
-    stroke: #00ff9d;
-    stroke-width: 3;
-    filter: drop-shadow(0 0 6px rgba(0,255,100,0.5));
-}
-
-.fb-wave--carrier {
-    stroke: rgba(0,200,255,0.7);
-    filter: drop-shadow(0 0 3px rgba(0,200,255,0.3));
-}
-
-/* ── Controls row ────────────────────────────────────────────────────────────── */
-
-.fb-controls {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 10px 16px;
-    border-top: 1px solid rgba(0,255,100,0.08);
+.fb-row-label {
+    font-size: 10px;
+    color: rgba(0,255,100,0.3);
+    letter-spacing: 0.15em;
+    width: 24px;
     flex-shrink: 0;
 }
 
-.fb-ctrl-label {
-    font-size: 7px;
-    color: rgba(0,255,100,0.25);
-    letter-spacing: 0.18em;
-    display: block;
-    margin-bottom: 4px;
-}
-
-/* Phase display */
-
-.fb-phase-block { display: flex; flex-direction: column; min-width: 90px; }
-
-.fb-phase-val {
-    font-size: 18px;
-    font-weight: 700;
-    color: rgba(0,200,255,0.8);
-    letter-spacing: 0.08em;
-}
-
-/* Sync meter */
-
-.fb-sync-block {
+.fb-wave-area {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    flex: 1;
+    min-width: 0;
 }
 
-.fb-sync-track {
-    height: 6px;
-    background: rgba(0,255,100,0.06);
-    overflow: hidden;
-    margin-bottom: 3px;
+.fb-svg {
+    width: 100%;
+    display: block;
+    border: 1px solid rgba(0,255,100,0.08);
+    background: rgba(0,10,5,0.6);
+    cursor: default;
 }
 
-.fb-sync-fill {
-    height: 100%;
-    background: rgba(0,255,100,0.3);
-    transition: background 0.2s;
+/* ── Wave path ────────────────────────────────────────────────────────────── */
+
+.fb-wave-path {
+    fill: none;
+    stroke: #00ff9d;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 3px rgba(0,255,100,0.35));
 }
 
-.fb-sync--locked {
-    background: #00ff9d;
-    box-shadow: 0 0 10px rgba(0,255,100,0.5);
-    animation: fb-sync-pulse 0.6s ease infinite alternate;
+/* ── Block dividers ───────────────────────────────────────────────────────── */
+
+.fb-block-div {
+    stroke: rgba(0,255,100,0.07);
+    stroke-width: 1;
 }
 
-.fb-sync-pct {
-    font-size: 9px;
-    color: rgba(0,255,100,0.35);
-    letter-spacing: 0.1em;
+/* ── Block overlays ───────────────────────────────────────────────────────── */
+
+.fb-block-rect {
+    fill: transparent;
+    stroke: none;
+    cursor: default;
+    transition: fill 0.1s;
 }
 
-.fb-sync-pct--locked {
-    color: #00ff9d;
-}
-
-/* Layer pips */
-
-.fb-layer-block { display: flex; flex-direction: column; }
-
-.fb-layer-pips  { display: flex; gap: 5px; margin-bottom: 3px; }
-
-.fb-pip { font-size: 10px; color: rgba(0,255,100,0.12); transition: color 0.3s; }
-.fb-pip--active  { color: #ff6600; text-shadow: 0 0 6px rgba(255,102,0,0.5); }
-.fb-pip--flushed { color: rgba(0,255,100,0.22); }
-
-.fb-layer-count { font-size: 8px; color: rgba(0,255,100,0.25); letter-spacing: 0.1em; }
-
-/* Advance button */
-
-.fb-advance-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    background: transparent;
-    border: 1px solid rgba(0,200,255,0.3);
-    color: rgba(0,200,255,0.6);
-    padding: 10px 22px;
+.fb-block--spike {
+    fill: rgba(255,102,0,0.10);
+    stroke: rgba(255,102,0,0.45);
+    stroke-width: 1;
     cursor: pointer;
-    transition: all 0.08s;
-    user-select: none;
+    animation: fb-spike-pulse 0.45s ease infinite alternate;
+}
+
+.fb-block--lock {
+    fill: rgba(0,255,100,0.18);
+    stroke: rgba(0,255,100,0.6);
+    stroke-width: 1;
+    animation: none;
+}
+
+/* ── Window bar ───────────────────────────────────────────────────────────── */
+
+.fb-window-track {
+    height: 3px;
+    background: rgba(255,102,0,0.06);
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.fb-window-fill {
+    height: 100%;
+    background: #ff6600;
+    box-shadow: 0 0 6px rgba(255,102,0,0.5);
+    transition: width 0.05s linear, opacity 0.2s;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.fb-footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0,255,100,0.06);
     flex-shrink: 0;
 }
 
-.fb-advance-btn:hover {
-    border-color: rgba(0,200,255,0.6);
-    color: rgba(0,200,255,0.9);
+.fb-footer-label {
+    font-size: 8px;
+    color: rgba(0,255,100,0.25);
+    letter-spacing: 0.18em;
 }
 
-.fb-advance--held {
-    background: rgba(0,200,255,0.08);
-    border-color: #00ccff;
-    color: #00ccff;
-    box-shadow: 0 0 14px rgba(0,200,255,0.2);
+.fb-lock-pips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
-/* ── Flash message ───────────────────────────────────────────────────────────── */
-
-.fb-flash-msg {
-    position: absolute;
-    bottom: 70px;
-    left: 50%;
-    transform: translateX(-50%);
+.fb-lock-pip {
     font-size: 10px;
+    color: rgba(0,255,100,0.12);
+    transition: color 0.2s, text-shadow 0.2s;
+}
+
+.fb-lock-pip--done {
     color: #00ff9d;
-    letter-spacing: 0.15em;
+    text-shadow: 0 0 8px rgba(0,255,100,0.5);
+}
+
+.fb-lock-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(0,255,100,0.5);
+    letter-spacing: 0.08em;
+    margin-left: auto;
+}
+
+/* ── Confirm flash ────────────────────────────────────────────────────────── */
+
+.fb-confirm-msg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    color: #00ff9d;
+    letter-spacing: 0.2em;
     background: rgba(0,20,10,0.95);
     border: 1px solid rgba(0,255,100,0.35);
-    padding: 7px 20px;
+    padding: 7px 22px;
     white-space: nowrap;
     pointer-events: none;
     text-shadow: 0 0 10px rgba(0,255,100,0.5);
     z-index: 10;
 }
 
-/* ── Transitions ─────────────────────────────────────────────────────────────── */
+/* ── Transitions ──────────────────────────────────────────────────────────── */
 
-.fb-flash-enter-active, .fb-flash-leave-active { transition: opacity 0.2s; }
-.fb-flash-enter-from,   .fb-flash-leave-to     { opacity: 0; }
+.fb-confirm-enter-active, .fb-confirm-leave-active { transition: opacity 0.15s; }
+.fb-confirm-enter-from,   .fb-confirm-leave-to     { opacity: 0; }
 
-/* ── Animations ──────────────────────────────────────────────────────────────── */
+/* ── Animations ───────────────────────────────────────────────────────────── */
 
-@keyframes fb-sync-pulse  { from { box-shadow: 0 0 6px rgba(0,255,100,0.3);  } to { box-shadow: 0 0 16px rgba(0,255,100,0.7); } }
-@keyframes fb-label-pulse { from { opacity: 0.7; } to { opacity: 1; } }
+@keyframes fb-spike-pulse {
+    from { fill: rgba(255,102,0,0.06); stroke: rgba(255,102,0,0.30); }
+    to   { fill: rgba(255,102,0,0.16); stroke: rgba(255,102,0,0.65); }
+}
 </style>

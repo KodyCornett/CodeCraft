@@ -17,6 +17,14 @@
                 :class="{ 'dev-diff-btn--active': selectedDiff === d }"
                 @click="selectedDiff = d"
             >D{{ d }}</button>
+            <span class="dev-diff-label" style="margin-left:16px">LOCKS REQ</span>
+            <button
+                v-for="n in [3, 5, 7, 10]"
+                :key="n"
+                class="dev-diff-btn"
+                :class="{ 'dev-diff-btn--active': selectedLocks === n }"
+                @click="selectedLocks = n"
+            >{{ n }}</button>
         </div>
 
         <!-- Game list -->
@@ -52,7 +60,8 @@ import { useQuestMinigame } from '@/composables/useQuestMinigame.js';
 
 const { launch } = useQuestMinigame();
 
-const selectedDiff = ref(1);
+const selectedDiff  = ref(1);
+const selectedLocks = ref(5);
 
 const GAMES = [
     {
@@ -141,6 +150,7 @@ function onLaunch(game) {
         hideBars:          game.skin.hideBars,
         dealsDamageOnFail: false,
         difficulty:        selectedDiff.value,
+        locksRequired:     selectedLocks.value,
     };
     launch('dev', game.type, skin);
 }
