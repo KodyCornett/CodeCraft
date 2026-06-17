@@ -15,11 +15,6 @@
                     <span class="fb-status-item" :class="isBufferFull ? 'fb-status--warn' : ''">BUFFER_STATUS: {{ capturedSignals.length }}/{{ MAX_BUFFER }}</span>
                     <span class="fb-status-sep">//</span>
                     <span class="fb-status-item">SIGNAL_LOCKED: {{ anomalousFlushed }}/{{ locksRequired }}</span>
-                    <button
-                        class="fb-scan-btn"
-                        :class="isScanning ? 'fb-scan--active' : 'fb-scan--paused'"
-                        @click="toggleScan"
-                    >{{ isScanning ? '[ STOP CAPTURE ]' : '[ RESUME CAPTURE ]' }}</button>
                     <div class="fb-scan-dot" :class="isScanning ? 'fb-dot--live' : 'fb-dot--dead'" />
                 </div>
 
@@ -189,15 +184,21 @@
 
                     <div class="fb-actions">
                         <button
+                            class="fb-action-btn fb-btn--scan"
+                            :class="isScanning ? 'fb-scan--active' : 'fb-scan--paused'"
+                            :disabled="!!result"
+                            @click="toggleScan"
+                        >{{ isScanning ? '[ ■ STOP CAPTURE ]' : '[ ▶ RESUME CAPTURE ]' }}</button>
+                        <button
                             class="fb-action-btn fb-btn--flush"
                             :disabled="selectedIds.length === 0 || !!result || isScanning"
                             @click="onFlush"
-                        >[!: FLUSH ]] <span class="fb-hotkey">SPACE</span></button>
+                        >[ FLUSH ] <span class="fb-hotkey">SPACE</span></button>
                         <button
                             class="fb-action-btn fb-btn--clear"
                             :disabled="selectedIds.length === 0 || !!result"
                             @click="onClear"
-                        >[!: CLEAR ]]</button>
+                        >[ CLEAR ]</button>
                     </div>
 
                 </div>
@@ -816,40 +817,7 @@ onUnmounted(() => {
     flex-shrink: 0;
 }
 
-.fb-scan-btn {
-    margin-left: auto;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
-    letter-spacing: 0.18em;
-    background: transparent;
-    padding: 3px 10px;
-    cursor: pointer;
-    transition: all 0.10s;
-    flex-shrink: 0;
-}
-
-.fb-scan--active {
-    border: 1px solid rgba(0,229,255,0.40);
-    color: #00e5ff;
-    text-shadow: 0 0 6px rgba(0,229,255,0.50);
-}
-
-.fb-scan--active:hover {
-    border-color: rgba(0,229,255,0.70);
-    box-shadow: 0 0 8px rgba(0,229,255,0.12);
-}
-
-.fb-scan--paused {
-    border: 1px solid rgba(255,102,0,0.50);
-    color: #ff9933;
-    text-shadow: 0 0 6px rgba(255,153,51,0.50);
-    animation: fb-scan-blink 1.0s ease infinite;
-}
-
-.fb-scan--paused:hover {
-    animation: none;
-    border-color: rgba(255,102,0,0.80);
-}
+/* scan button styling handled in .fb-btn--scan below */
 
 .fb-scan-dot {
     width: 5px;
@@ -1291,64 +1259,105 @@ onUnmounted(() => {
     letter-spacing: 0.10em;
 }
 
-/* ── ACTION BUTTONS — hardware console style ──────────────────────────────── */
+/* ── ACTION BUTTONS ───────────────────────────────────────────────────────── */
 
 .fb-actions {
     display: flex;
     gap: 0;
     flex-shrink: 0;
-    border-top: 1px solid rgba(255,102,0,0.12);
+    border-top: 1px solid rgba(0,255,157,0.10);
     align-items: stretch;
+    min-height: 40px;
 }
 
 .fb-action-btn {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.20em;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
     background: transparent;
-    padding: 6px 18px;
+    padding: 10px 22px;
     cursor: pointer;
-    transition: all 0.08s;
+    transition: all 0.10s;
     display: flex;
     align-items: center;
     gap: 8px;
     border: none;
-    border-right: 1px solid rgba(255,102,0,0.10);
+    border-right: 1px solid rgba(0,255,157,0.08);
 }
 
 .fb-action-btn:disabled {
-    opacity: 0.18;
+    opacity: 0.20;
     cursor: not-allowed;
 }
 
 .fb-hotkey {
-    font-size: 6.5px;
+    font-size: 8px;
+    font-weight: normal;
     letter-spacing: 0.12em;
-    color: rgba(255,153,51,0.35);
-    border: 1px solid rgba(255,102,0,0.18);
-    padding: 1px 4px;
+    color: rgba(255,153,51,0.50);
+    border: 1px solid rgba(255,102,0,0.25);
+    padding: 2px 5px;
 }
 
+/* Scan toggle — left-most, cyan themed */
+.fb-btn--scan {
+    min-width: 190px;
+    border-right: 1px solid rgba(0,255,157,0.12);
+}
+
+.fb-btn--scan.fb-scan--active {
+    color: #00e5ff;
+    border-left: 3px solid rgba(0,229,255,0.60);
+    text-shadow: 0 0 8px rgba(0,229,255,0.55);
+    background: rgba(0,229,255,0.04);
+}
+
+.fb-btn--scan.fb-scan--active:hover:not(:disabled) {
+    background: rgba(0,229,255,0.08);
+    text-shadow: 0 0 12px rgba(0,229,255,0.70);
+}
+
+.fb-btn--scan.fb-scan--paused {
+    color: #ff9933;
+    border-left: 3px solid rgba(255,102,0,0.70);
+    text-shadow: 0 0 8px rgba(255,153,51,0.60);
+    background: rgba(255,102,0,0.06);
+    animation: fb-scan-blink 1.0s ease infinite;
+}
+
+.fb-btn--scan.fb-scan--paused:hover:not(:disabled) {
+    animation: none;
+    background: rgba(255,102,0,0.10);
+    text-shadow: 0 0 12px rgba(255,153,51,0.80);
+}
+
+/* Flush — orange, most prominent */
 .fb-btn--flush {
-    color: rgba(255,120,0,0.75);
-    border-top: 1px solid rgba(255,102,0,0.25);
-    border-right: 1px solid rgba(255,102,0,0.12);
+    flex: 1;
+    color: #ff9933;
+    border-left: 3px solid rgba(255,102,0,0.50);
+    background: rgba(255,102,0,0.05);
+    text-shadow: 0 0 6px rgba(255,153,51,0.35);
 }
 
 .fb-btn--flush:hover:not(:disabled) {
-    background: rgba(255,102,0,0.06);
-    color: #ff9933;
-    text-shadow: 0 0 6px rgba(255,153,51,0.40);
+    background: rgba(255,102,0,0.10);
+    color: #ffbb55;
+    text-shadow: 0 0 10px rgba(255,153,51,0.60);
+    box-shadow: inset 0 0 20px rgba(255,102,0,0.06);
 }
 
+/* Clear — dim green */
 .fb-btn--clear {
-    color: rgba(0,200,80,0.35);
-    border-top: 1px solid rgba(0,200,80,0.10);
+    color: rgba(0,200,80,0.50);
+    border-left: 3px solid rgba(0,200,80,0.20);
 }
 
 .fb-btn--clear:hover:not(:disabled) {
-    background: rgba(0,255,100,0.025);
-    color: rgba(0,255,157,0.65);
+    background: rgba(0,255,100,0.04);
+    color: #00ff9d;
+    text-shadow: 0 0 6px rgba(0,255,157,0.40);
 }
 
 /* ── TERMINAL LOG ─────────────────────────────────────────────────────────── */
