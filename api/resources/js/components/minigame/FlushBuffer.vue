@@ -2,104 +2,93 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="fb-wrap">
 
-            <!-- Dump progress -->
-            <div class="fb-dump-header">
-                <span class="fb-dump-label">BUFFER DUMP</span>
-                <div class="fb-dump-pips">
-                    <span
-                        v-for="i in dumpGoal" :key="i"
-                        class="fb-dump-pip"
-                        :class="{ 'fb-dump-pip--done': i <= dumpsComplete }"
-                    >█</span>
-                </div>
-                <span class="fb-dump-count">{{ dumpsComplete }} / {{ dumpGoal }}</span>
+            <!-- Wave lane labels -->
+            <div class="fb-lane-labels">
+                <span class="fb-lane-label fb-lane-label--ghost">GHOST SIGNAL</span>
+                <span class="fb-lane-label fb-lane-label--composite"
+                    :class="syncing ? 'fb-composite-label--syncing' : ''">
+                    COMPOSITE {{ syncing ? '// CANCELLATION LOCKED' : '' }}
+                </span>
+                <span class="fb-lane-label fb-lane-label--carrier">FLUSH CARRIER</span>
             </div>
 
-            <!-- Signal array -->
-            <div class="fb-signals">
-                <div
-                    v-for="idx in [0, 1, 2]" :key="idx"
-                    class="fb-signal-row"
-                    :class="rowClass(idx)"
-                >
-                    <!-- Left: label + peak counter + miss pips -->
-                    <div class="fb-sig-meta">
-                        <span class="fb-sig-label">W{{ idx + 1 }}</span>
-                        <span class="fb-sig-peaks">{{ wavePeaksCaught[idx] }} / {{ waveformPeakReqs[idx] }}</span>
-                        <div class="fb-miss-pips">
-                            <span
-                                v-for="m in missTolerance[idx]" :key="m"
-                                class="fb-miss-pip"
-                                :class="{ 'fb-miss-pip--used': m <= waveMisses[idx] }"
-                            >◆</span>
-                        </div>
-                    </div>
+            <!-- Full-width waveform display -->
+            <svg class="fb-svg" viewBox="0 0 960 270" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Lane dividers -->
+                <line x1="0" y1="90"  x2="960" y2="90"  class="fb-lane-div" />
+                <line x1="0" y1="180" x2="960" y2="180" class="fb-lane-div" />
 
-                    <!-- Centre: scrolling waveform history -->
-                    <div class="fb-wf-display">
-                        <span
-                            class="fb-wf-chars"
-                            :class="{
-                                'fb-wf-chars--active': waveStates[idx] === 'active',
-                                'fb-wf-chars--locked': waveStates[idx] === 'locked',
-                            }"
-                        >{{ waveHistoryDisplay[idx] || '────────────────────────' }}</span>
-                    </div>
+                <!-- Zero-axis lines -->
+                <line x1="0" y1="45"  x2="960" y2="45"  class="fb-zero" />
+                <line x1="0" y1="135" x2="960" y2="135" class="fb-zero fb-zero--composite" />
+                <line x1="0" y1="225" x2="960" y2="225" class="fb-zero" />
 
-                    <!-- Right: vertical catch track -->
-                    <div
-                        class="fb-catch-track"
-                        :class="{ 'fb-catch-track--active': idx === activeWave && waveStates[idx] === 'active' }"
-                    >
-                        <!-- Peak zones top and bottom -->
+                <!-- Ghost wave — top lane, centre 45 -->
+                <path :d="ghostPath"     class="fb-wave fb-wave--ghost" />
+
+                <!-- Composite wave — middle lane, centre 135 -->
+                <path :d="compositePath" class="fb-wave fb-wave--composite"
+                    :class="syncing ? 'fb-wave--syncing' : ''" />
+
+                <!-- Carrier wave — bottom lane, centre 225 -->
+                <path :d="carrierPath"   class="fb-wave fb-wave--carrier" />
+            </svg>
+
+            <!-- Controls row -->
+            <div class="fb-controls">
+
+                <!-- Phase display -->
+                <div class="fb-phase-block">
+                    <span class="fb-ctrl-label">CARRIER PHASE</span>
+                    <span class="fb-phase-val">{{ phaseDisplay }}°</span>
+                </div>
+
+                <!-- Flush sync meter -->
+                <div class="fb-sync-block">
+                    <span class="fb-ctrl-label">FLUSH SYNC</span>
+                    <div class="fb-sync-track">
                         <div
-                            class="fb-peak-zone fb-peak-zone--top"
-                            :class="{ 'fb-peak-zone--lit': atPeak[idx] && waveAmplitudes[idx] > 0 && waveStates[idx] === 'active' }"
-                        />
-                        <div
-                            class="fb-peak-zone fb-peak-zone--bot"
-                            :class="{ 'fb-peak-zone--lit': atPeak[idx] && waveAmplitudes[idx] < 0 && waveStates[idx] === 'active' }"
-                        />
-                        <!-- Centre baseline -->
-                        <div class="fb-catch-center" />
-                        <!-- Amplitude dot -->
-                        <div
-                            class="fb-catch-dot"
-                            :class="{
-                                'fb-catch-dot--peak':   atPeak[idx] && waveStates[idx] === 'active',
-                                'fb-catch-dot--locked': waveStates[idx] === 'locked',
-                                'fb-catch-dot--dim':    waveStates[idx] === 'pending',
-                            }"
-                            :style="{ top: dotTop(idx) }"
+                            class="fb-sync-fill"
+                            :class="syncing ? 'fb-sync--locked' : ''"
+                            :style="{ width: (flushMeter * 100) + '%' }"
                         />
                     </div>
-
-                    <!-- Status badge -->
-                    <span class="fb-sig-status" :class="`fb-status--${waveStates[idx]}`">
-                        {{ waveStates[idx] === 'locked' ? '[ LOCKED ]' : waveStates[idx] === 'active' ? '[ ACTIVE ]' : '[ PENDING ]' }}
+                    <span class="fb-sync-pct" :class="syncing ? 'fb-sync-pct--locked' : ''">
+                        {{ Math.round(flushMeter * 100) }}%
                     </span>
                 </div>
-            </div>
 
-            <!-- Space prompt -->
-            <div class="fb-space-row">
-                <span
-                    class="fb-space-key"
-                    :class="{ 'fb-space-key--ready': atPeak[activeWave] && waveStates[activeWave] === 'active' && !result }"
-                >
-                    [ SPACE ] — CATCH SIGNAL PEAK
-                </span>
-            </div>
-
-            <!-- Feedback messages -->
-            <Transition name="fb-msg">
-                <div v-if="showRestartMsg" class="fb-msg fb-msg--fail">
-                    ⚠ SIGNAL CORRUPTED — RESETTING TO W1
+                <!-- Recursion depth pips -->
+                <div class="fb-layer-block">
+                    <span class="fb-ctrl-label">RECURSION DEPTH</span>
+                    <div class="fb-layer-pips">
+                        <span
+                            v-for="i in totalLayers"
+                            :key="i"
+                            class="fb-pip"
+                            :class="i <= currentLayer ? 'fb-pip--flushed' : (i === currentLayer + 1 ? 'fb-pip--active' : '')"
+                        >█</span>
+                    </div>
+                    <span class="fb-layer-count">{{ currentLayer }} / {{ totalLayers }}</span>
                 </div>
-            </Transition>
-            <Transition name="fb-msg">
-                <div v-if="showDumpMsg" class="fb-msg fb-msg--success">
-                    ✓ BUFFER FLUSHED — {{ dumpsComplete }} / {{ dumpGoal }} COMPLETE
+
+                <!-- Phase advance button -->
+                <button
+                    class="fb-advance-btn"
+                    :class="{ 'fb-advance--held': advancing }"
+                    @mousedown="advancing = true"
+                    @mouseup="advancing = false"
+                    @mouseleave="advancing = false"
+                    @touchstart.prevent="advancing = true"
+                    @touchend.prevent="advancing = false"
+                >[ ADVANCE PHASE ]</button>
+
+            </div>
+
+            <!-- Layer flush confirmation -->
+            <Transition name="fb-flash">
+                <div v-if="layerFlash" class="fb-flash-msg">
+                    ✓ LAYER FLUSHED — RECURSION COLLAPSING
                 </div>
             </Transition>
 
@@ -115,227 +104,149 @@ import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
 const props = defineProps({ skin: { type: Object, required: true } });
 const emit  = defineEmits(['complete', 'fail']);
 
-// ── Config ─────────────────────────────────────────────────────────────────────
-// All difficulty derived from iceLevel — same component handles prologue and PvE.
+// ── Difficulty config ─────────────────────────────────────────────────────────
+//
+// advanceRate   — phase radians advanced per second while button is held
+// syncThreshold — alignment (0–1) required to start filling the flush meter
+// fillRate      — flush meter fill per second while syncing
+// drainRate     — flush meter drain per second while out of sync
+// freqBase      — ghost signal base frequency (cycles visible on screen)
+// freqStep      — frequency added per layer (signal gets faster each collapse)
+// totalLayers   — recursion depth to unwind
 
-const iceLevel  = props.skin.iceLevel ?? 3
-const dumpGoal  = Math.max(1, iceLevel - 2)          // ICE3→1, ICE4→2, ICE5→3…
-const timeLimit = Math.max(30, 135 - iceLevel * 15)  // ICE3→90s … ICE7→30s
-const missHit   = 0.12 + (iceLevel - 3) * 0.015      // ICE3→12% … ICE7→18%
+const CONFIGS = {
+    1: { advanceRate: 2.2,  syncThreshold: 0.78, fillRate: 0.30, drainRate: 0.12, freqBase: 1.0, freqStep: 0.10, totalLayers: 3 },
+    2: { advanceRate: 1.8,  syncThreshold: 0.86, fillRate: 0.22, drainRate: 0.18, freqBase: 1.3, freqStep: 0.18, totalLayers: 5 },
+    3: { advanceRate: 1.4,  syncThreshold: 0.93, fillRate: 0.16, drainRate: 0.25, freqBase: 1.7, freqStep: 0.25, totalLayers: 7 },
+};
 
-// Peak requirements: (waveIndex+1) + (ICE-3), minimum 1
-// ICE3 → [1,2,3]  |  ICE4 → [2,3,4]  |  ICE5 → [3,4,5]
-const waveformPeakReqs = [0, 1, 2].map(i => Math.max(1, (i + 1) + (iceLevel - 3)))
+const diffLevel = props.skin.difficulty ?? 1;
+const config    = CONFIGS[diffLevel] ?? CONFIGS[1];
 
-// Miss tolerance matches waveform number: W1=1, W2=2, W3=3
-const missTolerance = [1, 2, 3]
-
-// Angular oscillation speeds (rad/s): W1 slowest, W3 fastest, scaled by ICE
-const SPEEDS = [0.9, 1.45, 2.1].map(s => s * (1 + (iceLevel - 3) * 0.10))
-
-// |amplitude| must reach this to register as a catchable peak
-const PEAK_THRESHOLD = 0.82
-
-const WAVE_CHARS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
-
-// ── Shared composable ──────────────────────────────────────────────────────────
-// difficulty:1 → minimal passive drain. Stability only drops from active misses.
-// We drive timeLeft and primaryProgress manually to keep them in sync.
+// ── Shared minigame state ─────────────────────────────────────────────────────
 
 const {
     stability, primaryProgress, timeLeft, result, failReason,
     glitchActive, glitchType, glitchIntensity,
     stabilityClass, timerClass,
-    applyHit, endGame,
-} = useQuestMinigameState({ ...props.skin, timeLimit, difficulty: 1 })
+    tickShared, applyHit, endGame,
+} = useQuestMinigameState(props.skin);
 
-timeLeft.value = timeLimit  // override composable default with ICE-computed value
+// ── Wave / phase state ────────────────────────────────────────────────────────
 
-// ── Reactive game state ────────────────────────────────────────────────────────
+// Phase offset of carrier relative to ghost (radians).
+// Player needs to push this toward π for destructive interference.
+// Starts at a random value far from π so there's always something to do.
+const phase        = ref(randomStartPhase());
+const advancing    = ref(false);
+const flushMeter   = ref(0);
+const currentLayer = ref(0);
+const layerFlash   = ref(false);
+let   layerCooldown = 0;
 
-const dumpsComplete      = ref(0)
-const activeWave         = ref(0)
-const waveStates         = ref(['active', 'pending', 'pending'])
-const wavePeaksCaught    = ref([0, 0, 0])
-const waveMisses         = ref([0, 0, 0])
-const waveAmplitudes     = ref([0, 0, 0])    // current -1…1 per waveform
-const atPeak             = ref([false, false, false])
-const waveHistoryDisplay = ref(['', '', ''])
-const showRestartMsg     = ref(false)
-const showDumpMsg        = ref(false)
+// Current ghost frequency — increases each layer
+let ghostFreq = config.freqBase;
 
-// ── Non-reactive loop vars ─────────────────────────────────────────────────────
+// Scroll offset drives the waveforms scrolling in real time
+let scrollT = 0;
 
-// Stagger start phases so the three waveforms look distinct immediately
-let phases        = [0, Math.PI * 0.65, Math.PI * 1.35]
-let historyArrs   = [[], [], []]
-let historyTimers = [0, 0, 0]
-let spaceCooldown = 0   // prevents double-triggering after catch or miss
-let rafId         = null
-let lastTs        = null
+// SVG path strings — updated directly each frame
+const ghostPath     = ref('');
+const carrierPath   = ref('');
+const compositePath = ref('');
 
-// ── Template helpers ───────────────────────────────────────────────────────────
+const totalLayers = config.totalLayers;
 
-// Translate -1…1 amplitude to CSS top% for the dot (centre = 50%)
-function dotTop(idx) {
-    const amp = waveStates.value[idx] === 'locked' ? 0 : waveAmplitudes.value[idx]
-    return `${50 - amp * 44}%`
+function randomStartPhase() {
+    // Pick a random phase that is at least π/3 away from the target (π)
+    // to ensure the player always has to do real work.
+    const candidates = [
+        Math.random() * (Math.PI * 0.6),                      // 0 – 0.6π
+        Math.PI * 1.4 + Math.random() * (Math.PI * 0.6),      // 1.4π – 2π
+    ];
+    return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-function rowClass(idx) {
-    return {
-        'fb-row--active':  waveStates.value[idx] === 'active',
-        'fb-row--pending': waveStates.value[idx] === 'pending',
-        'fb-row--locked':  waveStates.value[idx] === 'locked',
+// ── Alignment ─────────────────────────────────────────────────────────────────
+// Peaks at 1.0 when phase = π (perfect destructive interference).
+// Formula: (1 − cos(phase)) / 2
+
+function computeAlignment(p) {
+    const norm = ((p % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    return (1 - Math.cos(norm)) / 2;
+}
+
+const syncing = computed(() => computeAlignment(phase.value) >= config.syncThreshold);
+
+const phaseDisplay = computed(() =>
+    Math.round(((phase.value % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) * (180 / Math.PI))
+);
+
+// ── Waveform path generation ──────────────────────────────────────────────────
+// viewBox is 960 × 270. Three lanes, each 90px tall.
+// Centre lines: ghost=45, composite=135, carrier=225.
+
+const W         = 960;
+const STEPS     = 160;   // sample points — smooth without killing performance
+const GHOST_CY  = 45;
+const COMP_CY   = 135;
+const CARRIER_CY = 225;
+const GHOST_AMP  = 32;
+const COMP_AMP   = 64;   // 2× when fully in phase, 0 when cancelled
+const CARRIER_AMP = 32;
+
+function buildPath(centerY, amplitude, freq, phaseOffset) {
+    let d = '';
+    for (let i = 0; i <= STEPS; i++) {
+        const x = (i / STEPS) * W;
+        // scrollT drives the leftward scroll; freq controls how many cycles show
+        const t = scrollT + (i / STEPS) * Math.PI * 2 * freq;
+        const y = centerY + amplitude * Math.sin(t + phaseOffset);
+        d += i === 0 ? `M ${x.toFixed(1)} ${y.toFixed(2)}` : ` L ${x.toFixed(1)} ${y.toFixed(2)}`;
     }
+    return d;
 }
 
-// ── Game actions ───────────────────────────────────────────────────────────────
+function updatePaths() {
+    const p = phase.value;
+    const f = ghostFreq;
 
-function onSpace() {
-    if (result.value || spaceCooldown > 0 || showRestartMsg.value || showDumpMsg.value) return
-    const idx = activeWave.value
-    if (waveStates.value[idx] !== 'active') return
+    // Ghost: reference signal, phase 0
+    ghostPath.value = buildPath(GHOST_CY, GHOST_AMP, f, 0);
 
-    spaceCooldown = 0.35
+    // Carrier: same frequency, player-controlled phase offset
+    carrierPath.value = buildPath(CARRIER_CY, CARRIER_AMP, f, p);
 
-    if (atPeak.value[idx]) {
-        // Successful catch — advance this waveform's peak counter
-        const caught = wavePeaksCaught.value.map((v, i) => i === idx ? v + 1 : v)
-        wavePeaksCaught.value = caught
-        if (caught[idx] >= waveformPeakReqs[idx]) lockWaveform(idx)
-    } else {
-        // Miss — stability damage, increment miss counter, check restart
-        applyHit(missHit)
-        const misses = waveMisses.value.map((v, i) => i === idx ? v + 1 : v)
-        waveMisses.value = misses
-        if (misses[idx] > missTolerance[idx]) triggerRestart()
-    }
+    // Composite: sum of both — amplitude shrinks as p approaches π
+    // sin(t) + sin(t + p) = 2·cos(p/2)·sin(t + p/2)
+    // We render it as a wave with amplitude scaled by |2·cos(p/2)|
+    const compAmpScale = Math.abs(2 * Math.cos(p / 2));
+    const compPhase    = p / 2; // composite peak sits halfway between
+    compositePath.value = buildPath(COMP_CY, COMP_AMP * (compAmpScale / 2), f, compPhase);
 }
 
-function lockWaveform(idx) {
-    const states = waveStates.value.map((s, i) => {
-        if (i === idx)     return 'locked'
-        if (i === idx + 1) return 'active'
-        return s
-    })
-    if (idx < 2) {
-        activeWave.value = idx + 1
-        waveStates.value = states
-    } else {
-        waveStates.value = states
-        triggerDump()
-    }
-}
+// ── Layer management ──────────────────────────────────────────────────────────
 
-function triggerDump() {
-    dumpsComplete.value++
-    showDumpMsg.value = true
-    setTimeout(() => {
-        showDumpMsg.value = false
-        if (dumpsComplete.value >= dumpGoal) {
-            endGame('success')
-            setTimeout(() => emit('complete'), 2200)
-        } else {
-            resetSet()
-        }
-    }, 1800)
-}
+function onLayerFlushed() {
+    currentLayer.value++;
 
-function triggerRestart() {
-    showRestartMsg.value = true
-    setTimeout(() => {
-        showRestartMsg.value = false
-        resetSet()
-    }, 1200)
-}
-
-function resetSet() {
-    activeWave.value      = 0
-    waveStates.value      = ['active', 'pending', 'pending']
-    wavePeaksCaught.value = [0, 0, 0]
-    waveMisses.value      = [0, 0, 0]
-    historyArrs           = [[], [], []]
-    waveHistoryDisplay.value = ['', '', '']
-}
-
-// ── Game loop ──────────────────────────────────────────────────────────────────
-
-function tick(ts) {
-    if (result.value) return
-
-    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0
-    lastTs = ts
-
-    // Timer and trace bar stay in sync — both represent time pressure
-    timeLeft.value        = Math.max(0, timeLeft.value - dt)
-    primaryProgress.value = 1 - (timeLeft.value / timeLimit)
-
-    if (spaceCooldown > 0) spaceCooldown -= dt
-
-    // Fail conditions
-    if (!result.value && timeLeft.value <= 0) {
-        endGame('fail', props.skin.failText ?? 'Timer expired. Buffer unsalvaged.')
-        setTimeout(() => emit('fail'), 2200)
-        return
-    }
-    if (!result.value && stability.value <= 0) {
-        endGame('fail', '[STABILITY CRITICAL] — Rig shutdown.')
-        setTimeout(() => emit('fail'), 2200)
-        return
+    if (currentLayer.value >= totalLayers) {
+        endGame('success');
+        setTimeout(() => emit('complete'), 2200);
+        return;
     }
 
-    // Advance oscillations and update reactive display state
-    const newAmps = [0, 0, 0]
-    const newPeak = [false, false, false]
+    // Flash, then reset for next layer
+    layerFlash.value = true;
+    layerCooldown    = 1.0;
+    flushMeter.value = 0;
+    ghostFreq       += config.freqStep;
 
-    for (let i = 0; i < 3; i++) {
-        if (waveStates.value[i] === 'locked') continue
-
-        phases[i] += SPEEDS[i] * dt
-        const amp  = Math.sin(phases[i])
-        newAmps[i] = amp
-        newPeak[i] = Math.abs(amp) >= PEAK_THRESHOLD
-
-        // Push a bar-chart character to the scrolling history
-        historyTimers[i] -= dt
-        if (historyTimers[i] <= 0) {
-            const charIdx = Math.max(0, Math.min(7, Math.round(((amp + 1) / 2) * 7)))
-            historyArrs[i].push(WAVE_CHARS[charIdx])
-            if (historyArrs[i].length > 24) historyArrs[i].shift()
-            historyTimers[i] = 0.055
-        }
-    }
-
-    waveAmplitudes.value     = newAmps
-    atPeak.value             = newPeak
-    waveHistoryDisplay.value = historyArrs.map(h => h.join(''))
-
-    rafId = requestAnimationFrame(tick)
+    // Randomise starting phase for next layer so player can't just sit at π
+    phase.value = randomStartPhase();
 }
 
-// ── Keyboard ───────────────────────────────────────────────────────────────────
-
-function onKeyDown(e) {
-    if (e.code === 'Space') {
-        e.preventDefault()
-        onSpace()
-    }
-}
-
-// ── Lifecycle ──────────────────────────────────────────────────────────────────
-
-onMounted(() => {
-    document.addEventListener('keydown', onKeyDown)
-    rafId = requestAnimationFrame(tick)
-})
-
-onUnmounted(() => {
-    document.removeEventListener('keydown', onKeyDown)
-    if (rafId) cancelAnimationFrame(rafId)
-})
-
-// ── Chrome passthrough ─────────────────────────────────────────────────────────
+// ── Chrome passthrough ────────────────────────────────────────────────────────
 
 const chrome = computed(() => ({
     skin:            props.skin,
@@ -349,7 +260,76 @@ const chrome = computed(() => ({
     glitchIntensity: glitchIntensity.value,
     result:          result.value,
     failReason:      failReason.value,
-}))
+}));
+
+// ── Game loop ─────────────────────────────────────────────────────────────────
+
+let animFrame = null;
+let lastTs    = null;
+
+function tick(ts) {
+    if (result.value) return;
+
+    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
+    lastTs = ts;
+
+    // Scroll the waveforms left
+    scrollT -= dt * 1.4;
+
+    // Shared trace + stability
+    const failCause = tickShared(dt);
+    if (failCause) {
+        const reason = failCause === 'stability'
+            ? '[STABILITY CRITICAL] — System failure.'
+            : (props.skin.failText ?? 'Trace complete. Connection lost.');
+        endGame('fail', reason);
+        setTimeout(() => emit('fail'), 2200);
+        return;
+    }
+
+    // Layer cooldown — pause between flush and next layer starting
+    if (layerCooldown > 0) {
+        layerCooldown -= dt;
+        if (layerCooldown <= 0) layerFlash.value = false;
+        updatePaths();
+        animFrame = requestAnimationFrame(tick);
+        return;
+    }
+
+    // Phase advance while button held
+    if (advancing.value) {
+        phase.value += config.advanceRate * dt;
+    }
+
+    // Alignment drives the flush meter
+    const alignment = computeAlignment(phase.value);
+    if (alignment >= config.syncThreshold) {
+        flushMeter.value = Math.min(1, flushMeter.value + config.fillRate * dt);
+    } else {
+        flushMeter.value = Math.max(0, flushMeter.value - config.drainRate * dt);
+    }
+
+    if (flushMeter.value >= 1) {
+        flushMeter.value = 0;
+        onLayerFlushed();
+    }
+
+    // Update SVG paths
+    updatePaths();
+
+    animFrame = requestAnimationFrame(tick);
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+onMounted(() => {
+    updatePaths();
+    animFrame = requestAnimationFrame(tick);
+});
+
+onUnmounted(() => {
+    if (animFrame) cancelAnimationFrame(animFrame);
+});
 </script>
 
 <style scoped>
@@ -358,275 +338,228 @@ const chrome = computed(() => ({
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 16px 20px 12px;
     box-sizing: border-box;
-    gap: 14px;
     font-family: 'JetBrains Mono', monospace;
-    position: relative;
+    gap: 0;
 }
 
-/* ── Dump header ─────────────────────────────────────────────────────────────── */
+/* ── Lane labels ─────────────────────────────────────────────────────────────── */
 
-.fb-dump-header {
+.fb-lane-labels {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    left: 14px;
+    top: 0;
+    bottom: 0;
+    justify-content: space-around;
+    pointer-events: none;
+    z-index: 2;
+    padding: 8px 0;
+}
+
+.fb-lane-label {
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    opacity: 0.5;
+}
+
+.fb-lane-label--ghost     { color: #ff6600; }
+.fb-lane-label--composite { color: rgba(0,255,100,0.6); transition: color 0.3s; }
+.fb-lane-label--carrier   { color: #00ff9d; }
+
+.fb-composite-label--syncing {
+    color: #00ff9d;
+    opacity: 1;
+    animation: fb-label-pulse 0.8s ease infinite alternate;
+}
+
+/* ── SVG waveform ────────────────────────────────────────────────────────────── */
+
+.fb-svg {
+    flex: 1;
+    width: 100%;
+    display: block;
+    min-height: 0;
+}
+
+.fb-lane-div {
+    stroke: rgba(0,255,100,0.06);
+    stroke-width: 1;
+}
+
+.fb-zero {
+    stroke: rgba(0,255,100,0.08);
+    stroke-width: 1;
+    stroke-dasharray: 4 8;
+}
+
+.fb-zero--composite {
+    stroke: rgba(0,255,100,0.12);
+}
+
+.fb-wave {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.fb-wave--ghost {
+    stroke: rgba(255,102,0,0.65);
+    filter: drop-shadow(0 0 3px rgba(255,102,0,0.3));
+}
+
+.fb-wave--composite {
+    stroke: rgba(0,255,100,0.35);
+    stroke-width: 2.5;
+    transition: stroke 0.2s;
+}
+
+.fb-wave--syncing {
+    stroke: #00ff9d;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 6px rgba(0,255,100,0.5));
+}
+
+.fb-wave--carrier {
+    stroke: rgba(0,200,255,0.7);
+    filter: drop-shadow(0 0 3px rgba(0,200,255,0.3));
+}
+
+/* ── Controls row ────────────────────────────────────────────────────────────── */
+
+.fb-controls {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid rgba(0,255,100,0.08);
+    gap: 20px;
+    padding: 10px 16px;
+    border-top: 1px solid rgba(0,255,100,0.08);
     flex-shrink: 0;
 }
 
-.fb-dump-label {
-    font-size: 8px;
-    color: rgba(0,255,100,0.3);
+.fb-ctrl-label {
+    font-size: 7px;
+    color: rgba(0,255,100,0.25);
     letter-spacing: 0.18em;
+    display: block;
+    margin-bottom: 4px;
 }
 
-.fb-dump-pips { display: flex; gap: 7px; }
+/* Phase display */
 
-.fb-dump-pip {
-    font-size: 10px;
-    color: rgba(0,255,100,0.1);
-    transition: color 0.35s, text-shadow 0.35s;
+.fb-phase-block { display: flex; flex-direction: column; min-width: 90px; }
+
+.fb-phase-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: rgba(0,200,255,0.8);
+    letter-spacing: 0.08em;
 }
 
-.fb-dump-pip--done {
-    color: #00ff9d;
-    text-shadow: 0 0 8px rgba(0,255,100,0.6);
+/* Sync meter */
+
+.fb-sync-block {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 
-.fb-dump-count {
+.fb-sync-track {
+    height: 6px;
+    background: rgba(0,255,100,0.06);
+    overflow: hidden;
+    margin-bottom: 3px;
+}
+
+.fb-sync-fill {
+    height: 100%;
+    background: rgba(0,255,100,0.3);
+    transition: background 0.2s;
+}
+
+.fb-sync--locked {
+    background: #00ff9d;
+    box-shadow: 0 0 10px rgba(0,255,100,0.5);
+    animation: fb-sync-pulse 0.6s ease infinite alternate;
+}
+
+.fb-sync-pct {
     font-size: 9px;
     color: rgba(0,255,100,0.35);
     letter-spacing: 0.1em;
-    margin-left: auto;
 }
 
-/* ── Signal rows ─────────────────────────────────────────────────────────────── */
-
-.fb-signals {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 1;
-}
-
-.fb-signal-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px;
-    border: 1px solid rgba(0,255,100,0.07);
-    background: rgba(0,255,100,0.01);
-    transition: border-color 0.2s, background 0.2s, opacity 0.2s;
-}
-
-.fb-row--active {
-    border-color: rgba(0,255,100,0.28);
-    background: rgba(0,255,100,0.025);
-}
-
-.fb-row--pending { opacity: 0.4; }
-
-.fb-row--locked {
-    border-color: rgba(0,255,100,0.04);
-    background: transparent;
-    opacity: 0.55;
-}
-
-/* ── Signal meta ─────────────────────────────────────────────────────────────── */
-
-.fb-sig-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 62px;
-    flex-shrink: 0;
-}
-
-.fb-sig-label {
-    font-size: 11px;
-    color: rgba(0,255,100,0.4);
-    letter-spacing: 0.12em;
-}
-
-.fb-row--active .fb-sig-label { color: #00ff9d; }
-
-.fb-sig-peaks {
-    font-size: 9px;
-    color: rgba(0,255,100,0.3);
-    letter-spacing: 0.07em;
-}
-
-.fb-miss-pips { display: flex; gap: 5px; }
-
-.fb-miss-pip {
-    font-size: 7px;
-    color: rgba(0,255,100,0.18);
-    transition: color 0.12s;
-}
-
-.fb-miss-pip--used { color: rgba(255,50,50,0.75); }
-
-/* ── Waveform history ────────────────────────────────────────────────────────── */
-
-.fb-wf-display {
-    flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-.fb-wf-chars {
-    font-size: 12px;
-    color: rgba(0,255,100,0.15);
-    letter-spacing: 0.05em;
-    transition: color 0.2s;
-}
-
-.fb-wf-chars--active { color: rgba(0,255,100,0.55); }
-.fb-wf-chars--locked { color: rgba(0,255,100,0.12); }
-
-/* ── Vertical catch track ────────────────────────────────────────────────────── */
-
-.fb-catch-track {
-    width: 18px;
-    height: 72px;
-    position: relative;
-    background: rgba(0,255,100,0.02);
-    border: 1px solid rgba(0,255,100,0.07);
-    border-radius: 2px;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.fb-catch-track--active { border-color: rgba(0,255,100,0.22); }
-
-.fb-peak-zone {
-    position: absolute;
-    left: 0; right: 0;
-    height: 18%;
-    background: rgba(0,255,100,0.04);
-    transition: background 0.07s;
-}
-
-.fb-peak-zone--top { top: 0; }
-.fb-peak-zone--bot { bottom: 0; }
-
-.fb-peak-zone--lit {
-    background: rgba(0,255,100,0.28);
-    box-shadow: 0 0 6px rgba(0,255,100,0.35) inset;
-}
-
-.fb-catch-center {
-    position: absolute;
-    left: 0; right: 0;
-    top: 50%;
-    height: 1px;
-    background: rgba(0,255,100,0.1);
-    transform: translateY(-50%);
-}
-
-.fb-catch-dot {
-    position: absolute;
-    left: 50%;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,255,100,0.3);
-    transition: top 0.016s linear, background 0.07s, box-shadow 0.07s;
-}
-
-.fb-catch-dot--peak {
-    background: #00ff9d;
-    box-shadow: 0 0 10px rgba(0,255,100,1), 0 0 20px rgba(0,255,100,0.5);
-}
-
-.fb-catch-dot--locked { background: rgba(0,255,100,0.15); box-shadow: none; }
-.fb-catch-dot--dim    { background: rgba(0,255,100,0.1);  box-shadow: none; }
-
-/* ── Status badge ────────────────────────────────────────────────────────────── */
-
-.fb-sig-status {
-    font-size: 8px;
-    letter-spacing: 0.1em;
-    width: 76px;
-    flex-shrink: 0;
-    text-align: right;
-}
-
-.fb-status--active  { color: rgba(0,255,100,0.7); animation: fb-blink 0.9s steps(1) infinite; }
-.fb-status--pending { color: rgba(0,255,100,0.18); }
-.fb-status--locked  { color: rgba(0,255,100,0.28); }
-
-/* ── Space prompt ────────────────────────────────────────────────────────────── */
-
-.fb-space-row {
-    display: flex;
-    justify-content: center;
-    padding-top: 2px;
-    flex-shrink: 0;
-}
-
-.fb-space-key {
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: rgba(0,255,100,0.2);
-    border: 1px solid rgba(0,255,100,0.08);
-    padding: 7px 24px;
-    pointer-events: none;
-    user-select: none;
-    transition: color 0.1s, border-color 0.1s, box-shadow 0.1s;
-}
-
-.fb-space-key--ready {
+.fb-sync-pct--locked {
     color: #00ff9d;
-    border-color: rgba(0,255,100,0.55);
-    animation: fb-pulse 0.45s ease infinite alternate;
 }
 
-/* ── Feedback messages ───────────────────────────────────────────────────────── */
+/* Layer pips */
 
-.fb-msg {
+.fb-layer-block { display: flex; flex-direction: column; }
+
+.fb-layer-pips  { display: flex; gap: 5px; margin-bottom: 3px; }
+
+.fb-pip { font-size: 10px; color: rgba(0,255,100,0.12); transition: color 0.3s; }
+.fb-pip--active  { color: #ff6600; text-shadow: 0 0 6px rgba(255,102,0,0.5); }
+.fb-pip--flushed { color: rgba(0,255,100,0.22); }
+
+.fb-layer-count { font-size: 8px; color: rgba(0,255,100,0.25); letter-spacing: 0.1em; }
+
+/* Advance button */
+
+.fb-advance-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    background: transparent;
+    border: 1px solid rgba(0,200,255,0.3);
+    color: rgba(0,200,255,0.6);
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: all 0.08s;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.fb-advance-btn:hover {
+    border-color: rgba(0,200,255,0.6);
+    color: rgba(0,200,255,0.9);
+}
+
+.fb-advance--held {
+    background: rgba(0,200,255,0.08);
+    border-color: #00ccff;
+    color: #00ccff;
+    box-shadow: 0 0 14px rgba(0,200,255,0.2);
+}
+
+/* ── Flash message ───────────────────────────────────────────────────────────── */
+
+.fb-flash-msg {
     position: absolute;
-    bottom: 58px;
+    bottom: 70px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 10px;
+    color: #00ff9d;
     letter-spacing: 0.15em;
-    padding: 8px 22px;
-    border: 1px solid;
+    background: rgba(0,20,10,0.95);
+    border: 1px solid rgba(0,255,100,0.35);
+    padding: 7px 20px;
     white-space: nowrap;
     pointer-events: none;
-    text-align: center;
+    text-shadow: 0 0 10px rgba(0,255,100,0.5);
     z-index: 10;
-}
-
-.fb-msg--fail {
-    color: rgba(255,50,50,0.9);
-    border-color: rgba(255,50,50,0.3);
-    background: rgba(20,0,0,0.92);
-}
-
-.fb-msg--success {
-    color: #00ff9d;
-    border-color: rgba(0,255,100,0.4);
-    background: rgba(0,20,10,0.92);
-    text-shadow: 0 0 10px rgba(0,255,100,0.4);
 }
 
 /* ── Transitions ─────────────────────────────────────────────────────────────── */
 
-.fb-msg-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
-.fb-msg-leave-active { transition: opacity 0.18s ease; }
-.fb-msg-enter-from   { opacity: 0; transform: translateX(-50%) translateY(6px); }
-.fb-msg-leave-to     { opacity: 0; }
+.fb-flash-enter-active, .fb-flash-leave-active { transition: opacity 0.2s; }
+.fb-flash-enter-from,   .fb-flash-leave-to     { opacity: 0; }
 
 /* ── Animations ──────────────────────────────────────────────────────────────── */
 
-@keyframes fb-blink { 0%,49%{opacity:1} 50%,100%{opacity:0.35} }
-@keyframes fb-pulse {
-    from { box-shadow: 0 0 8px rgba(0,255,100,0.08); }
-    to   { box-shadow: 0 0 24px rgba(0,255,100,0.28); }
-}
+@keyframes fb-sync-pulse  { from { box-shadow: 0 0 6px rgba(0,255,100,0.3);  } to { box-shadow: 0 0 16px rgba(0,255,100,0.7); } }
+@keyframes fb-label-pulse { from { opacity: 0.7; } to { opacity: 1; } }
 </style>
