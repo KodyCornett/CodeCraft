@@ -324,6 +324,20 @@ const {
     tickShared, applyHit, endGame,
 } = useQuestMinigameState(props.skin);
 
+const chrome = computed(() => ({
+    skin:            props.skin,
+    timeLeft:        timeLeft.value,
+    primaryProgress: primaryProgress.value,
+    stability:       stability.value,
+    stabilityClass:  stabilityClass.value,
+    timerClass:      timerClass.value,
+    glitchActive:    glitchActive.value,
+    glitchType:      glitchType.value,
+    glitchIntensity: glitchIntensity.value,
+    result:          result.value,
+    failReason:      failReason.value,
+}));
+
 // ── Scan toggle ───────────────────────────────────────────────────────────────
 
 const isScanning = ref(true);
