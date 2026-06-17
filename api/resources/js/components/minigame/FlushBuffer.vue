@@ -143,6 +143,9 @@
 
             </div>
 
+            <!-- CRT overlay — scanlines + vignette, pointer-events: none -->
+            <div class="fb-crt-overlay" aria-hidden="true" />
+
         </div>
     </QuestMinigameChrome>
 </template>
@@ -503,13 +506,50 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/*
+ * ── Color palette ─────────────────────────────────────────────────────────────
+ * L1  Bright Cyan  #00e5ff  — key titles, selected highlights, CTAs
+ * L2  Bright Green #00ff9d  — live data, status, active labels
+ * L3  Dim Green    rgba(0,160,70,0.38)  — de-emphasized (ref baseline, grid header text)
+ * AL  Orange       #ff6600  — anomaly, warning, spike, flush
+ */
+
+/* ── Root wrapper ─────────────────────────────────────────────────────────── */
+
 .fb-wrap {
+    position: relative;          /* anchor for CRT overlay */
+    overflow: hidden;
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     font-family: 'JetBrains Mono', monospace;
     box-sizing: border-box;
+    background: #01080380;
+}
+
+/* ── CRT Overlay — scanlines + corner vignette ───────────────────────────── */
+
+.fb-crt-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+
+    /* Scanlines: 2 px opaque / 2 px glass, ~2.5% opacity — barely visible */
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            transparent        0px,
+            transparent        2px,
+            rgba(0,0,0,0.055)  2px,
+            rgba(0,0,0,0.055)  4px
+        );
+
+    /* Corner vignette via inset box-shadow */
+    box-shadow:
+        inset 0   0   60px  20px rgba(0,0,0,0.55),
+        inset 0   0   120px 40px rgba(0,0,0,0.28);
 }
 
 /* ── CAPTURE SECTION ──────────────────────────────────────────────────────── */
@@ -518,48 +558,68 @@ onUnmounted(() => {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    border-bottom: 1px solid rgba(0,255,100,0.12);
+    border-bottom: 1px solid rgba(0,200,80,0.14);
     padding: 0 0 6px;
 }
+
+/* Status bar */
 
 .fb-status-bar {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 5px 14px;
-    background: rgba(0,255,100,0.03);
-    border-bottom: 1px solid rgba(0,255,100,0.07);
+    background: rgba(0,255,100,0.025);
+    border-bottom: 1px solid rgba(0,200,80,0.09);
     flex-shrink: 0;
 }
 
+/* L2 — standard status labels */
 .fb-status-item {
     font-size: 8px;
-    color: rgba(0,255,100,0.45);
-    letter-spacing: 0.12em;
+    color: #00ff9d;
+    letter-spacing: 0.13em;
+    text-shadow: 0 0 6px rgba(0,255,157,0.45);
 }
 
-.fb-status-item--mode { margin-left: auto; color: rgba(0,255,100,0.25); }
-.fb-status--warn      { color: #ff6600; }
-.fb-status-sep        { color: rgba(0,255,100,0.15); font-size: 8px; }
+/* L1 — SYSTEM_DIAGNOSTIC_MODE label (cyan, pushed right) */
+.fb-status-item--mode {
+    margin-left: auto;
+    color: #00e5ff;
+    text-shadow: 0 0 8px rgba(0,229,255,0.55), 0 0 18px rgba(0,229,255,0.2);
+}
+
+/* Orange override when buffer full */
+.fb-status--warn {
+    color: #ff6600 !important;
+    text-shadow: 0 0 8px rgba(255,102,0,0.6) !important;
+}
+
+.fb-status-sep {
+    color: rgba(0,180,80,0.2);
+    font-size: 8px;
+}
+
+/* Waveform rows */
 
 .fb-waveforms {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 6px 14px 0;
+    padding: 7px 14px 0;
 }
 
 .fb-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .fb-row-label {
     font-size: 9px;
-    color: rgba(0,255,100,0.3);
-    letter-spacing: 0.12em;
-    width: 22px;
+    color: rgba(0,180,70,0.35);   /* L3 — de-emphasized channel label */
+    letter-spacing: 0.14em;
+    width: 24px;
     flex-shrink: 0;
 }
 
@@ -573,21 +633,25 @@ onUnmounted(() => {
 .fb-svg {
     width: 100%;
     display: block;
-    background: rgba(0,10,5,0.5);
-    border: 1px solid rgba(0,255,100,0.07);
+    background: rgba(0,8,3,0.6);
+    border: 1px solid rgba(0,180,70,0.10);
 }
 
 .fb-wave-path {
     fill: none;
     stroke: #00ff9d;
-    stroke-width: 1.5;
+    stroke-width: 1.6;
     stroke-linecap: round;
     stroke-linejoin: round;
-    filter: drop-shadow(0 0 2px rgba(0,255,100,0.3));
+    /* Phosphor bloom on the waveform */
+    filter:
+        drop-shadow(0 0 1.5px rgba(0,255,157,0.9))
+        drop-shadow(0 0 4px   rgba(0,255,157,0.4))
+        drop-shadow(0 0 10px  rgba(0,255,157,0.15));
 }
 
 .fb-block-div {
-    stroke: rgba(0,255,100,0.06);
+    stroke: rgba(0,200,80,0.06);
     stroke-width: 1;
 }
 
@@ -599,26 +663,30 @@ onUnmounted(() => {
 
 .fb-block--spike {
     fill: rgba(255,102,0,0.10);
-    stroke: rgba(255,102,0,0.5);
+    stroke: rgba(255,102,0,0.55);
     stroke-width: 1;
     cursor: pointer;
-    animation: fb-spike-pulse 0.4s ease infinite alternate;
+    animation: fb-spike-pulse 0.38s ease infinite alternate;
+    filter: drop-shadow(0 0 4px rgba(255,102,0,0.35));
 }
 
 .fb-block--lock {
-    fill: rgba(0,255,100,0.15);
-    stroke: rgba(0,255,100,0.5);
+    fill: rgba(0,255,157,0.10);
+    stroke: rgba(0,255,157,0.45);
     stroke-width: 1;
+    filter: drop-shadow(0 0 3px rgba(0,255,157,0.3));
 }
 
 .fb-block--full {
-    fill: rgba(255,102,0,0.03);
+    fill: rgba(255,102,0,0.025);
     cursor: not-allowed;
 }
 
+/* Window countdown bar under each row */
+
 .fb-window-track {
     height: 2px;
-    background: rgba(255,102,0,0.06);
+    background: rgba(255,102,0,0.05);
     overflow: hidden;
     margin-top: 1px;
 }
@@ -626,6 +694,7 @@ onUnmounted(() => {
 .fb-window-fill {
     height: 100%;
     background: #ff6600;
+    box-shadow: 0 0 5px rgba(255,102,0,0.6);
     transition: width 0.05s linear;
 }
 
@@ -635,7 +704,6 @@ onUnmounted(() => {
     flex: 1;
     display: flex;
     min-height: 0;
-    gap: 0;
 }
 
 .fb-audit-main {
@@ -643,34 +711,35 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 8px 14px;
-    border-right: 1px solid rgba(0,255,100,0.08);
+    padding: 8px 14px 8px 14px;
+    border-right: 1px solid rgba(0,180,70,0.10);
 }
 
-/* Reference baseline */
+/* Reference baseline — L3 de-emphasized */
 
 .fb-reference {
     display: flex;
     align-items: baseline;
-    gap: 10px;
-    padding: 5px 8px;
-    background: rgba(0,255,100,0.03);
-    border: 1px solid rgba(0,255,100,0.10);
+    gap: 12px;
+    padding: 5px 10px;
+    background: rgba(0,100,40,0.05);
+    border: 1px solid rgba(0,160,60,0.10);
     margin-bottom: 6px;
     flex-shrink: 0;
 }
 
 .fb-ref-tag {
     font-size: 7px;
-    color: rgba(0,255,100,0.35);
-    letter-spacing: 0.18em;
+    color: rgba(0,160,70,0.38);    /* L3 */
+    letter-spacing: 0.20em;
     flex-shrink: 0;
+    text-transform: uppercase;
 }
 
 .fb-ref-val {
     font-size: 8px;
-    color: rgba(0,255,100,0.55);
-    letter-spacing: 0.06em;
+    color: rgba(0,160,70,0.38);    /* L3 */
+    letter-spacing: 0.05em;
 }
 
 /* Audit grid */
@@ -679,65 +748,88 @@ onUnmounted(() => {
     flex: 1;
     overflow-y: auto;
     min-height: 0;
+    border: 1px solid rgba(0,180,70,0.12);
 }
 
 .fb-grid {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;    /* strict columnar alignment */
     font-size: 10px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
 }
+
+/* Fixed column widths for perfect monospaced alignment */
+.fb-grid th:nth-child(1), .fb-grid td:nth-child(1) { width: 82px;  }
+.fb-grid th:nth-child(2), .fb-grid td:nth-child(2) { width: 120px; }
+.fb-grid th:nth-child(3), .fb-grid td:nth-child(3) { width: 90px;  }
+.fb-grid th:nth-child(4), .fb-grid td:nth-child(4) { width: 74px;  }
+.fb-grid th:nth-child(5), .fb-grid td:nth-child(5) { width: auto;  }
 
 .fb-grid thead tr {
-    background: rgba(0,255,100,0.04);
+    background: rgba(0,200,80,0.035);
+    border-bottom: 1px solid rgba(0,180,70,0.15);
 }
 
+/* L3 — grid column headers */
 .fb-grid th {
     text-align: left;
-    padding: 5px 10px;
+    padding: 6px 10px;
     font-size: 8px;
-    color: rgba(0,255,100,0.3);
-    letter-spacing: 0.15em;
-    border-bottom: 1px solid rgba(0,255,100,0.10);
+    color: rgba(0,160,70,0.40);    /* L3 */
+    letter-spacing: 0.18em;
     font-weight: normal;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
+/* L2 — active data rows */
 .fb-grid-row {
-    border-bottom: 1px solid rgba(0,255,100,0.05);
+    border-bottom: 1px solid rgba(0,180,70,0.07);
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.08s;
 }
 
 .fb-grid-row:hover:not(.fb-grid-row--empty) {
-    background: rgba(0,255,100,0.04);
+    background: rgba(0,255,100,0.035);
 }
 
+/* Empty placeholder rows — use visible border instead of blank space */
 .fb-grid-row--empty {
     cursor: default;
-    opacity: 0.2;
+    border-bottom: 1px solid rgba(0,180,70,0.05);
 }
 
 .fb-grid td {
-    padding: 5px 10px;
-    color: rgba(0,255,100,0.65);
+    padding: 6px 10px;
+    color: #00ff9d;             /* L2 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 0 4px rgba(0,255,157,0.25);
 }
 
+/* L3 for empty slot placeholders */
 .fb-grid-row--empty td {
-    color: rgba(0,255,100,0.15);
+    color: rgba(0,140,60,0.18);
+    font-size: 8px;
+    text-shadow: none;
 }
 
+/* Selected (flagged) row — orange alert */
 .fb-row--selected {
-    background: rgba(255,102,0,0.08) !important;
-    border-left: 2px solid #ff6600;
+    background: rgba(255,102,0,0.07) !important;
+    border-left: 2px solid rgba(255,102,0,0.65);
 }
 
 .fb-row--selected td {
     color: #ff9933;
+    text-shadow: 0 0 6px rgba(255,153,51,0.45);
 }
 
 .fb-status-col {
     font-size: 9px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
 }
 
 /* Action buttons */
@@ -747,87 +839,104 @@ onUnmounted(() => {
     gap: 10px;
     padding-top: 8px;
     flex-shrink: 0;
-    border-top: 1px solid rgba(0,255,100,0.06);
+    border-top: 1px solid rgba(0,180,70,0.08);
     margin-top: 6px;
 }
 
 .fb-action-btn {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.20em;
     background: transparent;
-    padding: 7px 20px;
+    padding: 7px 22px;
     cursor: pointer;
     transition: all 0.1s;
 }
 
 .fb-action-btn:disabled {
-    opacity: 0.3;
+    opacity: 0.22;
     cursor: not-allowed;
 }
 
+/* L1 Cyan-tinted flush button (primary CTA) */
 .fb-btn--flush {
-    border: 1px solid rgba(255,102,0,0.4);
-    color: rgba(255,102,0,0.7);
+    border: 1px solid rgba(255,102,0,0.45);
+    color: rgba(255,120,0,0.80);
 }
 
 .fb-btn--flush:hover:not(:disabled) {
-    background: rgba(255,102,0,0.08);
+    background: rgba(255,102,0,0.07);
     border-color: #ff6600;
     color: #ff9933;
+    box-shadow: 0 0 8px rgba(255,102,0,0.25);
 }
 
 .fb-btn--clear {
-    border: 1px solid rgba(0,255,100,0.2);
-    color: rgba(0,255,100,0.4);
+    border: 1px solid rgba(0,200,80,0.18);
+    color: rgba(0,200,80,0.40);
 }
 
 .fb-btn--clear:hover:not(:disabled) {
-    background: rgba(0,255,100,0.04);
-    border-color: rgba(0,255,100,0.5);
-    color: rgba(0,255,100,0.7);
+    background: rgba(0,255,100,0.035);
+    border-color: rgba(0,200,80,0.45);
+    color: #00ff9d;
 }
 
-/* ── TERMINAL LOG ─────────────────────────────────────────────────────────── */
+/* ── TERMINAL LOG — full height, right panel ──────────────────────────────── */
 
 .fb-terminal-log {
     width: 220px;
     flex-shrink: 0;
-    background: rgba(0,5,2,0.6);
-    border-left: 1px solid rgba(0,255,100,0.08);
-    padding: 8px;
+    background: rgba(0,4,2,0.55);
+    border-left: 1px solid rgba(0,180,70,0.10);
+    padding: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 2px;
     box-sizing: border-box;
+    /* Full height is guaranteed because fb-audit-section is flex with min-height:0 */
 }
 
+/* L1 Cyan — terminal log title */
 .fb-log-header {
     font-size: 7px;
-    color: rgba(0,255,100,0.25);
-    letter-spacing: 0.2em;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(0,255,100,0.07);
-    margin-bottom: 4px;
+    color: #00e5ff;
+    letter-spacing: 0.22em;
+    padding: 7px 10px 6px;
+    border-bottom: 1px solid rgba(0,180,70,0.10);
     flex-shrink: 0;
+    background: rgba(0,229,255,0.025);
+    text-shadow: 0 0 7px rgba(0,229,255,0.55), 0 0 16px rgba(0,229,255,0.2);
 }
 
 .fb-log-line {
     font-size: 8px;
-    color: rgba(0,255,100,0.45);
+    color: rgba(0,200,80,0.50);
     letter-spacing: 0.04em;
-    line-height: 1.5;
+    line-height: 1.55;
     word-break: break-all;
+    padding: 2px 10px;
 }
 
-.fb-log--warn  { color: rgba(255,153,0,0.7); }
-.fb-log--error { color: rgba(255,80,80,0.8); }
+.fb-log--warn  {
+    color: rgba(255,153,0,0.75);
+    text-shadow: 0 0 5px rgba(255,153,0,0.30);
+}
+.fb-log--error {
+    color: rgba(255,70,70,0.85);
+    text-shadow: 0 0 6px rgba(255,70,70,0.35);
+}
 
 /* ── Animations ───────────────────────────────────────────────────────────── */
 
 @keyframes fb-spike-pulse {
-    from { fill: rgba(255,102,0,0.06); stroke: rgba(255,102,0,0.3); }
-    to   { fill: rgba(255,102,0,0.18); stroke: rgba(255,102,0,0.7); }
+    from {
+        fill: rgba(255,102,0,0.05);
+        stroke: rgba(255,102,0,0.30);
+    }
+    to {
+        fill: rgba(255,102,0,0.16);
+        stroke: rgba(255,102,0,0.80);
+    }
 }
 </style>
