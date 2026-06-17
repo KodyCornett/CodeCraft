@@ -85,9 +85,18 @@
                                 <path :d="refWavePath" class="fb-inspect-path fb-path--ref" />
                             </svg>
                             <div class="fb-inspect-metrics">
-                                <span class="fb-metric">SRC&nbsp;&nbsp;{{ sessionSource }}</span>
-                                <span class="fb-metric">FREQ {{ freqMinDisplay }}–{{ freqMaxDisplay }} GHz</span>
-                                <span class="fb-metric">LOAD {{ loadMinDisplay }}–{{ loadMaxDisplay }} KB</span>
+                                <div class="fb-metric-row">
+                                    <span class="fb-metric-key">SRC</span>
+                                    <span class="fb-metric-val">{{ sessionSource }}</span>
+                                </div>
+                                <div class="fb-metric-row">
+                                    <span class="fb-metric-key">FREQ</span>
+                                    <span class="fb-metric-val">{{ freqMinDisplay }}–{{ freqMaxDisplay }} <em>GHz</em></span>
+                                </div>
+                                <div class="fb-metric-row">
+                                    <span class="fb-metric-key">LOAD</span>
+                                    <span class="fb-metric-val">{{ loadMinDisplay }}–{{ loadMaxDisplay }} <em>KB</em></span>
+                                </div>
                             </div>
                         </div>
 
@@ -105,15 +114,18 @@
                                 <path :d="sigWavePath"  class="fb-inspect-path fb-path--sig" />
                             </svg>
                             <div class="fb-inspect-metrics">
-                                <span class="fb-metric" :class="sourceDeviation ? 'fb-metric--dev' : ''">
-                                    SRC&nbsp;&nbsp;{{ inspectedSignal.source }}{{ sourceDeviation ? ' ⚠' : '' }}
-                                </span>
-                                <span class="fb-metric" :class="freqDeviation ? 'fb-metric--dev' : ''">
-                                    FREQ {{ inspectedSignal.freq }} GHz{{ freqDeviation ? ' ⚠' : '' }}
-                                </span>
-                                <span class="fb-metric" :class="loadDeviation ? 'fb-metric--dev' : ''">
-                                    LOAD {{ inspectedSignal.load }} KB{{ loadDeviation ? ' ⚠' : '' }}
-                                </span>
+                                <div class="fb-metric-row" :class="sourceDeviation ? 'fb-metric-row--dev' : ''">
+                                    <span class="fb-metric-key">SRC</span>
+                                    <span class="fb-metric-val">{{ inspectedSignal.source }}<span v-if="sourceDeviation" class="fb-metric-warn"> ⚠</span></span>
+                                </div>
+                                <div class="fb-metric-row" :class="freqDeviation ? 'fb-metric-row--dev' : ''">
+                                    <span class="fb-metric-key">FREQ</span>
+                                    <span class="fb-metric-val">{{ inspectedSignal.freq }} <em>GHz</em><span v-if="freqDeviation" class="fb-metric-warn"> ⚠</span></span>
+                                </div>
+                                <div class="fb-metric-row" :class="loadDeviation ? 'fb-metric-row--dev' : ''">
+                                    <span class="fb-metric-key">LOAD</span>
+                                    <span class="fb-metric-val">{{ inspectedSignal.load }} <em>KB</em><span v-if="loadDeviation" class="fb-metric-warn"> ⚠</span></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -137,8 +149,12 @@
                     </div>
 
                     <div class="fb-reference">
-                        <span class="fb-ref-tag">REFERENCE_CAPTURE:</span>
-                        <span class="fb-ref-val">SRC: {{ sessionSource }} · FREQ: {{ freqMinDisplay }}–{{ freqMaxDisplay }} GHz · LOAD: {{ loadMinDisplay }}–{{ loadMaxDisplay }} KB</span>
+                        <span class="fb-ref-tag">REF</span>
+                        <span class="fb-ref-field"><span class="fb-ref-key">SRC</span><span class="fb-ref-val">{{ sessionSource }}</span></span>
+                        <span class="fb-ref-sep">·</span>
+                        <span class="fb-ref-field"><span class="fb-ref-key">FREQ</span><span class="fb-ref-val">{{ freqMinDisplay }}–{{ freqMaxDisplay }} GHz</span></span>
+                        <span class="fb-ref-sep">·</span>
+                        <span class="fb-ref-field"><span class="fb-ref-key">LOAD</span><span class="fb-ref-val">{{ loadMinDisplay }}–{{ loadMaxDisplay }} KB</span></span>
                     </div>
 
                     <div class="fb-grid-wrap">
@@ -1056,19 +1072,54 @@ onUnmounted(() => {
 
 .fb-inspect-metrics {
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    gap: 3px;
+    padding-top: 4px;
 }
 
-.fb-metric {
-    font-size: 7px;
-    color: rgba(0,160,70,0.35);
-    letter-spacing: 0.06em;
-    white-space: nowrap;
+.fb-metric-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
 }
 
-.fb-metric--dev {
+.fb-metric-key {
+    font-size: 7.5px;
+    color: rgba(0,160,70,0.40);
+    letter-spacing: 0.18em;
+    width: 36px;
+    flex-shrink: 0;
+}
+
+.fb-metric-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(0,220,130,0.75);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 6px rgba(0,255,157,0.25);
+}
+
+.fb-metric-val em {
+    font-style: normal;
+    font-size: 8px;
+    font-weight: normal;
+    color: rgba(0,180,80,0.45);
+    margin-left: 2px;
+}
+
+.fb-metric-row--dev .fb-metric-key {
+    color: rgba(255,153,51,0.55);
+}
+
+.fb-metric-row--dev .fb-metric-val {
     color: #ff9933;
-    text-shadow: 0 0 4px rgba(255,153,51,0.40);
+    text-shadow: 0 0 8px rgba(255,153,51,0.50);
+}
+
+.fb-metric-warn {
+    color: #ff6600;
+    font-size: 10px;
+    text-shadow: 0 0 6px rgba(255,102,0,0.60);
 }
 
 .fb-inspect-divider {
@@ -1141,25 +1192,45 @@ onUnmounted(() => {
 
 .fb-reference {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 3px 10px;
-    background: rgba(0,80,30,0.04);
-    border-bottom: 1px solid rgba(0,180,70,0.08);
+    align-items: center;
+    gap: 10px;
+    padding: 5px 10px;
+    background: rgba(0,80,30,0.06);
+    border-bottom: 1px solid rgba(0,180,70,0.10);
     flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 .fb-ref-tag {
-    font-size: 6.5px;
-    color: rgba(0,160,70,0.30);
-    letter-spacing: 0.18em;
+    font-size: 7px;
+    color: rgba(0,160,70,0.35);
+    letter-spacing: 0.20em;
     flex-shrink: 0;
 }
 
+.fb-ref-sep {
+    color: rgba(0,180,70,0.18);
+    font-size: 10px;
+}
+
+.fb-ref-field {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+
+.fb-ref-key {
+    font-size: 7.5px;
+    color: rgba(0,160,70,0.40);
+    letter-spacing: 0.16em;
+}
+
 .fb-ref-val {
-    font-size: 7px;
-    color: rgba(0,160,70,0.30);
+    font-size: 11px;
+    font-weight: 700;
+    color: #00ff9d;
     letter-spacing: 0.04em;
+    text-shadow: 0 0 6px rgba(0,255,157,0.30);
 }
 
 .fb-grid-wrap {
@@ -1172,8 +1243,8 @@ onUnmounted(() => {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 9px;
-    letter-spacing: 0.06em;
+    font-size: 11px;
+    letter-spacing: 0.04em;
 }
 
 .fb-grid th:nth-child(1), .fb-grid td:nth-child(1) { width: 78px;  }
