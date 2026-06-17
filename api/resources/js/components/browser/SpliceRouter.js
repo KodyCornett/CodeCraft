@@ -38,6 +38,7 @@ import ArchivePage     from './pages/ArchivePage.vue';
 import BankPage      from './pages/BankPage.vue';
 import SystemUpdate    from './pages/SystemUpdate.vue';
 import DocDialoguePage from './pages/DocDialoguePage.vue';
+import DevMinigameLauncher from './pages/DevMinigameLauncher.vue';
 import NotFound        from './pages/NotFound.vue';
 
 // ── Route table ───────────────────────────────────────────────────────────────
@@ -74,6 +75,9 @@ const ROUTES = [
     { url: 'splice://sys.tacat/cortex-patch',    title: 'CORTEX PATCH // FORCED', component: SystemUpdate   },
     { url: 'splice://sys.local/commands',         title: 'Commands',        component: SysCommands       },
     { url: 'splice://sys.local/inventory', title: 'Inventory',    component: SysInventory },
+
+    // ── Dev tools — remove before release ────────────────────────────────────
+    { url: 'splice://dev/minigames', title: 'DEV // Minigame Launcher', component: DevMinigameLauncher },
 
     // ── Doc dialogue pages ────────────────────────────────────────────────────
     { url: 'splice://dialogue/knuckle', title: 'KNUCKLE // TRANSMISSION', component: DocDialoguePage },
@@ -118,7 +122,8 @@ export const SPLICE = {
     FLUSH_BUFFER_GUIDE:  'splice://sys.local/guide/flushbuffer',
     TOXIC_SOAK_GUIDE:    'splice://sys.local/guide/toxicsoak',
     TUTORIAL:          'splice://sys.local/tutorial',
-    TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app — Mission Log / Quest Log
+    TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app
+    DEV_MINIGAMES:     'splice://dev/minigames',        // DEV ONLY — remove before release— Mission Log / Quest Log
     ARCHIVE:           'splice://sys.local/archive',   // Chronological story archive
     PERSONAS:          'splice://sys.local/personas',  // Runner Personas reference
     INVENTORY:    'splice://sys.local/inventory',
