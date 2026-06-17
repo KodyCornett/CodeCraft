@@ -416,7 +416,7 @@ const isBufferFull     = computed(() => capturedSignals.value.length >= MAX_BUFF
 const emptySlots       = computed(() => Math.max(0, MAX_BUFFER - capturedSignals.value.length));
 
 // Comparison waveform — cycles and amplitude normalised against session baseline
-const sigWavePath = computed(() => const sigWavePath = computed(() => {
+const sigWavePath = computed(() => {
     if (!inspectedSignal.value) return '';
     const sig    = inspectedSignal.value;
     const cycles = (parseFloat(sig.freq) / sessionFreq.value) * 2;
