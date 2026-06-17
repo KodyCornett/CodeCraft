@@ -2,68 +2,104 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="fb-wrap">
 
-            <!-- Signal monitor -->
-            <div class="fb-monitor-label">SIGNAL MONITOR // DT-v8.ghost</div>
-            <div class="fb-waveform">{{ signalDisplay }}</div>
-            <div class="fb-state-row">
-                <span class="fb-state-badge" :class="phase === 'cycling' ? 'fb-badge--cycling' : 'fb-badge--transmit'">
-                    {{ phase === 'cycling' ? '[ CYCLING ]' : '[ TRANSMITTING ]' }}
-                </span>
-                <span class="fb-amp">
-                    SIG_AMP: <span class="fb-amp-val" :class="phase === 'cycling' ? 'fb-amp--lock' : 'fb-amp--noise'">
-                        0x{{ phase === 'cycling' ? sigAmp : noiseVal }}
-                    </span>
-                </span>
-            </div>
-
-            <!-- Recursion depth -->
-            <div class="fb-depth-row">
-                <span class="fb-depth-label">RECURSION DEPTH</span>
-                <span class="fb-depth-pips">
+            <!-- Dump progress -->
+            <div class="fb-dump-header">
+                <span class="fb-dump-label">BUFFER DUMP</span>
+                <div class="fb-dump-pips">
                     <span
-                        v-for="i in totalLayers"
-                        :key="i"
-                        class="fb-pip"
-                        :class="i <= currentLayer ? 'fb-pip--flushed' : (i === currentLayer + 1 ? 'fb-pip--active' : '')"
+                        v-for="i in dumpGoal" :key="i"
+                        class="fb-dump-pip"
+                        :class="{ 'fb-dump-pip--done': i <= dumpsComplete }"
                     >█</span>
-                </span>
-                <span class="fb-depth-count">{{ currentLayer }} / {{ totalLayers }}</span>
+                </div>
+                <span class="fb-dump-count">{{ dumpsComplete }} / {{ dumpGoal }}</span>
             </div>
 
-            <div class="fb-instances">
-                ACTIVE INSTANCES&nbsp;&nbsp;<span class="fb-inst-val">{{ instanceDisplay }}</span>
-            </div>
-
-            <!-- Cycling panel — only visible during CYCLING phase -->
-            <Transition name="fb-cycle">
-                <div v-if="phase === 'cycling'" class="fb-cycle-panel">
-                    <div class="fb-cycle-title">ECHO TO FLUSH — SELECT MATCHING VALUE</div>
-                    <div class="fb-target-amp">0x{{ sigAmp }}</div>
-                    <div class="fb-options">
-                        <button
-                            v-for="opt in options"
-                            :key="opt"
-                            class="fb-opt-btn"
-                            @click="onSelect(opt)"
-                        >0x{{ opt }}</button>
-                    </div>
-                    <div class="fb-window-row">
-                        <span class="fb-window-label">WINDOW</span>
-                        <div class="fb-window-track">
-                            <div
-                                class="fb-window-fill"
-                                :class="{ 'fb-window--critical': windowProgress < 0.3 }"
-                                :style="{ width: (windowProgress * 100) + '%' }"
-                            />
+            <!-- Signal array -->
+            <div class="fb-signals">
+                <div
+                    v-for="idx in [0, 1, 2]" :key="idx"
+                    class="fb-signal-row"
+                    :class="rowClass(idx)"
+                >
+                    <!-- Left: label + peak counter + miss pips -->
+                    <div class="fb-sig-meta">
+                        <span class="fb-sig-label">W{{ idx + 1 }}</span>
+                        <span class="fb-sig-peaks">{{ wavePeaksCaught[idx] }} / {{ waveformPeakReqs[idx] }}</span>
+                        <div class="fb-miss-pips">
+                            <span
+                                v-for="m in missTolerance[idx]" :key="m"
+                                class="fb-miss-pip"
+                                :class="{ 'fb-miss-pip--used': m <= waveMisses[idx] }"
+                            >◆</span>
                         </div>
                     </div>
+
+                    <!-- Centre: scrolling waveform history -->
+                    <div class="fb-wf-display">
+                        <span
+                            class="fb-wf-chars"
+                            :class="{
+                                'fb-wf-chars--active': waveStates[idx] === 'active',
+                                'fb-wf-chars--locked': waveStates[idx] === 'locked',
+                            }"
+                        >{{ waveHistoryDisplay[idx] || '────────────────────────' }}</span>
+                    </div>
+
+                    <!-- Right: vertical catch track -->
+                    <div
+                        class="fb-catch-track"
+                        :class="{ 'fb-catch-track--active': idx === activeWave && waveStates[idx] === 'active' }"
+                    >
+                        <!-- Peak zones top and bottom -->
+                        <div
+                            class="fb-peak-zone fb-peak-zone--top"
+                            :class="{ 'fb-peak-zone--lit': atPeak[idx] && waveAmplitudes[idx] > 0 && waveStates[idx] === 'active' }"
+                        />
+                        <div
+                            class="fb-peak-zone fb-peak-zone--bot"
+                            :class="{ 'fb-peak-zone--lit': atPeak[idx] && waveAmplitudes[idx] < 0 && waveStates[idx] === 'active' }"
+                        />
+                        <!-- Centre baseline -->
+                        <div class="fb-catch-center" />
+                        <!-- Amplitude dot -->
+                        <div
+                            class="fb-catch-dot"
+                            :class="{
+                                'fb-catch-dot--peak':   atPeak[idx] && waveStates[idx] === 'active',
+                                'fb-catch-dot--locked': waveStates[idx] === 'locked',
+                                'fb-catch-dot--dim':    waveStates[idx] === 'pending',
+                            }"
+                            :style="{ top: dotTop(idx) }"
+                        />
+                    </div>
+
+                    <!-- Status badge -->
+                    <span class="fb-sig-status" :class="`fb-status--${waveStates[idx]}`">
+                        {{ waveStates[idx] === 'locked' ? '[ LOCKED ]' : waveStates[idx] === 'active' ? '[ ACTIVE ]' : '[ PENDING ]' }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Space prompt -->
+            <div class="fb-space-row">
+                <span
+                    class="fb-space-key"
+                    :class="{ 'fb-space-key--ready': atPeak[activeWave] && waveStates[activeWave] === 'active' && !result }"
+                >
+                    [ SPACE ] — CATCH SIGNAL PEAK
+                </span>
+            </div>
+
+            <!-- Feedback messages -->
+            <Transition name="fb-msg">
+                <div v-if="showRestartMsg" class="fb-msg fb-msg--fail">
+                    ⚠ SIGNAL CORRUPTED — RESETTING TO W1
                 </div>
             </Transition>
-
-            <!-- Layer flush confirmation flash -->
-            <Transition name="fb-flash">
-                <div v-if="layerFlash" class="fb-flash-msg">
-                    ✓ LAYER FLUSHED — RECURSION COLLAPSING
+            <Transition name="fb-msg">
+                <div v-if="showDumpMsg" class="fb-msg fb-msg--success">
+                    ✓ BUFFER FLUSHED — {{ dumpsComplete }} / {{ dumpGoal }} COMPLETE
                 </div>
             </Transition>
 
@@ -79,169 +115,227 @@ import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
 const props = defineProps({ skin: { type: Object, required: true } });
 const emit  = defineEmits(['complete', 'fail']);
 
-// ── Difficulty config ─────────────────────────────────────────────────────────
-// totalLayers  — recursion depth to unwind
-// baseWindow   — initial CYCLING window in seconds
-// windowDecay  — seconds lost per layer (window shrinks as depth collapses)
-// optionCount  — total echo options shown (1 correct + decoys)
-// transmitBase — initial TRANSMITTING duration; shrinks each layer
-// hitAmount    — stability penalty per miss (wrong select or timeout)
+// ── Config ─────────────────────────────────────────────────────────────────────
+// All difficulty derived from iceLevel — same component handles prologue and PvE.
 
-const LAYER_CONFIG = {
-    1: { totalLayers: 3, baseWindow: 2.0, windowDecay: 0.15, optionCount: 2, transmitBase: 3.0, hitAmount: 0.25 },
-    2: { totalLayers: 5, baseWindow: 1.6, windowDecay: 0.12, optionCount: 3, transmitBase: 2.5, hitAmount: 0.22 },
-    3: { totalLayers: 7, baseWindow: 1.3, windowDecay: 0.10, optionCount: 4, transmitBase: 2.0, hitAmount: 0.20 },
-};
+const iceLevel  = props.skin.iceLevel ?? 3
+const dumpGoal  = Math.max(1, iceLevel - 2)          // ICE3→1, ICE4→2, ICE5→3…
+const timeLimit = Math.max(30, 135 - iceLevel * 15)  // ICE3→90s … ICE7→30s
+const missHit   = 0.12 + (iceLevel - 3) * 0.015      // ICE3→12% … ICE7→18%
 
-const WAVEFORM_CHARS = ['▁','▁','▂','▃','▄','▅','▆','▇','█'];
+// Peak requirements: (waveIndex+1) + (ICE-3), minimum 1
+// ICE3 → [1,2,3]  |  ICE4 → [2,3,4]  |  ICE5 → [3,4,5]
+const waveformPeakReqs = [0, 1, 2].map(i => Math.max(1, (i + 1) + (iceLevel - 3)))
 
-const diff   = props.skin.difficulty ?? 1;
-const config = LAYER_CONFIG[diff] ?? LAYER_CONFIG[1];
-const { totalLayers, baseWindow, windowDecay, optionCount, transmitBase, hitAmount } = config;
+// Miss tolerance matches waveform number: W1=1, W2=2, W3=3
+const missTolerance = [1, 2, 3]
 
-// ── Shared minigame state ─────────────────────────────────────────────────────
+// Angular oscillation speeds (rad/s): W1 slowest, W3 fastest, scaled by ICE
+const SPEEDS = [0.9, 1.45, 2.1].map(s => s * (1 + (iceLevel - 3) * 0.10))
+
+// |amplitude| must reach this to register as a catchable peak
+const PEAK_THRESHOLD = 0.82
+
+const WAVE_CHARS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
+
+// ── Shared composable ──────────────────────────────────────────────────────────
+// difficulty:1 → minimal passive drain. Stability only drops from active misses.
+// We drive timeLeft and primaryProgress manually to keep them in sync.
 
 const {
     stability, primaryProgress, timeLeft, result, failReason,
     glitchActive, glitchType, glitchIntensity,
     stabilityClass, timerClass,
-    tickShared, applyHit, endGame,
-} = useQuestMinigameState(props.skin);
+    applyHit, endGame,
+} = useQuestMinigameState({ ...props.skin, timeLimit, difficulty: 1 })
 
-// ── Game state ────────────────────────────────────────────────────────────────
+timeLeft.value = timeLimit  // override composable default with ICE-computed value
 
-const phase            = ref('transmitting');   // 'transmitting' | 'cycling'
-const currentLayer     = ref(0);               // layers flushed so far
-const sigAmp           = ref('00');            // correct hex value to echo
-const options          = ref([]);              // shuffled hex options (correct + decoys)
-const noiseVal         = ref('00');            // flickering noise display during transmit
-const amplitudeHistory = ref(Array(32).fill(0));
-const layerFlash       = ref(false);
-const windowFraction   = ref(1);   // 1.0 = full window, 0 = expired; reactive so bar updates
+// ── Reactive game state ────────────────────────────────────────────────────────
 
-// Raw timers and animation state — not reactive, updated in RAF loop
-let transmitTimer    = 0;
-let windowTimer      = 0;
-let currentWindowDur = 0;
-let layerCooldown    = 0;
-let noiseTimer       = 0;
-let historyTimer     = 0;
-let signalPhase      = 0;
-let amplitude        = 0;
-let animFrame        = null;
-let lastTs           = null;
+const dumpsComplete      = ref(0)
+const activeWave         = ref(0)
+const waveStates         = ref(['active', 'pending', 'pending'])
+const wavePeaksCaught    = ref([0, 0, 0])
+const waveMisses         = ref([0, 0, 0])
+const waveAmplitudes     = ref([0, 0, 0])    // current -1…1 per waveform
+const atPeak             = ref([false, false, false])
+const waveHistoryDisplay = ref(['', '', ''])
+const showRestartMsg     = ref(false)
+const showDumpMsg        = ref(false)
 
-// ── Computed ──────────────────────────────────────────────────────────────────
+// ── Non-reactive loop vars ─────────────────────────────────────────────────────
 
-const signalDisplay = computed(() =>
-    amplitudeHistory.value.map(v =>
-        WAVEFORM_CHARS[Math.min(8, Math.max(0, v))]
-    ).join('')
-);
+// Stagger start phases so the three waveforms look distinct immediately
+let phases        = [0, Math.PI * 0.65, Math.PI * 1.35]
+let historyArrs   = [[], [], []]
+let historyTimers = [0, 0, 0]
+let spaceCooldown = 0   // prevents double-triggering after catch or miss
+let rafId         = null
+let lastTs        = null
 
-// windowFraction is set reactively in the RAF loop; computed not used because
-// windowTimer / currentWindowDur are plain vars Vue cannot track.
-const windowProgress = computed(() => windowFraction.value);
+// ── Template helpers ───────────────────────────────────────────────────────────
 
-// Active instances halve with each flushed layer — visualises recursion collapse
-const instanceDisplay = computed(() => {
-    const val = Math.floor(128 * Math.pow(2, totalLayers - currentLayer.value));
-    return val.toLocaleString();
-});
-
-// ── Hex helpers ───────────────────────────────────────────────────────────────
-
-function randHex() {
-    return Math.floor(Math.random() * 256).toString(16).toUpperCase().padStart(2, '0');
+// Translate -1…1 amplitude to CSS top% for the dot (centre = 50%)
+function dotTop(idx) {
+    const amp = waveStates.value[idx] === 'locked' ? 0 : waveAmplitudes.value[idx]
+    return `${50 - amp * 44}%`
 }
 
-// Generates the correct value + difficulty-appropriate decoys, shuffled.
-function generateOptions() {
-    const correct    = randHex();
-    const correctVal = parseInt(correct, 16);
-    const needed     = optionCount - 1;
-    const decoys     = new Set();
-    let   attempts   = 0;
-
-    while (decoys.size < needed && attempts < 100) {
-        attempts++;
-        let candidate;
-        if (diff === 1) {
-            // Completely different values — easy to distinguish
-            candidate = Math.floor(Math.random() * 256);
-        } else if (diff === 2) {
-            // Flip one nibble — visually similar first or second digit
-            const shift = Math.random() < 0.5 ? 0 : 4;
-            const mask  = (Math.floor(Math.random() * 15) + 1) << shift;
-            candidate   = (correctVal ^ mask) & 0xFF;
-        } else {
-            // Flip 1–2 bits — near-identical under pressure
-            const b1  = 1 << Math.floor(Math.random() * 8);
-            const b2  = Math.random() < 0.6 ? (1 << Math.floor(Math.random() * 8)) : 0;
-            candidate = (correctVal ^ b1 ^ b2) & 0xFF;
-        }
-        const hex = candidate.toString(16).toUpperCase().padStart(2, '0');
-        if (hex !== correct) decoys.add(hex);
-    }
-
-    const all = [correct, ...decoys];
-    for (let i = all.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [all[i], all[j]] = [all[j], all[i]];
-    }
-    return { correct, options: all };
-}
-
-// Duration helpers — each layer the signal gets tighter
-function getTransmitDuration(layer) { return Math.max(1.2, transmitBase - layer * 0.15); }
-function getWindowDuration(layer)   { return Math.max(0.5, baseWindow   - layer * windowDecay); }
-
-// ── Phase transitions ─────────────────────────────────────────────────────────
-
-function startTransmitting() {
-    phase.value   = 'transmitting';
-    transmitTimer = getTransmitDuration(currentLayer.value);
-    signalPhase   = 0;
-}
-
-function startCycling() {
-    const { correct, options: opts } = generateOptions();
-    sigAmp.value     = correct;
-    options.value    = opts;
-    currentWindowDur = getWindowDuration(currentLayer.value);
-    windowTimer      = currentWindowDur;
-    windowFraction.value = 1;
-    phase.value      = 'cycling';
-}
-
-function onLayerFlushed() {
-    currentLayer.value++;
-    layerFlash.value = true;
-    layerCooldown    = 0.9;
-    phase.value      = 'transmitting'; // hide cycling panel immediately
-
-    if (currentLayer.value >= totalLayers) {
-        // Final layer — win immediately; cooldown skipped
-        layerFlash.value = false;
-        layerCooldown    = 0;
-        endGame('success');
-        setTimeout(() => emit('complete'), 2200);
+function rowClass(idx) {
+    return {
+        'fb-row--active':  waveStates.value[idx] === 'active',
+        'fb-row--pending': waveStates.value[idx] === 'pending',
+        'fb-row--locked':  waveStates.value[idx] === 'locked',
     }
 }
 
-// ── Interaction ───────────────────────────────────────────────────────────────
+// ── Game actions ───────────────────────────────────────────────────────────────
 
-function onSelect(value) {
-    if (phase.value !== 'cycling' || result.value) return;
-    if (value === sigAmp.value) {
-        onLayerFlushed();
+function onSpace() {
+    if (result.value || spaceCooldown > 0 || showRestartMsg.value || showDumpMsg.value) return
+    const idx = activeWave.value
+    if (waveStates.value[idx] !== 'active') return
+
+    spaceCooldown = 0.35
+
+    if (atPeak.value[idx]) {
+        // Successful catch — advance this waveform's peak counter
+        const caught = wavePeaksCaught.value.map((v, i) => i === idx ? v + 1 : v)
+        wavePeaksCaught.value = caught
+        if (caught[idx] >= waveformPeakReqs[idx]) lockWaveform(idx)
     } else {
-        applyHit(hitAmount);
-        startTransmitting();
+        // Miss — stability damage, increment miss counter, check restart
+        applyHit(missHit)
+        const misses = waveMisses.value.map((v, i) => i === idx ? v + 1 : v)
+        waveMisses.value = misses
+        if (misses[idx] > missTolerance[idx]) triggerRestart()
     }
 }
 
-// ── Chrome passthrough ────────────────────────────────────────────────────────
+function lockWaveform(idx) {
+    const states = waveStates.value.map((s, i) => {
+        if (i === idx)     return 'locked'
+        if (i === idx + 1) return 'active'
+        return s
+    })
+    if (idx < 2) {
+        activeWave.value = idx + 1
+        waveStates.value = states
+    } else {
+        waveStates.value = states
+        triggerDump()
+    }
+}
+
+function triggerDump() {
+    dumpsComplete.value++
+    showDumpMsg.value = true
+    setTimeout(() => {
+        showDumpMsg.value = false
+        if (dumpsComplete.value >= dumpGoal) {
+            endGame('success')
+            setTimeout(() => emit('complete'), 2200)
+        } else {
+            resetSet()
+        }
+    }, 1800)
+}
+
+function triggerRestart() {
+    showRestartMsg.value = true
+    setTimeout(() => {
+        showRestartMsg.value = false
+        resetSet()
+    }, 1200)
+}
+
+function resetSet() {
+    activeWave.value      = 0
+    waveStates.value      = ['active', 'pending', 'pending']
+    wavePeaksCaught.value = [0, 0, 0]
+    waveMisses.value      = [0, 0, 0]
+    historyArrs           = [[], [], []]
+    waveHistoryDisplay.value = ['', '', '']
+}
+
+// ── Game loop ──────────────────────────────────────────────────────────────────
+
+function tick(ts) {
+    if (result.value) return
+
+    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0
+    lastTs = ts
+
+    // Timer and trace bar stay in sync — both represent time pressure
+    timeLeft.value        = Math.max(0, timeLeft.value - dt)
+    primaryProgress.value = 1 - (timeLeft.value / timeLimit)
+
+    if (spaceCooldown > 0) spaceCooldown -= dt
+
+    // Fail conditions
+    if (!result.value && timeLeft.value <= 0) {
+        endGame('fail', props.skin.failText ?? 'Timer expired. Buffer unsalvaged.')
+        setTimeout(() => emit('fail'), 2200)
+        return
+    }
+    if (!result.value && stability.value <= 0) {
+        endGame('fail', '[STABILITY CRITICAL] — Rig shutdown.')
+        setTimeout(() => emit('fail'), 2200)
+        return
+    }
+
+    // Advance oscillations and update reactive display state
+    const newAmps = [0, 0, 0]
+    const newPeak = [false, false, false]
+
+    for (let i = 0; i < 3; i++) {
+        if (waveStates.value[i] === 'locked') continue
+
+        phases[i] += SPEEDS[i] * dt
+        const amp  = Math.sin(phases[i])
+        newAmps[i] = amp
+        newPeak[i] = Math.abs(amp) >= PEAK_THRESHOLD
+
+        // Push a bar-chart character to the scrolling history
+        historyTimers[i] -= dt
+        if (historyTimers[i] <= 0) {
+            const charIdx = Math.max(0, Math.min(7, Math.round(((amp + 1) / 2) * 7)))
+            historyArrs[i].push(WAVE_CHARS[charIdx])
+            if (historyArrs[i].length > 24) historyArrs[i].shift()
+            historyTimers[i] = 0.055
+        }
+    }
+
+    waveAmplitudes.value     = newAmps
+    atPeak.value             = newPeak
+    waveHistoryDisplay.value = historyArrs.map(h => h.join(''))
+
+    rafId = requestAnimationFrame(tick)
+}
+
+// ── Keyboard ───────────────────────────────────────────────────────────────────
+
+function onKeyDown(e) {
+    if (e.code === 'Space') {
+        e.preventDefault()
+        onSpace()
+    }
+}
+
+// ── Lifecycle ──────────────────────────────────────────────────────────────────
+
+onMounted(() => {
+    document.addEventListener('keydown', onKeyDown)
+    rafId = requestAnimationFrame(tick)
+})
+
+onUnmounted(() => {
+    document.removeEventListener('keydown', onKeyDown)
+    if (rafId) cancelAnimationFrame(rafId)
+})
+
+// ── Chrome passthrough ─────────────────────────────────────────────────────────
 
 const chrome = computed(() => ({
     skin:            props.skin,
@@ -255,94 +349,7 @@ const chrome = computed(() => ({
     glitchIntensity: glitchIntensity.value,
     result:          result.value,
     failReason:      failReason.value,
-}));
-
-// ── Game loop ─────────────────────────────────────────────────────────────────
-
-function tick(ts) {
-    if (result.value) return;
-
-    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
-    lastTs = ts;
-
-    // Shared trace + stability drain
-    const failCause = tickShared(dt);
-    if (failCause) {
-        const reason = failCause === 'stability'
-            ? '[STABILITY CRITICAL] — System failure.'
-            : (props.skin.failText ?? 'Trace complete. Connection lost.');
-        endGame('fail', reason);
-        setTimeout(() => emit('fail'), 2200);
-        return;
-    }
-
-    // Layer cooldown — brief pause between flush and next transmit cycle
-    // Returns early so no transmit/window timers tick during the pause.
-    if (layerCooldown > 0) {
-        layerCooldown -= dt;
-        if (layerCooldown <= 0 && !result.value) {
-            layerFlash.value = false;
-            startTransmitting();
-        }
-        animFrame = requestAnimationFrame(tick);
-        return;
-    }
-
-    // Amplitude animation
-    if (phase.value === 'transmitting') {
-        const speed = 1.5 + currentLayer.value * 0.2 + (diff - 1) * 0.3;
-        signalPhase += dt * speed;
-        amplitude    = (Math.sin(signalPhase * Math.PI * 2) * 0.5 + 0.5) * 8;
-    } else {
-        // CYCLING — amplitude drops to near zero (gap between recursive calls)
-        amplitude = Math.max(0, amplitude - dt * 14);
-    }
-
-    // Push amplitude sample to scrolling history
-    historyTimer -= dt;
-    if (historyTimer <= 0) {
-        amplitudeHistory.value = [...amplitudeHistory.value.slice(-31), Math.round(amplitude)];
-        historyTimer = 0.06;
-    }
-
-    // Flicker the noise display during transmit
-    if (phase.value === 'transmitting') {
-        noiseTimer -= dt;
-        if (noiseTimer <= 0) {
-            noiseVal.value = randHex();
-            noiseTimer     = 0.07 + Math.random() * 0.05;
-        }
-
-        // Transition to CYCLING when transmit timer expires
-        transmitTimer -= dt;
-        if (transmitTimer <= 0) startCycling();
-    }
-
-    // Count down the CYCLING window — timeout = missed = stability hit
-    if (phase.value === 'cycling') {
-        windowTimer -= dt;
-        windowFraction.value = currentWindowDur > 0
-            ? Math.max(0, windowTimer / currentWindowDur)
-            : 0;
-        if (windowTimer <= 0) {
-            applyHit(hitAmount);
-            startTransmitting();
-        }
-    }
-
-    animFrame = requestAnimationFrame(tick);
-}
-
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
-
-onMounted(() => {
-    startTransmitting();
-    animFrame = requestAnimationFrame(tick);
-});
-
-onUnmounted(() => {
-    if (animFrame) cancelAnimationFrame(animFrame);
-});
+}))
 </script>
 
 <style scoped>
@@ -351,210 +358,275 @@ onUnmounted(() => {
     height: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 14px 20px;
+    padding: 16px 20px 12px;
     box-sizing: border-box;
-    gap: 10px;
-    position: relative;
+    gap: 14px;
     font-family: 'JetBrains Mono', monospace;
+    position: relative;
 }
 
-/* ── Monitor header ──────────────────────────────────────────────────────────── */
+/* ── Dump header ─────────────────────────────────────────────────────────────── */
 
-.fb-monitor-label {
-    font-size: 9px;
+.fb-dump-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(0,255,100,0.08);
+    flex-shrink: 0;
+}
+
+.fb-dump-label {
+    font-size: 8px;
     color: rgba(0,255,100,0.3);
     letter-spacing: 0.18em;
-    align-self: flex-start;
 }
 
-.fb-waveform {
-    font-size: 13px;
-    color: rgba(0,255,100,0.55);
-    letter-spacing: 0.05em;
-    line-height: 1;
-    align-self: stretch;
+.fb-dump-pips { display: flex; gap: 7px; }
+
+.fb-dump-pip {
+    font-size: 10px;
+    color: rgba(0,255,100,0.1);
+    transition: color 0.35s, text-shadow 0.35s;
+}
+
+.fb-dump-pip--done {
+    color: #00ff9d;
+    text-shadow: 0 0 8px rgba(0,255,100,0.6);
+}
+
+.fb-dump-count {
+    font-size: 9px;
+    color: rgba(0,255,100,0.35);
+    letter-spacing: 0.1em;
+    margin-left: auto;
+}
+
+/* ── Signal rows ─────────────────────────────────────────────────────────────── */
+
+.fb-signals {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.fb-signal-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid rgba(0,255,100,0.07);
+    background: rgba(0,255,100,0.01);
+    transition: border-color 0.2s, background 0.2s, opacity 0.2s;
+}
+
+.fb-row--active {
+    border-color: rgba(0,255,100,0.28);
+    background: rgba(0,255,100,0.025);
+}
+
+.fb-row--pending { opacity: 0.4; }
+
+.fb-row--locked {
+    border-color: rgba(0,255,100,0.04);
+    background: transparent;
+    opacity: 0.55;
+}
+
+/* ── Signal meta ─────────────────────────────────────────────────────────────── */
+
+.fb-sig-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 62px;
+    flex-shrink: 0;
+}
+
+.fb-sig-label {
+    font-size: 11px;
+    color: rgba(0,255,100,0.4);
+    letter-spacing: 0.12em;
+}
+
+.fb-row--active .fb-sig-label { color: #00ff9d; }
+
+.fb-sig-peaks {
+    font-size: 9px;
+    color: rgba(0,255,100,0.3);
+    letter-spacing: 0.07em;
+}
+
+.fb-miss-pips { display: flex; gap: 5px; }
+
+.fb-miss-pip {
+    font-size: 7px;
+    color: rgba(0,255,100,0.18);
+    transition: color 0.12s;
+}
+
+.fb-miss-pip--used { color: rgba(255,50,50,0.75); }
+
+/* ── Waveform history ────────────────────────────────────────────────────────── */
+
+.fb-wf-display {
+    flex: 1;
     overflow: hidden;
     white-space: nowrap;
 }
 
-.fb-state-row {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    align-self: flex-start;
+.fb-wf-chars {
+    font-size: 12px;
+    color: rgba(0,255,100,0.15);
+    letter-spacing: 0.05em;
+    transition: color 0.2s;
 }
 
-.fb-state-badge {
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    padding: 3px 8px;
-    border: 1px solid;
-}
+.fb-wf-chars--active { color: rgba(0,255,100,0.55); }
+.fb-wf-chars--locked { color: rgba(0,255,100,0.12); }
 
-.fb-badge--transmit {
-    color: rgba(255,102,0,0.7);
-    border-color: rgba(255,102,0,0.25);
-}
+/* ── Vertical catch track ────────────────────────────────────────────────────── */
 
-.fb-badge--cycling {
-    color: #00ff9d;
-    border-color: rgba(0,255,100,0.5);
-    animation: fb-blink 0.6s steps(1) infinite;
-}
-
-.fb-amp { font-size: 10px; color: rgba(0,255,100,0.4); letter-spacing: 0.1em; }
-
-.fb-amp-val { font-weight: 700; }
-.fb-amp--noise { color: rgba(255,102,0,0.5); animation: fb-flicker 0.08s steps(1) infinite; }
-.fb-amp--lock  { color: #00ff9d; text-shadow: 0 0 8px rgba(0,255,100,0.5); }
-
-/* ── Recursion depth ──────────────────────────────────────────────────────────── */
-
-.fb-depth-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    align-self: flex-start;
-    border-top: 1px solid rgba(0,255,100,0.07);
-    padding-top: 10px;
-    width: 100%;
-}
-
-.fb-depth-label { font-size: 8px; color: rgba(0,255,100,0.25); letter-spacing: 0.15em; }
-
-.fb-depth-pips  { display: flex; gap: 5px; }
-
-.fb-pip { font-size: 11px; color: rgba(0,255,100,0.12); transition: color 0.3s; }
-.fb-pip--active  { color: #ff6600; text-shadow: 0 0 6px rgba(255,102,0,0.6); }
-.fb-pip--flushed { color: rgba(0,255,100,0.2); }
-
-.fb-depth-count { font-size: 9px; color: rgba(0,255,100,0.3); margin-left: auto; }
-
-.fb-instances {
-    font-size: 9px;
-    color: rgba(0,255,100,0.22);
-    letter-spacing: 0.12em;
-    align-self: flex-start;
-}
-
-.fb-inst-val { color: rgba(0,255,100,0.45); }
-
-/* ── Cycling panel ──────────────────────────────────────────────────────────── */
-
-.fb-cycle-panel {
-    width: 100%;
-    max-width: 480px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    padding: 18px;
-    border: 1px solid rgba(0,255,100,0.2);
-    background: rgba(0,255,100,0.03);
-    margin-top: 6px;
-    box-sizing: border-box;
-}
-
-.fb-cycle-title {
-    font-size: 9px;
-    color: rgba(0,255,100,0.4);
-    letter-spacing: 0.15em;
-}
-
-.fb-target-amp {
-    font-size: 32px;
-    font-weight: 700;
-    color: #00ff9d;
-    letter-spacing: 0.12em;
-    text-shadow: 0 0 20px rgba(0,255,100,0.4);
-}
-
-.fb-options {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.fb-opt-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    background: transparent;
-    border: 1px solid rgba(0,255,100,0.3);
-    color: rgba(0,255,100,0.7);
-    padding: 10px 22px;
-    cursor: pointer;
-    transition: all 0.1s;
-    min-width: 90px;
-    text-align: center;
-}
-
-.fb-opt-btn:hover {
-    background: rgba(0,255,100,0.08);
-    border-color: #00ff9d;
-    color: #00ff9d;
-    box-shadow: 0 0 14px rgba(0,255,100,0.2);
-}
-
-.fb-window-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-}
-
-.fb-window-label { font-size: 8px; color: rgba(0,255,100,0.25); letter-spacing: 0.15em; flex-shrink: 0; }
-
-.fb-window-track {
-    flex: 1;
-    height: 3px;
-    background: rgba(0,255,100,0.08);
+.fb-catch-track {
+    width: 18px;
+    height: 72px;
+    position: relative;
+    background: rgba(0,255,100,0.02);
+    border: 1px solid rgba(0,255,100,0.07);
+    border-radius: 2px;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
-.fb-window-fill {
-    height: 100%;
-    background: #00ff9d;
-    box-shadow: 0 0 6px rgba(0,255,100,0.5);
-    transition: background 0.2s;
-}
+.fb-catch-track--active { border-color: rgba(0,255,100,0.22); }
 
-.fb-window--critical { background: #ff3333; box-shadow: 0 0 6px rgba(255,51,51,0.5); }
-
-/* ── Layer flush flash ──────────────────────────────────────────────────────── */
-
-.fb-flash-msg {
+.fb-peak-zone {
     position: absolute;
-    bottom: 16px;
+    left: 0; right: 0;
+    height: 18%;
+    background: rgba(0,255,100,0.04);
+    transition: background 0.07s;
+}
+
+.fb-peak-zone--top { top: 0; }
+.fb-peak-zone--bot { bottom: 0; }
+
+.fb-peak-zone--lit {
+    background: rgba(0,255,100,0.28);
+    box-shadow: 0 0 6px rgba(0,255,100,0.35) inset;
+}
+
+.fb-catch-center {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    height: 1px;
+    background: rgba(0,255,100,0.1);
+    transform: translateY(-50%);
+}
+
+.fb-catch-dot {
+    position: absolute;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,255,100,0.3);
+    transition: top 0.016s linear, background 0.07s, box-shadow 0.07s;
+}
+
+.fb-catch-dot--peak {
+    background: #00ff9d;
+    box-shadow: 0 0 10px rgba(0,255,100,1), 0 0 20px rgba(0,255,100,0.5);
+}
+
+.fb-catch-dot--locked { background: rgba(0,255,100,0.15); box-shadow: none; }
+.fb-catch-dot--dim    { background: rgba(0,255,100,0.1);  box-shadow: none; }
+
+/* ── Status badge ────────────────────────────────────────────────────────────── */
+
+.fb-sig-status {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    width: 76px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.fb-status--active  { color: rgba(0,255,100,0.7); animation: fb-blink 0.9s steps(1) infinite; }
+.fb-status--pending { color: rgba(0,255,100,0.18); }
+.fb-status--locked  { color: rgba(0,255,100,0.28); }
+
+/* ── Space prompt ────────────────────────────────────────────────────────────── */
+
+.fb-space-row {
+    display: flex;
+    justify-content: center;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+
+.fb-space-key {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: rgba(0,255,100,0.2);
+    border: 1px solid rgba(0,255,100,0.08);
+    padding: 7px 24px;
+    pointer-events: none;
+    user-select: none;
+    transition: color 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.fb-space-key--ready {
+    color: #00ff9d;
+    border-color: rgba(0,255,100,0.55);
+    animation: fb-pulse 0.45s ease infinite alternate;
+}
+
+/* ── Feedback messages ───────────────────────────────────────────────────────── */
+
+.fb-msg {
+    position: absolute;
+    bottom: 58px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 10px;
-    color: #00ff9d;
     letter-spacing: 0.15em;
-    background: rgba(0,20,10,0.92);
-    border: 1px solid rgba(0,255,100,0.3);
-    padding: 6px 18px;
+    padding: 8px 22px;
+    border: 1px solid;
     white-space: nowrap;
     pointer-events: none;
-    text-shadow: 0 0 10px rgba(0,255,100,0.5);
+    text-align: center;
+    z-index: 10;
+}
+
+.fb-msg--fail {
+    color: rgba(255,50,50,0.9);
+    border-color: rgba(255,50,50,0.3);
+    background: rgba(20,0,0,0.92);
+}
+
+.fb-msg--success {
+    color: #00ff9d;
+    border-color: rgba(0,255,100,0.4);
+    background: rgba(0,20,10,0.92);
+    text-shadow: 0 0 10px rgba(0,255,100,0.4);
 }
 
 /* ── Transitions ─────────────────────────────────────────────────────────────── */
 
-.fb-cycle-enter-active { transition: opacity 0.15s ease, transform 0.15s ease; }
-.fb-cycle-leave-active { transition: opacity 0.12s ease; }
-.fb-cycle-enter-from   { opacity: 0; transform: translateY(6px); }
-.fb-cycle-leave-to     { opacity: 0; }
+.fb-msg-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.fb-msg-leave-active { transition: opacity 0.18s ease; }
+.fb-msg-enter-from   { opacity: 0; transform: translateX(-50%) translateY(6px); }
+.fb-msg-leave-to     { opacity: 0; }
 
-.fb-flash-enter-active, .fb-flash-leave-active { transition: opacity 0.2s; }
-.fb-flash-enter-from,   .fb-flash-leave-to     { opacity: 0; }
+/* ── Animations ──────────────────────────────────────────────────────────────── */
 
-/* ── Animations ─────────────────────────────────────────────────────────────── */
-
-@keyframes fb-blink   { 0%,49%{opacity:1} 50%,100%{opacity:0.4} }
-@keyframes fb-flicker { 0%,49%{opacity:1} 50%,100%{opacity:0.5} }
+@keyframes fb-blink { 0%,49%{opacity:1} 50%,100%{opacity:0.35} }
+@keyframes fb-pulse {
+    from { box-shadow: 0 0 8px rgba(0,255,100,0.08); }
+    to   { box-shadow: 0 0 24px rgba(0,255,100,0.28); }
+}
 </style>
