@@ -625,11 +625,14 @@ function tick(ts) {
 
     if (result.value) return;
 
-    // Shared tick — slower when feed paused
+    // Shared tick — slower when feed paused.
+    // FlushBuffer only fails on stability collapse; the trace/timer bar
+    // is atmosphere only and does NOT end this game.
     const traceDt = isScanning.value ? dt : dt * 0.5;
     const failCause = tickShared(traceDt);
-    if (failCause) {
-        addLog(`> SYSTEM_FAILURE: ${failCause}`, 'error');
+    if (failCause === 'stability') {
+        addLog('> SYSTEM_FAILURE: stability collapse — ICE locked the channel', 'error');
+        endGame('fail', 'STABILITY COLLAPSE');
         setTimeout(() => emit('fail'), 1800);
         return;
     }

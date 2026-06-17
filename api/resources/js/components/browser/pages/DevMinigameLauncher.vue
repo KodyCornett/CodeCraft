@@ -82,14 +82,14 @@ const GAMES = [
         type:  'flush_buffer',
         built: true,
         quest: 'Quest 2 — Veil / Downtown',
-        brief: 'Match the signal amplitude each time the ghost-loop cycles. Window shrinks per layer.',
+        brief: 'Capture and forensically analyse incoming signals. Flush anomalous packets before the buffer overflows.',
         skin: {
-            primaryBarLabel: 'SIGNAL LOAD',
+            primaryBarLabel: 'ICE TRACE',
             stabilityLabel:  'STABILITY',
-            objectiveText:   'Cancel the ghost signal before buffer overflow.',
+            objectiveText:   'Identify and flush ghost signals. Stability collapses if the buffer floods.',
             fileName:        'DT-V8.sys',
             hideBars:        false,
-            timeLimit:       30,
+            timeLimit:       180,
         },
     },
     {
