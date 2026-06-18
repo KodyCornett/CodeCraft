@@ -88,7 +88,7 @@ const props = defineProps({
 
 // ── Emits ──────────────────────────────────────────────────────────────────────
 
-defineEmits([
+const emit = defineEmits([
     /**
      * User clicked an active tile.
      * Payload: tile id (number)
@@ -100,8 +100,6 @@ defineEmits([
      */
     'pool-cancel',
 ]);
-
-const emit = defineEmits(['pool-select', 'pool-cancel']);
 
 // ── Derived ────────────────────────────────────────────────────────────────────
 
