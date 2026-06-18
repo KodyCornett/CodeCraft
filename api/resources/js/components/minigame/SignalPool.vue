@@ -252,7 +252,7 @@ function onTileClick(item) {
 .sp-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 4px;
     align-content: flex-start;
     overflow: hidden;
     flex: 1;
@@ -262,13 +262,13 @@ function onTileClick(item) {
 /* ── Tile base ────────────────────────────────────────────────────────────── */
 
 .sp-tile {
-    width: 52px;
-    height: 56px;
+    width: 40px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 700;
     border: 1px solid;
     background: transparent;

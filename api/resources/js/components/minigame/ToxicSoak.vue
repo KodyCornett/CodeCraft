@@ -4,7 +4,7 @@
         <!-- ═══════════════════════════════════════════════════════════════════
              Root canvas — fixed 1920 × 1080, CSS Grid
              Columns : 350px | 1fr | 400px
-             Rows    : 1fr   | 260px
+             Rows    : 1fr   | 220px
         ════════════════════════════════════════════════════════════════════ -->
         <div class="ts-canvas">
 
@@ -575,7 +575,7 @@ onUnmounted(() => {
 /* ═══════════════════════════════════════════════════════════════════════════
    Canvas — fixed 1920 × 1080, CSS Grid
    Columns : 350px | 1fr | 400px
-   Rows    : 1fr   | 260px
+   Rows    : 1fr   | 220px
 ════════════════════════════════════════════════════════════════════════════ */
 
 .ts-canvas {
@@ -586,7 +586,7 @@ onUnmounted(() => {
 
     display: grid;
     grid-template-columns: 350px 1fr 400px;
-    grid-template-rows: 1fr 260px;
+    grid-template-rows: 1fr 220px;
 
     font-family: 'JetBrains Mono', monospace;
     background: #04090e;
