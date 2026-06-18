@@ -2,29 +2,95 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="ts-wrap">
 
-            <!-- ── Header ──────────────────────────────────────────────────── -->
-            <div class="ts-header">
-                <span class="ts-header-star">*</span>
-                <span class="ts-header-title">CIPHER_BUFFER_{{ String(props.skin.bufferId ?? '01').padStart(2, '0') }}</span>
+            <!-- ── Grid overlay ──────────────────────────────────────────────── -->
+            <div class="ts-grid" aria-hidden="true"/>
+
+            <!-- ── Top bar ───────────────────────────────────────────────────── -->
+            <div class="ts-topbar">
+                <span class="ts-topbar-diamond">◈</span>
+                <span class="ts-topbar-title">CIPHER_BUFFER_{{ String(props.skin.bufferId ?? '01').padStart(2, '0') }}</span>
+                <div class="ts-topbar-greebles">
+                    <span>SESS: 0x{{ Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4,'0') }}</span>
+                    <span>PKT: 1487</span>
+                    <span class="ts-greeble-div">│</span>
+                    <span>SPLICE_LOCK</span>
+                    <span class="ts-greeble-ok">◆ AUTH_OK</span>
+                </div>
             </div>
 
-            <!-- ── Body ───────────────────────────────────────────────────── -->
+            <!-- ── Main body ──────────────────────────────────────────────────── -->
             <div class="ts-body">
 
-                <!-- Fragments column -->
-                <div class="ts-fragments">
+                <!-- ┌ Left — Archive scan panel ──────────────────────────────── -->
+                <div class="ts-left">
+                    <div class="ts-panel-label">
+                        <span class="ts-panel-bracket">[</span>
+                        ARCHIVE_SCAN
+                        <span class="ts-panel-bracket">]</span>
+                    </div>
+
+                    <template v-if="scanOpen !== null">
+                        <div class="ts-scan-dir">
+                            <span class="ts-scan-path">ARCHIVE_DIR/_FRAGMENT_{{ String(scanOpen + 1).padStart(2, '0') }}</span>
+                        </div>
+                        <div class="ts-scan-files">
+                            <div
+                                v-for="(file, fli) in fragments[scanOpen].archive"
+                                :key="fli"
+                                class="ts-file-row"
+                                :class="{ 'ts-file--active': openFileIdx === fli }"
+                                @click="openFile(fli)"
+                            >
+                                <span class="ts-file-open">▸</span>
+                                <span class="ts-file-name">{{ file.name }}</span>
+                                <span class="ts-file-meta">{{ file.size }}<span v-if="file.locked && !isUnlocked(fli)" class="ts-file-lock"> 🔒</span></span>
+                            </div>
+                        </div>
+                        <Transition name="ts-fade">
+                            <div v-if="openFileIdx !== null" class="ts-file-content">
+                                <pre class="ts-file-text">{{ currentFileContent }}</pre>
+                            </div>
+                        </Transition>
+                        <button class="ts-scan-close" @click="scanOpen = null">[ CLOSE_SCAN ]</button>
+                    </template>
+
+                    <template v-else>
+                        <div class="ts-no-scan">
+                            <div class="ts-no-scan-icon">⬡</div>
+                            <div class="ts-no-scan-line">NO FRAGMENT SELECTED</div>
+                            <div class="ts-no-scan-sub">Press [ SCAN ] on any fragment to investigate its data archive.</div>
+                        </div>
+                    </template>
+
+                    <!-- Greebles -->
+                    <div class="ts-left-greebles">
+                        <span>0x0A4E: READ</span>
+                        <span>PTR: 0xFFE2</span>
+                        <span>BUF: CLEAN</span>
+                    </div>
+                </div>
+
+                <!-- ┌ Center — Fragments ─────────────────────────────────────── -->
+                <div class="ts-center">
                     <div
                         v-for="(frag, fi) in fragments"
                         :key="fi"
                         class="ts-fragment"
                         :class="{ 'ts-fragment--solved': solvedFrags[fi] }"
                     >
-                        <div class="ts-frag-title">
-                            FRAGMENT_{{ String(fi + 1).padStart(2, '0') }} // {{ frag.codename }}
+                        <!-- Fragment header -->
+                        <div class="ts-frag-header">
+                            <span class="ts-frag-id">FRAGMENT_{{ String(fi + 1).padStart(2, '0') }} // {{ frag.codename }}</span>
+                            <span class="ts-frag-badge" :class="solvedFrags[fi] ? 'ts-badge--ok' : 'ts-badge--pending'">
+                                {{ solvedFrags[fi] ? '◆ SECURED' : '○ PENDING' }}
+                            </span>
                         </div>
-                        <div class="ts-frag-hint">Hint: "{{ frag.hint }}"</div>
-                        <div class="ts-frag-controls">
-                            <!-- Letter slots -->
+
+                        <!-- Hint -->
+                        <div class="ts-frag-hint">"{{ frag.hint }}"</div>
+
+                        <!-- Controls row -->
+                        <div class="ts-frag-row">
                             <div class="ts-slots">
                                 <div
                                     v-for="(entry, si) in slots[fi]"
@@ -37,75 +103,113 @@
                                     @click="onSlotClick(fi, si)"
                                 >{{ entry ? entry.letter : '?' }}</div>
                             </div>
-                            <button
-                                class="ts-btn ts-btn--scan"
-                                :class="{ 'ts-btn--scan-active': scanOpen === fi }"
-                                @click="openScan(fi)"
-                            >[ SCAN _{{ String(fi + 1).padStart(2, '0') }} ]</button>
-                            <button
-                                class="ts-btn ts-btn--inject"
-                                :class="{ 'ts-btn--inject-ready': canInject(fi) }"
-                                :disabled="solvedFrags[fi]"
-                                @click="inject(fi)"
-                            >[ INJECT _{{ String(fi + 1).padStart(2, '0') }} ]</button>
+
+                            <div class="ts-frag-btns">
+                                <button
+                                    class="ts-btn ts-btn--scan"
+                                    :class="{ 'ts-btn--scan-active': scanOpen === fi }"
+                                    @click="openScan(fi)"
+                                >[ SCAN_{{ String(fi + 1).padStart(2, '0') }} ]</button>
+                                <button
+                                    class="ts-btn ts-btn--inject"
+                                    :class="{ 'ts-btn--inject-ready': canInject(fi) }"
+                                    :disabled="solvedFrags[fi]"
+                                    @click="inject(fi)"
+                                >[ INJECT_{{ String(fi + 1).padStart(2, '0') }} ]</button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- HUD -->
-                <div class="ts-hud">
-                    <div class="ts-hud-row">
-                        <span class="ts-hud-label">SYSTEM STABILITY</span>
-                        <span class="ts-hud-val" :class="localStabClass">{{ Math.round(stability * 100) }}%</span>
-                    </div>
-                    <div class="ts-hud-bar">
-                        <div class="ts-hud-fill ts-fill--stab" :style="{ width: stability * 100 + '%' }"/>
+                <!-- ┌ Right — Status monitor ─────────────────────────────────── -->
+                <div class="ts-right">
+                    <div class="ts-panel-label">
+                        <span class="ts-panel-bracket">[</span>
+                        STATUS_MONITOR
+                        <span class="ts-panel-bracket">]</span>
                     </div>
 
-                    <div class="ts-hud-row ts-hud-sep">
-                        <span class="ts-hud-label">ACTIVE TRACE</span>
-                        <span class="ts-hud-val ts-val--trace">{{ Math.round(traceLevel * 100) }}%</span>
-                    </div>
-                    <div class="ts-hud-bar">
-                        <div class="ts-hud-fill ts-fill--trace" :style="{ width: traceLevel * 100 + '%' }"/>
-                    </div>
-
-                    <div class="ts-hud-row ts-hud-sep">
-                        <span class="ts-hud-label">FRAGMENTS SECURED</span>
-                    </div>
-                    <div class="ts-hud-pips">
-                        <span
-                            v-for="i in fragments.length"
-                            :key="i"
-                            class="ts-hud-pip"
-                            :class="solvedFrags[i - 1] ? 'ts-pip--secured' : 'ts-pip--open'"
-                        >◉</span>
+                    <!-- Stability -->
+                    <div class="ts-stat-block">
+                        <div class="ts-stat-row">
+                            <span class="ts-stat-label">SYS.STABILITY</span>
+                            <span class="ts-stat-val" :class="localStabClass">{{ Math.round(stability * 100) }}%</span>
+                        </div>
+                        <div class="ts-stat-bar">
+                            <div class="ts-bar-fill ts-fill--stab" :style="{ width: stability * 100 + '%' }"/>
+                        </div>
+                        <div class="ts-stat-sub">
+                            {{ stability >= 0.7 ? 'NOMINAL' : stability >= 0.35 ? 'DEGRADED' : 'CRITICAL' }}
+                        </div>
                     </div>
 
-                    <!-- Wrong inject flash -->
+                    <!-- Trace -->
+                    <div class="ts-stat-block">
+                        <div class="ts-stat-row">
+                            <span class="ts-stat-label">ACTIVE_TRACE</span>
+                            <span class="ts-stat-val ts-val--trace" :class="{ 'ts-val--crit': traceLevel > 0.7, 'ts-val--warn': traceLevel > 0.4 && traceLevel <= 0.7 }">{{ Math.round(traceLevel * 100) }}%</span>
+                        </div>
+                        <div class="ts-stat-bar">
+                            <div class="ts-bar-fill ts-fill--trace" :style="{ width: traceLevel * 100 + '%' }"/>
+                        </div>
+                        <div class="ts-stat-sub ts-sub--trace">
+                            {{ traceLevel < 0.3 ? 'UNDETECTED' : traceLevel < 0.6 ? 'EXPOSURE LOW' : traceLevel < 0.85 ? 'TRACED — EVADE' : 'ICE IMMINENT' }}
+                        </div>
+                    </div>
+
+                    <!-- Fragments -->
+                    <div class="ts-stat-block">
+                        <div class="ts-stat-label" style="margin-bottom:6px">FRAGS_SECURED</div>
+                        <div class="ts-pips">
+                            <span
+                                v-for="i in fragments.length"
+                                :key="i"
+                                class="ts-pip"
+                                :class="solvedFrags[i - 1] ? 'ts-pip--secured' : 'ts-pip--open'"
+                            >◉</span>
+                        </div>
+                        <div class="ts-stat-sub">{{ solvedFrags.filter(Boolean).length }} / {{ fragments.length }} recovered</div>
+                    </div>
+
+                    <!-- Flash messages -->
                     <Transition name="ts-flash">
-                        <div v-if="showWrong" class="ts-wrong-flash">
-                            [ SEQUENCE REJECTED ]<br/>TRACE INCREASED
+                        <div v-if="showWrong" class="ts-flash ts-flash--wrong">
+                            <span class="ts-flash-icon">✕</span>
+                            SEQ REJECTED<br/>
+                            <span class="ts-flash-sub">TRACE INCREASED</span>
+                        </div>
+                    </Transition>
+                    <Transition name="ts-flash">
+                        <div v-if="showCorrect !== null" class="ts-flash ts-flash--ok">
+                            <span class="ts-flash-icon">◆</span>
+                            FRAG_{{ String(showCorrect + 1).padStart(2, '0') }} SECURED<br/>
+                            <span class="ts-flash-sub">SEQUENCE CONFIRMED</span>
                         </div>
                     </Transition>
 
-                    <!-- Correct flash -->
-                    <Transition name="ts-flash">
-                        <div v-if="showCorrect !== null" class="ts-correct-flash">
-                            [ FRAGMENT_{{ String(showCorrect + 1).padStart(2, '0') }} SECURED ]
-                        </div>
-                    </Transition>
+                    <!-- Greebles -->
+                    <div class="ts-right-greebles">
+                        <span>SPLICE: ACTIVE</span>
+                        <span>KERN: OK</span>
+                        <span>MEM: 847MB</span>
+                        <span>NET: 0x3C1A</span>
+                        <span>UPLINK: OK</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- ── Signal pool ─────────────────────────────────────────────── -->
-            <div class="ts-pool-wrap">
-                <div class="ts-pool-header">
-                    <span class="ts-pool-label">SHARED SIGNAL POOL</span>
-                    <Transition name="ts-fade">
-                        <span v-if="selectedPoolId !== null" class="ts-pool-hint">▸ PLACE LETTER</span>
-                    </Transition>
-                    <span v-if="selectedPoolId !== null" class="ts-pool-deselect" @click="selectedPoolId = null">[ CANCEL ]</span>
+            <!-- ── Signal pool ─────────────────────────────────────────────────── -->
+            <div class="ts-pool-section">
+                <div class="ts-pool-bar">
+                    <span class="ts-pool-label">SHARED_SIGNAL_POOL</span>
+                    <span class="ts-pool-legend"><span class="ts-legend-sig">■</span> SIGNAL</span>
+                    <span class="ts-pool-legend"><span class="ts-legend-noise">■</span> NOISE</span>
+                    <div class="ts-pool-bar-right">
+                        <Transition name="ts-fade">
+                            <span v-if="selectedPoolId !== null" class="ts-pool-hint">▸ SELECT SLOT TO PLACE</span>
+                        </Transition>
+                        <span v-if="selectedPoolId !== null" class="ts-pool-cancel" @click="selectedPoolId = null">[ CANCEL ]</span>
+                    </div>
                 </div>
                 <div class="ts-pool">
                     <div
@@ -121,35 +225,6 @@
                     >{{ item.letter }}</div>
                 </div>
             </div>
-
-            <!-- ── Investigate popup ───────────────────────────────────────── -->
-            <Transition name="ts-popup">
-                <div v-if="scanOpen !== null" class="ts-popup">
-                    <div class="ts-popup-header">
-                        <span class="ts-popup-title">ARCHIVE_DIR/_FRAGMENT_{{ String(scanOpen + 1).padStart(2, '0') }}</span>
-                        <button class="ts-popup-close" @click="scanOpen = null">×</button>
-                    </div>
-                    <div class="ts-popup-files">
-                        <div
-                            v-for="(file, fli) in fragments[scanOpen].archive"
-                            :key="fli"
-                            class="ts-file-row"
-                            :class="{ 'ts-file--active': openFileIdx === fli }"
-                            @click="openFile(fli)"
-                        >
-                            <span class="ts-file-open">[ OPEN ]</span>
-                            <span class="ts-file-name">{{ file.name }}</span>
-                            <span class="ts-file-size">({{ file.size }})</span>
-                            <span v-if="file.locked && !isUnlocked(fli)" class="ts-file-lock">🔒</span>
-                        </div>
-                    </div>
-                    <Transition name="ts-fade">
-                        <div v-if="openFileIdx !== null" class="ts-file-content">
-                            <pre class="ts-file-text">{{ currentFileContent }}</pre>
-                        </div>
-                    </Transition>
-                </div>
-            </Transition>
 
         </div>
     </QuestMinigameChrome>
@@ -548,82 +623,294 @@ onMounted(() => buildPuzzle());
     display: flex;
     flex-direction: column;
     font-family: 'JetBrains Mono', monospace;
-    background: #060e12;
-    color: #00d4ff;
+    background: #04090e;
+    color: #00c8f0;
     box-sizing: border-box;
-    padding: 8px 10px 6px;
-    gap: 6px;
+    padding: 6px 8px 5px;
+    gap: 5px;
     overflow: hidden;
     position: relative;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────────── */
+/* ── Grid overlay ────────────────────────────────────────────────────────── */
 
-.ts-header {
+.ts-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+        linear-gradient(rgba(0,200,240,0.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,240,0.028) 1px, transparent 1px);
+    background-size: 28px 28px;
+}
+
+/* Ensure content sits above grid */
+.ts-topbar, .ts-body, .ts-pool-section { position: relative; z-index: 1; }
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+
+.ts-topbar {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     flex-shrink: 0;
-    border-bottom: 1px solid rgba(0,212,255,0.1);
+    border-bottom: 1px solid rgba(0,200,240,0.12);
     padding-bottom: 5px;
 }
 
-.ts-header-star  { color: #00ff9d; font-size: 14px; }
-.ts-header-title { font-size: 11px; letter-spacing: 0.16em; color: rgba(0,212,255,0.9); }
+.ts-topbar-diamond { color: #00ff9d; font-size: 13px; }
+.ts-topbar-title   { font-size: 11px; letter-spacing: 0.18em; color: rgba(0,200,240,0.9); flex-shrink: 0; }
 
-/* ── Body ────────────────────────────────────────────────────────────────── */
+.ts-topbar-greebles {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    font-size: 9px;
+    color: rgba(0,200,240,0.28);
+    letter-spacing: 0.1em;
+}
+
+.ts-greeble-div { color: rgba(0,200,240,0.15); }
+.ts-greeble-ok  { color: rgba(0,255,150,0.4); }
+
+/* ── Body: three-column ──────────────────────────────────────────────────── */
 
 .ts-body {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex: 1;
     min-height: 0;
 }
 
-/* ── Fragments ───────────────────────────────────────────────────────────── */
+/* ── Left: Archive scan panel ────────────────────────────────────────────── */
 
-.ts-fragments {
+.ts-left {
+    width: 240px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 6px;
+    border: 1px solid rgba(0,200,240,0.1);
+    background: rgba(0,12,20,0.7);
+    padding: 8px;
+    min-height: 0;
+}
+
+.ts-panel-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: rgba(0,200,240,0.45);
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(0,200,240,0.08);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+}
+
+.ts-panel-bracket { color: rgba(0,200,240,0.25); }
+
+.ts-scan-dir {
+    flex-shrink: 0;
+}
+
+.ts-scan-path {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: rgba(0,200,240,0.5);
+}
+
+.ts-scan-files {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.ts-file-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 4px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-bottom: 1px solid rgba(0,200,240,0.05);
+}
+
+.ts-file-row:hover  { background: rgba(0,200,240,0.06); }
+.ts-file--active    { background: rgba(0,200,240,0.09) !important; }
+
+.ts-file-open {
+    color: rgba(0,200,240,0.4);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.ts-file-row:hover .ts-file-open { color: #00c8f0; }
+
+.ts-file-name {
     flex: 1;
+    font-size: 10px;
+    color: rgba(0,200,240,0.8);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ts-file-meta {
+    font-size: 9px;
+    color: rgba(0,200,240,0.3);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.ts-file-lock { font-size: 9px; }
+
+.ts-file-content {
+    flex: 1;
+    border: 1px solid rgba(0,200,240,0.1);
+    padding: 6px 7px;
+    background: rgba(0,8,15,0.7);
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.ts-file-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,200,80,0.8);
+    line-height: 1.7;
+    margin: 0;
+    white-space: pre-wrap;
+    letter-spacing: 0.02em;
+}
+
+.ts-scan-close {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 5px 8px;
+    border: 1px solid rgba(0,200,240,0.2);
+    background: transparent;
+    color: rgba(0,200,240,0.45);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+}
+.ts-scan-close:hover { color: #00c8f0; border-color: rgba(0,200,240,0.5); }
+
+/* No-scan state */
+.ts-no-scan {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+.ts-no-scan-icon {
+    font-size: 28px;
+    color: rgba(0,200,240,0.12);
+}
+
+.ts-no-scan-line {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: rgba(0,200,240,0.3);
+}
+
+.ts-no-scan-sub {
+    font-size: 9px;
+    color: rgba(0,200,240,0.2);
+    line-height: 1.5;
+    letter-spacing: 0.03em;
+}
+
+/* Left greebles */
+.ts-left-greebles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: auto;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0,200,240,0.06);
+    font-size: 8px;
+    color: rgba(0,200,240,0.18);
+    letter-spacing: 0.08em;
+}
+
+/* ── Center: Fragments ───────────────────────────────────────────────────── */
+
+.ts-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
     min-width: 0;
+    min-height: 0;
 }
 
 .ts-fragment {
-    border: 1px solid rgba(0,212,255,0.14);
-    background: rgba(0,20,30,0.5);
-    padding: 6px 8px;
+    flex: 1;
+    border: 1px solid rgba(0,200,240,0.12);
+    background: rgba(0,15,25,0.6);
+    padding: 10px 14px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    transition: border-color 0.2s;
+    gap: 7px;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+    min-height: 0;
 }
 
 .ts-fragment--solved {
-    border-color: rgba(0,255,100,0.3);
-    background: rgba(0,30,20,0.4);
+    border-color: rgba(0,255,100,0.28);
+    background: rgba(0,25,18,0.5);
 }
 
-.ts-frag-title {
-    font-size: 8px;
-    letter-spacing: 0.14em;
-    color: rgba(0,212,255,0.55);
-}
-
-.ts-frag-hint {
-    font-size: 10px;
-    color: rgba(0,212,255,0.85);
-    font-style: italic;
-    letter-spacing: 0.02em;
-    line-height: 1.4;
-}
-
-.ts-frag-controls {
+.ts-frag-header {
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ts-frag-id {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: rgba(0,200,240,0.5);
+}
+
+.ts-frag-badge {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    flex-shrink: 0;
+}
+
+.ts-badge--pending { color: rgba(0,200,240,0.3); }
+.ts-badge--ok      { color: #00ff9d; text-shadow: 0 0 8px rgba(0,255,100,0.5); }
+
+.ts-frag-hint {
+    font-size: 12px;
+    color: rgba(0,200,240,0.85);
+    font-style: italic;
+    letter-spacing: 0.02em;
+    line-height: 1.45;
+}
+
+.ts-frag-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-wrap: wrap;
+}
+
+.ts-frag-btns {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 /* ── Slots ───────────────────────────────────────────────────────────────── */
@@ -635,31 +922,31 @@ onMounted(() => buildPuzzle());
 }
 
 .ts-slot {
-    width: 34px;
-    height: 38px;
+    width: 46px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 700;
-    border: 1px solid rgba(0,212,255,0.22);
-    background: rgba(0,15,25,0.8);
-    color: rgba(0,212,255,0.4);
+    border: 1px solid rgba(0,200,240,0.2);
+    background: rgba(0,12,22,0.85);
+    color: rgba(0,200,240,0.35);
     cursor: pointer;
     transition: border-color 0.12s, color 0.12s, background 0.12s, box-shadow 0.12s;
     user-select: none;
 }
 
 .ts-slot--filled {
-    color: #00d4ff;
-    border-color: rgba(0,212,255,0.5);
-    background: rgba(0,30,45,0.8);
+    color: #00c8f0;
+    border-color: rgba(0,200,240,0.5);
+    background: rgba(0,28,42,0.9);
 }
 
 .ts-slot--droppable:hover {
-    border-color: #00d4ff;
-    background: rgba(0,212,255,0.1);
-    box-shadow: 0 0 8px rgba(0,212,255,0.2);
+    border-color: #00c8f0;
+    background: rgba(0,200,240,0.1);
+    box-shadow: 0 0 10px rgba(0,200,240,0.2);
     cursor: crosshair;
 }
 
@@ -667,9 +954,9 @@ onMounted(() => buildPuzzle());
 
 .ts-btn {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0.1em;
-    padding: 5px 10px;
+    padding: 7px 14px;
     border: 1px solid;
     background: transparent;
     cursor: pointer;
@@ -678,122 +965,218 @@ onMounted(() => buildPuzzle());
 }
 
 .ts-btn--scan {
-    color: rgba(0,212,255,0.6);
-    border-color: rgba(0,212,255,0.25);
+    color: rgba(0,200,240,0.55);
+    border-color: rgba(0,200,240,0.22);
 }
 
 .ts-btn--scan:hover,
 .ts-btn--scan-active {
-    color: #00d4ff;
-    border-color: rgba(0,212,255,0.7);
-    background: rgba(0,212,255,0.07);
-    box-shadow: 0 0 8px rgba(0,212,255,0.15);
+    color: #00c8f0;
+    border-color: rgba(0,200,240,0.6);
+    background: rgba(0,200,240,0.07);
+    box-shadow: 0 0 8px rgba(0,200,240,0.12);
 }
 
 .ts-btn--inject {
-    color: rgba(0,255,100,0.35);
-    border-color: rgba(0,255,100,0.15);
+    color: rgba(0,255,100,0.3);
+    border-color: rgba(0,255,100,0.12);
     opacity: 0.5;
 }
 
 .ts-btn--inject-ready {
     color: #00ff9d;
-    border-color: rgba(0,255,100,0.55);
+    border-color: rgba(0,255,100,0.5);
     opacity: 1;
 }
 
 .ts-btn--inject-ready:hover {
     background: rgba(0,255,100,0.08);
-    box-shadow: 0 0 10px rgba(0,255,100,0.2);
+    box-shadow: 0 0 10px rgba(0,255,100,0.18);
 }
 
-.ts-btn:disabled { cursor: not-allowed; opacity: 0.25; }
+.ts-btn:disabled { cursor: not-allowed; opacity: 0.22; }
 
-/* ── HUD ─────────────────────────────────────────────────────────────────── */
+/* ── Right: Status monitor ───────────────────────────────────────────────── */
 
-.ts-hud {
+.ts-right {
+    width: 210px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    flex-shrink: 0;
-    width: 180px;
-    border: 1px solid rgba(0,212,255,0.1);
-    background: rgba(0,10,18,0.6);
+    gap: 6px;
+    border: 1px solid rgba(0,200,240,0.1);
+    background: rgba(0,10,18,0.7);
     padding: 8px 10px;
+    min-height: 0;
 }
 
-.ts-hud-sep   { margin-top: 8px; }
+.ts-stat-block {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border-bottom: 1px solid rgba(0,200,240,0.07);
+    padding-bottom: 7px;
+}
 
-.ts-hud-row {
+.ts-stat-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
 }
 
-.ts-hud-label { font-size: 7px; letter-spacing: 0.12em; color: rgba(0,212,255,0.4); }
-.ts-hud-val   { font-size: 9px; letter-spacing: 0.06em; color: #00d4ff; }
+.ts-stat-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: rgba(0,200,240,0.4);
+}
+
+.ts-stat-val {
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    color: #00c8f0;
+    font-weight: 700;
+}
+
+.ts-stat-sub {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    color: rgba(0,200,240,0.28);
+    margin-top: 1px;
+}
+
+.ts-sub--trace { color: rgba(255,136,0,0.35); }
+
 .ts-val--warn { color: #ffaa00; }
 .ts-val--crit { color: #ff3333; animation: ts-pulse 0.6s ease infinite alternate; }
-.ts-val--trace{ color: #ff6600; }
+.ts-val--trace { color: #ff7700; }
 
-.ts-hud-bar {
-    height: 4px;
-    background: rgba(0,212,255,0.07);
+.ts-stat-bar {
+    height: 5px;
+    background: rgba(0,200,240,0.07);
     overflow: hidden;
-    flex-shrink: 0;
 }
 
-.ts-hud-fill { height: 100%; transition: width 0.4s; }
+.ts-bar-fill { height: 100%; transition: width 0.4s; }
 
 .ts-fill--stab {
-    background: linear-gradient(90deg, #004422, #00ff9d);
-    box-shadow: 0 0 5px rgba(0,255,100,0.4);
+    background: linear-gradient(90deg, #003d1a, #00ff9d);
+    box-shadow: 0 0 5px rgba(0,255,100,0.3);
 }
 
 .ts-fill--trace {
-    background: linear-gradient(90deg, #330000, #ff3333);
-    box-shadow: 0 0 5px rgba(255,50,50,0.3);
+    background: linear-gradient(90deg, #2a0000, #ff4400);
+    box-shadow: 0 0 5px rgba(255,50,0,0.3);
 }
 
-.ts-hud-pips { display: flex; gap: 5px; margin-top: 2px; }
+.ts-pips { display: flex; gap: 7px; }
 
-.ts-hud-pip      { font-size: 13px; transition: color 0.2s; }
-.ts-pip--open    { color: rgba(0,212,255,0.3); }
-.ts-pip--secured { color: #00ff9d; text-shadow: 0 0 8px rgba(0,255,100,0.6); }
+.ts-pip      { font-size: 18px; transition: color 0.2s; }
+.ts-pip--open    { color: rgba(0,200,240,0.25); }
+.ts-pip--secured { color: #00ff9d; text-shadow: 0 0 8px rgba(0,255,100,0.5); }
 
-.ts-wrong-flash,
-.ts-correct-flash {
-    margin-top: 8px;
-    font-size: 8px;
+/* Flash messages */
+.ts-flash {
+    padding: 7px 8px;
+    font-size: 10px;
     letter-spacing: 0.1em;
     line-height: 1.5;
-    padding: 5px 7px;
-    border: 1px solid;
-    text-align: center;
-}
-
-.ts-wrong-flash   { color: #ff3333; border-color: rgba(255,50,50,0.3); background: rgba(80,0,0,0.3); }
-.ts-correct-flash { color: #00ff9d; border-color: rgba(0,255,100,0.3); background: rgba(0,60,30,0.3); }
-
-/* ── Signal pool ─────────────────────────────────────────────────────────── */
-
-.ts-pool-wrap {
+    border-left: 2px solid;
     flex-shrink: 0;
-    border-top: 1px solid rgba(0,212,255,0.1);
-    padding-top: 6px;
 }
 
-.ts-pool-header {
+.ts-flash--wrong {
+    border-color: #ff4400;
+    color: #ff6633;
+    background: rgba(80,10,0,0.3);
+}
+
+.ts-flash--ok {
+    border-color: #00ff9d;
+    color: #00ff9d;
+    background: rgba(0,40,20,0.3);
+}
+
+.ts-flash-icon {
+    margin-right: 5px;
+}
+
+.ts-flash-sub {
+    font-size: 9px;
+    opacity: 0.65;
+}
+
+/* Right greebles */
+.ts-right-greebles {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0,200,240,0.06);
+    font-size: 8px;
+    color: rgba(0,200,240,0.2);
+    letter-spacing: 0.1em;
+}
+
+/* ── Pool section ────────────────────────────────────────────────────────── */
+
+.ts-pool-section {
+    flex-shrink: 0;
+    border-top: 1px solid rgba(0,200,240,0.1);
+    padding-top: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ts-pool-bar {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 5px;
 }
 
-.ts-pool-label   { font-size: 7px; letter-spacing: 0.16em; color: rgba(0,212,255,0.4); }
-.ts-pool-hint    { font-size: 7px; letter-spacing: 0.1em; color: #00d4ff; animation: ts-blink 0.8s ease infinite alternate; }
-.ts-pool-deselect{ font-size: 7px; letter-spacing: 0.1em; color: rgba(255,100,50,0.7); cursor: pointer; margin-left: auto; }
-.ts-pool-deselect:hover { color: #ff6633; }
+.ts-pool-label {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: rgba(0,200,240,0.4);
+    flex-shrink: 0;
+}
+
+.ts-pool-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: rgba(0,200,240,0.3);
+    letter-spacing: 0.06em;
+}
+
+.ts-legend-sig   { color: rgba(0,200,240,0.6); }
+.ts-legend-noise { color: rgba(255,136,0,0.6); }
+
+.ts-pool-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.ts-pool-hint {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: #00ff9d;
+    animation: ts-blink 0.9s ease infinite alternate;
+}
+
+.ts-pool-cancel {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: rgba(255,80,80,0.6);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.ts-pool-cancel:hover { color: #ff4444; }
 
 .ts-pool {
     display: flex;
@@ -801,150 +1184,55 @@ onMounted(() => buildPuzzle());
     gap: 4px;
 }
 
+/* ── Pool tiles ──────────────────────────────────────────────────────────── */
+
 .ts-tile {
-    width: 30px;
-    height: 32px;
+    width: 38px;
+    height: 42px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
-    border: 1px solid rgba(0,212,255,0.25);
-    background: rgba(0,20,35,0.8);
-    color: #00d4ff;
+    border: 1px solid rgba(0,200,240,0.2);
+    background: rgba(0,15,28,0.9);
+    color: rgba(0,200,240,0.7);
     cursor: pointer;
     transition: border-color 0.1s, background 0.1s, box-shadow 0.1s, opacity 0.1s;
     user-select: none;
-    letter-spacing: 0;
 }
 
 .ts-tile:hover {
-    border-color: rgba(0,212,255,0.6);
-    background: rgba(0,212,255,0.08);
+    border-color: rgba(0,200,240,0.55);
+    background: rgba(0,200,240,0.07);
 }
 
 .ts-tile--selected {
-    border-color: #00d4ff;
-    background: rgba(0,212,255,0.14);
-    box-shadow: 0 0 10px rgba(0,212,255,0.3);
+    border-color: #00c8f0;
+    background: rgba(0,200,240,0.13);
+    box-shadow: 0 0 10px rgba(0,200,240,0.28);
     color: #fff;
 }
 
 .ts-tile--used {
-    opacity: 0.35;
+    opacity: 0.3;
     cursor: default;
 }
 
 .ts-tile--used:hover {
-    border-color: rgba(0,212,255,0.25);
-    background: rgba(0,20,35,0.8);
+    border-color: rgba(0,200,240,0.2);
+    background: rgba(0,15,28,0.9);
 }
 
 .ts-tile--noise {
-    color: #ff8800;
-    border-color: rgba(255,136,0,0.22);
-    background: rgba(30,10,0,0.8);
+    color: rgba(255,136,0,0.6);
+    border-color: rgba(255,136,0,0.18);
+    background: rgba(25,8,0,0.9);
 }
 
 .ts-tile--noise:hover {
-    border-color: rgba(255,136,0,0.5);
-    background: rgba(40,15,0,0.8);
-}
-
-/* ── Investigate popup ───────────────────────────────────────────────────── */
-
-.ts-popup {
-    position: absolute;
-    top: 56px;
-    left: 10px;
-    width: 300px;
-    background: #060e14;
-    border: 1px solid rgba(0,212,255,0.4);
-    box-shadow: 0 0 20px rgba(0,212,255,0.1);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-}
-
-.ts-popup-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 8px;
-    border-bottom: 1px solid rgba(0,212,255,0.15);
-    background: rgba(0,30,45,0.6);
-}
-
-.ts-popup-title { font-size: 8px; letter-spacing: 0.12em; color: rgba(0,212,255,0.7); }
-
-.ts-popup-close {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    color: rgba(0,212,255,0.5);
-    background: none;
-    border: none;
-    cursor: pointer;
-    line-height: 1;
-    padding: 0 2px;
-    transition: color 0.15s;
-}
-.ts-popup-close:hover { color: #ff3333; }
-
-.ts-popup-files {
-    display: flex;
-    flex-direction: column;
-    padding: 4px 0;
-}
-
-.ts-file-row {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 5px 8px;
-    cursor: pointer;
-    transition: background 0.12s;
-    font-size: 9px;
-}
-
-.ts-file-row:hover     { background: rgba(0,212,255,0.06); }
-.ts-file--active       { background: rgba(0,212,255,0.08); }
-
-.ts-file-open {
-    color: rgba(0,212,255,0.6);
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.ts-file-row:hover .ts-file-open { color: #00d4ff; }
-
-.ts-file-name {
-    flex: 1;
-    color: rgba(0,212,255,0.85);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.ts-file-size { color: rgba(0,212,255,0.35); flex-shrink: 0; }
-.ts-file-lock { flex-shrink: 0; font-size: 10px; }
-
-.ts-file-content {
-    border-top: 1px solid rgba(0,212,255,0.12);
-    padding: 7px 8px;
-    background: rgba(0,12,20,0.6);
-    max-height: 90px;
-    overflow-y: auto;
-}
-
-.ts-file-text {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8.5px;
-    color: rgba(255,200,80,0.85);
-    line-height: 1.7;
-    margin: 0;
-    white-space: pre-wrap;
-    letter-spacing: 0.02em;
+    border-color: rgba(255,136,0,0.4);
+    background: rgba(35,12,0,0.9);
 }
 
 /* ── Transitions ─────────────────────────────────────────────────────────── */
@@ -952,11 +1240,6 @@ onMounted(() => buildPuzzle());
 .ts-flash-enter-active { animation: ts-flash-in 0.15s ease; }
 .ts-flash-leave-active { transition: opacity 0.35s; }
 .ts-flash-leave-to     { opacity: 0; }
-
-.ts-popup-enter-active { transition: opacity 0.2s, transform 0.2s; }
-.ts-popup-leave-active { transition: opacity 0.18s, transform 0.18s; }
-.ts-popup-enter-from,
-.ts-popup-leave-to     { opacity: 0; transform: translateY(-6px); }
 
 .ts-fade-enter-active  { transition: opacity 0.25s; }
 .ts-fade-leave-active  { transition: opacity 0.2s; }
