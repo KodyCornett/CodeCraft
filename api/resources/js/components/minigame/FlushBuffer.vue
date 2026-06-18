@@ -1398,25 +1398,25 @@ onUnmounted(() => {
     display: flex;
     gap: 0;
     flex-shrink: 0;
-    border-top: 1px solid rgba(0,180,0,0.08);
+    border-top: 1px solid rgba(0,180,0,0.12);
     align-items: stretch;
-    min-height: 26px;
+    min-height: 38px;
 }
 
 .fb-action-btn {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.16em;
     background: transparent;
-    padding: 0 12px;
+    padding: 0 16px;
     cursor: pointer;
     transition: all 0.08s;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     border: none;
-    border-right: 1px solid rgba(0,180,0,0.06);
+    border-right: 1px solid rgba(0,180,0,0.08);
     border-radius: 0;
 }
 
@@ -1426,12 +1426,12 @@ onUnmounted(() => {
 }
 
 .fb-hotkey {
-    font-size: 6px;
+    font-size: 7px;
     font-weight: normal;
     letter-spacing: 0.10em;
-    color: rgba(255,136,0,0.42);
-    border: 1px solid rgba(255,136,0,0.22);
-    padding: 1px 3px;
+    color: rgba(255,136,0,0.55);
+    border: 1px solid rgba(255,136,0,0.30);
+    padding: 1px 4px;
 }
 
 .fb-btn--scan {
@@ -1440,9 +1440,9 @@ onUnmounted(() => {
 }
 
 .fb-btn--scan.fb-scan--active {
-    color: #00aa00;
-    border-left: 2px solid rgba(0,180,0,0.45);
-    background: rgba(0,180,0,0.03);
+    color: #00cc00;
+    border-left: 3px solid rgba(0,220,0,0.70);
+    background: rgba(0,180,0,0.05);
 }
 
 .fb-btn--scan.fb-scan--active:hover:not(:disabled) {
@@ -1452,8 +1452,8 @@ onUnmounted(() => {
 
 .fb-btn--scan.fb-scan--paused {
     color: #ff8800;
-    border-left: 2px solid rgba(255,136,0,0.60);
-    background: rgba(255,136,0,0.04);
+    border-left: 3px solid rgba(255,136,0,0.80);
+    background: rgba(255,136,0,0.05);
     animation: fb-scan-blink 1.0s ease infinite;
 }
 
@@ -1464,9 +1464,9 @@ onUnmounted(() => {
 
 .fb-btn--flush {
     flex: 1;
-    color: #ff8800;
-    border-left: 2px solid rgba(255,136,0,0.45);
-    background: rgba(255,136,0,0.04);
+    color: #ff9900;
+    border-left: 3px solid rgba(255,136,0,0.70);
+    background: rgba(255,136,0,0.06);
 }
 
 .fb-btn--flush:hover:not(:disabled) {
@@ -1475,8 +1475,8 @@ onUnmounted(() => {
 }
 
 .fb-btn--clear {
-    color: rgba(0,180,0,0.44);
-    border-left: 2px solid rgba(0,180,0,0.16);
+    color: rgba(0,200,0,0.60);
+    border-left: 3px solid rgba(0,180,0,0.30);
 }
 
 .fb-btn--clear:hover:not(:disabled) {
