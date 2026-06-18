@@ -268,8 +268,8 @@ const DIFF_CONFIGS = {
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
-const diff   = props.skin.difficulty ?? 1;
-const config = DIFF_CONFIGS[diff] ?? DIFF_CONFIGS[1];
+const diffLevel = props.skin.difficulty ?? 1;
+const config    = DIFF_CONFIGS[diffLevel] ?? DIFF_CONFIGS[1];
 
 const {
     stability, primaryProgress, timeLeft, result, failReason,
