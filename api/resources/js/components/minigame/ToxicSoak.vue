@@ -67,13 +67,37 @@
             <!-- ┌─────────────────────────────────────────────────────────────
                  │  CELL D — Signal pool            col 1-3 · row 2
                  └───────────────────────────────────────────────────────── -->
-            <div class="ts-cell ts-cell--pool">
+            <div class="ts-cell ts-cell--pool ts-cell--pool-layout">
+
+                <!-- Pool control strip: ping status + command input -->
+                <div class="ts-pool-ctrl">
+                    <span
+                        class="ts-ping-status"
+                        :class="canPing ? 'ts-ping--ready' : 'ts-ping--cool'"
+                    >
+                        [PING: {{ canPing ? 'READY' : `RECHARGING (${pingCooldown}s)` }}]
+                    </span>
+                    <div class="ts-cmd-bar">
+                        <span class="ts-cmd-prompt">></span>
+                        <input
+                            v-model="commandInput"
+                            class="ts-cmd-input"
+                            placeholder="ping --noise"
+                            spellcheck="false"
+                            autocomplete="off"
+                            @keydown.enter="parseCommand"
+                        />
+                    </div>
+                </div>
+
                 <SignalPool
                     :letters="poolLetters"
                     :selected-pool-id="selectedPoolId"
+                    :ping-active="pingActive"
                     @pool-select="onPoolSelect"
                     @pool-cancel="selectedPoolId = null"
                 />
+
             </div>
 
         </div>
@@ -194,6 +218,14 @@ const unlockedIdxs = ref(new Set());
 
 const showWrong    = ref(false);
 const showCorrect  = ref(null);
+
+// ── Ping state ─────────────────────────────────────────────────────────────────
+const pingActive   = ref(false);   // true during the 1.5s reveal window
+const canPing      = ref(true);    // false during 20s cooldown
+const pingCooldown = ref(0);       // remaining cooldown seconds for HUD display
+const commandInput = ref('');      // command bar text
+let   pingTimer            = null; // reveal timeout handle
+let   pingCooldownInterval = null; // cooldown tick interval handle
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -347,14 +379,27 @@ function buildPuzzle() {
 function buildPool(frags) {
     const items = [];
 
+    // Signal: one pool entry per letter occurrence across all fragment words
     frags.forEach(frag => {
         frag.word.split('').forEach(letter => {
             items.push({ letter, noise: false });
         });
     });
 
-    for (let i = 0; i < cfg.noiseCount; i++) {
-        items.push({ letter: NOISE_CHARS[randInt(0, NOISE_CHARS.length - 1)], noise: true });
+    // Track which letters are already covered by signal words
+    const signalSet = new Set(frags.flatMap(f => f.word.split('')));
+
+    // Full A-Z: every letter NOT already present as a signal letter becomes noise
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
+        if (!signalSet.has(letter)) {
+            items.push({ letter, noise: true });
+        }
+    });
+
+    // Extra symbol noise for texture
+    const SYMBOLS = '[]{}|\\<>!@#%&'.split('');
+    for (let i = 0; i < 6; i++) {
+        items.push({ letter: SYMBOLS[randInt(0, SYMBOLS.length - 1)], noise: true });
     }
 
     shuffle(items);
@@ -472,9 +517,58 @@ function openFile(fileIdx) {
     openFileIdx.value = fileIdx;
 }
 
+// ── Ping / command ─────────────────────────────────────────────────────────────
+
+/**
+ * Activate the noise-reveal ping.
+ * - Reveals all noise tiles for 1.5 s.
+ * - Spikes the active trace (generates "heat").
+ * - Enters a 20 s recharge cooldown before the command is usable again.
+ */
+function pingNoise() {
+    if (!canPing.value || result.value) return;
+
+    // Trace spike — pinging generates ICE heat
+    traceLevel.value = Math.min(1, traceLevel.value + 0.12);
+
+    // Reveal noise tiles
+    pingActive.value = true;
+    clearTimeout(pingTimer);
+    pingTimer = setTimeout(() => { pingActive.value = false; }, 1500);
+
+    // Start 20 s cooldown
+    canPing.value      = false;
+    pingCooldown.value = 20;
+    clearInterval(pingCooldownInterval);
+    pingCooldownInterval = setInterval(() => {
+        pingCooldown.value--;
+        if (pingCooldown.value <= 0) {
+            clearInterval(pingCooldownInterval);
+            pingCooldown.value = 0;
+            canPing.value      = true;
+        }
+    }, 1000);
+}
+
+/**
+ * Parse a command typed into the command bar.
+ * Recognised commands:
+ *   ping --noise   →  activate noise reveal
+ */
+function parseCommand() {
+    const cmd = commandInput.value.trim().toLowerCase();
+    commandInput.value = '';
+    if (cmd === 'ping --noise') pingNoise();
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(() => buildPuzzle());
+
+onUnmounted(() => {
+    clearTimeout(pingTimer);
+    clearInterval(pingCooldownInterval);
+});
 </script>
 
 <style scoped>
@@ -561,6 +655,72 @@ onMounted(() => buildPuzzle());
 .ts-scan-slide-enter-from,
 .ts-scan-slide-leave-to     { opacity: 0; transform: translateY(-10px); }
 
+/* Pool cell uses flex-col; SignalPool takes flex:1 via its own CSS */
+.ts-cell--pool-layout {
+    flex-direction: column;
+    gap: 0;
+    padding: 10px 16px 10px;
+}
+
+/* ── Pool control strip (ping status + command input) ─────────────────────── */
+
+.ts-pool-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0,200,240,0.07);
+    margin-bottom: 8px;
+}
+
+.ts-ping-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    flex-shrink: 0;
+    transition: color 0.3s;
+}
+
+.ts-ping--ready { color: #00ff9d; }
+.ts-ping--cool  { color: rgba(255,170,0,0.65); animation: ts-ping-blink 0.8s step-start infinite; }
+
+.ts-cmd-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    max-width: 280px;
+    border: 1px solid rgba(0,200,240,0.12);
+    padding: 3px 8px;
+    background: rgba(0,10,18,0.6);
+}
+
+.ts-cmd-prompt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #00ff9d;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.ts-cmd-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(0,200,240,0.8);
+    letter-spacing: 0.06em;
+    caret-color: #00c8f0;
+}
+
+.ts-cmd-input::placeholder {
+    color: rgba(0,200,240,0.18);
+    font-style: italic;
+}
+
 /* ── Cell label (development guide / section header) ─────────────────────── */
 
 .ts-cell-label {
@@ -570,5 +730,10 @@ onMounted(() => buildPuzzle());
     border-bottom: 1px solid rgba(0,200,240,0.08);
     padding-bottom: 8px;
     flex-shrink: 0;
+}
+
+@keyframes ts-ping-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.35; }
 }
 </style>

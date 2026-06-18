@@ -84,6 +84,12 @@ const props = defineProps({
      * Drives the selected glow state.
      */
     selectedPoolId: { type: [Number, null], default: null },
+
+    /**
+     * When true, noise tiles enter the reveal state (amber pulse + jitter).
+     * Signal tiles stay visually neutral so the player deduces by exclusion.
+     */
+    pingActive: { type: Boolean, default: false },
 });
 
 // ── Emits ──────────────────────────────────────────────────────────────────────
@@ -110,11 +116,14 @@ const activeCount = computed(() =>
 // ── Tile class logic ───────────────────────────────────────────────────────────
 
 function tileClass(item) {
+    const revealing = props.pingActive && item.noise && item.status !== 'used';
     return {
-        'sp-tile--signal':   !item.noise,
-        'sp-tile--noise':    item.noise,
-        'sp-tile--used':     item.status === 'used',
-        'sp-tile--selected': item.id === props.selectedPoolId,
+        // All tiles are visually neutral by default — no signal/noise colour hint.
+        // sp-tile--signal / sp-tile--noise only differ in the reveal state below.
+        'sp-tile--noise':      item.noise,
+        'sp-tile--revealing':  revealing,
+        'sp-tile--used':       item.status === 'used',
+        'sp-tile--selected':   item.id === props.selectedPoolId,
     };
 }
 
@@ -132,7 +141,9 @@ function onTileClick(item) {
 
 .sp-pool {
     width: 100%;
-    height: 100%;
+    /* flex: 1 + min-height: 0 so it shares its parent cell with the control strip */
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -279,32 +290,39 @@ function onTileClick(item) {
     outline-offset: 2px;
 }
 
-/* ── Signal tile (cyan) ───────────────────────────────────────────────────── */
+/* ── All tiles — neutral / blind state (no signal vs noise distinction) ───── */
+/*    Players cannot tell signal from noise until ping reveals them.           */
 
-.sp-tile--signal {
-    color: rgba(0,200,240,0.75);
-    border-color: rgba(0,200,240,0.2);
-    background: rgba(0,14,22,0.8);
+.sp-tile {
+    /* Neutral cyan — same for both signal and noise until ping fires */
+    color: rgba(0,200,240,0.55);
+    border-color: rgba(0,200,240,0.14);
+    background: rgba(0,12,20,0.8);
 }
 
-.sp-tile--signal:hover:not(:disabled) {
-    color: #00c8f0;
-    border-color: rgba(0,200,240,0.55);
-    background: rgba(0,200,240,0.07);
+.sp-tile:hover:not(:disabled):not(.sp-tile--revealing) {
+    color: rgba(0,200,240,0.85);
+    border-color: rgba(0,200,240,0.4);
+    background: rgba(0,200,240,0.06);
 }
 
-/* ── Noise tile (amber) ───────────────────────────────────────────────────── */
+/* ── Noise tile — NO visual change by default; only styled during reveal ──── */
+/* (.sp-tile--noise alone does nothing; paired with --revealing it activates) */
 
-.sp-tile--noise {
-    color: rgba(255,136,0,0.55);
-    border-color: rgba(255,136,0,0.18);
-    background: rgba(22,8,0,0.8);
+/* ── Reveal state — ping active, noise tiles exposed ─────────────────────── */
+
+.sp-tile--revealing {
+    color: #ff6600;
+    border-color: rgba(255,100,0,0.65);
+    background: rgba(40,8,0,0.92);
+    animation:
+        sp-jitter   0.12s linear infinite,
+        sp-pulse-noise 0.55s ease-in-out infinite alternate;
 }
 
-.sp-tile--noise:hover:not(:disabled) {
-    color: rgba(255,136,0,0.85);
-    border-color: rgba(255,136,0,0.45);
-    background: rgba(35,12,0,0.9);
+.sp-tile--revealing:hover:not(:disabled) {
+    border-color: rgba(255,120,0,0.85);
+    color: #ff8800;
 }
 
 /* ── Used tile — dimmed, non-interactive ──────────────────────────────────── */
@@ -326,14 +344,16 @@ function onTileClick(item) {
         0 0 18px rgba(0,200,240,0.35);
 }
 
-/* Selected noise tile keeps amber identity */
-.sp-tile--selected.sp-tile--noise {
-    color: #ffcc44;
-    border-color: rgba(255,180,0,0.8);
-    background: rgba(40,18,0,0.9);
+/* Selected noise tile: during ping reveal, override to white-on-amber so
+   selection is still readable over the jitter animation */
+.sp-tile--selected.sp-tile--revealing {
+    color: #ffffff;
+    border-color: rgba(255,140,0,0.9);
+    background: rgba(50,14,0,0.95);
     box-shadow:
-        0 0 0 1px rgba(255,180,0,0.4),
-        0 0 18px rgba(255,160,0,0.3);
+        0 0 0 1px rgba(255,140,0,0.5),
+        0 0 22px rgba(255,100,0,0.5);
+    animation: none; /* suspend jitter while selected */
 }
 
 /* ── Transitions ──────────────────────────────────────────────────────────── */
@@ -348,5 +368,25 @@ function onTileClick(item) {
 @keyframes sp-blink {
     from { opacity: 1;   }
     to   { opacity: 0.4; }
+}
+
+/* Noise reveal — micro-jitter so tiles feel "hot" */
+@keyframes sp-jitter {
+    0%   { transform: translate(0,    0);    }
+    20%  { transform: translate(-1px, 1px);  }
+    40%  { transform: translate(1px,  -1px); }
+    60%  { transform: translate(-1px, -1px); }
+    80%  { transform: translate(1px,  1px);  }
+    100% { transform: translate(0,    0);    }
+}
+
+/* Noise reveal — amber glow pulse */
+@keyframes sp-pulse-noise {
+    from {
+        box-shadow: 0 0 4px rgba(255,80,0,0.2),  inset 0 0 4px rgba(255,80,0,0.05);
+    }
+    to {
+        box-shadow: 0 0 18px rgba(255,80,0,0.65), inset 0 0 8px rgba(255,80,0,0.12);
+    }
 }
 </style>
