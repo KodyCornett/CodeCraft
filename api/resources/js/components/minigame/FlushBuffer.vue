@@ -146,22 +146,17 @@
                 <div class="fb-audit-main">
 
                     <div class="fb-audit-banner">
-                        <span class="fb-audit-title">FORENSIC_AUDIT</span>
-                        <span class="fb-audit-sep">//</span>
-                        <span class="fb-audit-meta">SYSTEM_DIAGNOSTIC_MODE: AUDIT</span>
-                        <span class="fb-audit-sep">//</span>
-                        <span class="fb-audit-meta" :class="isBufferFull ? 'fb-status--warn' : ''">BUFFER: {{ capturedSignals.length }}/{{ MAX_BUFFER }}</span>
-                        <span class="fb-audit-sep">//</span>
-                        <span class="fb-audit-meta">SIGNAL_LOCKED: {{ anomalousFlushed }}/{{ locksRequired }}</span>
+                        <span class="fb-audit-title">FORENSIC AUDIT</span>
+                        <span class="fb-audit-chip"><span class="fb-cite-tag">CITE</span> SYSTEM_DIAGNOSTIC_MODE: AUDIT</span>
+                        <span class="fb-audit-chip" :class="isBufferFull ? 'fb-chip--hi' : ''">
+                            <span class="fb-cite-tag">CITE</span> BUFFER: {{ capturedSignals.filter(s => !s.flushed).length }}/{{ MAX_BUFFER }}
+                        </span>
+                        <span class="fb-audit-chip"><span class="fb-cite-tag">CITE</span> STABILITY: {{ Math.round(stability) }}%</span>
+                        <span class="fb-audit-phase">LOCKED: {{ anomalousFlushed }}/{{ locksRequired }}</span>
                     </div>
 
                     <div class="fb-reference">
-                        <span class="fb-ref-tag">REF</span>
-                        <span class="fb-ref-field"><span class="fb-ref-key">SRC</span><span class="fb-ref-val">{{ sessionSource }}</span></span>
-                        <span class="fb-ref-sep">·</span>
-                        <span class="fb-ref-field"><span class="fb-ref-key">FREQ</span><span class="fb-ref-val">{{ freqMinDisplay }}–{{ freqMaxDisplay }} GHz</span></span>
-                        <span class="fb-ref-sep">·</span>
-                        <span class="fb-ref-field"><span class="fb-ref-key">LOAD</span><span class="fb-ref-val">{{ loadMinDisplay }}–{{ loadMaxDisplay }} KB</span></span>
+                        <span class="fb-ref-text">REFERENCE BASELINE: <b class="fb-ref-value">[cite: REF: Source: {{ sessionSource }}, Freq: {{ freqMinDisplay }}–{{ freqMaxDisplay }}, Load: &lt;{{ loadMaxDisplay }}KB]</b></span>
                     </div>
 
                     <div class="fb-grid-wrap">
@@ -181,17 +176,22 @@
                                     :key="signal.id"
                                     class="fb-grid-row"
                                     :class="{
-                                        'fb-row--selected':  selectedIds.includes(signal.id),
-                                        'fb-row--inspected': inspectedSignal?.id === signal.id,
+                                        'fb-row--selected':  selectedIds.includes(signal.id) && !signal.flushed,
+                                        'fb-row--inspected': inspectedSignal?.id === signal.id && !signal.flushed,
+                                        'fb-row--anom':      signal.anomaly && !signal.flushed && !selectedIds.includes(signal.id),
+                                        'fb-row--flushed':   signal.flushed,
                                     }"
-                                    @click="onRowClick(signal.id)"
+                                    @click="signal.flushed ? null : onRowClick(signal.id)"
                                 >
                                     <td>{{ signal.id }}</td>
                                     <td>{{ signal.source }}</td>
                                     <td>{{ signal.freq }}</td>
                                     <td>{{ signal.load }}</td>
                                     <td class="fb-status-col">
-                                        {{ selectedIds.includes(signal.id) ? '[!] SIGNAL_FLAGGED' : '[VALID]]' }}
+                                        <span v-if="signal.flushed"                                        class="fb-st-purged">[PURGED]</span>
+                                        <span v-else-if="signal.anomaly && !selectedIds.includes(signal.id)" class="fb-st-anom">[!] ANOMALY_DETECTED</span>
+                                        <span v-else-if="selectedIds.includes(signal.id)"                  class="fb-st-flag">[!] SIGNAL_FLAGGED</span>
+                                        <span v-else                                                        class="fb-st-valid">[VALID]]</span>
                                     </td>
                                 </tr>
                                 <tr
@@ -214,6 +214,7 @@
                         >{{ isScanning ? '[!: STOP CAPTURE]]' : '[!: RESUME CAPTURE]]' }}</button>
                         <button
                             class="fb-action-btn fb-btn--flush"
+                            :class="selectedIds.length > 0 && !isScanning && !result ? 'fb-flush--armed' : ''"
                             :disabled="selectedIds.length === 0 || !!result || isScanning"
                             @click="onFlush"
                         >[!: FLUSH]] <span class="fb-hotkey">SPACE</span></button>
@@ -222,6 +223,20 @@
                             :disabled="selectedIds.length === 0 || !!result"
                             @click="onClear"
                         >[!: CLEAR]]</button>
+                        <div class="fb-ss-bar-wrap">
+                            <span class="fb-ss-label">SS:</span>
+                            <div class="fb-ss-bar">
+                                <div class="fb-ss-fill"
+                                    :class="stability > 50 ? 'fb-fill--ok' : stability > 25 ? 'fb-fill--warn' : 'fb-fill--crit'"
+                                    :style="{ width: stability + '%' }"></div>
+                            </div>
+                            <span class="fb-ss-val" :class="stability > 50 ? '' : stability > 25 ? 'fb-val--warn' : 'fb-val--crit'">{{ Math.round(stability) }}%</span>
+                        </div>
+                        <button
+                            class="fb-action-btn fb-btn--exit"
+                            :disabled="!!result"
+                            @click="onEarlyExit"
+                        >[!: BACK_TO_CAPTURE]]</button>
                     </div>
 
                 </div>
@@ -235,6 +250,8 @@
                         :class="{
                             'fb-log--warn':  line.type === 'warn',
                             'fb-log--error': line.type === 'error',
+                            'fb-log--hi':    line.type === 'hi',
+                            'fb-log--good':  line.type === 'good',
                         }"
                     >{{ line.text }}</div>
                 </div>
@@ -451,8 +468,8 @@ const capturedSignals  = ref([]);
 const selectedIds      = ref([]);
 const inspectedSignal  = ref(null);
 const anomalousFlushed = ref(0);
-const isBufferFull     = computed(() => capturedSignals.value.length >= MAX_BUFFER);
-const emptySlots       = computed(() => Math.max(0, MAX_BUFFER - capturedSignals.value.length));
+const isBufferFull     = computed(() => capturedSignals.value.filter(s => !s.flushed).length >= MAX_BUFFER);
+const emptySlots       = computed(() => Math.max(0, MAX_BUFFER - capturedSignals.value.filter(s => !s.flushed).length));
 
 // Comparison waveform — cycles and amplitude normalised against session baseline
 const sigWavePath = computed(() => {
@@ -597,9 +614,11 @@ function onFlush() {
         addLog(`> FLUSH_ERROR: ${cleanCount} clean signal(s) incorrectly flagged — trace spiked`, 'warn');
     }
 
-    // Remove flushed signals from buffer
-    capturedSignals.value = capturedSignals.value.filter(s => !selectedIds.value.includes(s.id));
+    // Mark flushed signals — keep rows visible with [PURGED] styling
     const flushedIds = [...selectedIds.value];
+    capturedSignals.value = capturedSignals.value.map(s =>
+        flushedIds.includes(s.id) ? { ...s, flushed: true } : s
+    );
     selectedIds.value = [];
     if (inspectedSignal.value && flushedIds.includes(inspectedSignal.value.id)) {
         inspectedSignal.value = null;
@@ -607,9 +626,9 @@ function onFlush() {
 
     if (anomCount > 0) {
         anomalousFlushed.value += anomCount;
-        addLog(`> FLUSH_COMPLETE: ${anomCount} anomalous signal(s) purged [${anomalousFlushed.value}/${locksRequired}]`);
+        addLog(`> FLUSH_COMPLETE: ${anomCount} anomalous signal(s) purged [${anomalousFlushed.value}/${locksRequired}]`, 'good');
         if (anomalousFlushed.value >= locksRequired) {
-            addLog('> BUFFER CLEAN — all ghost signals eliminated');
+            addLog('> BUFFER CLEAN — all ghost signals eliminated', 'good');
             endGame('success');
             setTimeout(() => emit('complete'), 2200);
             return;
@@ -624,6 +643,13 @@ function onFlush() {
 
 function onClear() {
     selectedIds.value = [];
+}
+
+function onEarlyExit() {
+    if (result.value) return;
+    addLog('> ABORT: operator initiated early exit — feed abandoned', 'warn');
+    endGame('fail', 'OPERATOR ABORT');
+    setTimeout(() => emit('fail'), 1200);
 }
 
 // ── Space key ─────────────────────────────────────────────────────────────────
@@ -932,7 +958,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    height: 174px;
+    height: 144px;
     border-bottom: 1px solid rgba(0,180,0,0.10);
     padding: 0;
     gap: 0;
@@ -944,7 +970,7 @@ onUnmounted(() => {
     flex: 1;
     border-bottom: 1px solid rgba(0,180,0,0.06);
     min-height: 0;
-    max-height: 58px;
+    max-height: 48px;
 }
 
 .fb-row-label {
@@ -1234,65 +1260,56 @@ onUnmounted(() => {
 }
 
 .fb-audit-title {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.20em;
+    letter-spacing: 0.15em;
     color: #00ff00;
 }
 
-.fb-audit-sep {
-    color: rgba(0,180,0,0.20);
-    font-size: 8px;
+.fb-audit-chip {
+    color: #005500;
+    border: 1px solid #003300;
+    padding: 0 4px;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
 }
 
-.fb-audit-meta {
-    font-size: 7px;
-    color: rgba(0,160,0,0.44);
-    letter-spacing: 0.08em;
+.fb-chip--hi {
+    color: #ff8800;
+    border-color: #3a2000;
+}
+
+.fb-audit-phase {
+    font-size: 9px;
+    color: #005500;
+    letter-spacing: 0.10em;
+    border: 1px solid #003300;
+    padding: 0 4px;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 /* ── REFERENCE BASELINE ───────────────────────────────────────────────────── */
 
 .fb-reference {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     padding: 2px 6px;
     border-bottom: 1px solid rgba(0,160,0,0.08);
     background: #010e01;
     flex-shrink: 0;
-    flex-wrap: nowrap;
 }
 
-.fb-ref-tag {
-    font-size: 6px;
-    color: rgba(0,140,0,0.30);
-    letter-spacing: 0.18em;
-    flex-shrink: 0;
+.fb-ref-text {
+    font-size: 9px;
+    color: #004400;
+    letter-spacing: 0.02em;
 }
 
-.fb-ref-sep {
-    color: rgba(0,160,0,0.16);
-    font-size: 8px;
-}
-
-.fb-ref-field {
-    display: flex;
-    align-items: baseline;
-    gap: 3px;
-}
-
-.fb-ref-key {
-    font-size: 6px;
-    color: rgba(0,140,0,0.42);
-    letter-spacing: 0.12em;
-}
-
-.fb-ref-val {
-    font-size: 10px;
-    font-weight: 700;
-    color: #00cc00;
-    letter-spacing: 0.03em;
+.fb-ref-value {
+    color: #006600;
+    font-weight: bold;
 }
 
 /* ── DATA GRID ────────────────────────────────────────────────────────────── */
@@ -1349,8 +1366,8 @@ onUnmounted(() => {
 }
 
 .fb-grid td {
-    padding: 3px 5px;
-    color: #00aa00;
+    padding: 3px 6px;
+    color: #00b800;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1360,13 +1377,43 @@ onUnmounted(() => {
     color: rgba(0,100,0,0.14);
 }
 
+/* Anomalous row — amber pre-label */
+.fb-row--anom td {
+    color: #ff8800;
+    background: #0a0400;
+}
+
+.fb-row--anom:hover:not(.fb-grid-row--empty) {
+    background: rgba(255,100,0,0.07) !important;
+}
+
+/* Flushed row — struck through */
+.fb-row--flushed {
+    cursor: default !important;
+}
+
+.fb-row--flushed td {
+    color: #003300;
+    text-decoration: line-through;
+    background: transparent;
+}
+
 .fb-row--selected {
-    background: rgba(255,136,0,0.07) !important;
-    border-left: 2px solid rgba(255,136,0,0.60);
+    background: #011e01 !important;
+    outline: 1px solid #006600;
 }
 
 .fb-row--selected td {
-    color: #ff8800;
+    color: #00ff00;
+}
+
+.fb-row--anom.fb-row--selected {
+    background: #160700 !important;
+    outline: 1px solid #ff8800;
+}
+
+.fb-row--anom.fb-row--selected td {
+    color: #ffaa00;
 }
 
 .fb-row--inspected {
@@ -1378,46 +1425,61 @@ onUnmounted(() => {
     color: #00cc00;
 }
 
-.fb-row--selected.fb-row--inspected {
-    background: rgba(255,136,0,0.08) !important;
-    border-left: 2px solid #ff8800;
-}
-
-.fb-row--selected.fb-row--inspected td {
-    color: #ff8800;
-}
-
 .fb-status-col {
     font-size: 7px;
     letter-spacing: 0.08em;
 }
 
+/* Status span variants */
+.fb-st-valid  { color: #00aa00; }
+.fb-st-flag   { color: #ff8800; }
+.fb-st-purged { color: #003300; }
+.fb-st-anom   { color: #ff6600; font-weight: bold; animation: fb-scan-blink 1.0s step-end infinite; }
+
 /* ── ACTION BUTTONS ───────────────────────────────────────────────────────── */
 
 .fb-actions {
     display: flex;
-    gap: 0;
+    gap: 4px;
     flex-shrink: 0;
     border-top: 1px solid rgba(0,180,0,0.12);
-    align-items: stretch;
-    min-height: 38px;
+    align-items: center;
+    padding: 4px 6px;
+    background: #010901;
+    min-height: 32px;
 }
 
 .fb-action-btn {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    background: transparent;
-    padding: 0 16px;
+    font-weight: normal;
+    letter-spacing: 0.10em;
+    background: #010e01;
+    padding: 4px 10px;
     cursor: pointer;
-    transition: all 0.08s;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
     display: flex;
     align-items: center;
-    gap: 8px;
-    border: none;
-    border-right: 1px solid rgba(0,180,0,0.08);
+    gap: 6px;
+    border: 1px solid #0a3a0a;
     border-radius: 0;
+    color: #00aa00;
+    text-transform: uppercase;
+}
+
+.fb-action-btn:hover:not(:disabled) {
+    background: #001a00;
+    color: #00ff00;
+    border-color: #00aa00;
+}
+
+.fb-action-btn:active:not(:disabled) {
+    background: #002800;
+}
+
+.fb-action-btn:disabled {
+    opacity: 0.30;
+    cursor: not-allowed;
 }
 
 .fb-action-btn:disabled {
@@ -1428,66 +1490,96 @@ onUnmounted(() => {
 .fb-hotkey {
     font-size: 7px;
     font-weight: normal;
-    letter-spacing: 0.10em;
+    letter-spacing: 0.08em;
     color: rgba(255,136,0,0.55);
-    border: 1px solid rgba(255,136,0,0.30);
-    padding: 1px 4px;
-}
-
-.fb-btn--scan {
-    min-width: 168px;
-    border-right: 1px solid rgba(0,180,0,0.08);
-}
-
-.fb-btn--scan.fb-scan--active {
-    color: #00cc00;
-    border-left: 3px solid rgba(0,220,0,0.70);
-    background: rgba(0,180,0,0.05);
-}
-
-.fb-btn--scan.fb-scan--active:hover:not(:disabled) {
-    background: rgba(0,200,0,0.05);
-    color: #00cc00;
+    border: 1px solid rgba(255,136,0,0.25);
+    padding: 1px 3px;
 }
 
 .fb-btn--scan.fb-scan--paused {
     color: #ff8800;
-    border-left: 3px solid rgba(255,136,0,0.80);
-    background: rgba(255,136,0,0.05);
+    border-color: #3a2000;
     animation: fb-scan-blink 1.0s ease infinite;
 }
 
 .fb-btn--scan.fb-scan--paused:hover:not(:disabled) {
     animation: none;
-    background: rgba(255,136,0,0.08);
+    background: #1a0800;
+    color: #ff8800;
 }
 
 .fb-btn--flush {
-    flex: 1;
-    color: #ff9900;
-    border-left: 3px solid rgba(255,136,0,0.70);
-    background: rgba(255,136,0,0.06);
+    color: #cc6600;
+    border-color: #3a2000;
 }
 
 .fb-btn--flush:hover:not(:disabled) {
-    background: rgba(255,136,0,0.09);
-    color: #ffaa33;
+    background: #1a0800;
+    color: #ff8800;
+    border-color: #cc5500;
 }
 
-.fb-btn--clear {
-    color: rgba(0,200,0,0.60);
-    border-left: 3px solid rgba(0,180,0,0.30);
+.fb-flush--armed {
+    border-color: #ff8800;
+    color: #ff8800;
+    animation: fb-flush-pulse 0.6s ease-in-out infinite alternate;
 }
 
-.fb-btn--clear:hover:not(:disabled) {
-    background: rgba(0,200,0,0.03);
-    color: #00cc00;
+.fb-btn--exit {
+    margin-left: auto;
+    color: rgba(160,50,50,0.70);
+    border-color: rgba(120,30,30,0.40);
+}
+
+.fb-btn--exit:hover:not(:disabled) {
+    background: #100000;
+    color: rgba(220,80,80,0.90);
+    border-color: rgba(180,50,50,0.60);
+}
+
+/* ── SS BAR (in button row) ───────────────────────────────────────────────── */
+
+.fb-ss-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    padding: 0 8px;
+}
+
+.fb-ss-label {
+    font-size: 9px;
+    color: #004400;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+}
+
+.fb-ss-bar {
+    flex: 1;
+    height: 4px;
+    background: #010901;
+    border: 1px solid #051005;
+    overflow: hidden;
+}
+
+.fb-ss-fill {
+    height: 100%;
+    transition: width 0.4s;
+}
+
+.fb-ss-val {
+    font-size: 9px;
+    color: #00aa00;
+    min-width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
 }
 
 /* ── TERMINAL LOG ─────────────────────────────────────────────────────────── */
 
 .fb-terminal-log {
-    width: 155px;
+    width: 190px;
     flex-shrink: 0;
     background: rgba(0,2,0,0.55);
     border-left: 1px solid rgba(0,180,0,0.06);
@@ -1507,16 +1599,20 @@ onUnmounted(() => {
 }
 
 .fb-log-line {
-    font-size: 7px;
-    color: rgba(0,180,0,0.45);
+    font-size: 8.5px;
+    color: #004d00;
     letter-spacing: 0.02em;
-    line-height: 1.45;
-    word-break: break-all;
-    padding: 1px 5px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0px 4px;
 }
 
-.fb-log--warn  { color: rgba(255,136,0,0.65); }
-.fb-log--error { color: rgba(255,60,60,0.72); }
+.fb-log--warn  { color: #cc6600; }
+.fb-log--error { color: #ff3333; }
+.fb-log--hi    { color: #00aa00; }
+.fb-log--good  { color: #00ff00; }
 
 /* ── ANIMATIONS ───────────────────────────────────────────────────────────── */
 
@@ -1533,6 +1629,11 @@ onUnmounted(() => {
 @keyframes fb-dot-pulse {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.25; }
+}
+
+@keyframes fb-flush-pulse {
+    from { box-shadow: none; }
+    to   { box-shadow: 0 0 0 1px rgba(255,136,0,0.40); }
 }
 
 @keyframes fb-sig-oscillate {
