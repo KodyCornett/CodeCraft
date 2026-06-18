@@ -485,9 +485,10 @@ onMounted(() => buildPuzzle());
 ════════════════════════════════════════════════════════════════════════════ */
 
 .ts-canvas {
-    /* Fixed pixel canvas — designed for 1920 × 1080 */
+    /* Width fixed at 1920px (scrolls horizontally if viewport is narrower).
+       Height fills qmc-game-area so the pool row is never clipped. */
     width:  1920px;
-    height: 1080px;
+    height: 100%;
 
     display: grid;
     grid-template-columns: 350px 1fr 400px;
