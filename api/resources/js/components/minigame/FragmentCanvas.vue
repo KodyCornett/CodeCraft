@@ -101,6 +101,7 @@ defineEmits([
 .fc-canvas {
     width: 100%;
     height: 100%;
+    min-height: 0; /* prevent flex child from overflowing its parent cell */
     display: flex;
     flex-direction: column;
     /* Equal vertical distribution across the three fragment cards */

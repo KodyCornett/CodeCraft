@@ -518,6 +518,14 @@ onMounted(() => buildPuzzle());
 .ts-cell {
     position: relative;
     z-index: 1;
+    /*
+     * min-height: 0 is critical.
+     * Grid items default to min-height: auto (= content size).
+     * Without this, a tall cell expands its row track beyond the
+     * allocated 1fr, pushing the 200px pool row off the canvas.
+     */
+    min-height: 0;
+    min-width: 0;
     overflow: hidden;
     border: 1px solid rgba(39, 39, 42, 0.5); /* zinc-800/50 */
     padding: 16px;
@@ -528,15 +536,17 @@ onMounted(() => buildPuzzle());
 
 /* ── Cell placement ───────────────────────────────────────────────────────── */
 
-.ts-cell--scan   { grid-column: 1; grid-row: 1; }
-.ts-cell--frags  { grid-column: 2; grid-row: 1; }
-.ts-cell--status { grid-column: 3; grid-row: 1; }
+.ts-cell--scan   { grid-column: 1;      grid-row: 1; overflow-y: auto; }
+.ts-cell--frags  { grid-column: 2;      grid-row: 1; }
+.ts-cell--status { grid-column: 3;      grid-row: 1; overflow-y: auto; }
 .ts-cell--pool   { grid-column: 1 / -1; grid-row: 2; }
 
-/* Scan cell — column layout: ScanPanel stacks above SystemNoise */
+/* Scan cell — ScanPanel + SystemNoise stack vertically */
 .ts-cell--scan-layout {
     flex-direction: column;
     gap: 0;
+    /* Override overflow-y: auto so internal flex children manage scroll */
+    overflow-y: hidden;
 }
 
 /* Fragment cell — canvas manages its own internal padding */
