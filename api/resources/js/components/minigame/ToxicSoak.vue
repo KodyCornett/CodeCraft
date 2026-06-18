@@ -80,6 +80,16 @@
                         >{{ c }}</span>
                     </div>
 
+                    <!-- Shared SVG glow filter -->
+                    <svg width="0" height="0" style="position:absolute">
+                        <defs>
+                            <filter id="cf-glow" x="-60%" y="-60%" width="220%" height="220%">
+                                <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                        </defs>
+                    </svg>
+
                     <!-- Grid rows -->
                     <div class="cf-grid">
                         <div v-for="(row, r) in grid" :key="r" class="cf-grid-row">
@@ -93,18 +103,13 @@
                                 @click="rotateTile(r, c)"
                             >
                                 <svg :viewBox="`0 0 ${TILE_PX} ${TILE_PX}`" class="cf-tile-svg">
-                                    <defs>
-                                        <filter :id="`glow-${r}-${c}`" x="-50%" y="-50%" width="200%" height="200%">
-                                            <feGaussianBlur stdDeviation="2" result="blur"/>
-                                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                                        </filter>
-                                    </defs>
                                     <path
                                         v-if="tilePath(r, c)"
                                         :d="tilePath(r, c)"
                                         class="cf-pipe"
                                         :class="pipeClass(r, c)"
-                                        :filter="tile.flowType ? `url(#glow-${r}-${c})` : ''"
+                                        :stroke="pipeStroke(r, c)"
+                                        :filter="tile.flowType ? 'url(#cf-glow)' : ''"
                                         :stroke-width="TILE_PX * 0.22"
                                         fill="none"
                                         stroke-linecap="round"
@@ -177,7 +182,7 @@ const emit  = defineEmits(['complete', 'fail']);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TILE_PX   = 34;
+const TILE_PX   = 40;
 const ROW_LABELS = 'ABCDEFGHIJ'.split('');
 const N = 1, E = 2, S = 4, W = 8;
 
@@ -270,7 +275,8 @@ const {
     stability, primaryProgress, timeLeft, result, failReason,
     glitchActive, glitchType, glitchIntensity,
     stabilityClass, timerClass,
-    tickShared, applyHit, endGame,
+    diff,
+    applyHit, endGame,
 } = useQuestMinigameState(props.skin);
 
 // ── Grid state ────────────────────────────────────────────────────────────────
@@ -348,9 +354,16 @@ function tileClass(r, c) {
 function pipeClass(r, c) {
     const tile = grid.value[r]?.[c];
     if (!tile || !tile.flowType) return 'cf-pipe--dim';
-    if (tile.flowStatus === 'correct')  return 'cf-pipe--correct';
-    if (tile.flowStatus === 'wrong')    return 'cf-pipe--wrong';
+    if (tile.flowStatus === 'wrong')   return 'cf-pipe--wrong';
+    if (tile.flowStatus === 'correct') return 'cf-pipe--correct';
     return 'cf-pipe--flow';
+}
+
+function pipeStroke(r, c) {
+    const tile = grid.value[r]?.[c];
+    if (!tile || !tile.flowType) return 'rgba(0,255,100,0.10)';
+    if (tile.flowStatus === 'wrong') return '#ff3333';
+    return TYPE_META[tile.flowType]?.color ?? '#00ff9d';
 }
 
 function srcStatusClass(id) {
@@ -659,35 +672,49 @@ const DMG_WRONG    = 0.0015; // stability/s per wrong-sink source
 function tick(ts) {
     if (result.value) return;
 
-    const dt  = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
+    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
     lastTs = ts;
 
-    const cause = tickShared(dt);
-    if (cause === 'trace') {
+    // ── Manual time + stability (bypass tickShared to control primary progress) ─
+    timeLeft.value  = Math.max(0, timeLeft.value - dt);
+    stability.value = Math.max(0, stability.value - diff.stabilityDrain * dt);
+
+    // Primary progress only fills when sources are correctly routed
+    const sources      = activeSources.value;
+    const correctCount = sources.filter(s => flowResults.value[s.id] === 'ROUTED').length;
+    const routingRatio = sources.length > 0 ? correctCount / sources.length : 0;
+    primaryProgress.value = Math.min(1, primaryProgress.value + diff.traceSpeed * routingRatio * dt);
+
+    // ── Win / fail checks ──────────────────────────────────────────────────────
+    if (primaryProgress.value >= 1) {
         endGame('success');
         setTimeout(() => emit('complete'), 2200);
         return;
     }
-    if (cause === 'stability') {
+    if (timeLeft.value <= 0) {
+        endGame('fail', '[TIME EXPIRED] — Purge incomplete. Frequency line disconnected.');
+        setTimeout(() => emit('fail'), 2200);
+        return;
+    }
+    if (stability.value <= 0) {
         endGame('fail', '[CONDUIT COLLAPSE] — Frequency line saturated. Ejected from node.');
         setTimeout(() => emit('fail'), 2200);
         return;
     }
 
-    // Apply damage from bad routing
+    // ── Routing damage + type-change timers ────────────────────────────────────
     let dmg = 0;
-    for (const src of activeSources.value) {
+    for (const src of sources) {
         const r = flowResults.value[src.id];
-        if (r === 'UNROUTED')    dmg += DMG_UNROUTED;
+        if (r === 'UNROUTED')     dmg += DMG_UNROUTED;
         else if (r === 'WRONG SINK') dmg += DMG_WRONG;
 
-        // Type-change timer
         src.changeTimer -= dt;
         if (src.changeTimer <= 0) {
             const newType = ALL_TYPES.filter(t => t !== src.type)[randInt(0, 1)];
             failLog.value.unshift(`${src.id}: ${src.type}→${newType}`);
             if (failLog.value.length > 4) failLog.value.pop();
-            src.type = newType;
+            src.type           = newType;
             src.changeInterval = randInt(...config.changeRange);
             src.changeTimer    = src.changeInterval;
             propagateFlows();
@@ -801,8 +828,7 @@ onUnmounted(() => {
 
 .cf-src-spacer {
     flex-shrink: 0;
-    /* matches col-nums + top-sinks height */
-    height: 36px;
+    height: 42px; /* top-sinks (26px) + col-nums (16px) */
 }
 
 .cf-src-list {
@@ -885,7 +911,7 @@ onUnmounted(() => {
 .cf-top-sinks {
     display: flex;
     align-items: flex-end;
-    height: 26px;
+    height: 28px;
     flex-shrink: 0;
 }
 
@@ -998,7 +1024,7 @@ onUnmounted(() => {
 }
 
 .cf-right-top {
-    height: 36px; /* aligns with col headers */
+    height: 42px; /* aligns with col headers */
     flex-shrink: 0;
 }
 
