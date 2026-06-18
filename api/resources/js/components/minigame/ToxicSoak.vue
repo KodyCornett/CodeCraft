@@ -1,229 +1,79 @@
 <template>
     <QuestMinigameChrome v-bind="chrome">
-        <div class="ts-wrap">
 
-            <!-- ── Grid overlay ──────────────────────────────────────────────── -->
-            <div class="ts-grid" aria-hidden="true"/>
+        <!-- ═══════════════════════════════════════════════════════════════════
+             Root canvas — fixed 1920 × 1080, CSS Grid
+             Columns : 350px | 1fr | 400px
+             Rows    : 1fr   | 200px
+        ════════════════════════════════════════════════════════════════════ -->
+        <div class="ts-canvas">
 
-            <!-- ── Top bar ───────────────────────────────────────────────────── -->
-            <div class="ts-topbar">
-                <span class="ts-topbar-diamond">◈</span>
-                <span class="ts-topbar-title">CIPHER_BUFFER_{{ String(props.skin.bufferId ?? '01').padStart(2, '0') }}</span>
-                <div class="ts-topbar-greebles">
-                    <span>SESS: 0x{{ Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4,'0') }}</span>
-                    <span>PKT: 1487</span>
-                    <span class="ts-greeble-div">│</span>
-                    <span>SPLICE_LOCK</span>
-                    <span class="ts-greeble-ok">◆ AUTH_OK</span>
-                </div>
+            <!-- ── Grid overlay (decorative) ─────────────────────────────── -->
+            <div class="ts-grid-bg" aria-hidden="true"/>
+
+            <!-- ┌─────────────────────────────────────────────────────────────
+                 │  CELL A — Scan panel + System noise   col 1 · row 1
+                 └───────────────────────────────────────────────────────── -->
+            <div class="ts-cell ts-cell--scan ts-cell--scan-layout">
+
+                <!-- ScanPanel — visible only when a fragment is being scanned -->
+                <Transition name="ts-scan-slide">
+                    <ScanPanel
+                        v-if="scanOpen !== null"
+                        :fragment="activeScanFragment"
+                        :fragment-index="scanOpen"
+                        :open-file-idx="openFileIdx"
+                        :unlocked-idxs="unlockedIdxs"
+                        :file-content="currentFileContent"
+                        :lock-cost-pct="lockCostPct"
+                        @file-click="openFile"
+                        @close="scanOpen = null"
+                    />
+                </Transition>
+
+                <!-- SystemNoise — always running; shrinks when scan is open -->
+                <SystemNoise :compressed="scanOpen !== null" />
+
             </div>
 
-            <!-- ── Main body ──────────────────────────────────────────────────── -->
-            <div class="ts-body">
-
-                <!-- ┌ Left — Archive scan panel ──────────────────────────────── -->
-                <div class="ts-left">
-                    <div class="ts-panel-label">
-                        <span class="ts-panel-bracket">[</span>
-                        ARCHIVE_SCAN
-                        <span class="ts-panel-bracket">]</span>
-                    </div>
-
-                    <template v-if="scanOpen !== null">
-                        <div class="ts-scan-dir">
-                            <span class="ts-scan-path">ARCHIVE_DIR/_FRAGMENT_{{ String(scanOpen + 1).padStart(2, '0') }}</span>
-                        </div>
-                        <div class="ts-scan-files">
-                            <div
-                                v-for="(file, fli) in fragments[scanOpen].archive"
-                                :key="fli"
-                                class="ts-file-row"
-                                :class="{ 'ts-file--active': openFileIdx === fli }"
-                                @click="openFile(fli)"
-                            >
-                                <span class="ts-file-open">▸</span>
-                                <span class="ts-file-name">{{ file.name }}</span>
-                                <span class="ts-file-meta">{{ file.size }}<span v-if="file.locked && !isUnlocked(fli)" class="ts-file-lock"> 🔒</span></span>
-                            </div>
-                        </div>
-                        <Transition name="ts-fade">
-                            <div v-if="openFileIdx !== null" class="ts-file-content">
-                                <pre class="ts-file-text">{{ currentFileContent }}</pre>
-                            </div>
-                        </Transition>
-                        <button class="ts-scan-close" @click="scanOpen = null">[ CLOSE_SCAN ]</button>
-                    </template>
-
-                    <template v-else>
-                        <div class="ts-no-scan">
-                            <div class="ts-no-scan-icon">⬡</div>
-                            <div class="ts-no-scan-line">NO FRAGMENT SELECTED</div>
-                            <div class="ts-no-scan-sub">Press [ SCAN ] on any fragment to investigate its data archive.</div>
-                        </div>
-                    </template>
-
-                    <!-- Greebles -->
-                    <div class="ts-left-greebles">
-                        <span>0x0A4E: READ</span>
-                        <span>PTR: 0xFFE2</span>
-                        <span>BUF: CLEAN</span>
-                    </div>
-                </div>
-
-                <!-- ┌ Center — Fragments ─────────────────────────────────────── -->
-                <div class="ts-center">
-                    <div
-                        v-for="(frag, fi) in fragments"
-                        :key="fi"
-                        class="ts-fragment"
-                        :class="{ 'ts-fragment--solved': solvedFrags[fi] }"
-                    >
-                        <!-- Fragment header -->
-                        <div class="ts-frag-header">
-                            <span class="ts-frag-id">FRAGMENT_{{ String(fi + 1).padStart(2, '0') }} // {{ frag.codename }}</span>
-                            <span class="ts-frag-badge" :class="solvedFrags[fi] ? 'ts-badge--ok' : 'ts-badge--pending'">
-                                {{ solvedFrags[fi] ? '◆ SECURED' : '○ PENDING' }}
-                            </span>
-                        </div>
-
-                        <!-- Hint -->
-                        <div class="ts-frag-hint">"{{ frag.hint }}"</div>
-
-                        <!-- Controls row -->
-                        <div class="ts-frag-row">
-                            <div class="ts-slots">
-                                <div
-                                    v-for="(entry, si) in slots[fi]"
-                                    :key="si"
-                                    class="ts-slot"
-                                    :class="{
-                                        'ts-slot--filled':    entry !== null,
-                                        'ts-slot--droppable': selectedPoolId !== null && !solvedFrags[fi],
-                                    }"
-                                    @click="onSlotClick(fi, si)"
-                                >{{ entry ? entry.letter : '?' }}</div>
-                            </div>
-
-                            <div class="ts-frag-btns">
-                                <button
-                                    class="ts-btn ts-btn--scan"
-                                    :class="{ 'ts-btn--scan-active': scanOpen === fi }"
-                                    @click="openScan(fi)"
-                                >[ SCAN_{{ String(fi + 1).padStart(2, '0') }} ]</button>
-                                <button
-                                    class="ts-btn ts-btn--inject"
-                                    :class="{ 'ts-btn--inject-ready': canInject(fi) }"
-                                    :disabled="solvedFrags[fi]"
-                                    @click="inject(fi)"
-                                >[ INJECT_{{ String(fi + 1).padStart(2, '0') }} ]</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ┌ Right — Status monitor ─────────────────────────────────── -->
-                <div class="ts-right">
-                    <div class="ts-panel-label">
-                        <span class="ts-panel-bracket">[</span>
-                        STATUS_MONITOR
-                        <span class="ts-panel-bracket">]</span>
-                    </div>
-
-                    <!-- Stability -->
-                    <div class="ts-stat-block">
-                        <div class="ts-stat-row">
-                            <span class="ts-stat-label">SYS.STABILITY</span>
-                            <span class="ts-stat-val" :class="localStabClass">{{ Math.round(stability * 100) }}%</span>
-                        </div>
-                        <div class="ts-stat-bar">
-                            <div class="ts-bar-fill ts-fill--stab" :style="{ width: stability * 100 + '%' }"/>
-                        </div>
-                        <div class="ts-stat-sub">
-                            {{ stability >= 0.7 ? 'NOMINAL' : stability >= 0.35 ? 'DEGRADED' : 'CRITICAL' }}
-                        </div>
-                    </div>
-
-                    <!-- Trace -->
-                    <div class="ts-stat-block">
-                        <div class="ts-stat-row">
-                            <span class="ts-stat-label">ACTIVE_TRACE</span>
-                            <span class="ts-stat-val ts-val--trace" :class="{ 'ts-val--crit': traceLevel > 0.7, 'ts-val--warn': traceLevel > 0.4 && traceLevel <= 0.7 }">{{ Math.round(traceLevel * 100) }}%</span>
-                        </div>
-                        <div class="ts-stat-bar">
-                            <div class="ts-bar-fill ts-fill--trace" :style="{ width: traceLevel * 100 + '%' }"/>
-                        </div>
-                        <div class="ts-stat-sub ts-sub--trace">
-                            {{ traceLevel < 0.3 ? 'UNDETECTED' : traceLevel < 0.6 ? 'EXPOSURE LOW' : traceLevel < 0.85 ? 'TRACED — EVADE' : 'ICE IMMINENT' }}
-                        </div>
-                    </div>
-
-                    <!-- Fragments -->
-                    <div class="ts-stat-block">
-                        <div class="ts-stat-label" style="margin-bottom:6px">FRAGS_SECURED</div>
-                        <div class="ts-pips">
-                            <span
-                                v-for="i in fragments.length"
-                                :key="i"
-                                class="ts-pip"
-                                :class="solvedFrags[i - 1] ? 'ts-pip--secured' : 'ts-pip--open'"
-                            >◉</span>
-                        </div>
-                        <div class="ts-stat-sub">{{ solvedFrags.filter(Boolean).length }} / {{ fragments.length }} recovered</div>
-                    </div>
-
-                    <!-- Flash messages -->
-                    <Transition name="ts-flash">
-                        <div v-if="showWrong" class="ts-flash ts-flash--wrong">
-                            <span class="ts-flash-icon">✕</span>
-                            SEQ REJECTED<br/>
-                            <span class="ts-flash-sub">TRACE INCREASED</span>
-                        </div>
-                    </Transition>
-                    <Transition name="ts-flash">
-                        <div v-if="showCorrect !== null" class="ts-flash ts-flash--ok">
-                            <span class="ts-flash-icon">◆</span>
-                            FRAG_{{ String(showCorrect + 1).padStart(2, '0') }} SECURED<br/>
-                            <span class="ts-flash-sub">SEQUENCE CONFIRMED</span>
-                        </div>
-                    </Transition>
-
-                    <!-- Greebles -->
-                    <div class="ts-right-greebles">
-                        <span>SPLICE: ACTIVE</span>
-                        <span>KERN: OK</span>
-                        <span>MEM: 847MB</span>
-                        <span>NET: 0x3C1A</span>
-                        <span>UPLINK: OK</span>
-                    </div>
-                </div>
+            <!-- ┌─────────────────────────────────────────────────────────────
+                 │  CELL B — Fragment canvas        col 2 · row 1
+                 └───────────────────────────────────────────────────────── -->
+            <div class="ts-cell ts-cell--frags ts-cell--frags-flush">
+                <FragmentCanvas
+                    :fragments="fragments"
+                    :slots="slots"
+                    :solved-frags="solvedFrags"
+                    :scan-open="scanOpen"
+                    :selected-pool-id="selectedPoolId"
+                    @slot-click="onSlotClick"
+                    @scan-click="openScan"
+                    @inject-click="inject"
+                />
             </div>
 
-            <!-- ── Signal pool ─────────────────────────────────────────────────── -->
-            <div class="ts-pool-section">
-                <div class="ts-pool-bar">
-                    <span class="ts-pool-label">SHARED_SIGNAL_POOL</span>
-                    <span class="ts-pool-legend"><span class="ts-legend-sig">■</span> SIGNAL</span>
-                    <span class="ts-pool-legend"><span class="ts-legend-noise">■</span> NOISE</span>
-                    <div class="ts-pool-bar-right">
-                        <Transition name="ts-fade">
-                            <span v-if="selectedPoolId !== null" class="ts-pool-hint">▸ SELECT SLOT TO PLACE</span>
-                        </Transition>
-                        <span v-if="selectedPoolId !== null" class="ts-pool-cancel" @click="selectedPoolId = null">[ CANCEL ]</span>
-                    </div>
-                </div>
-                <div class="ts-pool">
-                    <div
-                        v-for="item in pool"
-                        :key="item.id"
-                        class="ts-tile"
-                        :class="{
-                            'ts-tile--selected': item.id === selectedPoolId,
-                            'ts-tile--used':     item.usedBy !== null,
-                            'ts-tile--noise':    item.noise,
-                        }"
-                        @click="onPoolClick(item)"
-                    >{{ item.letter }}</div>
-                </div>
+            <!-- ┌─────────────────────────────────────────────────────────────
+                 │  CELL C — Status monitor         col 3 · row 1
+                 └───────────────────────────────────────────────────────── -->
+            <div class="ts-cell ts-cell--status">
+                <StatusMonitor
+                    :stability="stability"
+                    :trace-level="traceLevel"
+                    :reputation="5"
+                    :solved-frags="solvedFrags"
+                />
+            </div>
+
+            <!-- ┌─────────────────────────────────────────────────────────────
+                 │  CELL D — Signal pool            col 1-3 · row 2
+                 └───────────────────────────────────────────────────────── -->
+            <div class="ts-cell ts-cell--pool">
+                <SignalPool
+                    :letters="poolLetters"
+                    :selected-pool-id="selectedPoolId"
+                    @pool-select="onPoolSelect"
+                    @pool-cancel="selectedPoolId = null"
+                />
             </div>
 
         </div>
@@ -234,6 +84,11 @@
 import { ref, computed } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
+import StatusMonitor from './StatusMonitor.vue';
+import FragmentCanvas from './FragmentCanvas.vue';
+import SignalPool from './SignalPool.vue';
+import ScanPanel from './ScanPanel.vue';
+import SystemNoise from './SystemNoise.vue';
 import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
 
 // ── Acrostic word bank ─────────────────────────────────────────────────────────
@@ -326,19 +181,19 @@ const cfg        = DIFF_CONFIG[difficulty] ?? DIFF_CONFIG[1];
 
 // ── Game state ─────────────────────────────────────────────────────────────────
 
-const fragments    = ref([]);            // [{ word, hint, codename, archive }]
-const slots        = ref([[], [], []]);  // slots[fi][si] = { poolId, letter } | null
-const pool         = ref([]);            // [{ id, letter, noise, usedBy: null|fi }]
+const fragments    = ref([]);
+const slots        = ref([[], [], []]);
+const pool         = ref([]);
 const solvedFrags  = ref([false, false, false]);
 const traceLevel   = ref(0);
 const selectedPoolId = ref(null);
 
-const scanOpen     = ref(null);          // null | fragment index
-const openFileIdx  = ref(null);          // null | file index within current scan
-const unlockedIdxs = ref(new Set());     // file indexes unlocked in current scan session
+const scanOpen     = ref(null);
+const openFileIdx  = ref(null);
+const unlockedIdxs = ref(new Set());
 
 const showWrong    = ref(false);
-const showCorrect  = ref(null);          // null | fragment index
+const showCorrect  = ref(null);
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -347,6 +202,28 @@ const localStabClass = computed(() => {
     if (stability.value < 0.35) return 'ts-val--warn';
     return '';
 });
+
+/**
+ * Transforms internal pool shape → clean SignalPool prop interface.
+ * Internal: { id, letter, noise, usedBy: null|fi }
+ * External: { id, char,   noise, status: 'active'|'used' }
+ */
+const poolLetters = computed(() =>
+    pool.value.map(item => ({
+        id:     item.id,
+        char:   item.letter,
+        noise:  item.noise,
+        status: item.usedBy !== null ? 'used' : 'active',
+    }))
+);
+
+/** Stability cost shown in ScanPanel lock badge */
+const lockCostPct = computed(() => Math.round(cfg.lockCost * 100));
+
+/** Fragment currently being scanned — null-safe */
+const activeScanFragment = computed(() =>
+    scanOpen.value !== null ? fragments.value[scanOpen.value] ?? null : null
+);
 
 const currentFileContent = computed(() => {
     if (scanOpen.value === null || openFileIdx.value === null) return '';
@@ -420,21 +297,21 @@ function generateArchive(word, fragIdx) {
 
     const files = [
         {
-            name: `${noiseNames[0][0]}.${noiseNames[0][1]}`,
-            size: `${randInt(30, 90)}kb`,
-            locked: false,
+            name:    `${noiseNames[0][0]}.${noiseNames[0][1]}`,
+            size:    `${randInt(30, 90)}kb`,
+            locked:  false,
             content: `[SYSTEM LOG]\n\nNo anomalous entries detected in this segment.\nRoutine traffic recorded. Nothing actionable.\n\nEnd of log.`,
         },
         {
-            name: `${lockedNames[0][0]}.${lockedNames[0][1]}`,
-            size: `${randInt(8, 20)}kb`,
-            locked: true,
+            name:    `${lockedNames[0][0]}.${lockedNames[0][1]}`,
+            size:    `${randInt(8, 20)}kb`,
+            locked:  true,
             content: `[ENCRYPTED RECORD]\n\nPartial trace data recovered.\nOrigin: masked. Destination: masked.\nContent: insufficient for analysis.\n\nRecommendation: discard.`,
         },
         {
-            name: `acrostic_clue_fragment.txt`,
-            size: `1kb`,
-            locked: false,
+            name:    `acrostic_clue_fragment.txt`,
+            size:    `1kb`,
+            locked:  false,
             content: `Acrostic Fragment ${String(fragIdx + 1).padStart(2, '0')}:\n${acrostic}`,
         },
     ];
@@ -461,8 +338,8 @@ function buildPuzzle() {
         });
     }
 
-    fragments.value = selected;
-    slots.value     = selected.map(f => Array(f.word.length).fill(null));
+    fragments.value   = selected;
+    slots.value       = selected.map(f => Array(f.word.length).fill(null));
     solvedFrags.value = Array(selected.length).fill(false);
     buildPool(selected);
 }
@@ -470,14 +347,12 @@ function buildPuzzle() {
 function buildPool(frags) {
     const items = [];
 
-    // Signal letters — one per character of each word
-    frags.forEach((frag, fi) => {
+    frags.forEach(frag => {
         frag.word.split('').forEach(letter => {
             items.push({ letter, noise: false });
         });
     });
 
-    // Noise
     for (let i = 0; i < cfg.noiseCount; i++) {
         items.push({ letter: NOISE_CHARS[randInt(0, NOISE_CHARS.length - 1)], noise: true });
     }
@@ -494,48 +369,39 @@ function buildPool(frags) {
 // ── Letter placement ───────────────────────────────────────────────────────────
 
 function onPoolClick(item) {
-    if (selectedPoolId.value === item.id) {
-        // Deselect
-        selectedPoolId.value = null;
-        return;
-    }
-    if (item.usedBy !== null) {
-        // Already placed — select it so player can move it
-        selectedPoolId.value = item.id;
-        return;
-    }
+    if (selectedPoolId.value === item.id) { selectedPoolId.value = null; return; }
     selectedPoolId.value = item.id;
+}
+
+/** Called by SignalPool's pool-select emit (receives id, not the item object). */
+function onPoolSelect(id) {
+    onPoolClick(pool.value.find(p => p.id === id) ?? { id });
 }
 
 function onSlotClick(fi, si) {
     if (solvedFrags.value[fi]) return;
 
     if (selectedPoolId.value !== null) {
-        // Place selected pool letter into this slot
         const poolItem = pool.value.find(p => p.id === selectedPoolId.value);
         if (!poolItem) return;
 
-        // If this slot already has a letter, return it to pool
         const existing = slots.value[fi][si];
         if (existing) {
             const oldItem = pool.value.find(p => p.id === existing.poolId);
             if (oldItem) oldItem.usedBy = null;
         }
 
-        // If pool item was used elsewhere, clear that slot
         if (poolItem.usedBy !== null) {
             const prevFi = poolItem.usedBy;
             const prevSi = slots.value[prevFi].findIndex(s => s?.poolId === poolItem.id);
             if (prevSi !== -1) slots.value[prevFi][prevSi] = null;
         }
 
-        // Place into new slot
-        poolItem.usedBy          = fi;
-        slots.value[fi][si]      = { poolId: poolItem.id, letter: poolItem.letter };
-        selectedPoolId.value     = null;
+        poolItem.usedBy      = fi;
+        slots.value[fi][si]  = { poolId: poolItem.id, letter: poolItem.letter };
+        selectedPoolId.value = null;
 
     } else {
-        // No letter selected — click filled slot to return it to pool
         const existing = slots.value[fi][si];
         if (existing) {
             const poolItem = pool.value.find(p => p.id === existing.poolId);
@@ -556,7 +422,6 @@ function inject(fi) {
         showCorrect.value = fi;
         setTimeout(() => { showCorrect.value = null; }, 1400);
 
-        // Update progress
         const solved = solvedFrags.value.filter(Boolean).length;
         primaryProgress.value = solved / fragments.value.length;
 
@@ -568,7 +433,6 @@ function inject(fi) {
             }, 800);
         }
     } else {
-        // Wrong — damage stability + raise trace
         traceLevel.value = Math.min(1, traceLevel.value + cfg.traceDmg);
         applyHit(cfg.stabDmg);
         showWrong.value = true;
@@ -597,7 +461,6 @@ function openFile(fileIdx) {
     const file = fragments.value[scanOpen.value].archive[fileIdx];
 
     if (file.locked && !isUnlocked(fileIdx)) {
-        // Pay stability to decrypt
         applyHit(cfg.lockCost);
         unlockedIdxs.value.add(fileIdx);
         if (stability.value <= 0) {
@@ -615,651 +478,86 @@ onMounted(() => buildPuzzle());
 </script>
 
 <style scoped>
-/* ── Root ────────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Canvas — fixed 1920 × 1080, CSS Grid
+   Columns : 350px | 1fr | 400px
+   Rows    : 1fr   | 200px
+════════════════════════════════════════════════════════════════════════════ */
 
-.ts-wrap {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+.ts-canvas {
+    /* Fixed pixel canvas — designed for 1920 × 1080 */
+    width:  1920px;
+    height: 1080px;
+
+    display: grid;
+    grid-template-columns: 350px 1fr 400px;
+    grid-template-rows: 1fr 200px;
+
     font-family: 'JetBrains Mono', monospace;
     background: #04090e;
     color: #00c8f0;
-    box-sizing: border-box;
-    padding: 6px 8px 5px;
-    gap: 5px;
     overflow: hidden;
     position: relative;
 }
 
-/* ── Grid overlay ────────────────────────────────────────────────────────── */
+/* ── Grid overlay ─────────────────────────────────────────────────────────── */
 
-.ts-grid {
+.ts-grid-bg {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 0;
     background-image:
-        linear-gradient(rgba(0,200,240,0.028) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,200,240,0.028) 1px, transparent 1px);
-    background-size: 28px 28px;
+        linear-gradient(rgba(0,200,240,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,240,0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
 }
 
-/* Ensure content sits above grid */
-.ts-topbar, .ts-body, .ts-pool-section { position: relative; z-index: 1; }
+/* ── Cells — base ─────────────────────────────────────────────────────────── */
 
-/* ── Top bar ─────────────────────────────────────────────────────────────── */
-
-.ts-topbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(0,200,240,0.12);
-    padding-bottom: 5px;
-}
-
-.ts-topbar-diamond { color: #00ff9d; font-size: 13px; }
-.ts-topbar-title   { font-size: 11px; letter-spacing: 0.18em; color: rgba(0,200,240,0.9); flex-shrink: 0; }
-
-.ts-topbar-greebles {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-left: auto;
-    font-size: 9px;
-    color: rgba(0,200,240,0.28);
-    letter-spacing: 0.1em;
-}
-
-.ts-greeble-div { color: rgba(0,200,240,0.15); }
-.ts-greeble-ok  { color: rgba(0,255,150,0.4); }
-
-/* ── Body: three-column ──────────────────────────────────────────────────── */
-
-.ts-body {
-    display: flex;
-    gap: 8px;
-    flex: 1;
-    min-height: 0;
-}
-
-/* ── Left: Archive scan panel ────────────────────────────────────────────── */
-
-.ts-left {
-    width: 240px;
-    flex-shrink: 0;
+.ts-cell {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    border: 1px solid rgba(39, 39, 42, 0.5); /* zinc-800/50 */
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    border: 1px solid rgba(0,200,240,0.1);
-    background: rgba(0,12,20,0.7);
-    padding: 8px;
-    min-height: 0;
+    gap: 12px;
 }
 
-.ts-panel-label {
-    font-size: 9px;
+/* ── Cell placement ───────────────────────────────────────────────────────── */
+
+.ts-cell--scan   { grid-column: 1; grid-row: 1; }
+.ts-cell--frags  { grid-column: 2; grid-row: 1; }
+.ts-cell--status { grid-column: 3; grid-row: 1; }
+.ts-cell--pool   { grid-column: 1 / -1; grid-row: 2; }
+
+/* Scan cell — column layout: ScanPanel stacks above SystemNoise */
+.ts-cell--scan-layout {
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Fragment cell — canvas manages its own internal padding */
+.ts-cell--frags-flush {
+    padding: 0;
+}
+
+/* ScanPanel slide-in transition */
+.ts-scan-slide-enter-active { transition: opacity 0.22s, transform 0.22s; }
+.ts-scan-slide-leave-active { transition: opacity 0.18s, transform 0.18s; }
+.ts-scan-slide-enter-from,
+.ts-scan-slide-leave-to     { opacity: 0; transform: translateY(-10px); }
+
+/* ── Cell label (development guide / section header) ─────────────────────── */
+
+.ts-cell-label {
+    font-size: 10px;
     letter-spacing: 0.18em;
-    color: rgba(0,200,240,0.45);
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(0,200,240,0.08);
-    padding-bottom: 4px;
-    margin-bottom: 2px;
-}
-
-.ts-panel-bracket { color: rgba(0,200,240,0.25); }
-
-.ts-scan-dir {
-    flex-shrink: 0;
-}
-
-.ts-scan-path {
-    font-size: 8px;
-    letter-spacing: 0.08em;
-    color: rgba(0,200,240,0.5);
-}
-
-.ts-scan-files {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-}
-
-.ts-file-row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 5px 4px;
-    cursor: pointer;
-    transition: background 0.12s;
-    border-bottom: 1px solid rgba(0,200,240,0.05);
-}
-
-.ts-file-row:hover  { background: rgba(0,200,240,0.06); }
-.ts-file--active    { background: rgba(0,200,240,0.09) !important; }
-
-.ts-file-open {
-    color: rgba(0,200,240,0.4);
-    font-size: 10px;
-    flex-shrink: 0;
-}
-
-.ts-file-row:hover .ts-file-open { color: #00c8f0; }
-
-.ts-file-name {
-    flex: 1;
-    font-size: 10px;
-    color: rgba(0,200,240,0.8);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.ts-file-meta {
-    font-size: 9px;
-    color: rgba(0,200,240,0.3);
-    flex-shrink: 0;
-    white-space: nowrap;
-}
-
-.ts-file-lock { font-size: 9px; }
-
-.ts-file-content {
-    flex: 1;
-    border: 1px solid rgba(0,200,240,0.1);
-    padding: 6px 7px;
-    background: rgba(0,8,15,0.7);
-    overflow-y: auto;
-    min-height: 0;
-}
-
-.ts-file-text {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: rgba(255,200,80,0.8);
-    line-height: 1.7;
-    margin: 0;
-    white-space: pre-wrap;
-    letter-spacing: 0.02em;
-}
-
-.ts-scan-close {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    padding: 5px 8px;
-    border: 1px solid rgba(0,200,240,0.2);
-    background: transparent;
-    color: rgba(0,200,240,0.45);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: color 0.15s, border-color 0.15s;
-}
-.ts-scan-close:hover { color: #00c8f0; border-color: rgba(0,200,240,0.5); }
-
-/* No-scan state */
-.ts-no-scan {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    text-align: center;
-    padding: 12px 8px;
-}
-
-.ts-no-scan-icon {
-    font-size: 28px;
-    color: rgba(0,200,240,0.12);
-}
-
-.ts-no-scan-line {
-    font-size: 9px;
-    letter-spacing: 0.16em;
-    color: rgba(0,200,240,0.3);
-}
-
-.ts-no-scan-sub {
-    font-size: 9px;
-    color: rgba(0,200,240,0.2);
-    line-height: 1.5;
-    letter-spacing: 0.03em;
-}
-
-/* Left greebles */
-.ts-left-greebles {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-top: auto;
-    padding-top: 6px;
-    border-top: 1px solid rgba(0,200,240,0.06);
-    font-size: 8px;
-    color: rgba(0,200,240,0.18);
-    letter-spacing: 0.08em;
-}
-
-/* ── Center: Fragments ───────────────────────────────────────────────────── */
-
-.ts-center {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    min-width: 0;
-    min-height: 0;
-}
-
-.ts-fragment {
-    flex: 1;
-    border: 1px solid rgba(0,200,240,0.12);
-    background: rgba(0,15,25,0.6);
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    justify-content: center;
-    transition: border-color 0.2s, background 0.2s;
-    min-height: 0;
-}
-
-.ts-fragment--solved {
-    border-color: rgba(0,255,100,0.28);
-    background: rgba(0,25,18,0.5);
-}
-
-.ts-frag-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.ts-frag-id {
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    color: rgba(0,200,240,0.5);
-}
-
-.ts-frag-badge {
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    flex-shrink: 0;
-}
-
-.ts-badge--pending { color: rgba(0,200,240,0.3); }
-.ts-badge--ok      { color: #00ff9d; text-shadow: 0 0 8px rgba(0,255,100,0.5); }
-
-.ts-frag-hint {
-    font-size: 12px;
-    color: rgba(0,200,240,0.85);
-    font-style: italic;
-    letter-spacing: 0.02em;
-    line-height: 1.45;
-}
-
-.ts-frag-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.ts-frag-btns {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-/* ── Slots ───────────────────────────────────────────────────────────────── */
-
-.ts-slots {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.ts-slot {
-    width: 46px;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    font-weight: 700;
-    border: 1px solid rgba(0,200,240,0.2);
-    background: rgba(0,12,22,0.85);
     color: rgba(0,200,240,0.35);
-    cursor: pointer;
-    transition: border-color 0.12s, color 0.12s, background 0.12s, box-shadow 0.12s;
-    user-select: none;
-}
-
-.ts-slot--filled {
-    color: #00c8f0;
-    border-color: rgba(0,200,240,0.5);
-    background: rgba(0,28,42,0.9);
-}
-
-.ts-slot--droppable:hover {
-    border-color: #00c8f0;
-    background: rgba(0,200,240,0.1);
-    box-shadow: 0 0 10px rgba(0,200,240,0.2);
-    cursor: crosshair;
-}
-
-/* ── Buttons ─────────────────────────────────────────────────────────────── */
-
-.ts-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    padding: 7px 14px;
-    border: 1px solid;
-    background: transparent;
-    cursor: pointer;
-    transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
-    white-space: nowrap;
-}
-
-.ts-btn--scan {
-    color: rgba(0,200,240,0.55);
-    border-color: rgba(0,200,240,0.22);
-}
-
-.ts-btn--scan:hover,
-.ts-btn--scan-active {
-    color: #00c8f0;
-    border-color: rgba(0,200,240,0.6);
-    background: rgba(0,200,240,0.07);
-    box-shadow: 0 0 8px rgba(0,200,240,0.12);
-}
-
-.ts-btn--inject {
-    color: rgba(0,255,100,0.3);
-    border-color: rgba(0,255,100,0.12);
-    opacity: 0.5;
-}
-
-.ts-btn--inject-ready {
-    color: #00ff9d;
-    border-color: rgba(0,255,100,0.5);
-    opacity: 1;
-}
-
-.ts-btn--inject-ready:hover {
-    background: rgba(0,255,100,0.08);
-    box-shadow: 0 0 10px rgba(0,255,100,0.18);
-}
-
-.ts-btn:disabled { cursor: not-allowed; opacity: 0.22; }
-
-/* ── Right: Status monitor ───────────────────────────────────────────────── */
-
-.ts-right {
-    width: 210px;
+    border-bottom: 1px solid rgba(0,200,240,0.08);
+    padding-bottom: 8px;
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border: 1px solid rgba(0,200,240,0.1);
-    background: rgba(0,10,18,0.7);
-    padding: 8px 10px;
-    min-height: 0;
-}
-
-.ts-stat-block {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    border-bottom: 1px solid rgba(0,200,240,0.07);
-    padding-bottom: 7px;
-}
-
-.ts-stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-}
-
-.ts-stat-label {
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    color: rgba(0,200,240,0.4);
-}
-
-.ts-stat-val {
-    font-size: 14px;
-    letter-spacing: 0.04em;
-    color: #00c8f0;
-    font-weight: 700;
-}
-
-.ts-stat-sub {
-    font-size: 8px;
-    letter-spacing: 0.1em;
-    color: rgba(0,200,240,0.28);
-    margin-top: 1px;
-}
-
-.ts-sub--trace { color: rgba(255,136,0,0.35); }
-
-.ts-val--warn { color: #ffaa00; }
-.ts-val--crit { color: #ff3333; animation: ts-pulse 0.6s ease infinite alternate; }
-.ts-val--trace { color: #ff7700; }
-
-.ts-stat-bar {
-    height: 5px;
-    background: rgba(0,200,240,0.07);
-    overflow: hidden;
-}
-
-.ts-bar-fill { height: 100%; transition: width 0.4s; }
-
-.ts-fill--stab {
-    background: linear-gradient(90deg, #003d1a, #00ff9d);
-    box-shadow: 0 0 5px rgba(0,255,100,0.3);
-}
-
-.ts-fill--trace {
-    background: linear-gradient(90deg, #2a0000, #ff4400);
-    box-shadow: 0 0 5px rgba(255,50,0,0.3);
-}
-
-.ts-pips { display: flex; gap: 7px; }
-
-.ts-pip      { font-size: 18px; transition: color 0.2s; }
-.ts-pip--open    { color: rgba(0,200,240,0.25); }
-.ts-pip--secured { color: #00ff9d; text-shadow: 0 0 8px rgba(0,255,100,0.5); }
-
-/* Flash messages */
-.ts-flash {
-    padding: 7px 8px;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    line-height: 1.5;
-    border-left: 2px solid;
-    flex-shrink: 0;
-}
-
-.ts-flash--wrong {
-    border-color: #ff4400;
-    color: #ff6633;
-    background: rgba(80,10,0,0.3);
-}
-
-.ts-flash--ok {
-    border-color: #00ff9d;
-    color: #00ff9d;
-    background: rgba(0,40,20,0.3);
-}
-
-.ts-flash-icon {
-    margin-right: 5px;
-}
-
-.ts-flash-sub {
-    font-size: 9px;
-    opacity: 0.65;
-}
-
-/* Right greebles */
-.ts-right-greebles {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding-top: 6px;
-    border-top: 1px solid rgba(0,200,240,0.06);
-    font-size: 8px;
-    color: rgba(0,200,240,0.2);
-    letter-spacing: 0.1em;
-}
-
-/* ── Pool section ────────────────────────────────────────────────────────── */
-
-.ts-pool-section {
-    flex-shrink: 0;
-    border-top: 1px solid rgba(0,200,240,0.1);
-    padding-top: 5px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.ts-pool-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.ts-pool-label {
-    font-size: 9px;
-    letter-spacing: 0.16em;
-    color: rgba(0,200,240,0.4);
-    flex-shrink: 0;
-}
-
-.ts-pool-legend {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 9px;
-    color: rgba(0,200,240,0.3);
-    letter-spacing: 0.06em;
-}
-
-.ts-legend-sig   { color: rgba(0,200,240,0.6); }
-.ts-legend-noise { color: rgba(255,136,0,0.6); }
-
-.ts-pool-bar-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-}
-
-.ts-pool-hint {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    color: #00ff9d;
-    animation: ts-blink 0.9s ease infinite alternate;
-}
-
-.ts-pool-cancel {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    color: rgba(255,80,80,0.6);
-    cursor: pointer;
-    transition: color 0.15s;
-}
-
-.ts-pool-cancel:hover { color: #ff4444; }
-
-.ts-pool {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-
-/* ── Pool tiles ──────────────────────────────────────────────────────────── */
-
-.ts-tile {
-    width: 38px;
-    height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    font-weight: 700;
-    border: 1px solid rgba(0,200,240,0.2);
-    background: rgba(0,15,28,0.9);
-    color: rgba(0,200,240,0.7);
-    cursor: pointer;
-    transition: border-color 0.1s, background 0.1s, box-shadow 0.1s, opacity 0.1s;
-    user-select: none;
-}
-
-.ts-tile:hover {
-    border-color: rgba(0,200,240,0.55);
-    background: rgba(0,200,240,0.07);
-}
-
-.ts-tile--selected {
-    border-color: #00c8f0;
-    background: rgba(0,200,240,0.13);
-    box-shadow: 0 0 10px rgba(0,200,240,0.28);
-    color: #fff;
-}
-
-.ts-tile--used {
-    opacity: 0.3;
-    cursor: default;
-}
-
-.ts-tile--used:hover {
-    border-color: rgba(0,200,240,0.2);
-    background: rgba(0,15,28,0.9);
-}
-
-.ts-tile--noise {
-    color: rgba(255,136,0,0.6);
-    border-color: rgba(255,136,0,0.18);
-    background: rgba(25,8,0,0.9);
-}
-
-.ts-tile--noise:hover {
-    border-color: rgba(255,136,0,0.4);
-    background: rgba(35,12,0,0.9);
-}
-
-/* ── Transitions ─────────────────────────────────────────────────────────── */
-
-.ts-flash-enter-active { animation: ts-flash-in 0.15s ease; }
-.ts-flash-leave-active { transition: opacity 0.35s; }
-.ts-flash-leave-to     { opacity: 0; }
-
-.ts-fade-enter-active  { transition: opacity 0.25s; }
-.ts-fade-leave-active  { transition: opacity 0.2s; }
-.ts-fade-enter-from,
-.ts-fade-leave-to      { opacity: 0; }
-
-/* ── Keyframes ───────────────────────────────────────────────────────────── */
-
-@keyframes ts-pulse {
-    from { opacity: 1; }
-    to   { opacity: 0.35; }
-}
-
-@keyframes ts-blink {
-    from { opacity: 1; }
-    to   { opacity: 0.4; }
-}
-
-@keyframes ts-flash-in {
-    from { opacity: 0; transform: scale(0.96); }
-    to   { opacity: 1; transform: scale(1); }
 }
 </style>

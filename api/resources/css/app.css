@@ -20,6 +20,13 @@
     --color-surface-panel: #111111;
     --color-border-dim: #1A1A1A;
     --color-scorched: #2A2A2A;
+
+    /* ── Game canvas — fixed 1920×1080 ── */
+    --width-game:        1920px;
+    --height-game:       1080px;
+    --col-scan-panel:    350px;
+    --col-status-panel:  400px;
+    --row-pool:          200px;
 }
 
 /* Global reset — no white surfaces ever */
