@@ -83,9 +83,9 @@
                     <!-- Shared SVG glow filter -->
                     <svg width="0" height="0" style="position:absolute">
                         <defs>
-                            <filter id="cf-glow" x="-60%" y="-60%" width="220%" height="220%">
-                                <feGaussianBlur stdDeviation="2.5" result="blur"/>
-                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            <filter id="cf-glow" x="-80%" y="-80%" width="260%" height="260%">
+                                <feGaussianBlur stdDeviation="3.5" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                             </filter>
                         </defs>
                     </svg>
@@ -110,7 +110,7 @@
                                         :class="pipeClass(r, c)"
                                         :stroke="pipeStroke(r, c)"
                                         :filter="tile.flowType ? 'url(#cf-glow)' : ''"
-                                        :stroke-width="TILE_PX * 0.22"
+                                        :stroke-width="TILE_PX * 0.26"
                                         fill="none"
                                         stroke-linecap="round"
                                         stroke-linejoin="round"
@@ -227,8 +227,8 @@ const DIFF_CONFIGS = {
             { row: 5, edge: 'right', accepts: 'STACK_LEAK',   label: 'STACK_LEAK_DUMP' },
             { row: 8, edge: 'right', accepts: 'SIGNAL_NOISE', label: 'SIGNAL_NOISE_DUMP' },
         ],
-        scramble: 0.6,
-        changeRange: [20, 30],
+        scramble: 0,
+        changeRange: [12, 18],
     },
     2: {
         sources: [
@@ -243,8 +243,8 @@ const DIFF_CONFIGS = {
             { row: 5, edge: 'right', accepts: 'STACK_LEAK',   label: 'STACK_LEAK_DUMP' },
             { row: 8, edge: 'right', accepts: 'SIGNAL_NOISE', label: 'SIGNAL_NOISE_DUMP' },
         ],
-        scramble: 0.7,
-        changeRange: [14, 22],
+        scramble: 0,
+        changeRange: [8, 14],
     },
     3: {
         sources: [
@@ -261,8 +261,8 @@ const DIFF_CONFIGS = {
             { row: 3, edge: 'right', accepts: 'SIGNAL_NOISE', label: 'SIGNAL_NOISE_DUMP' },
             { row: 7, edge: 'right', accepts: 'SIGNAL_NOISE', label: 'SIGNAL_NOISE_DUMP 2' },
         ],
-        scramble: 0.8,
-        changeRange: [9, 16],
+        scramble: 0,
+        changeRange: [6, 10],
     },
 };
 
@@ -361,7 +361,7 @@ function pipeClass(r, c) {
 
 function pipeStroke(r, c) {
     const tile = grid.value[r]?.[c];
-    if (!tile || !tile.flowType) return 'rgba(0,255,100,0.10)';
+    if (!tile || !tile.flowType) return 'rgba(0,255,100,0.22)';
     if (tile.flowStatus === 'wrong') return '#ff3333';
     return TYPE_META[tile.flowType]?.color ?? '#00ff9d';
 }
@@ -524,7 +524,8 @@ function generateGrid() {
     }
 
     // Fill remaining cells with random tiles (mix of types)
-    const fillTypes  = [1, 1, 1, 2, 2, 2, 3, 4];
+    // Heavy on T and cross tiles so re-routing is possible when types change
+    const fillTypes  = [1, 2, 3, 3, 3, 4, 4, 4];
     const fillRots   = [0, 90, 180, 270];
     for (let r = 0; r < 10; r++) {
         for (let c = 0; c < 10; c++) {
