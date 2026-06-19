@@ -86,14 +86,20 @@
                     <span class="ts-ping-status" :class="canPing ? 'ts-ping--ready' : 'ts-ping--cool'">
                         {{ canPing ? '◈ READY' : `⟳ RECHARGING (${pingCooldown}s)` }}
                     </span>
+                    <span class="ts-mark-budget" :class="noiseMarkBudget === 0 ? 'ts-mark-budget--spent' : ''">
+                        ◈ LOCK MARKS: {{ noiseMarkBudget }}/{{ cfg.noiseMarkBudget }}
+                    </span>
                 </div>
 
                 <SignalPool
                     :letters="poolLetters"
                     :selected-pool-id="selectedPoolId"
                     :ping-active="pingActive"
+                    :marked-noise-ids="markedNoiseIds"
+                    :noise-mark-budget="noiseMarkBudget"
                     @pool-select="onPoolSelect"
                     @pool-cancel="selectedPoolId = null"
+                    @noise-mark="onNoiseMark"
                 />
 
             </div>
@@ -103,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
 import StatusMonitor from './StatusMonitor.vue';
@@ -177,9 +183,9 @@ const CLUSTERS = [
 // ── Difficulty config ──────────────────────────────────────────────────────────
 
 const DIFF_CONFIG = {
-    1: { fragCount: 3, noiseCount: 10, wordLengthMax: 5, traceDmg: 0.15, stabDmg: 0.08, lockCost: 0.10 },
-    2: { fragCount: 3, noiseCount: 16, wordLengthMax: 6, traceDmg: 0.20, stabDmg: 0.10, lockCost: 0.12 },
-    3: { fragCount: 3, noiseCount: 22, wordLengthMax: 99, traceDmg: 0.25, stabDmg: 0.13, lockCost: 0.15 },
+    1: { fragCount: 3, noiseCount: 10, wordLengthMax: 5, traceDmg: 0.15, stabDmg: 0.08, lockCost: 0.10, noiseMarkBudget: 5 },
+    2: { fragCount: 3, noiseCount: 16, wordLengthMax: 6, traceDmg: 0.20, stabDmg: 0.10, lockCost: 0.12, noiseMarkBudget: 4 },
+    3: { fragCount: 3, noiseCount: 22, wordLengthMax: 99, traceDmg: 0.25, stabDmg: 0.13, lockCost: 0.15, noiseMarkBudget: 3 },
 };
 
 // ── Props / emits ──────────────────────────────────────────────────────────────
@@ -246,10 +252,14 @@ function gameLoop(ts) {
 }
 
 // ── Ping state ─────────────────────────────────────────────────────────────────
-const pingActive   = ref(false);   // true during the 1.5s reveal window
+const pingActive   = ref(false);   // true during the 4s reveal window
 const canPing      = ref(true);    // false during 20s cooldown
 const pingCooldown = ref(0);       // remaining cooldown seconds for HUD display
 let   pingTimer            = null; // reveal timeout handle
+
+// Noise-lock marks — player can lock noise tiles during an active ping
+const markedNoiseIds  = reactive(new Set());
+const noiseMarkBudget = ref(cfg.noiseMarkBudget);
 let   pingCooldownInterval = null; // cooldown tick interval handle
 
 // ── Computed ───────────────────────────────────────────────────────────────────
@@ -595,7 +605,7 @@ function pingNoise() {
     // Reveal noise tiles
     pingActive.value = true;
     clearTimeout(pingTimer);
-    pingTimer = setTimeout(() => { pingActive.value = false; }, 1500);
+    pingTimer = setTimeout(() => { pingActive.value = false; }, 4000);
 
     // Start 20 s cooldown
     canPing.value      = false;
@@ -609,6 +619,19 @@ function pingNoise() {
             canPing.value      = true;
         }
     }, 1000);
+}
+
+/**
+ * Lock a noise tile as confirmed noise.
+ * Only callable during an active ping (when noise tiles are glowing).
+ * Consumes one mark from the budget — marks are permanent for the run.
+ */
+function onNoiseMark(id) {
+    if (!pingActive.value) return;
+    if (markedNoiseIds.has(id)) return;
+    if (noiseMarkBudget.value <= 0) return;
+    markedNoiseIds.add(id);
+    noiseMarkBudget.value--;
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -793,6 +816,18 @@ onUnmounted(() => {
 
 .ts-ping--ready { color: rgba(0,255,100,0.6); }
 .ts-ping--cool  { color: rgba(255,170,0,0.55); animation: ts-ping-blink 0.8s step-start infinite; }
+
+.ts-mark-budget {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: rgba(255,136,0,0.6);
+    flex-shrink: 0;
+}
+
+.ts-mark-budget--spent {
+    color: rgba(255,60,60,0.45);
+}
 
 /* ── Cell label (development guide / section header) ─────────────────────── */
 

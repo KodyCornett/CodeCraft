@@ -50,7 +50,7 @@
                 :key="item.id"
                 class="sp-tile"
                 :class="tileClass(item)"
-                :disabled="item.status === 'used'"
+                :disabled="item.status === 'used' || props.markedNoiseIds.has(item.id)"
                 :aria-label="`Letter ${item.char}${item.noise ? ' (noise)' : ''}`"
                 :aria-pressed="item.id === props.selectedPoolId"
                 @click="onTileClick(item)"
@@ -90,6 +90,18 @@ const props = defineProps({
      * Signal tiles stay visually neutral so the player deduces by exclusion.
      */
     pingActive: { type: Boolean, default: false },
+
+    /**
+     * Set of pool tile IDs the player has permanently locked as noise.
+     * Locked tiles cannot be selected for placement.
+     */
+    markedNoiseIds: { type: Object, default: () => new Set() },
+
+    /**
+     * Remaining noise lock marks the player can spend.
+     * When 0, clicking noise tiles during a ping does nothing.
+     */
+    noiseMarkBudget: { type: Number, default: 0 },
 });
 
 // ── Emits ──────────────────────────────────────────────────────────────────────
@@ -105,6 +117,12 @@ const emit = defineEmits([
      * User clicked the CANCEL button while a tile is selected.
      */
     'pool-cancel',
+
+    /**
+     * User clicked a glowing noise tile during an active ping to lock it.
+     * Payload: tile id (number)
+     */
+    'noise-mark',
 ]);
 
 // ── Derived ────────────────────────────────────────────────────────────────────
@@ -116,22 +134,31 @@ const activeCount = computed(() =>
 // ── Tile class logic ───────────────────────────────────────────────────────────
 
 function tileClass(item) {
-    const revealing = props.pingActive && item.noise && item.status !== 'used';
+    const locked    = props.markedNoiseIds.has(item.id);
+    const revealing = props.pingActive && item.noise && item.status !== 'used' && !locked;
     return {
-        // All tiles are visually neutral by default — no signal/noise colour hint.
-        // sp-tile--signal / sp-tile--noise only differ in the reveal state below.
-        'sp-tile--noise':      item.noise,
-        'sp-tile--revealing':  revealing,
-        'sp-tile--used':       item.status === 'used',
-        'sp-tile--selected':   item.id === props.selectedPoolId,
+        'sp-tile--noise':        item.noise,
+        'sp-tile--revealing':    revealing,
+        'sp-tile--used':         item.status === 'used',
+        'sp-tile--selected':     item.id === props.selectedPoolId,
+        'sp-tile--noise-locked': locked,
     };
 }
 
 // ── Interaction ────────────────────────────────────────────────────────────────
 
 function onTileClick(item) {
-    // used tiles are disabled via :disabled — this guard is a safety net
     if (item.status === 'used') return;
+
+    // Locked noise tiles cannot be selected or placed
+    if (props.markedNoiseIds.has(item.id)) return;
+
+    // During an active ping, clicking a noise tile locks it as confirmed noise
+    if (props.pingActive && item.noise && props.noiseMarkBudget > 0) {
+        emit('noise-mark', item.id);
+        return;
+    }
+
     emit('pool-select', item.id);
 }
 </script>
@@ -334,6 +361,24 @@ function onTileClick(item) {
     opacity: 0.2;
     cursor: default;
     pointer-events: none;
+}
+
+/* ── Noise-locked tile — permanently marked as confirmed noise ────────────── */
+/* Set during a ping. Cannot be selected or placed. Persists for the run.     */
+
+.sp-tile--noise-locked {
+    color: rgba(255,100,0,0.35);
+    border-color: rgba(255,100,0,0.3);
+    background: rgba(18,4,0,0.85);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.sp-tile--noise-locked:hover {
+    color: rgba(255,100,0,0.35);
+    border-color: rgba(255,100,0,0.3);
+    background: rgba(18,4,0,0.85);
+    box-shadow: none;
 }
 
 /* ── Selected tile — bright neon glow ─────────────────────────────────────── */
