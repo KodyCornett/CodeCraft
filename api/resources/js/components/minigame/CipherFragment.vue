@@ -146,22 +146,26 @@ const canInject = computed(() =>
     flex-direction: column;
     gap: 20px;
     padding: 28px 32px;
-    border: 1px solid rgba(0,200,240,0.12);
-    background: rgba(0,14,22,0.65);
-    transition: border-color 0.25s, background 0.25s;
+    border: 1px solid rgba(34,211,238,0.22);
+    background: rgba(0,10,18,0.75);
+    box-shadow: inset 0 0 60px rgba(34,211,238,0.03);
+    transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
     font-family: 'JetBrains Mono', monospace;
-    color: #00c8f0;
+    color: #22d3ee;
 }
 
 .cf-card--solved {
-    border-color: rgba(0,255,100,0.25);
-    background: rgba(0,22,14,0.55);
+    border-color: rgba(0,255,100,0.35);
+    background: rgba(0,18,12,0.6);
+    box-shadow: inset 0 0 40px rgba(0,255,100,0.04);
 }
 
 /* Ambient glow on the card when its scan panel is open */
 .cf-card--scan-active {
-    border-color: rgba(0,200,240,0.3);
-    box-shadow: inset 0 0 40px rgba(0,200,240,0.03);
+    border-color: rgba(34,211,238,0.5);
+    box-shadow:
+        inset 0 0 60px rgba(34,211,238,0.06),
+        0 0 20px rgba(34,211,238,0.08);
 }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
@@ -171,6 +175,11 @@ const canInject = computed(() =>
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    padding: 8px 12px;
+    margin: -8px -12px 4px;
+    background: rgba(24,24,27,0.55);
+    border-bottom: 1px solid rgba(251,146,60,0.4);
+    box-shadow: 0 2px 14px rgba(251,146,60,0.08);
 }
 
 .cf-header-left {
@@ -182,18 +191,20 @@ const canInject = computed(() =>
 .cf-frag-num {
     font-size: 11px;
     letter-spacing: 0.2em;
-    color: rgba(0,200,240,0.5);
+    color: rgba(251,146,60,0.85);
+    text-shadow: 0 0 8px rgba(251,146,60,0.5);
 }
 
 .cf-sep {
     font-size: 11px;
-    color: rgba(0,200,240,0.2);
+    color: rgba(251,146,60,0.2);
 }
 
 .cf-codename {
     font-size: 11px;
     letter-spacing: 0.14em;
-    color: rgba(0,200,240,0.35);
+    color: rgba(34,211,238,0.6);
+    text-shadow: 0 0 6px rgba(34,211,238,0.3);
 }
 
 /* ── Badge ────────────────────────────────────────────────────────────────── */
@@ -229,23 +240,25 @@ const canInject = computed(() =>
     align-items: baseline;
     gap: 10px;
     padding: 14px 16px;
-    background: rgba(0,8,14,0.6);
-    border-left: 2px solid rgba(0,200,240,0.18);
+    background: rgba(0,6,12,0.7);
+    border-left: 2px solid rgba(34,211,238,0.5);
+    box-shadow: inset 4px 0 12px rgba(34,211,238,0.04);
 }
 
 .cf-hint-tag {
     font-size: 9px;
     letter-spacing: 0.16em;
-    color: rgba(0,200,240,0.3);
+    color: rgba(251,146,60,0.5);
     flex-shrink: 0;
 }
 
 .cf-hint {
     font-size: 14px;
     font-style: italic;
-    color: rgba(0,200,240,0.9);
+    color: #22d3ee;
     letter-spacing: 0.03em;
     line-height: 1.5;
+    text-shadow: 0 0 12px rgba(34,211,238,0.4);
 }
 
 /* ── Controls row ─────────────────────────────────────────────────────────── */
@@ -271,8 +284,8 @@ const canInject = computed(() =>
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(0,200,240,0.18);
-    background: rgba(0,10,18,0.9);
+    border: 1px solid rgba(34,211,238,0.25);
+    background: rgba(0,8,16,0.9);
     cursor: pointer;
     font-family: 'JetBrains Mono', monospace;
     transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
@@ -280,45 +293,52 @@ const canInject = computed(() =>
 }
 
 .cf-slot:focus-visible {
-    outline: 1px solid rgba(0,200,240,0.5);
+    outline: 1px solid #22d3ee;
     outline-offset: 2px;
 }
 
 .cf-slot-empty {
     font-size: 18px;
-    color: rgba(0,200,240,0.2);
+    color: rgba(34,211,238,0.2);
     letter-spacing: 0;
 }
 
 .cf-slot-letter {
     font-size: 24px;
     font-weight: 700;
-    color: #00c8f0;
+    color: #22d3ee;
     letter-spacing: 0;
+    text-shadow: 0 0 10px rgba(34,211,238,0.7);
 }
 
 /* Filled slot */
 .cf-slot--filled {
-    border-color: rgba(0,200,240,0.45);
-    background: rgba(0,28,44,0.9);
+    border-color: rgba(34,211,238,0.65);
+    background: rgba(0,22,40,0.9);
+    box-shadow:
+        0 0 8px rgba(34,211,238,0.15),
+        inset 0 0 8px rgba(34,211,238,0.06);
 }
 
 /* Droppable — a pool tile is selected, show hover affordance */
 .cf-slot--droppable:hover {
-    border-color: #00c8f0;
-    background: rgba(0,200,240,0.08);
-    box-shadow: 0 0 14px rgba(0,200,240,0.2);
+    border-color: #22d3ee;
+    background: rgba(34,211,238,0.08);
+    box-shadow: 0 0 18px rgba(34,211,238,0.3);
     cursor: crosshair;
 }
 
 /* Solved — dim and locked */
 .cf-slot--solved {
-    border-color: rgba(0,255,100,0.2);
-    background: rgba(0,22,14,0.6);
+    border-color: rgba(0,255,100,0.3);
+    background: rgba(0,18,12,0.7);
     cursor: default;
 }
 
-.cf-slot--solved .cf-slot-letter { color: rgba(0,255,100,0.7); }
+.cf-slot--solved .cf-slot-letter {
+    color: #00ff9d;
+    text-shadow: 0 0 10px rgba(0,255,100,0.6);
+}
 
 /* ── Action buttons ───────────────────────────────────────────────────────── */
 
@@ -352,24 +372,26 @@ const canInject = computed(() =>
 
 /* SCAN — default */
 .cf-btn--scan {
-    color: rgba(0,200,240,0.5);
-    border-color: rgba(0,200,240,0.2);
+    color: rgba(34,211,238,0.55);
+    border-color: rgba(34,211,238,0.22);
 }
 
 .cf-btn--scan:hover {
-    color: #00c8f0;
-    border-color: rgba(0,200,240,0.55);
-    background: rgba(0,200,240,0.06);
+    color: #22d3ee;
+    border-color: rgba(34,211,238,0.6);
+    background: rgba(34,211,238,0.06);
+    box-shadow: 0 0 10px rgba(34,211,238,0.15);
 }
 
 /* SCAN — active glow when this fragment's archive is open */
 .cf-btn--scan-glow {
-    color: #00c8f0;
-    border-color: rgba(0,200,240,0.7);
-    background: rgba(0,200,240,0.07);
+    color: #22d3ee;
+    border-color: rgba(34,211,238,0.8);
+    background: rgba(34,211,238,0.08);
+    text-shadow: 0 0 8px rgba(34,211,238,0.6);
     box-shadow:
-        0 0 12px rgba(0,200,240,0.2),
-        inset 0 0 8px rgba(0,200,240,0.05);
+        0 0 16px rgba(34,211,238,0.3),
+        inset 0 0 10px rgba(34,211,238,0.07);
 }
 
 /* INJECT — locked state */
@@ -381,11 +403,14 @@ const canInject = computed(() =>
 /* INJECT — ready (all slots filled) */
 .cf-btn--inject-ready {
     color: #00ff9d;
-    border-color: rgba(0,255,100,0.45);
+    border-color: rgba(0,255,100,0.55);
+    text-shadow: 0 0 8px rgba(0,255,100,0.5);
 }
 
 .cf-btn--inject-ready:hover {
-    background: rgba(0,255,100,0.07);
-    box-shadow: 0 0 14px rgba(0,255,100,0.2);
+    background: rgba(0,255,100,0.08);
+    box-shadow:
+        0 0 18px rgba(0,255,100,0.3),
+        inset 0 0 8px rgba(0,255,100,0.06);
 }
 </style>

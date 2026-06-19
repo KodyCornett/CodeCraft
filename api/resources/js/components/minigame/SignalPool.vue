@@ -159,19 +159,22 @@ function onTileClick(item) {
     align-items: center;
     gap: 20px;
     flex-shrink: 0;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(0,200,240,0.08);
+    padding: 6px 10px 8px;
+    background: rgba(24,24,27,0.55);
+    border: 1px solid rgba(251,146,60,0.3);
+    box-shadow: 0 0 14px rgba(251,146,60,0.07);
 }
 
 .sp-header-left {
     font-size: 10px;
     letter-spacing: 0.18em;
-    color: rgba(0,200,240,0.4);
+    color: rgba(251,146,60,0.7);
+    text-shadow: 0 0 8px rgba(251,146,60,0.35);
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-.sp-header-bracket { color: rgba(0,200,240,0.2); }
+.sp-header-bracket { color: rgba(251,146,60,0.3); }
 
 /* ── Legend ───────────────────────────────────────────────────────────────── */
 
@@ -333,15 +336,17 @@ function onTileClick(item) {
     pointer-events: none;
 }
 
-/* ── Selected tile — bright glow ──────────────────────────────────────────── */
+/* ── Selected tile — bright neon glow ─────────────────────────────────────── */
 
 .sp-tile--selected {
     color: #ffffff;
-    border-color: #00c8f0;
-    background: rgba(0,200,240,0.14);
+    border-color: #22d3ee;
+    background: rgba(34,211,238,0.14);
+    text-shadow: 0 0 8px rgba(34,211,238,0.9);
     box-shadow:
-        0 0 0 1px rgba(0,200,240,0.4),
-        0 0 18px rgba(0,200,240,0.35);
+        0 0 0 1px rgba(34,211,238,0.5),
+        0 0 20px rgba(34,211,238,0.4),
+        inset 0 0 10px rgba(34,211,238,0.08);
 }
 
 /* Selected noise tile: during ping reveal, override to white-on-amber so

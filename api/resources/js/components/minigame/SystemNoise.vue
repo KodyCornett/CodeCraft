@@ -160,11 +160,16 @@ onUnmounted(() => {
     gap: 5px;
     font-size: 9px;
     letter-spacing: 0.16em;
-    color: rgba(0,200,240,0.3);
+    color: rgba(251,146,60,0.65);
+    text-shadow: 0 0 6px rgba(251,146,60,0.3);
     flex-shrink: 0;
+    padding: 5px 8px 6px;
+    background: rgba(24,24,27,0.55);
+    border: 1px solid rgba(251,146,60,0.25);
+    box-shadow: 0 0 10px rgba(251,146,60,0.06);
 }
 
-.sn-header-bracket { color: rgba(0,200,240,0.15); }
+.sn-header-bracket { color: rgba(251,146,60,0.25); }
 
 .sn-header-dot {
     width: 5px;

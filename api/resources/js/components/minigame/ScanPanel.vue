@@ -166,9 +166,11 @@ function isUnlocked(fi) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 0 10px;
-    border-bottom: 1px solid rgba(0,200,240,0.1);
+    padding: 6px 8px 8px;
     flex-shrink: 0;
+    background: rgba(24,24,27,0.55);
+    border: 1px solid rgba(251,146,60,0.3);
+    box-shadow: 0 0 12px rgba(251,146,60,0.07);
 }
 
 .sp-header-path {
@@ -179,8 +181,11 @@ function isUnlocked(fi) {
     letter-spacing: 0.12em;
 }
 
-.sp-path-dim  { color: rgba(0,200,240,0.25); }
-.sp-path-frag { color: rgba(0,200,240,0.7); }
+.sp-path-dim  { color: rgba(251,146,60,0.35); }
+.sp-path-frag {
+    color: rgba(251,146,60,0.85);
+    text-shadow: 0 0 8px rgba(251,146,60,0.4);
+}
 
 .sp-close {
     font-family: 'JetBrains Mono', monospace;

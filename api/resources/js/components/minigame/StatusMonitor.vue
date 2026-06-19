@@ -219,17 +219,20 @@ const statusLines = computed(() => [
 .sm-header {
     font-size: 10px;
     letter-spacing: 0.2em;
-    color: rgba(0,200,240,0.4);
-    border-bottom: 1px solid rgba(0,200,240,0.1);
-    padding-bottom: 10px;
+    color: rgba(251,146,60,0.8);
+    text-shadow: 0 0 8px rgba(251,146,60,0.4);
+    padding: 6px 10px 8px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 4px;
+    background: rgba(24,24,27,0.55);
+    border: 1px solid rgba(251,146,60,0.3);
+    box-shadow: 0 0 12px rgba(251,146,60,0.07);
 }
 
-.sm-header-bracket { color: rgba(0,200,240,0.2); }
-.sm-header-id      { margin-left: auto; color: rgba(0,200,240,0.18); font-size: 9px; }
+.sm-header-bracket { color: rgba(251,146,60,0.3); }
+.sm-header-id      { margin-left: auto; color: rgba(251,146,60,0.25); font-size: 9px; }
 
 /* ── Metric block ─────────────────────────────────────────────────────────── */
 

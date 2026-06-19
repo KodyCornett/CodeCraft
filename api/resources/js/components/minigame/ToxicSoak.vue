@@ -603,9 +603,26 @@ onUnmounted(() => {
     pointer-events: none;
     z-index: 0;
     background-image:
-        linear-gradient(rgba(0,200,240,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,200,240,0.025) 1px, transparent 1px);
+        linear-gradient(rgba(34,211,238,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34,211,238,0.04) 1px, transparent 1px);
     background-size: 32px 32px;
+}
+
+/* ── Scanline CRT overlay ─────────────────────────────────────────────────── */
+
+.ts-canvas::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.09) 3px,
+        rgba(0,0,0,0.09) 4px
+    );
 }
 
 /* ── Cells — base ─────────────────────────────────────────────────────────── */
@@ -617,12 +634,13 @@ onUnmounted(() => {
      * min-height: 0 is critical.
      * Grid items default to min-height: auto (= content size).
      * Without this, a tall cell expands its row track beyond the
-     * allocated 1fr, pushing the 200px pool row off the canvas.
+     * allocated 1fr, pushing the pool row off the canvas.
      */
     min-height: 0;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid rgba(39, 39, 42, 0.5); /* zinc-800/50 */
+    border: 1px solid rgba(251,146,60,0.25);
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -669,9 +687,11 @@ onUnmounted(() => {
     align-items: center;
     gap: 20px;
     flex-shrink: 0;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(0,200,240,0.07);
+    padding: 6px 8px 8px;
     margin-bottom: 8px;
+    background: rgba(24,24,27,0.55);
+    border: 1px solid rgba(251,146,60,0.3);
+    box-shadow: 0 0 12px rgba(251,146,60,0.07);
 }
 
 .ts-ping-status {
