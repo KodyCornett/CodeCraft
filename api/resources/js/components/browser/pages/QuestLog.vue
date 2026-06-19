@@ -146,7 +146,7 @@ const { currentNodeCanvasId, launch } = useQuestMinigame();
 const MINIGAME_SKIN = {
     disconnect_layer:   { primary: 'TRACE',       stability: 'SYSTEM HEAT', brief: 'Sever the governor chain before it reroutes.',            timeLimit: 90, hideBars: true,  dealsDamageOnFail: true  },
     flush_buffer:       { primary: 'SIGNAL LOAD', stability: 'STABILITY',   brief: 'Cancel the ghost signal before buffer overflow.',         timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
-    toxic_soak:         { primary: 'ABSORPTION',  stability: 'OVERLOAD',    brief: 'Hold position. Anchor until saturation threshold.',       timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
+    toxic_soak:         { primary: 'ABSORPTION',  stability: 'OVERLOAD',    brief: 'Hold position. Anchor until saturation threshold.',       timeLimit: 240, hideBars: false, dealsDamageOnFail: false },
     archive_extraction: { primary: 'DETECTION',   stability: 'SUPPRESSION', brief: 'Extract the packet. Avoid triggering live ICE.',          timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
     calibration_tether: { primary: 'PAYLOAD',     stability: 'INTEGRITY',   brief: 'Deliver the sub-routines. Do not let the chain cascade.', timeLimit: 30, hideBars: false, dealsDamageOnFail: false },
 };

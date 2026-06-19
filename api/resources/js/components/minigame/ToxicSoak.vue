@@ -46,9 +46,11 @@
                     :solved-frags="solvedFrags"
                     :scan-open="scanOpen"
                     :selected-pool-id="selectedPoolId"
+                    :validation-states="validationStates"
                     @slot-click="onSlotClick"
                     @scan-click="openScan"
                     @inject-click="inject"
+                    @validate-click="validateFragment"
                 />
             </div>
 
@@ -69,25 +71,21 @@
                  └───────────────────────────────────────────────────────── -->
             <div class="ts-cell ts-cell--pool ts-cell--pool-layout">
 
-                <!-- Pool control strip: ping status + command input -->
+                <!-- Pool control strip: ping button + cooldown status -->
                 <div class="ts-pool-ctrl">
-                    <span
-                        class="ts-ping-status"
-                        :class="canPing ? 'ts-ping--ready' : 'ts-ping--cool'"
+                    <button
+                        class="ts-ping-btn"
+                        :class="canPing ? 'ts-ping-btn--ready' : 'ts-ping-btn--cool'"
+                        :disabled="!canPing"
+                        @click="pingNoise"
                     >
-                        [PING: {{ canPing ? 'READY' : `RECHARGING (${pingCooldown}s)` }}]
+                        <span class="ts-ping-bracket">[</span>
+                        PING --NOISE
+                        <span class="ts-ping-bracket">]</span>
+                    </button>
+                    <span class="ts-ping-status" :class="canPing ? 'ts-ping--ready' : 'ts-ping--cool'">
+                        {{ canPing ? '◈ READY' : `⟳ RECHARGING (${pingCooldown}s)` }}
                     </span>
-                    <div class="ts-cmd-bar">
-                        <span class="ts-cmd-prompt">></span>
-                        <input
-                            v-model="commandInput"
-                            class="ts-cmd-input"
-                            placeholder="ping --noise"
-                            spellcheck="false"
-                            autocomplete="off"
-                            @keydown.enter="parseCommand"
-                        />
-                    </div>
                 </div>
 
                 <SignalPool
@@ -195,7 +193,7 @@ const {
     stability, primaryProgress, timeLeft, result, failReason,
     glitchActive, glitchType, glitchIntensity,
     stabilityClass, timerClass,
-    applyHit, endGame,
+    tickShared, applyHit, endGame,
 } = useQuestMinigameState(props.skin);
 
 // ── Game config ────────────────────────────────────────────────────────────────
@@ -212,6 +210,8 @@ const solvedFrags  = ref([false, false, false]);
 const traceLevel   = ref(0);
 const selectedPoolId = ref(null);
 
+const validationStates = ref([[], [], []]);
+
 const scanOpen     = ref(null);
 const openFileIdx  = ref(null);
 const unlockedIdxs = ref(new Set());
@@ -219,11 +219,36 @@ const unlockedIdxs = ref(new Set());
 const showWrong    = ref(false);
 const showCorrect  = ref(null);
 
+// ── Game loop ──────────────────────────────────────────────────────────────────
+
+let rafHandle = null;
+let lastTs    = null;
+
+function gameLoop(ts) {
+    if (result.value) return; // game ended — let the RAF stop naturally
+
+    if (lastTs !== null) {
+        const dt      = Math.min((ts - lastTs) / 1000, 0.1); // cap dt at 100 ms
+        const outcome = tickShared(dt);
+
+        if (outcome) {
+            const reason = outcome === 'stability'
+                ? '[SYSTEM COLLAPSE] — Stability exhausted.'
+                : '[TRACE LOCK] — Absorption threshold exceeded.';
+            endGame('fail', reason);
+            setTimeout(() => emit('fail'), 2200);
+            return;
+        }
+    }
+
+    lastTs    = ts;
+    rafHandle = requestAnimationFrame(gameLoop);
+}
+
 // ── Ping state ─────────────────────────────────────────────────────────────────
 const pingActive   = ref(false);   // true during the 1.5s reveal window
 const canPing      = ref(true);    // false during 20s cooldown
 const pingCooldown = ref(0);       // remaining cooldown seconds for HUD display
-const commandInput = ref('');      // command bar text
 let   pingTimer            = null; // reveal timeout handle
 let   pingCooldownInterval = null; // cooldown tick interval handle
 
@@ -370,9 +395,10 @@ function buildPuzzle() {
         });
     }
 
-    fragments.value   = selected;
-    slots.value       = selected.map(f => Array(f.word.length).fill(null));
-    solvedFrags.value = Array(selected.length).fill(false);
+    fragments.value        = selected;
+    slots.value            = selected.map(f => Array(f.word.length).fill(null));
+    solvedFrags.value      = Array(selected.length).fill(false);
+    validationStates.value = selected.map(f => Array(f.word.length).fill(null));
     buildPool(selected);
 }
 
@@ -439,11 +465,15 @@ function onSlotClick(fi, si) {
         if (poolItem.usedBy !== null) {
             const prevFi = poolItem.usedBy;
             const prevSi = slots.value[prevFi].findIndex(s => s?.poolId === poolItem.id);
-            if (prevSi !== -1) slots.value[prevFi][prevSi] = null;
+            if (prevSi !== -1) {
+                slots.value[prevFi][prevSi] = null;
+                if (validationStates.value[prevFi]) validationStates.value[prevFi][prevSi] = null;
+            }
         }
 
         poolItem.usedBy      = fi;
         slots.value[fi][si]  = { poolId: poolItem.id, letter: poolItem.letter };
+        if (validationStates.value[fi]) validationStates.value[fi][si] = null;
         selectedPoolId.value = null;
 
     } else {
@@ -452,6 +482,7 @@ function onSlotClick(fi, si) {
             const poolItem = pool.value.find(p => p.id === existing.poolId);
             if (poolItem) poolItem.usedBy = null;
             slots.value[fi][si] = null;
+            if (validationStates.value[fi]) validationStates.value[fi][si] = null;
         }
     }
 }
@@ -490,6 +521,36 @@ function inject(fi) {
             endGame('fail', reason);
             setTimeout(() => emit('fail'), 2200);
         }
+    }
+}
+
+// ── Validate ───────────────────────────────────────────────────────────────────
+
+/**
+ * Wordle-style positional feedback for one fragment.
+ * Each filled slot gets: 'correct' | 'present' | 'absent'.
+ * Empty slots stay null.
+ * Flat stability cost regardless of how many slots are filled —
+ * incentivises filling all slots before validating.
+ */
+function validateFragment(fi) {
+    if (solvedFrags.value[fi] || result.value) return;
+
+    const word    = fragments.value[fi].word;
+    const slotArr = slots.value[fi];
+
+    validationStates.value[fi] = slotArr.map((slot, si) => {
+        if (!slot) return null;
+        if (slot.letter === word[si]) return 'correct';
+        if (word.includes(slot.letter)) return 'present';
+        return 'absent';
+    });
+
+    applyHit(0.05);
+
+    if (stability.value <= 0) {
+        endGame('fail', '[SYSTEM COLLAPSE] — Stability exhausted.');
+        setTimeout(() => emit('fail'), 2200);
     }
 }
 
@@ -550,22 +611,15 @@ function pingNoise() {
     }, 1000);
 }
 
-/**
- * Parse a command typed into the command bar.
- * Recognised commands:
- *   ping --noise   →  activate noise reveal
- */
-function parseCommand() {
-    const cmd = commandInput.value.trim().toLowerCase();
-    commandInput.value = '';
-    if (cmd === 'ping --noise') pingNoise();
-}
-
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
-onMounted(() => buildPuzzle());
+onMounted(() => {
+    buildPuzzle();
+    rafHandle = requestAnimationFrame(gameLoop);
+});
 
 onUnmounted(() => {
+    cancelAnimationFrame(rafHandle);
     clearTimeout(pingTimer);
     clearInterval(pingCooldownInterval);
 });
@@ -694,6 +748,41 @@ onUnmounted(() => {
     box-shadow: 0 0 12px rgba(251,146,60,0.07);
 }
 
+.ts-ping-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    padding: 6px 20px;
+    border: 1px solid;
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.ts-ping-btn--ready {
+    color: #00ff9d;
+    border-color: rgba(0,255,100,0.45);
+}
+
+.ts-ping-btn--ready:hover {
+    background: rgba(0,255,100,0.08);
+    box-shadow: 0 0 16px rgba(0,255,100,0.25);
+}
+
+.ts-ping-btn--cool {
+    color: rgba(255,170,0,0.35);
+    border-color: rgba(255,170,0,0.15);
+    cursor: not-allowed;
+}
+
+.ts-ping-bracket {
+    color: inherit;
+    opacity: 0.4;
+    font-size: 10px;
+}
+
 .ts-ping-status {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -702,44 +791,8 @@ onUnmounted(() => {
     transition: color 0.3s;
 }
 
-.ts-ping--ready { color: #00ff9d; }
-.ts-ping--cool  { color: rgba(255,170,0,0.65); animation: ts-ping-blink 0.8s step-start infinite; }
-
-.ts-cmd-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    max-width: 280px;
-    border: 1px solid rgba(0,200,240,0.12);
-    padding: 3px 8px;
-    background: rgba(0,10,18,0.6);
-}
-
-.ts-cmd-prompt {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #00ff9d;
-    flex-shrink: 0;
-    user-select: none;
-}
-
-.ts-cmd-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: rgba(0,200,240,0.8);
-    letter-spacing: 0.06em;
-    caret-color: #00c8f0;
-}
-
-.ts-cmd-input::placeholder {
-    color: rgba(0,200,240,0.18);
-    font-style: italic;
-}
+.ts-ping--ready { color: rgba(0,255,100,0.6); }
+.ts-ping--cool  { color: rgba(255,170,0,0.55); animation: ts-ping-blink 0.8s step-start infinite; }
 
 /* ── Cell label (development guide / section header) ─────────────────────── */
 

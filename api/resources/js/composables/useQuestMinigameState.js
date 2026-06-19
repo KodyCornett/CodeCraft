@@ -51,8 +51,10 @@ export function useQuestMinigameState(skin) {
     });
 
     const timerClass = computed(() => {
-        if (timeLeft.value <= 5)  return 'timer--critical';
-        if (timeLeft.value <= 10) return 'timer--warn';
+        // Percentage-based so thresholds scale correctly at any duration
+        const pct = timeLeft.value / (skin.timeLimit ?? 30);
+        if (pct <= 0.10) return 'timer--critical';
+        if (pct <= 0.25) return 'timer--warn';
         return '';
     });
 

@@ -103,7 +103,7 @@ const GAMES = [
             objectiveText:   'Hold position. Anchor until saturation threshold.',
             fileName:        'SV-V9.sys',
             hideBars:        false,
-            timeLimit:       30,
+            timeLimit:       240,
         },
     },
     {

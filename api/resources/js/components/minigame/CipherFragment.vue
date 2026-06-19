@@ -39,6 +39,9 @@
                         'cf-slot--filled':    slotData[si - 1] !== null,
                         'cf-slot--droppable': props.selectedPoolId !== null && !props.solved,
                         'cf-slot--solved':    props.solved,
+                        'cf-slot--correct':   !props.solved && props.validationState[si - 1] === 'correct',
+                        'cf-slot--present':   !props.solved && props.validationState[si - 1] === 'present',
+                        'cf-slot--absent':    !props.solved && props.validationState[si - 1] === 'absent',
                     }"
                     :disabled="props.solved"
                     :aria-label="`Fragment ${props.fragmentIndex + 1} slot ${si}`"
@@ -61,6 +64,17 @@
                 >
                     <span class="cf-btn-bracket">[</span>
                     SCAN_{{ padded }}
+                    <span class="cf-btn-bracket">]</span>
+                </button>
+
+                <button
+                    class="cf-btn cf-btn--validate"
+                    :class="{ 'cf-btn--validate-ready': hasAnySlotFilled && !props.solved }"
+                    :disabled="props.solved || !hasAnySlotFilled"
+                    @click="$emit('validate-click')"
+                >
+                    <span class="cf-btn-bracket">[</span>
+                    VALIDATE_{{ padded }}
                     <span class="cf-btn-bracket">]</span>
                 </button>
 
@@ -113,6 +127,13 @@ const props = defineProps({
      * Used to activate the droppable state on slots.
      */
     selectedPoolId: { type: [Number, null], default: null },
+    /**
+     * Per-slot validation state from the last VALIDATE run.
+     * validationState[si] = null | 'correct' | 'present' | 'absent'
+     * Null means the slot was empty at validation time, or the letter
+     * has been swapped out since the last validate.
+     */
+    validationState: { type: Array, default: () => [] },
 });
 
 // ── Emits ──────────────────────────────────────────────────────────────────────
@@ -124,6 +145,8 @@ defineEmits([
     'scan-click',
     /** User clicked the INJECT button */
     'inject-click',
+    /** User clicked the VALIDATE button */
+    'validate-click',
 ]);
 
 // ── Derived ────────────────────────────────────────────────────────────────────
@@ -136,6 +159,9 @@ const canInject = computed(() =>
     props.slotData.length === props.wordLength &&
     props.slotData.every(s => s !== null)
 );
+
+/** At least one slot has a letter — VALIDATE becomes live */
+const hasAnySlotFilled = computed(() => props.slotData.some(s => s !== null));
 </script>
 
 <style scoped>
@@ -412,5 +438,68 @@ const canInject = computed(() =>
     box-shadow:
         0 0 18px rgba(0,255,100,0.3),
         inset 0 0 8px rgba(0,255,100,0.06);
+}
+
+/* ── VALIDATE button ──────────────────────────────────────────────────────── */
+
+/* Locked (no slots filled) */
+.cf-btn--validate {
+    color: rgba(251,146,60,0.25);
+    border-color: rgba(251,146,60,0.1);
+}
+
+/* Ready — at least one slot filled */
+.cf-btn--validate-ready {
+    color: rgba(251,146,60,0.75);
+    border-color: rgba(251,146,60,0.4);
+    text-shadow: 0 0 6px rgba(251,146,60,0.3);
+}
+
+.cf-btn--validate-ready:hover {
+    background: rgba(251,146,60,0.06);
+    border-color: rgba(251,146,60,0.65);
+    color: rgba(251,146,60,0.95);
+    box-shadow: 0 0 12px rgba(251,146,60,0.2);
+}
+
+/* ── Validation slot states ───────────────────────────────────────────────── */
+
+/* CORRECT — right letter, right position (green) */
+.cf-slot--correct {
+    border-color: rgba(0,255,100,0.7);
+    background: rgba(0,20,10,0.9);
+    box-shadow:
+        0 0 12px rgba(0,255,100,0.22),
+        inset 0 0 8px rgba(0,255,100,0.07);
+}
+
+.cf-slot--correct .cf-slot-letter {
+    color: #00ff9d;
+    text-shadow: 0 0 10px rgba(0,255,100,0.7);
+}
+
+/* PRESENT — right letter, wrong position (amber) */
+.cf-slot--present {
+    border-color: rgba(251,146,60,0.65);
+    background: rgba(28,10,0,0.9);
+    box-shadow:
+        0 0 12px rgba(251,146,60,0.18),
+        inset 0 0 8px rgba(251,146,60,0.06);
+}
+
+.cf-slot--present .cf-slot-letter {
+    color: rgba(251,146,60,0.92);
+    text-shadow: 0 0 10px rgba(251,146,60,0.5);
+}
+
+/* ABSENT — letter not in word at all (red/dim) */
+.cf-slot--absent {
+    border-color: rgba(255,50,50,0.3);
+    background: rgba(18,0,0,0.9);
+}
+
+.cf-slot--absent .cf-slot-letter {
+    color: rgba(255,80,80,0.5);
+    text-shadow: none;
 }
 </style>

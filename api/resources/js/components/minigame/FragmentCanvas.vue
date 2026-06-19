@@ -12,9 +12,11 @@
             :solved="props.solvedFrags[fi] ?? false"
             :scan-active="props.scanOpen === fi"
             :selected-pool-id="props.selectedPoolId"
+            :validation-state="props.validationStates[fi] ?? []"
             @slot-click="(si) => $emit('slot-click', fi, si)"
             @scan-click="$emit('scan-click', fi)"
             @inject-click="$emit('inject-click', fi)"
+            @validate-click="$emit('validate-click', fi)"
         />
 
         <!-- Empty-state placeholder — rendered before puzzle data arrives -->
@@ -70,6 +72,12 @@ const props = defineProps({
      * null when no tile is selected.
      */
     selectedPoolId: { type: [Number, null], default: null },
+
+    /**
+     * Per-fragment per-slot validation state.
+     * validationStates[fi][si] = null | 'correct' | 'present' | 'absent'
+     */
+    validationStates: { type: Array, default: () => [] },
 });
 
 // ── Emits ──────────────────────────────────────────────────────────────────────
@@ -92,6 +100,12 @@ defineEmits([
      * Payload: (fragmentIndex: number)
      */
     'inject-click',
+
+    /**
+     * User clicked the VALIDATE button.
+     * Payload: (fragmentIndex: number)
+     */
+    'validate-click',
 ]);
 </script>
 
