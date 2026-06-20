@@ -113,18 +113,33 @@
                     </div>
                 </div>
 
-                <!-- Container 4 — Expected field contents -->
+                <!-- Container 4 — Field specification / sync status -->
                 <div class="ts-panel ts-expected-panel">
                     <div class="ts-ph">
-                        {{ focusedFieldId ? 'EXPECTED :: ' + focusedFieldId : 'FIELD SPECIFICATION' }}
+                        {{ focusedFieldId ? 'FIELD SPEC :: ' + focusedFieldId : 'FIELD SPECIFICATION' }}
                     </div>
                     <template v-if="focusedFieldId">
+                        <div class="ts-spec-summary">
+                            <span class="ts-spec-label">SYNC STATUS</span>
+                            <span class="ts-spec-count" :class="syncCountClass">
+                                {{ syncedCount(focusedFieldId) }}/{{ expectedPackets.length }} SYNCHRONIZED
+                            </span>
+                        </div>
+                        <div class="ts-spec-col-headers">
+                            <span>COMMON_DATA</span>
+                            <span>LOCATION</span>
+                        </div>
                         <div v-for="name in expectedPackets" :key="name"
-                             class="ts-pkt-row ts-pkt--expected"
-                             :class="{ 'ts-pkt--present': isPacketHome(name, focusedFieldId) }">
-                            <span class="ts-pkt-name">{{ name }}</span>
-                            <span class="ts-pkt-status">
-                                {{ isPacketHome(name, focusedFieldId) ? '✓' : '✗' }}
+                             class="ts-spec-row"
+                             :class="isPacketHome(name, focusedFieldId) ? 'ts-spec--synced' : 'ts-spec--missing'">
+                            <span class="ts-spec-name">{{ name }}</span>
+                            <span class="ts-spec-loc">
+                                <template v-if="isPacketHome(name, focusedFieldId)">
+                                    <span class="ts-loc--home">✓ HOME</span>
+                                </template>
+                                <template v-else>
+                                    <span class="ts-loc--away">✗ IN {{ findPacketLocation(name, focusedFieldId) }}</span>
+                                </template>
                             </span>
                         </div>
                     </template>
@@ -616,6 +631,28 @@ function isPacketHome(name, fieldId) {
         p => p.name === name && p.homeField === fieldId && p.currentField === fieldId
     );
 }
+
+function findPacketLocation(name, homeFieldId) {
+    const p = Object.values(packetDefs.value).find(
+        p => p.name === name && p.homeField === homeFieldId
+    );
+    return p ? p.currentField : '???';
+}
+
+function syncedCount(fieldId) {
+    return Object.values(packetDefs.value)
+        .filter(p => p.homeField === fieldId && p.currentField === fieldId)
+        .length;
+}
+
+const syncCountClass = computed(() => {
+    if (!focusedFieldId.value) return '';
+    const total  = expectedPackets.value.length;
+    const synced = syncedCount(focusedFieldId.value);
+    if (synced === total) return 'ts-sync--full';
+    if (synced === 0)     return 'ts-sync--none';
+    return 'ts-sync--partial';
+});
 
 // ── Computed — SPLICE dropdowns ────────────────────────────────────────────────
 
@@ -1135,35 +1172,74 @@ onUnmounted(() => {
 .ts-file--home .ts-file-status    { color: rgba(0,255,100,0.6); }
 .ts-file--bleed .ts-file-status   { color: rgba(255,140,60,0.7); }
 
-/* ── Container 4: Expected panel ──────────────────────────────────────────── */
+/* ── Container 4: Field spec panel ───────────────────────────────────────── */
 
 .ts-expected-panel { overflow-y: auto; }
 
-.ts-pkt-row {
+.ts-spec-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 14px;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(0,200,240,0.08);
+    flex-shrink: 0;
+}
+
+.ts-spec-label {
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    color: rgba(0,200,240,0.35);
+}
+
+.ts-spec-count {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+
+.ts-sync--full    { color: rgba(0,255,100,0.8); }
+.ts-sync--partial { color: rgba(255,170,0,0.8); }
+.ts-sync--none    { color: rgba(255,60,60,0.8); }
+
+.ts-spec-col-headers {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 4px 14px;
+    font-size: 8px;
+    letter-spacing: 0.16em;
+    color: rgba(0,200,240,0.25);
+    border-bottom: 1px solid rgba(0,200,240,0.06);
+}
+
+.ts-spec-row {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 8px;
     align-items: center;
     padding: 6px 14px;
     border-bottom: 1px solid rgba(0,200,240,0.04);
-    font-size: 10px;
 }
 
-.ts-pkt--expected { color: rgba(0,200,240,0.55); }
-.ts-pkt--present .ts-pkt-name { color: rgba(0,255,100,0.8); }
-
-.ts-pkt-name {
+.ts-spec-name {
     font-size: 10px;
     letter-spacing: 0.06em;
-    color: rgba(0,200,240,0.55);
+    color: rgba(0,200,240,0.6);
 }
 
-.ts-pkt-status {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    color: rgba(0,200,240,0.3);
+.ts-spec--synced .ts-spec-name { color: rgba(0,255,100,0.75); }
+.ts-spec--missing .ts-spec-name { color: rgba(0,200,240,0.45); }
+
+.ts-spec-loc {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    text-align: right;
 }
-.ts-pkt--present .ts-pkt-status { color: rgba(0,255,100,0.7); }
+
+.ts-loc--home { color: rgba(0,255,100,0.7); }
+.ts-loc--away { color: rgba(255,120,60,0.75); }
 
 .ts-empty {
     padding: 20px 14px;
