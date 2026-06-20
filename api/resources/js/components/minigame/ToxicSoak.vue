@@ -1,847 +1,1281 @@
 <template>
     <QuestMinigameChrome v-bind="chrome">
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             Root canvas — fixed 1920 × 1080, CSS Grid
-             Columns : 350px | 1fr | 400px
-             Rows    : 1fr   | 220px
-        ════════════════════════════════════════════════════════════════════ -->
         <div class="ts-canvas">
 
-            <!-- ── Grid overlay (decorative) ─────────────────────────────── -->
-            <div class="ts-grid-bg" aria-hidden="true"/>
-
-            <!-- ┌─────────────────────────────────────────────────────────────
-                 │  CELL A — Scan panel + System noise   col 1 · row 1
-                 └───────────────────────────────────────────────────────── -->
-            <div class="ts-cell ts-cell--scan ts-cell--scan-layout">
-
-                <!-- ScanPanel — visible only when a fragment is being scanned -->
-                <Transition name="ts-scan-slide">
-                    <ScanPanel
-                        v-if="scanOpen !== null"
-                        :fragment="activeScanFragment"
-                        :fragment-index="scanOpen"
-                        :open-file-idx="openFileIdx"
-                        :unlocked-idxs="unlockedIdxs"
-                        :file-content="currentFileContent"
-                        :lock-cost-pct="lockCostPct"
-                        @file-click="openFile"
-                        @close="scanOpen = null"
-                    />
-                </Transition>
-
-                <!-- SystemNoise — always running; shrinks when scan is open -->
-                <SystemNoise :compressed="scanOpen !== null" />
-
+            <!-- ══════════════════════════════════════════════════════════════
+                 Container 1 — Top bar: Node Integrity | Rig | Environment
+            ══════════════════════════════════════════════════════════════ -->
+            <div class="ts-top">
+                <div class="ts-meter-group">
+                    <span class="ts-meter-lbl">NODE INTEGRITY</span>
+                    <div class="ts-meter-track">
+                        <div class="ts-meter-fill ts-fill--ni"
+                             :style="{ width: nodeIntegrity + '%' }"
+                             :class="niClass" />
+                        <div v-for="t in [15,30,45,60,75,90]" :key="t"
+                             class="ts-thresh-mark"
+                             :style="{ left: t + '%' }" />
+                    </div>
+                    <span class="ts-meter-val" :class="niClass">{{ Math.round(nodeIntegrity) }}%</span>
+                </div>
+                <div class="ts-meter-group">
+                    <span class="ts-meter-lbl">RIG</span>
+                    <div class="ts-meter-track">
+                        <div class="ts-meter-fill ts-fill--rig"
+                             :style="{ width: rig + '%' }"
+                             :class="rigClass" />
+                    </div>
+                    <span class="ts-meter-val" :class="rigClass">{{ Math.round(rig) }}%</span>
+                </div>
+                <div class="ts-meter-group">
+                    <span class="ts-meter-lbl">ENVIRONMENT</span>
+                    <div class="ts-meter-track">
+                        <div class="ts-meter-fill ts-fill--env"
+                             :style="{ width: environment + '%' }"
+                             :class="envClass" />
+                    </div>
+                    <span class="ts-meter-val" :class="envClass">{{ Math.round(environment) }}%</span>
+                </div>
             </div>
 
-            <!-- ┌─────────────────────────────────────────────────────────────
-                 │  CELL B — Fragment canvas        col 2 · row 1
-                 └───────────────────────────────────────────────────────── -->
-            <div class="ts-cell ts-cell--frags ts-cell--frags-flush">
-                <FragmentCanvas
-                    :fragments="fragments"
-                    :slots="slots"
-                    :solved-frags="solvedFrags"
-                    :scan-open="scanOpen"
-                    :selected-pool-id="selectedPoolId"
-                    :validation-states="validationStates"
-                    @slot-click="onSlotClick"
-                    @scan-click="openScan"
-                    @inject-click="inject"
-                    @validate-click="validateFragment"
-                />
-            </div>
+            <!-- ══════════════════════════════════════════════════════════════
+                 Containers 2 / 3 / 4 — Middle panels
+            ══════════════════════════════════════════════════════════════ -->
+            <div class="ts-middle">
 
-            <!-- ┌─────────────────────────────────────────────────────────────
-                 │  CELL C — Status monitor         col 3 · row 1
-                 └───────────────────────────────────────────────────────── -->
-            <div class="ts-cell ts-cell--status">
-                <StatusMonitor
-                    :stability="stability"
-                    :trace-level="traceLevel"
-                    :reputation="5"
-                    :solved-frags="solvedFrags"
-                />
-            </div>
-
-            <!-- ┌─────────────────────────────────────────────────────────────
-                 │  CELL D — Signal pool            col 1-3 · row 2
-                 └───────────────────────────────────────────────────────── -->
-            <div class="ts-cell ts-cell--pool ts-cell--pool-layout">
-
-                <!-- Pool control strip: ping button + cooldown status -->
-                <div class="ts-pool-ctrl">
-                    <button
-                        class="ts-ping-btn"
-                        :class="canPing ? 'ts-ping-btn--ready' : 'ts-ping-btn--cool'"
-                        :disabled="!canPing"
-                        @click="pingNoise"
-                    >
-                        <span class="ts-ping-bracket">[</span>
-                        PING --NOISE
-                        <span class="ts-ping-bracket">]</span>
-                    </button>
-                    <span class="ts-ping-status" :class="canPing ? 'ts-ping--ready' : 'ts-ping--cool'">
-                        {{ canPing ? '◈ READY' : `⟳ RECHARGING (${pingCooldown}s)` }}
-                    </span>
-                    <span class="ts-mark-budget" :class="noiseMarkBudget === 0 ? 'ts-mark-budget--spent' : ''">
-                        ◈ LOCK MARKS: {{ noiseMarkBudget }}/{{ cfg.noiseMarkBudget }}
-                    </span>
+                <!-- Container 2 — Data fields with I/O throughput -->
+                <div class="ts-panel ts-fields-panel">
+                    <div class="ts-ph">DATA FIELDS</div>
+                    <div class="ts-io-header">
+                        <span class="ts-fid-col" />
+                        <span class="ts-io-hdr">OUTPUT</span>
+                        <span class="ts-io-sep">|</span>
+                        <span class="ts-io-hdr">INPUT</span>
+                    </div>
+                    <div v-for="fid in activeFieldIds" :key="fid"
+                         class="ts-field-row"
+                         :class="{ 'ts-field-row--active': scannedFieldId === fid, 'ts-field-row--bleed': fieldHasBleed(fid) }"
+                         @click="scanField(fid)">
+                        <span class="ts-fid">{{ fid }}</span>
+                        <span class="ts-io-val" :class="ioOutClass(fid)">{{ ioOut(fid) }}</span>
+                        <span class="ts-io-sep">|</span>
+                        <span class="ts-io-val" :class="ioInClass(fid)">{{ ioIn(fid) }}</span>
+                    </div>
                 </div>
 
-                <SignalPool
-                    :letters="poolLetters"
-                    :selected-pool-id="selectedPoolId"
-                    :ping-active="pingActive"
-                    :marked-noise-ids="markedNoiseIds"
-                    :noise-mark-budget="noiseMarkBudget"
-                    @pool-select="onPoolSelect"
-                    @pool-cancel="selectedPoolId = null"
-                    @noise-mark="onNoiseMark"
-                />
+                <!-- Container 3 — Actual field contents (scan result) -->
+                <div class="ts-panel ts-actual-panel">
+                    <div class="ts-ph">
+                        {{ scannedFieldId ? 'SCAN :: ' + scannedFieldId : 'SELECT FIELD TO SCAN' }}
+                    </div>
+                    <template v-if="scannedFieldId">
+                        <div v-for="entry in displayPackets" :key="entry.id"
+                             class="ts-pkt-row"
+                             :class="{ 'ts-pkt--bleed': entry.isBleed, 'ts-pkt--home': entry.isHome }">
+                            <span class="ts-pkt-name">{{ entry.displayName }}</span>
+                            <span class="ts-pkt-aff" :class="'ts-aff--' + entry.affinity">
+                                {{ entry.affinity === 'rig' ? '◈ RIG' : '◈ ENV' }}
+                            </span>
+                            <span class="ts-pkt-dest">
+                                {{ entry.isHome ? '✓ HOME' : '⟶ ' + entry.homeField }}
+                            </span>
+                        </div>
+                        <!-- Rig noise — phantom entries -->
+                        <template v-if="flickerPhantom && phantomEntries.length">
+                            <div v-for="(ph, i) in phantomEntries" :key="'ph' + i"
+                                 class="ts-pkt-row ts-pkt--phantom">
+                                <span class="ts-pkt-name">{{ ph }}</span>
+                                <span class="ts-pkt-aff">◈ ???</span>
+                                <span class="ts-pkt-dest">⟶ [UNKNOWN]</span>
+                            </div>
+                        </template>
+                    </template>
+                    <div v-else class="ts-empty">// NO FIELD SELECTED</div>
+                </div>
+
+                <!-- Container 4 — Expected field contents -->
+                <div class="ts-panel ts-expected-panel">
+                    <div class="ts-ph">
+                        {{ scannedFieldId ? 'EXPECTED :: ' + scannedFieldId : 'FIELD SPECIFICATION' }}
+                    </div>
+                    <template v-if="scannedFieldId">
+                        <div v-for="name in expectedPackets" :key="name"
+                             class="ts-pkt-row ts-pkt--expected"
+                             :class="{ 'ts-pkt--present': isPacketHome(name, scannedFieldId) }">
+                            <span class="ts-pkt-name">{{ name }}</span>
+                            <span class="ts-pkt-status">
+                                {{ isPacketHome(name, scannedFieldId) ? '✓' : '✗' }}
+                            </span>
+                        </div>
+                    </template>
+                    <div v-else class="ts-empty">// SELECT FIELD TO VIEW SPECIFICATION</div>
+                </div>
+
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 Containers 5 / 6 — Bottom bar
+            ══════════════════════════════════════════════════════════════ -->
+            <div class="ts-bottom">
+
+                <!-- Container 5 — SPLICE interface -->
+                <div class="ts-panel ts-splice-panel">
+                    <div class="ts-ph">SPLICE INTERFACE</div>
+                    <div class="ts-splice-chain">
+
+                        <div class="ts-splice-step">
+                            <label class="ts-slbl">SOURCE FIELD</label>
+                            <select class="ts-sel" v-model="spliceFieldId" @change="onSrcFieldChange">
+                                <option value="">-- SELECT --</option>
+                                <option v-for="fid in activeFieldIds" :key="fid" :value="fid">{{ fid }}</option>
+                            </select>
+                        </div>
+
+                        <span class="ts-chain-sep">-</span>
+
+                        <div class="ts-splice-step">
+                            <label class="ts-slbl">COMMON_DATA</label>
+                            <select class="ts-sel" v-model="splicePacketId"
+                                    @change="onSrcPacketChange"
+                                    :disabled="!spliceFieldId">
+                                <option value="">-- SELECT --</option>
+                                <option v-for="p in spliceSourcePackets" :key="p.id" :value="p.id">
+                                    {{ p.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <span class="ts-chain-sep">>>>></span>
+
+                        <div class="ts-splice-step">
+                            <label class="ts-slbl">DESTINATION FIELD</label>
+                            <select class="ts-sel" v-model="spliceDestFieldId"
+                                    @change="onDestFieldChange"
+                                    :disabled="!splicePacketId">
+                                <option value="">-- SELECT --</option>
+                                <option v-for="fid in spliceDestFields" :key="fid" :value="fid">{{ fid }}</option>
+                            </select>
+                        </div>
+
+                        <span class="ts-chain-sep">>>>></span>
+
+                        <div class="ts-splice-step">
+                            <label class="ts-slbl">POSITION</label>
+                            <select class="ts-sel" v-model="spliceDestSlot"
+                                    :disabled="!spliceDestFieldId">
+                                <option value="">-- SELECT --</option>
+                                <option v-for="idx in spliceDestEmptySlots" :key="idx" :value="idx">
+                                    SLOT {{ idx + 1 }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <button class="ts-splice-btn"
+                                :disabled="!canSplice"
+                                @click="executeSplice">
+                            [ EXECUTE SPLICE ]
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- Container 6 — SOAK / VENT / PURGE buttons -->
+                <div class="ts-panel ts-action-panel">
+                    <div class="ts-ph">DISCHARGE // PURGE</div>
+                    <div class="ts-action-row">
+
+                        <button class="ts-act-btn ts-btn--soak"
+                                :disabled="!canDischarge"
+                                @click="soak">
+                            <span class="ts-abl">SOAK</span>
+                            <span class="ts-asub">→ RIG</span>
+                            <span v-if="dischargeCooldown > 0" class="ts-cool">{{ dischargeCooldown }}s</span>
+                        </button>
+
+                        <button class="ts-act-btn ts-btn--vent"
+                                :disabled="!canDischarge"
+                                @click="vent">
+                            <span class="ts-abl">VENT</span>
+                            <span class="ts-asub">→ ENV</span>
+                            <span v-if="dischargeCooldown > 0" class="ts-cool">{{ dischargeCooldown }}s</span>
+                        </button>
+
+                        <button class="ts-act-btn ts-btn--purge"
+                                :disabled="!canPurge"
+                                @click="purge">
+                            <span class="ts-abl">PURGE</span>
+                            <span class="ts-asub" :class="{ 'ts-asub--ready': canPurge }">
+                                {{ canPurge ? '◈ SYNC COMPLETE' : 'SYNC PENDING' }}
+                            </span>
+                        </button>
+
+                    </div>
+                </div>
 
             </div>
 
         </div>
+
     </QuestMinigameChrome>
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue';
-import { onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
-import StatusMonitor from './StatusMonitor.vue';
-import FragmentCanvas from './FragmentCanvas.vue';
-import SignalPool from './SignalPool.vue';
-import ScanPanel from './ScanPanel.vue';
-import SystemNoise from './SystemNoise.vue';
-import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
 
-// ── Acrostic word bank ─────────────────────────────────────────────────────────
-// Used to generate acrostic sentences. Each entry starts with the keyed letter.
+// ── Field / packet data ────────────────────────────────────────────────────────
 
-const ACROSTIC_WORDS = {
-    A: ['Access', 'Archive', 'Anomaly', 'Authentication', 'Active', 'Alert', 'Asymmetric'],
-    B: ['Buffer', 'Breach', 'Bandwidth', 'Backdoor', 'Broadcast', 'Blacklisted'],
-    C: ['Cache', 'Channel', 'Cipher', 'Connection', 'Corrupted', 'Credentials', 'Cascade'],
-    D: ['Data', 'Daemon', 'Disconnect', 'Diagnostic', 'Downlink', 'Delayed', 'Dumped'],
-    E: ['Encrypted', 'Error', 'Endpoint', 'Exfiltrated', 'Expired', 'Evaded', 'Erased'],
-    F: ['Firewall', 'Forensic', 'Frequency', 'Flagged', 'Filtered', 'Forged'],
-    G: ['Gateway', 'Ghost', 'Grid', 'Granted', 'Garbled', 'Grounded'],
-    H: ['Hardware', 'Hash', 'Handshake', 'Hidden', 'Hijacked', 'Hardened'],
-    I: ['Identity', 'Injection', 'Intercepted', 'Invisible', 'Inactive', 'Integrity'],
-    J: ['Junction', 'Junk', 'Jammed', 'Jailbroken'],
-    K: ['Key', 'Kernel', 'Known', 'Killed'],
-    L: ['Latency', 'Log', 'Legacy', 'Leaked', 'Locked', 'Loopback'],
-    M: ['Memory', 'Masked', 'Monitor', 'Modified', 'Mirrored', 'Mapped'],
-    N: ['Node', 'Network', 'Null', 'Noise', 'Nested', 'Narrowband'],
-    O: ['Offline', 'Overflow', 'Origin', 'Outbound', 'Obfuscated', 'Orphaned'],
-    P: ['Packet', 'Protocol', 'Purged', 'Patched', 'Persistent', 'Proxied'],
-    Q: ['Queue', 'Query', 'Quarantined', 'Queued'],
-    R: ['Router', 'Remote', 'Residual', 'Rejected', 'Routed', 'Redirected'],
-    S: ['Signal', 'Session', 'Sector', 'Spoofed', 'Suppressed', 'Staged'],
-    T: ['Trace', 'Token', 'Traffic', 'Terminated', 'Throttled', 'Tunnelled'],
-    U: ['Unauthorized', 'Unverified', 'Upstream', 'Unstable', 'Unlisted'],
-    V: ['Vector', 'Voiding', 'Validated', 'Volatile', 'Vectored'],
-    W: ['Watchdog', 'Write', 'Wiped', 'Wireless', 'Weakened'],
-    X: ['X-sector', 'Xor-masked', 'Expired'],
-    Y: ['Years-old', 'Yielding', 'Yoked'],
-    Z: ['Zero-day', 'Zone', 'Zeroed'],
+const FIELD_DEFS = {
+    AI_WASTE: {
+        affinity: 'environment',
+        packets: ['Core_Frags','Ghost_Process','Logic_Residue','Kernel_Shards','Thread_Stacks','Personality_Seeds','Loop_Artifacts','Heuristic_Maps'],
+    },
+    SENSORIUM_DATA: {
+        affinity: 'rig',
+        packets: ['Visual_Capture','Audio_Stream','Motion_Trace','Haptic_Record','Presence_Snapshot','Scent_Profile','Location_History','Biometric_Readings'],
+    },
+    AFFECT_PROFILE: {
+        affinity: 'rig',
+        packets: ['Mood_Vector','Threat_Index','Reward_Profile','Attention_Trace','Preference_Map','Social_Weight','Engagement_Pattern','Impulse_Record'],
+    },
+    DISPLAY_WASTE: {
+        affinity: 'environment',
+        packets: ['Screen_Waste','Pixel_Decay','Color_Burn','Compression_Artifacts','Scanlines','CRT_Noise','HUD_Residue','Render_Fragments'],
+    },
+    AD_RESIDUE: {
+        affinity: 'environment',
+        packets: ['Banner_Ads','Popup_Spam','Tracking_Data','Product_Profiles','Engagement_Metrics','Recommendation_Feed','Purchase_History','Sponsored_Content'],
+    },
+    SYSTEM_NOISE: {
+        affinity: 'environment',
+        packets: ['Packet_Loss','Null_Values','Dead_Links','Clock_Drift','Cache_Errors','Sync_Failure','Protocol_Timeout','Desync'],
+    },
+    NETWORK_ECHOES: {
+        affinity: 'environment',
+        packets: ['Presence_Data','Session_Keys','Friend_Lists','Avatar_Profiles','Message_Threads','Shared_Channels','Access_Tokens','User_Handles'],
+    },
+    ARCHIVE_DECAY: {
+        affinity: 'rig',
+        packets: ['Legacy_Formats','Corrupted_Backups','Dead_Indexes','Timestamp_Records','Deleted_Pointers','Version_History','Deprecated_Protocols','Data_Fossils'],
+    },
 };
 
-// ── Codename parts ─────────────────────────────────────────────────────────────
+const ALL_FIELD_IDS = Object.keys(FIELD_DEFS);
 
-const CODENAME_PRE = ['ACCESS', 'SYSTEM', 'GHOST', 'SIGNAL', 'VECTOR', 'CIPHER', 'NEURAL', 'PROXY', 'SECTOR', 'DAEMON', 'KERNEL', 'SOCKET'];
-const CODENAME_SUF = ['DELTA', 'HEARTBEAT', 'IDENTITY', 'PROTOCOL', 'GATEWAY', 'SEQUENCE', 'FREQUENCY', 'ARCHIVE', 'MANIFEST', 'LATTICE', 'FRAGMENT'];
+const NOISE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ[]{}|\\<>!@#%&0123456789'.split('');
 
-// ── Noise characters ───────────────────────────────────────────────────────────
+// ── Game constants ─────────────────────────────────────────────────────────────
 
-const NOISE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ[]{}|\\'.split('');
+const DISCHARGE_RELIEF    = 20;   // % reduction to node integrity per discharge
+const DISCHARGE_DMG_MATCH = 12;   // % damage with matching affinity
+const DISCHARGE_DMG_WRONG = 22;   // % damage with wrong affinity
+const DISCHARGE_COOLDOWN  = 10;   // seconds shared cooldown
+const TICK_INTERVAL_MS    = 3000; // ms between node integrity ticks
+const BASE_TIME           = 210;  // seconds (3.5 minutes)
 
-// ── Word clusters ──────────────────────────────────────────────────────────────
-
-const CLUSTERS = [
-    { words: ['VOID', 'NULL', 'GONE', 'WIPE'],   hints: ["What the corporation leaves in an emptied archive.", "The state after a hard deletion.", "What ICE does to a runner's footprint.", "A field that was never meant to hold anything."] },
-    { words: ['ECHO', 'PING', 'WAVE', 'PULSE'],   hints: ["What SPLICE runs on beneath everything else.", "The heartbeat of a channel that should be dead.", "A transmission with no source on record.", "What you send when no one is listening."] },
-    { words: ['GHOST', 'MASK', 'ALIAS', 'TRACE'],  hints: ["What a runner leaves in a system they never entered.", "The layer between a person and their credential.", "What corporations pay to erase from their logs.", "Everything you are to a system that doesn't know you."] },
-    { words: ['NODE', 'LINK', 'BRIDGE', 'SPLICE'], hints: ["Where things that shouldn't move get routed anyway.", "The connection that isn't supposed to exist.", "Infrastructure that outlived the org that built it.", "What the city runs on beneath the streets."] },
-    { words: ['RUST', 'BLEED', 'DECAY', 'FAULT'],  hints: ["What happens to systems no one maintains.", "A server left running in an abandoned building.", "What time does to encryption that was never updated.", "Entropy, made visible in the access logs."] },
-    { words: ['CACHE', 'STORE', 'KEEP', 'HOLD'],   hints: ["Where everything critical lives before it disappears.", "What persists after the source has been deleted.", "The part of the system that doesn't know how to forget.", "Where the important things go before the purge cycle runs."] },
-    { words: ['DARK', 'SHADE', 'VEIL', 'CLOAK'],   hints: ["The frequency the monitored channels can't see.", "What a runner becomes when they stop broadcasting.", "The state between visible and gone.", "What separates a runner who gets out from one who doesn't."] },
-    { words: ['DATA', 'CODE', 'BYTE', 'HASH'],     hints: ["The raw material of every secret ever kept.", "What survives every wipe, every migration.", "The substance beneath the interface.", "What the corporation is actually selling."] },
-    { words: ['GATE', 'DOOR', 'LOCK', 'ENTRY'],    hints: ["What every system has, even ones built to keep you out.", "The point where you stop being outside.", "What separates the permitted from everyone else.", "The opening that was never meant to be found."] },
-    { words: ['BURN', 'HARM', 'KILL', 'BLAZE'],    hints: ["What ICE does when a trace finally resolves.", "The last option when extraction has already failed.", "What remains after the response team arrives.", "The outcome you were hoping to avoid triggering."] },
-    { words: ['RISE', 'BREAK', 'REBEL', 'SURGE'],  hints: ["What happens after enough pressure has been applied.", "The runner's answer to a node that won't open.", "What the underground does with nothing left to lose.", "The direction everything tends to move in eventually."] },
-    { words: ['FLESH', 'NERVE', 'BLOOD', 'BONE'],  hints: ["What the hardware plugs into.", "What the corporations are trying to upgrade.", "The part of the runner without a digital fallback.", "What you cannot spoof, replace, or patch."] },
-    { words: ['CITY', 'GRID', 'TOWER', 'BLOCK'],   hints: ["The structure that holds all of this together.", "What the corporations built their signal towers on top of.", "Where runners live in the gaps between monitored zones.", "What you navigate when the official map is lying."] },
-    { words: ['PAST', 'FADE', 'RELIC', 'LAPSE'],   hints: ["Where everything the system tried to delete still exists.", "What archives turn into when nobody audits them.", "The direction logs only travel in.", "What a runner exploits when a credential was never rotated."] },
-    { words: ['STILL', 'HUSH', 'QUIET', 'MUTE'],   hints: ["The interval between a scan and a triggered alert.", "What the buffer sounds like when they've stopped looking.", "The rarest resource on a monitored network.", "What a careful runner leaves behind them."] },
+const TICK_RATES = [
+    { threshold: 90, rate: 4.0 },
+    { threshold: 75, rate: 3.5 },
+    { threshold: 60, rate: 3.0 },
+    { threshold: 45, rate: 2.5 },
+    { threshold: 30, rate: 2.0 },
+    { threshold: 15, rate: 1.5 },
+    { threshold: 0,  rate: 1.0 },
 ];
-
-// ── Difficulty config ──────────────────────────────────────────────────────────
-
-const DIFF_CONFIG = {
-    1: { fragCount: 3, noiseCount: 10, wordLengthMax: 5, traceDmg: 0.15, stabDmg: 0.08, lockCost: 0.10, noiseMarkBudget: 5 },
-    2: { fragCount: 3, noiseCount: 16, wordLengthMax: 6, traceDmg: 0.20, stabDmg: 0.10, lockCost: 0.12, noiseMarkBudget: 4 },
-    3: { fragCount: 3, noiseCount: 22, wordLengthMax: 99, traceDmg: 0.25, stabDmg: 0.13, lockCost: 0.15, noiseMarkBudget: 3 },
-};
 
 // ── Props / emits ──────────────────────────────────────────────────────────────
 
 const props = defineProps({ skin: { type: Object, required: true } });
 const emit  = defineEmits(['complete', 'fail']);
 
-// ── Shared state ───────────────────────────────────────────────────────────────
+// ── ICE level ─────────────────────────────────────────────────────────────────
 
-const {
-    stability, primaryProgress, timeLeft, result, failReason,
-    glitchActive, glitchType, glitchIntensity,
-    stabilityClass, timerClass,
-    tickShared, applyHit, endGame,
-} = useQuestMinigameState(props.skin);
-
-// ── Game config ────────────────────────────────────────────────────────────────
-
-const difficulty = props.skin.difficulty ?? 1;
-const cfg        = DIFF_CONFIG[difficulty] ?? DIFF_CONFIG[1];
-
-// ── Game state ─────────────────────────────────────────────────────────────────
-
-const fragments    = ref([]);
-const slots        = ref([[], [], []]);
-const pool         = ref([]);
-const solvedFrags  = ref([false, false, false]);
-const traceLevel   = ref(0);
-const selectedPoolId = ref(null);
-
-const validationStates = ref([[], [], []]);
-
-const scanOpen     = ref(null);
-const openFileIdx  = ref(null);
-const unlockedIdxs = ref(new Set());
-
-const showWrong    = ref(false);
-const showCorrect  = ref(null);
-
-// ── Game loop ──────────────────────────────────────────────────────────────────
-
-let rafHandle = null;
-let lastTs    = null;
-
-function gameLoop(ts) {
-    if (result.value) return; // game ended — let the RAF stop naturally
-
-    if (lastTs !== null) {
-        const dt      = Math.min((ts - lastTs) / 1000, 0.1); // cap dt at 100 ms
-        const outcome = tickShared(dt);
-
-        if (outcome) {
-            const reason = outcome === 'stability'
-                ? '[SYSTEM COLLAPSE] — Stability exhausted.'
-                : '[TRACE LOCK] — Absorption threshold exceeded.';
-            endGame('fail', reason);
-            setTimeout(() => emit('fail'), 2200);
-            return;
-        }
-    }
-
-    lastTs    = ts;
-    rafHandle = requestAnimationFrame(gameLoop);
-}
-
-// ── Ping state ─────────────────────────────────────────────────────────────────
-const pingActive   = ref(false);   // true during the 4s reveal window
-const canPing      = ref(true);    // false during 20s cooldown
-const pingCooldown = ref(0);       // remaining cooldown seconds for HUD display
-let   pingTimer            = null; // reveal timeout handle
-
-// Noise-lock marks — player can lock noise tiles during an active ping
-const markedNoiseIds  = reactive(new Set());
-const noiseMarkBudget = ref(cfg.noiseMarkBudget);
-let   pingCooldownInterval = null; // cooldown tick interval handle
-
-// ── Computed ───────────────────────────────────────────────────────────────────
-
-const localStabClass = computed(() => {
-    if (stability.value < 0.15) return 'ts-val--crit';
-    if (stability.value < 0.35) return 'ts-val--warn';
-    return '';
-});
-
-/**
- * Transforms internal pool shape → clean SignalPool prop interface.
- * Internal: { id, letter, noise, usedBy: null|fi }
- * External: { id, char,   noise, status: 'active'|'used' }
- */
-const poolLetters = computed(() =>
-    pool.value.map(item => ({
-        id:     item.id,
-        char:   item.letter,
-        noise:  item.noise,
-        status: item.usedBy !== null ? 'used' : 'active',
-    }))
+const iceLevel = computed(() =>
+    Math.min(8, Math.max(3, props.skin.iceLevel ?? props.skin.difficulty ?? 3))
 );
 
-/** Stability cost shown in ScanPanel lock badge */
-const lockCostPct = computed(() => Math.round(cfg.lockCost * 100));
+// ── Game meters ────────────────────────────────────────────────────────────────
 
-/** Fragment currently being scanned — null-safe */
-const activeScanFragment = computed(() =>
-    scanOpen.value !== null ? fragments.value[scanOpen.value] ?? null : null
-);
+const nodeIntegrity   = ref(0);
+const rig             = ref(0);
+const environment     = ref(0);
+const timeLeft        = ref(BASE_TIME + (props.skin.ramBonus ?? 0));
+const gameResult      = ref(null);   // null | 'success' | 'fail'
+const failReason      = ref('');
+const dischargeCooldown = ref(0);
 
-const currentFileContent = computed(() => {
-    if (scanOpen.value === null || openFileIdx.value === null) return '';
-    const file = fragments.value[scanOpen.value]?.archive[openFileIdx.value];
-    if (!file) return '';
-    if (file.locked && !isUnlocked(openFileIdx.value)) return '[ENCRYPTED] — Stability required to decrypt.';
-    return file.content ?? '[NO DATA]';
-});
+// ── Puzzle state ───────────────────────────────────────────────────────────────
 
-const chrome = computed(() => ({
-    skin:            props.skin,
-    timeLeft:        timeLeft.value,
-    primaryProgress: primaryProgress.value,
-    stability:       stability.value,
-    stabilityClass:  stabilityClass.value,
-    timerClass:      '',
-    glitchActive:    glitchActive.value,
-    glitchType:      glitchType.value,
-    glitchIntensity: glitchIntensity.value,
-    result:          result.value,
-    failReason:      failReason.value,
-}));
+const activeFieldIds   = ref([]);   // string[]
+const fieldSlots       = ref({});   // { [fieldId]: (string|null)[] }
+const packetDefs       = ref({});   // { [id]: { id, name, homeField, currentField, affinity } }
+const fieldConnections = ref({});   // { [fieldId]: string[] }
+const openSlotFieldId  = ref('');
+
+// ── UI state ───────────────────────────────────────────────────────────────────
+
+const scannedFieldId    = ref(null);
+const spliceFieldId     = ref('');
+const splicePacketId    = ref('');
+const spliceDestFieldId = ref('');
+const spliceDestSlot    = ref('');  // holds slot index (number) or ''
+
+// ── Noise state ────────────────────────────────────────────────────────────────
+
+const flickerPhantom = ref(false);
+const flickerLabel   = ref(false);
+const corruptSeed    = ref(0);
+const ioValues       = ref({});     // { [fieldId]: { out: number, in: number } }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
 function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
 function shuffle(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
         const j = randInt(0, i);
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+        [a[i], a[j]] = [a[j], a[i]];
     }
-    return arr;
+    return a;
 }
 
-function isUnlocked(fileIdx) {
-    return unlockedIdxs.value.has(fileIdx);
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+function hasEmptySlot(fieldId) {
+    return (fieldSlots.value[fieldId] ?? []).some(s => s === null);
 }
 
-function canInject(fi) {
-    if (solvedFrags.value[fi]) return false;
-    return slots.value[fi].every(s => s !== null);
-}
-
-// ── Content generation ─────────────────────────────────────────────────────────
-
-function generateCodename() {
-    const p = CODENAME_PRE[randInt(0, CODENAME_PRE.length - 1)];
-    const s = CODENAME_SUF[randInt(0, CODENAME_SUF.length - 1)];
-    return `${p}_${s}`;
-}
-
-function generateAcrostic(word) {
-    return word.split('').map(letter => {
-        const bank = ACROSTIC_WORDS[letter.toUpperCase()] ?? [letter];
-        return bank[randInt(0, bank.length - 1)];
-    }).join(' ') + '.';
-}
-
-function generateArchive(word, fragIdx) {
-    const acrostic = generateAcrostic(word);
-    const noiseNames = shuffle([
-        ['log_purge', 'data'], ['network_dump', 'raw'], ['system_trace', 'log'],
-        ['audit_report', 'txt'], ['traffic_sample', 'pcap'], ['error_cascade', 'log'],
-        ['memory_snapshot', 'bin'], ['diagnostic_run', 'dat'],
-    ]);
-    const lockedNames = shuffle([
-        ['trace_log_gamma', 'enc'], ['encrypted_manifest', 'enc'],
-        ['secure_packet', 'enc'], ['redacted_log', 'enc'],
-    ]);
-
-    const files = [
-        {
-            name:    `${noiseNames[0][0]}.${noiseNames[0][1]}`,
-            size:    `${randInt(30, 90)}kb`,
-            locked:  false,
-            content: `[SYSTEM LOG]\n\nNo anomalous entries detected in this segment.\nRoutine traffic recorded. Nothing actionable.\n\nEnd of log.`,
-        },
-        {
-            name:    `${lockedNames[0][0]}.${lockedNames[0][1]}`,
-            size:    `${randInt(8, 20)}kb`,
-            locked:  true,
-            content: `[ENCRYPTED RECORD]\n\nPartial trace data recovered.\nOrigin: masked. Destination: masked.\nContent: insufficient for analysis.\n\nRecommendation: discard.`,
-        },
-        {
-            name:    `acrostic_clue_fragment.txt`,
-            size:    `1kb`,
-            locked:  false,
-            content: `Acrostic Fragment ${String(fragIdx + 1).padStart(2, '0')}:\n${acrostic}`,
-        },
-    ];
-    return shuffle(files);
+function fieldHasBleed(fieldId) {
+    return (fieldSlots.value[fieldId] ?? []).some(id => {
+        if (!id) return false;
+        const p = packetDefs.value[id];
+        return p && p.homeField !== fieldId;
+    });
 }
 
 // ── Puzzle generation ──────────────────────────────────────────────────────────
 
 function buildPuzzle() {
-    const shuffledClusters = shuffle([...CLUSTERS]);
-    const selected = [];
+    const ice = iceLevel.value;
 
-    for (const cluster of shuffledClusters) {
-        if (selected.length >= cfg.fragCount) break;
-        const eligible = cluster.words.filter(w => w.length <= cfg.wordLengthMax);
-        if (!eligible.length) continue;
-        const word = eligible[randInt(0, eligible.length - 1)];
-        const hint = cluster.hints[randInt(0, cluster.hints.length - 1)];
-        selected.push({
-            word,
-            hint,
-            codename: generateCodename(),
-            archive:  generateArchive(word, selected.length),
+    // 1. Select fields
+    const selected = shuffle([...ALL_FIELD_IDS]).slice(0, ice);
+    activeFieldIds.value = selected;
+
+    // 2. Connection topology — spanning tree + extra edges
+    const conns = {};
+    selected.forEach(id => { conns[id] = []; });
+
+    const tree = shuffle([...selected]);
+    for (let i = 1; i < tree.length; i++) {
+        const a = tree[i];
+        const b = tree[randInt(0, i - 1)];
+        if (!conns[a].includes(b)) { conns[a].push(b); conns[b].push(a); }
+    }
+    const extraEdges = Math.floor(ice * 0.6);
+    for (let e = 0; e < extraEdges; e++) {
+        const a = selected[randInt(0, selected.length - 1)];
+        const b = selected[randInt(0, selected.length - 1)];
+        if (a !== b && !conns[a].includes(b)) { conns[a].push(b); conns[b].push(a); }
+    }
+    fieldConnections.value = conns;
+
+    // 3. Seed packets — ICE packets per field from correct pool
+    const pkts  = {};
+    const slots = {};
+
+    selected.forEach(fieldId => {
+        const def   = FIELD_DEFS[fieldId];
+        const names = shuffle([...def.packets]).slice(0, ice);
+        slots[fieldId] = [];
+        names.forEach(name => {
+            const id = `${fieldId}__${name}__${uid()}`;
+            pkts[id] = { id, name, homeField: fieldId, currentField: fieldId, affinity: def.affinity };
+            slots[fieldId].push(id);
         });
-    }
-
-    fragments.value        = selected;
-    slots.value            = selected.map(f => Array(f.word.length).fill(null));
-    solvedFrags.value      = Array(selected.length).fill(false);
-    validationStates.value = selected.map(f => Array(f.word.length).fill(null));
-    buildPool(selected);
-}
-
-function buildPool(frags) {
-    const items = [];
-
-    // Signal: one pool entry per letter occurrence across all fragment words
-    frags.forEach(frag => {
-        frag.word.split('').forEach(letter => {
-            items.push({ letter, noise: false });
-        });
     });
 
-    // Track which letters are already covered by signal words
-    const signalSet = new Set(frags.flatMap(f => f.word.split('')));
+    // 4. Open slot — add one null to a random field
+    const openField = selected[randInt(0, selected.length - 1)];
+    openSlotFieldId.value = openField;
+    slots[openField].push(null);
 
-    // Full A-Z: every letter NOT already present as a signal letter becomes noise
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
-        if (!signalSet.has(letter)) {
-            items.push({ letter, noise: true });
+    // 5. Seed bleeds via pair swaps (max 2 per field)
+    const bleedCounts = {};
+    selected.forEach(id => { bleedCounts[id] = 0; });
+
+    let placed = 0;
+    const target = ice;
+
+    // Generate candidate pairs
+    const pairs = [];
+    for (let i = 0; i < selected.length; i++) {
+        for (let j = i + 1; j < selected.length; j++) {
+            pairs.push([selected[i], selected[j]]);
         }
-    });
-
-    // Extra symbol noise for texture
-    const SYMBOLS = '[]{}|\\<>!@#%&'.split('');
-    for (let i = 0; i < 6; i++) {
-        items.push({ letter: SYMBOLS[randInt(0, SYMBOLS.length - 1)], noise: true });
     }
 
-    shuffle(items);
-    pool.value = items.map((item, i) => ({
-        id:     i,
-        letter: item.letter,
-        noise:  item.noise,
-        usedBy: null,
-    }));
-}
+    for (const [a, b] of shuffle(pairs)) {
+        if (placed >= target) break;
+        if (bleedCounts[a] >= 2 || bleedCounts[b] >= 2) continue;
 
-// ── Letter placement ───────────────────────────────────────────────────────────
+        // Find a home packet from a currently sitting in a, and vice versa
+        const pFromA = slots[a].find(id => id && pkts[id].homeField === a);
+        const pFromB = slots[b].find(id => id && pkts[id].homeField === b);
+        if (!pFromA || !pFromB) continue;
 
-function onPoolClick(item) {
-    if (selectedPoolId.value === item.id) { selectedPoolId.value = null; return; }
-    selectedPoolId.value = item.id;
-}
+        const ia = slots[a].indexOf(pFromA);
+        const ib = slots[b].indexOf(pFromB);
 
-/** Called by SignalPool's pool-select emit (receives id, not the item object). */
-function onPoolSelect(id) {
-    onPoolClick(pool.value.find(p => p.id === id) ?? { id });
-}
+        slots[a][ia] = pFromB;
+        slots[b][ib] = pFromA;
+        pkts[pFromA].currentField = b;
+        pkts[pFromB].currentField = a;
 
-function onSlotClick(fi, si) {
-    if (solvedFrags.value[fi]) return;
+        bleedCounts[a]++;
+        bleedCounts[b]++;
+        placed += 2;
+    }
 
-    if (selectedPoolId.value !== null) {
-        const poolItem = pool.value.find(p => p.id === selectedPoolId.value);
-        if (!poolItem) return;
+    // Handle odd bleed count: move one more packet into the open slot field
+    if (placed < target) {
+        for (const src of shuffle([...selected])) {
+            if (src === openField) continue;
+            if (bleedCounts[src] >= 2 || bleedCounts[openField] >= 2) continue;
 
-        const existing = slots.value[fi][si];
-        if (existing) {
-            const oldItem = pool.value.find(p => p.id === existing.poolId);
-            if (oldItem) oldItem.usedBy = null;
+            const pId    = slots[src].find(id => id && pkts[id].homeField === src);
+            const nullIdx = slots[openField].indexOf(null);
+            const srcIdx  = pId ? slots[src].indexOf(pId) : -1;
+            if (!pId || nullIdx === -1 || srcIdx === -1) continue;
+
+            slots[openField][nullIdx] = pId;
+            slots[src][srcIdx] = null;
+            pkts[pId].currentField = openField;
+            openSlotFieldId.value = src;
+            bleedCounts[openField]++;
+            placed++;
+            break;
         }
+    }
 
-        if (poolItem.usedBy !== null) {
-            const prevFi = poolItem.usedBy;
-            const prevSi = slots.value[prevFi].findIndex(s => s?.poolId === poolItem.id);
-            if (prevSi !== -1) {
-                slots.value[prevFi][prevSi] = null;
-                if (validationStates.value[prevFi]) validationStates.value[prevFi][prevSi] = null;
-            }
+    packetDefs.value = pkts;
+    fieldSlots.value  = slots;
+
+    initIoValues();
+}
+
+// ── I/O display values ─────────────────────────────────────────────────────────
+
+function initIoValues() {
+    const v = {};
+    activeFieldIds.value.forEach(fid => {
+        if (fieldHasBleed(fid)) {
+            v[fid] = { out: 14 + Math.random() * 4, in: 8 + Math.random() * 3 };
+        } else {
+            v[fid] = { out: 10 + Math.random() * 3, in: 11 + Math.random() * 4 };
         }
+    });
+    ioValues.value = v;
+}
 
-        poolItem.usedBy      = fi;
-        slots.value[fi][si]  = { poolId: poolItem.id, letter: poolItem.letter };
-        if (validationStates.value[fi]) validationStates.value[fi][si] = null;
-        selectedPoolId.value = null;
+function updateIoForField(fieldId) {
+    const hasBleed = fieldHasBleed(fieldId);
+    const cur = ioValues.value[fieldId];
+    if (!cur) return;
+    if (hasBleed && cur.in >= cur.out) {
+        ioValues.value = { ...ioValues.value, [fieldId]: { out: 14 + Math.random() * 4, in: 8 + Math.random() * 3 } };
+    } else if (!hasBleed && cur.out > cur.in) {
+        ioValues.value = { ...ioValues.value, [fieldId]: { out: 10 + Math.random() * 3, in: 11 + Math.random() * 4 } };
+    }
+}
 
+function fluctuateIo() {
+    if (gameResult.value) return;
+    const updated = {};
+    activeFieldIds.value.forEach(fid => {
+        const v = ioValues.value[fid];
+        if (!v) return;
+        const delta = (Math.random() - 0.5) * 0.5;
+        let newOut = Math.max(0.5, v.out + delta);
+        let newIn  = Math.max(0.5, v.in  + delta * 0.7);
+        // Environment noise can corrupt readings
+        const corrupt = environment.value > 50 && Math.random() < 0.12;
+        updated[fid] = { out: corrupt ? -1 : newOut, in: newIn };
+    });
+    ioValues.value = { ...ioValues.value, ...updated };
+}
+
+function ioOut(fid) {
+    const v = ioValues.value[fid];
+    if (!v) return '--.-- TH/s';
+    if (v.out < 0) return '??.?? TH/s';
+    return v.out.toFixed(1) + ' TH/s';
+}
+
+function ioIn(fid) {
+    const v = ioValues.value[fid];
+    if (!v) return '--.-- TH/s';
+    return v.in.toFixed(1) + ' TH/s';
+}
+
+function ioOutClass(fid) {
+    const v = ioValues.value[fid];
+    if (!v) return '';
+    if (v.out < 0) return 'ts-io--corrupt';
+    return v.out > v.in ? 'ts-io--red' : 'ts-io--green';
+}
+
+function ioInClass(fid) {
+    const v = ioValues.value[fid];
+    if (!v) return '';
+    return v.out > v.in ? 'ts-io--yellow' : 'ts-io--green';
+}
+
+// ── Noise helpers ──────────────────────────────────────────────────────────────
+
+function corruptedName(name) {
+    if (environment.value < 20 || !flickerLabel.value) return name;
+    const chance = Math.min(0.5, (environment.value - 20) / 80 * 0.5);
+    const seed = corruptSeed.value;
+    return name.split('').map((c, i) => {
+        if (c === '_') return c;
+        const h = ((seed * 31 + i * 17) % 100) / 100;
+        if (h < chance) return NOISE_CHARS[(seed + i) % NOISE_CHARS.length];
+        return c;
+    }).join('');
+}
+
+const phantomEntries = computed(() => {
+    if (!flickerPhantom.value || !scannedFieldId.value || rig.value < 25) return [];
+    const count = Math.min(3, Math.floor(rig.value / 25));
+    const def   = FIELD_DEFS[scannedFieldId.value];
+    if (!def) return [];
+    const seed = corruptSeed.value;
+    return def.packets.slice(0, count).map((name, pi) =>
+        name.split('').map((c, i) => {
+            if (c === '_') return c;
+            return ((seed + pi * 7 + i * 3) % 4 === 0)
+                ? NOISE_CHARS[(seed + i) % NOISE_CHARS.length]
+                : c;
+        }).join('')
+    );
+});
+
+// ── Computed — packet display ──────────────────────────────────────────────────
+
+const displayPackets = computed(() => {
+    if (!scannedFieldId.value) return [];
+    return (fieldSlots.value[scannedFieldId.value] ?? [])
+        .filter(id => id !== null)
+        .map(id => {
+            const p = packetDefs.value[id];
+            if (!p) return null;
+            return {
+                id:          p.id,
+                name:        p.name,
+                displayName: corruptedName(p.name),
+                homeField:   p.homeField,
+                affinity:    p.affinity,
+                isBleed:     p.homeField !== scannedFieldId.value,
+                isHome:      p.homeField === scannedFieldId.value,
+            };
+        })
+        .filter(Boolean);
+});
+
+const expectedPackets = computed(() => {
+    if (!scannedFieldId.value) return [];
+    return Object.values(packetDefs.value)
+        .filter(p => p.homeField === scannedFieldId.value)
+        .map(p => p.name);
+});
+
+function isPacketHome(name, fieldId) {
+    return Object.values(packetDefs.value).some(
+        p => p.name === name && p.homeField === fieldId && p.currentField === fieldId
+    );
+}
+
+// ── Computed — SPLICE dropdowns ────────────────────────────────────────────────
+
+const spliceSourcePackets = computed(() => {
+    if (!spliceFieldId.value) return [];
+    return (fieldSlots.value[spliceFieldId.value] ?? [])
+        .filter(id => id !== null)
+        .map(id => packetDefs.value[id])
+        .filter(Boolean);
+});
+
+const spliceDestFields = computed(() => {
+    if (!splicePacketId.value) return [];
+    const pkt = packetDefs.value[splicePacketId.value];
+    if (!pkt) return [];
+    const connected = fieldConnections.value[pkt.currentField] ?? [];
+    return connected.filter(fid => hasEmptySlot(fid));
+});
+
+const spliceDestEmptySlots = computed(() => {
+    if (!spliceDestFieldId.value) return [];
+    const slots = fieldSlots.value[spliceDestFieldId.value] ?? [];
+    return slots.map((s, i) => i).filter(i => slots[i] === null);
+});
+
+const canSplice = computed(() =>
+    !!spliceFieldId.value &&
+    !!splicePacketId.value &&
+    !!spliceDestFieldId.value &&
+    spliceDestSlot.value !== ''
+);
+
+const canDischarge = computed(() => dischargeCooldown.value === 0 && !gameResult.value);
+
+const canPurge = computed(() => {
+    const pkts = Object.values(packetDefs.value);
+    return pkts.length > 0 && pkts.every(p => p.currentField === p.homeField);
+});
+
+// ── CSS state classes ──────────────────────────────────────────────────────────
+
+const niClass = computed(() => {
+    if (nodeIntegrity.value >= 90) return 'ts-val--crit';
+    if (nodeIntegrity.value >= 60) return 'ts-val--warn';
+    return '';
+});
+
+const rigClass = computed(() => {
+    if (rig.value >= 80) return 'ts-val--crit';
+    if (rig.value >= 55) return 'ts-val--warn';
+    return '';
+});
+
+const envClass = computed(() => {
+    if (environment.value >= 80) return 'ts-val--crit';
+    if (environment.value >= 55) return 'ts-val--warn';
+    return '';
+});
+
+// ── Actions ────────────────────────────────────────────────────────────────────
+
+function scanField(fieldId) {
+    scannedFieldId.value = fieldId;
+}
+
+function getActiveAffinity() {
+    if (splicePacketId.value) {
+        return packetDefs.value[splicePacketId.value]?.affinity ?? 'environment';
+    }
+    if (scannedFieldId.value) {
+        return FIELD_DEFS[scannedFieldId.value]?.affinity ?? 'environment';
+    }
+    return 'environment';
+}
+
+function discharge(target) {
+    if (!canDischarge.value) return;
+
+    const activeAff   = getActiveAffinity();
+    const matching    = (target === 'rig' && activeAff === 'rig') ||
+                        (target === 'environment' && activeAff === 'environment');
+    const damage      = matching ? DISCHARGE_DMG_MATCH : DISCHARGE_DMG_WRONG;
+
+    nodeIntegrity.value = Math.max(0, nodeIntegrity.value - DISCHARGE_RELIEF);
+
+    if (target === 'rig') {
+        rig.value = Math.min(100, rig.value + damage);
     } else {
-        const existing = slots.value[fi][si];
-        if (existing) {
-            const poolItem = pool.value.find(p => p.id === existing.poolId);
-            if (poolItem) poolItem.usedBy = null;
-            slots.value[fi][si] = null;
-            if (validationStates.value[fi]) validationStates.value[fi][si] = null;
-        }
+        environment.value = Math.min(100, environment.value + damage);
+    }
+
+    dischargeCooldown.value = DISCHARGE_COOLDOWN;
+    checkFailConditions();
+}
+
+function soak() { discharge('rig'); }
+function vent()  { discharge('environment'); }
+
+function onSrcFieldChange() {
+    splicePacketId.value    = '';
+    spliceDestFieldId.value = '';
+    spliceDestSlot.value    = '';
+}
+
+function onSrcPacketChange() {
+    spliceDestFieldId.value = '';
+    spliceDestSlot.value    = '';
+}
+
+function onDestFieldChange() {
+    spliceDestSlot.value = '';
+}
+
+function executeSplice() {
+    if (!canSplice.value || gameResult.value) return;
+
+    const pkt    = packetDefs.value[splicePacketId.value];
+    if (!pkt) return;
+
+    const srcSlots = fieldSlots.value[spliceFieldId.value];
+    const dstSlots = fieldSlots.value[spliceDestFieldId.value];
+    const dstIdx   = Number(spliceDestSlot.value);
+
+    const srcIdx = srcSlots.indexOf(splicePacketId.value);
+    if (srcIdx === -1 || dstSlots[dstIdx] !== null) return;
+
+    srcSlots[srcIdx]   = null;
+    dstSlots[dstIdx]   = splicePacketId.value;
+    pkt.currentField   = spliceDestFieldId.value;
+
+    updateIoForField(spliceFieldId.value);
+    updateIoForField(spliceDestFieldId.value);
+
+    // Reset SPLICE UI
+    spliceFieldId.value     = '';
+    splicePacketId.value    = '';
+    spliceDestFieldId.value = '';
+    spliceDestSlot.value    = '';
+}
+
+function purge() {
+    if (!canPurge.value || gameResult.value) return;
+    endGame('success', '');
+}
+
+// ── Win / fail ─────────────────────────────────────────────────────────────────
+
+function checkFailConditions() {
+    if (gameResult.value) return;
+    if (nodeIntegrity.value >= 100) {
+        endGame('fail', '[CRITICAL NODE FAILURE] — Node integrity threshold exceeded.');
+    } else if (rig.value >= 100) {
+        endGame('fail', '[RIG COLLAPSE] — Rig absorption capacity exhausted.');
+    } else if (environment.value >= 100) {
+        endGame('fail', '[ENVIRONMENT COLLAPSE] — Splice Frequency saturation critical.');
     }
 }
 
-// ── Inject ─────────────────────────────────────────────────────────────────────
-
-function inject(fi) {
-    if (solvedFrags.value[fi] || !canInject(fi)) return;
-
-    const attempt = slots.value[fi].map(s => s?.letter ?? '').join('');
-    if (attempt === fragments.value[fi].word) {
-        solvedFrags.value[fi] = true;
-        showCorrect.value = fi;
-        setTimeout(() => { showCorrect.value = null; }, 1400);
-
-        const solved = solvedFrags.value.filter(Boolean).length;
-        primaryProgress.value = solved / fragments.value.length;
-
-        if (solvedFrags.value.every(Boolean)) {
-            primaryProgress.value = 1;
-            setTimeout(() => {
-                endGame('success');
-                setTimeout(() => emit('complete'), 2200);
-            }, 800);
-        }
+function endGame(result, reason) {
+    if (gameResult.value) return;
+    gameResult.value = result;
+    failReason.value = reason ?? '';
+    clearAllIntervals();
+    if (result === 'success') {
+        setTimeout(() => emit('complete'), 2200);
     } else {
-        traceLevel.value = Math.min(1, traceLevel.value + cfg.traceDmg);
-        applyHit(cfg.stabDmg);
-        showWrong.value = true;
-        setTimeout(() => { showWrong.value = false; }, 1400);
-
-        if (traceLevel.value >= 1 || stability.value <= 0) {
-            const reason = traceLevel.value >= 1
-                ? '[ICE LOCK] — Trace resolved. Location compromised.'
-                : '[SYSTEM COLLAPSE] — Stability exhausted.';
-            endGame('fail', reason);
-            setTimeout(() => emit('fail'), 2200);
-        }
-    }
-}
-
-// ── Validate ───────────────────────────────────────────────────────────────────
-
-/**
- * Wordle-style positional feedback for one fragment.
- * Each filled slot gets: 'correct' | 'present' | 'absent'.
- * Empty slots stay null.
- * Flat stability cost regardless of how many slots are filled —
- * incentivises filling all slots before validating.
- */
-function validateFragment(fi) {
-    if (solvedFrags.value[fi] || result.value) return;
-
-    const word    = fragments.value[fi].word;
-    const slotArr = slots.value[fi];
-
-    validationStates.value[fi] = slotArr.map((slot, si) => {
-        if (!slot) return null;
-        if (slot.letter === word[si]) return 'correct';
-        if (word.includes(slot.letter)) return 'present';
-        return 'absent';
-    });
-
-    applyHit(0.05);
-
-    if (stability.value <= 0) {
-        endGame('fail', '[SYSTEM COLLAPSE] — Stability exhausted.');
         setTimeout(() => emit('fail'), 2200);
     }
 }
 
-// ── Scan / investigate ─────────────────────────────────────────────────────────
+// ── Tick system ────────────────────────────────────────────────────────────────
 
-function openScan(fi) {
-    scanOpen.value     = fi;
-    openFileIdx.value  = null;
-    unlockedIdxs.value = new Set();
-}
-
-function openFile(fileIdx) {
-    if (scanOpen.value === null) return;
-    const file = fragments.value[scanOpen.value].archive[fileIdx];
-
-    if (file.locked && !isUnlocked(fileIdx)) {
-        applyHit(cfg.lockCost);
-        unlockedIdxs.value.add(fileIdx);
-        if (stability.value <= 0) {
-            endGame('fail', '[SYSTEM COLLAPSE] — Stability exhausted during decryption.');
-            setTimeout(() => emit('fail'), 2200);
-        }
+function getTickRate() {
+    const ni = nodeIntegrity.value;
+    for (const { threshold, rate } of TICK_RATES) {
+        if (ni >= threshold) return rate;
     }
-
-    openFileIdx.value = fileIdx;
+    return 1.0;
 }
 
-// ── Ping / command ─────────────────────────────────────────────────────────────
+const _intervals = [];
 
-/**
- * Activate the noise-reveal ping.
- * - Reveals all noise tiles for 1.5 s.
- * - Spikes the active trace (generates "heat").
- * - Enters a 20 s recharge cooldown before the command is usable again.
- */
-function pingNoise() {
-    if (!canPing.value || result.value) return;
+function startAllIntervals() {
+    // Node integrity climbs every 3s
+    _intervals.push(setInterval(() => {
+        if (gameResult.value) return;
+        nodeIntegrity.value = Math.min(100, nodeIntegrity.value + getTickRate());
+        checkFailConditions();
+    }, TICK_INTERVAL_MS));
 
-    // Trace spike — pinging generates ICE heat
-    traceLevel.value = Math.min(1, traceLevel.value + 0.12);
-
-    // Reveal noise tiles
-    pingActive.value = true;
-    clearTimeout(pingTimer);
-    pingTimer = setTimeout(() => { pingActive.value = false; }, 4000);
-
-    // Start 20 s cooldown
-    canPing.value      = false;
-    pingCooldown.value = 20;
-    clearInterval(pingCooldownInterval);
-    pingCooldownInterval = setInterval(() => {
-        pingCooldown.value--;
-        if (pingCooldown.value <= 0) {
-            clearInterval(pingCooldownInterval);
-            pingCooldown.value = 0;
-            canPing.value      = true;
+    // Timer countdown — 1s
+    _intervals.push(setInterval(() => {
+        if (gameResult.value) return;
+        timeLeft.value = Math.max(0, timeLeft.value - 1);
+        if (timeLeft.value <= 0) {
+            endGame('fail', '[TIMER EXPIRED] — Node integrity could not be restored in time.');
         }
-    }, 1000);
+    }, 1000));
+
+    // Discharge cooldown — 1s
+    _intervals.push(setInterval(() => {
+        if (dischargeCooldown.value > 0) {
+            dischargeCooldown.value = Math.max(0, dischargeCooldown.value - 1);
+        }
+    }, 1000));
+
+    // I/O fluctuation — 500ms
+    _intervals.push(setInterval(fluctuateIo, 500));
+
+    // Noise flicker — 700ms
+    _intervals.push(setInterval(() => {
+        if (rig.value >= 25) flickerPhantom.value = !flickerPhantom.value;
+        if (environment.value >= 20) {
+            flickerLabel.value = !flickerLabel.value;
+            corruptSeed.value++;
+        }
+    }, 700));
 }
 
-/**
- * Lock a noise tile as confirmed noise.
- * Only callable during an active ping (when noise tiles are glowing).
- * Consumes one mark from the budget — marks are permanent for the run.
- */
-function onNoiseMark(id) {
-    if (!pingActive.value) return;
-    if (markedNoiseIds.has(id)) return;
-    if (noiseMarkBudget.value <= 0) return;
-    markedNoiseIds.add(id);
-    noiseMarkBudget.value--;
+function clearAllIntervals() {
+    _intervals.forEach(clearInterval);
+    _intervals.length = 0;
 }
+
+// ── Chrome ─────────────────────────────────────────────────────────────────────
+
+const chrome = computed(() => ({
+    skin:            props.skin,
+    timeLeft:        timeLeft.value,
+    primaryProgress: 0,
+    stability:       1,
+    stabilityClass:  '',
+    timerClass:      timeLeft.value < 30 ? 'timer--critical' : timeLeft.value < 60 ? 'timer--warn' : '',
+    glitchActive:    (rig.value > 55 || environment.value > 55) && !gameResult.value,
+    glitchType:      rig.value > 70 ? 'static,bars' : 'scan',
+    glitchIntensity: Math.max(rig.value, environment.value) / 300,
+    result:          gameResult.value,
+    failReason:      failReason.value,
+    hideBars:        true,
+}));
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(() => {
     buildPuzzle();
-    rafHandle = requestAnimationFrame(gameLoop);
+    startAllIntervals();
 });
 
 onUnmounted(() => {
-    cancelAnimationFrame(rafHandle);
-    clearTimeout(pingTimer);
-    clearInterval(pingCooldownInterval);
+    clearAllIntervals();
 });
 </script>
 
 <style scoped>
-/* ═══════════════════════════════════════════════════════════════════════════
-   Canvas — fixed 1920 × 1080, CSS Grid
-   Columns : 350px | 1fr | 400px
-   Rows    : 1fr   | 220px
-════════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════════
+   Canvas — CSS Grid: top bar | middle row | bottom bar
+══════════════════════════════════════════════════════════════════════════════ */
 
 .ts-canvas {
-    /* Width fixed at 1920px (scrolls horizontally if viewport is narrower).
-       Height fills qmc-game-area so the pool row is never clipped. */
-    width:  1920px;
+    width: 1920px;
     height: 100%;
-
     display: grid;
-    grid-template-columns: 350px 1fr 400px;
-    grid-template-rows: 1fr 220px;
-
+    grid-template-rows: 64px 1fr 180px;
     font-family: 'JetBrains Mono', monospace;
     background: #04090e;
     color: #00c8f0;
     overflow: hidden;
+}
+
+/* ── Top bar ──────────────────────────────────────────────────────────────── */
+
+.ts-top {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding: 0 24px;
+    background: rgba(0,0,0,0.5);
+    border-bottom: 1px solid rgba(0,200,240,0.15);
+}
+
+.ts-meter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.ts-meter-lbl {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: rgba(0,200,240,0.5);
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: 140px;
+}
+
+.ts-meter-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(0,200,240,0.08);
+    border: 1px solid rgba(0,200,240,0.15);
     position: relative;
+    overflow: visible;
 }
 
-/* ── Grid overlay ─────────────────────────────────────────────────────────── */
+.ts-meter-fill {
+    height: 100%;
+    transition: width 0.4s ease;
+}
 
-.ts-grid-bg {
+.ts-fill--ni  { background: rgba(0,200,240,0.7); }
+.ts-fill--rig { background: rgba(251,146,60,0.7); }
+.ts-fill--env { background: rgba(163,230,53,0.7); }
+
+.ts-thresh-mark {
     position: absolute;
-    inset: 0;
+    top: -3px;
+    bottom: -3px;
+    width: 1px;
+    background: rgba(255,255,255,0.2);
     pointer-events: none;
-    z-index: 0;
-    background-image:
-        linear-gradient(rgba(34,211,238,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(34,211,238,0.04) 1px, transparent 1px);
-    background-size: 32px 32px;
 }
 
-/* ── Scanline CRT overlay ─────────────────────────────────────────────────── */
-
-.ts-canvas::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 100;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0,0,0,0.09) 3px,
-        rgba(0,0,0,0.09) 4px
-    );
+.ts-meter-val {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    min-width: 38px;
+    text-align: right;
+    color: rgba(0,200,240,0.8);
 }
 
-/* ── Cells — base ─────────────────────────────────────────────────────────── */
+.ts-val--warn { color: #ffaa00 !important; }
+.ts-val--crit { color: #ff3333 !important; animation: ts-blink 0.6s step-start infinite; }
 
-.ts-cell {
-    position: relative;
-    z-index: 1;
-    /*
-     * min-height: 0 is critical.
-     * Grid items default to min-height: auto (= content size).
-     * Without this, a tall cell expands its row track beyond the
-     * allocated 1fr, pushing the pool row off the canvas.
-     */
-    min-height: 0;
-    min-width: 0;
+/* ── Middle row ───────────────────────────────────────────────────────────── */
+
+.ts-middle {
+    display: grid;
+    grid-template-columns: 340px 1fr 360px;
     overflow: hidden;
-    border: 1px solid rgba(251,146,60,0.25);
-    box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
-    padding: 16px;
+}
+
+/* ── Bottom bar ───────────────────────────────────────────────────────────── */
+
+.ts-bottom {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    border-top: 1px solid rgba(0,200,240,0.12);
+}
+
+/* ── Shared panel ─────────────────────────────────────────────────────────── */
+
+.ts-panel {
+    border: 1px solid rgba(251,146,60,0.2);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    overflow: hidden;
+    min-height: 0;
 }
 
-/* ── Cell placement ───────────────────────────────────────────────────────── */
-
-.ts-cell--scan   { grid-column: 1;      grid-row: 1; overflow-y: auto; }
-.ts-cell--frags  { grid-column: 2;      grid-row: 1; }
-.ts-cell--status { grid-column: 3;      grid-row: 1; overflow-y: auto; }
-.ts-cell--pool   { grid-column: 1 / -1; grid-row: 2; }
-
-/* Scan cell — ScanPanel + SystemNoise stack vertically */
-.ts-cell--scan-layout {
-    flex-direction: column;
-    gap: 0;
-    /* Override overflow-y: auto so internal flex children manage scroll */
-    overflow-y: hidden;
+.ts-ph {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: rgba(0,200,240,0.4);
+    border-bottom: 1px solid rgba(0,200,240,0.08);
+    padding: 6px 12px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.3);
 }
 
-/* Fragment cell — canvas manages its own internal padding */
-.ts-cell--frags-flush {
+/* ── Container 2: Fields panel ────────────────────────────────────────────── */
+
+.ts-fields-panel {
+    overflow-y: auto;
+}
+
+.ts-io-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 6px;
+    padding: 4px 12px;
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    color: rgba(0,200,240,0.3);
+    border-bottom: 1px solid rgba(0,200,240,0.05);
+    flex-shrink: 0;
+}
+
+.ts-io-hdr { text-align: right; }
+
+.ts-fid-col { /* spacer */ }
+
+.ts-field-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 6px;
+    align-items: center;
+    padding: 7px 12px;
+    border-bottom: 1px solid rgba(0,200,240,0.05);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.ts-field-row:hover { background: rgba(0,200,240,0.04); }
+.ts-field-row--active { background: rgba(0,200,240,0.08); border-left: 2px solid rgba(0,200,240,0.5); }
+.ts-field-row--bleed  { border-left: 2px solid rgba(255,51,51,0.6); }
+
+.ts-fid {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #00c8f0;
+}
+
+.ts-io-val {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-align: right;
+    min-width: 80px;
+}
+
+.ts-io-sep {
+    font-size: 9px;
+    color: rgba(0,200,240,0.25);
+    padding: 0 2px;
+}
+
+.ts-io--green  { color: rgba(0,255,100,0.7); }
+.ts-io--yellow { color: rgba(255,200,0,0.7); }
+.ts-io--red    { color: rgba(255,60,60,0.8); }
+.ts-io--corrupt { color: rgba(255,60,60,0.4); letter-spacing: 0.04em; }
+
+/* ── Containers 3 & 4: Packet panels ─────────────────────────────────────── */
+
+.ts-actual-panel,
+.ts-expected-panel {
+    overflow-y: auto;
+}
+
+.ts-pkt-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 14px;
+    border-bottom: 1px solid rgba(0,200,240,0.04);
+    font-size: 10px;
+}
+
+.ts-pkt--bleed    { background: rgba(255,51,51,0.04); }
+.ts-pkt--home     { background: rgba(0,255,100,0.03); }
+.ts-pkt--phantom  { opacity: 0.45; color: rgba(255,51,51,0.6); cursor: default; }
+.ts-pkt--expected { color: rgba(0,200,240,0.6); }
+.ts-pkt--present .ts-pkt-name { color: rgba(0,255,100,0.8); }
+
+.ts-pkt-name {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: #00c8f0;
+}
+
+.ts-pkt-aff {
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+}
+
+.ts-aff--rig { color: rgba(251,146,60,0.8); }
+.ts-aff--environment { color: rgba(163,230,53,0.8); }
+
+.ts-pkt-dest, .ts-pkt-status {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    color: rgba(0,200,240,0.4);
+}
+
+.ts-pkt--home .ts-pkt-dest { color: rgba(0,255,100,0.6); }
+.ts-pkt--present .ts-pkt-status { color: rgba(0,255,100,0.8); }
+
+.ts-empty {
+    padding: 20px 14px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: rgba(0,200,240,0.2);
+}
+
+/* ── Container 5: SPLICE panel ────────────────────────────────────────────── */
+
+.ts-splice-panel {
     padding: 0;
 }
 
-/* ScanPanel slide-in transition */
-.ts-scan-slide-enter-active { transition: opacity 0.22s, transform 0.22s; }
-.ts-scan-slide-leave-active { transition: opacity 0.18s, transform 0.18s; }
-.ts-scan-slide-enter-from,
-.ts-scan-slide-leave-to     { opacity: 0; transform: translateY(-10px); }
-
-/* Pool cell uses flex-col; SignalPool takes flex:1 via its own CSS */
-.ts-cell--pool-layout {
-    flex-direction: column;
-    gap: 0;
-    padding: 10px 16px 10px;
-}
-
-/* ── Pool control strip (ping status + command input) ─────────────────────── */
-
-.ts-pool-ctrl {
+.ts-splice-chain {
     display: flex;
-    align-items: center;
-    gap: 20px;
-    flex-shrink: 0;
-    padding: 6px 8px 8px;
-    margin-bottom: 8px;
-    background: rgba(24,24,27,0.55);
-    border: 1px solid rgba(251,146,60,0.3);
-    box-shadow: 0 0 12px rgba(251,146,60,0.07);
+    align-items: flex-end;
+    gap: 10px;
+    padding: 10px 16px;
+    flex: 1;
+    overflow-x: auto;
 }
 
-.ts-ping-btn {
+.ts-splice-step {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.ts-slbl {
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: rgba(0,200,240,0.4);
+}
+
+.ts-sel {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    padding: 6px 20px;
-    border: 1px solid;
-    background: transparent;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    background: rgba(0,10,20,0.8);
+    border: 1px solid rgba(0,200,240,0.25);
+    color: #00c8f0;
+    padding: 5px 8px;
     cursor: pointer;
-    flex-shrink: 0;
-    transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    min-width: 180px;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
 }
 
-.ts-ping-btn--ready {
-    color: #00ff9d;
-    border-color: rgba(0,255,100,0.45);
-}
-
-.ts-ping-btn--ready:hover {
-    background: rgba(0,255,100,0.08);
-    box-shadow: 0 0 16px rgba(0,255,100,0.25);
-}
-
-.ts-ping-btn--cool {
-    color: rgba(255,170,0,0.35);
-    border-color: rgba(255,170,0,0.15);
+.ts-sel:disabled {
+    opacity: 0.3;
     cursor: not-allowed;
 }
 
-.ts-ping-bracket {
-    color: inherit;
-    opacity: 0.4;
-    font-size: 10px;
+.ts-sel:focus {
+    border-color: rgba(0,200,240,0.6);
 }
 
-.ts-ping-status {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    flex-shrink: 0;
-    transition: color 0.3s;
+.ts-sel option {
+    background: #04090e;
+    color: #00c8f0;
 }
 
-.ts-ping--ready { color: rgba(0,255,100,0.6); }
-.ts-ping--cool  { color: rgba(255,170,0,0.55); animation: ts-ping-blink 0.8s step-start infinite; }
-
-.ts-mark-budget {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    color: rgba(255,136,0,0.6);
-    flex-shrink: 0;
-}
-
-.ts-mark-budget--spent {
-    color: rgba(255,60,60,0.45);
-}
-
-/* ── Cell label (development guide / section header) ─────────────────────── */
-
-.ts-cell-label {
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    color: rgba(0,200,240,0.35);
-    border-bottom: 1px solid rgba(0,200,240,0.08);
+.ts-chain-sep {
+    font-size: 12px;
+    color: rgba(0,200,240,0.3);
     padding-bottom: 8px;
     flex-shrink: 0;
+    letter-spacing: 0.1em;
 }
 
-@keyframes ts-ping-blink {
+.ts-splice-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    background: transparent;
+    border: 1px solid rgba(0,200,240,0.35);
+    color: rgba(0,200,240,0.8);
+    padding: 7px 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-self: flex-end;
+    transition: all 0.15s;
+}
+
+.ts-splice-btn:hover:not(:disabled) {
+    background: rgba(0,200,240,0.08);
+    border-color: rgba(0,200,240,0.7);
+    color: #00c8f0;
+}
+
+.ts-splice-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+/* ── Container 6: Action buttons ──────────────────────────────────────────── */
+
+.ts-action-panel {
+    border-left: 1px solid rgba(0,200,240,0.1);
+}
+
+.ts-action-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex: 1;
+    padding: 10px 12px;
+    gap: 10px;
+}
+
+.ts-act-btn {
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid;
+    background: transparent;
+    cursor: pointer;
+    padding: 8px 12px;
+    transition: all 0.15s;
+    position: relative;
+}
+
+.ts-abl {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+}
+
+.ts-asub {
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    opacity: 0.6;
+}
+
+.ts-asub--ready { color: #00ff64; opacity: 1; }
+
+.ts-cool {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+}
+
+/* SOAK */
+.ts-btn--soak {
+    color: rgba(251,146,60,0.85);
+    border-color: rgba(251,146,60,0.35);
+}
+.ts-btn--soak:hover:not(:disabled) {
+    background: rgba(251,146,60,0.08);
+    border-color: rgba(251,146,60,0.7);
+}
+
+/* VENT */
+.ts-btn--vent {
+    color: rgba(163,230,53,0.85);
+    border-color: rgba(163,230,53,0.35);
+}
+.ts-btn--vent:hover:not(:disabled) {
+    background: rgba(163,230,53,0.08);
+    border-color: rgba(163,230,53,0.7);
+}
+
+/* PURGE */
+.ts-btn--purge {
+    color: rgba(0,200,240,0.6);
+    border-color: rgba(0,200,240,0.2);
+}
+.ts-btn--purge:not(:disabled) {
+    color: #00ff64;
+    border-color: rgba(0,255,100,0.5);
+    animation: ts-purge-pulse 1.2s ease-in-out infinite;
+}
+.ts-btn--purge:hover:not(:disabled) {
+    background: rgba(0,255,100,0.08);
+}
+
+.ts-act-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes ts-blink {
     0%, 49% { opacity: 1; }
-    50%, 100% { opacity: 0.35; }
+    50%, 100% { opacity: 0.3; }
+}
+
+@keyframes ts-purge-pulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(0,255,100,0); }
+    50%       { box-shadow: 0 0 16px rgba(0,255,100,0.3); }
 }
 </style>
