@@ -55,8 +55,8 @@
                     </div>
                     <div v-for="fid in activeFieldIds" :key="fid"
                          class="ts-field-row"
-                         :class="{ 'ts-field-row--active': scannedFieldId === fid, 'ts-field-row--bleed': fieldHasBleed(fid) }"
-                         @click="scanField(fid)">
+                         :class="{ 'ts-field-row--active': expandedFields.has(fid), 'ts-field-row--bleed': fieldHasBleed(fid) }"
+                         @click="toggleField(fid)">
                         <span class="ts-fid">{{ fid }}</span>
                         <span class="ts-io-val" :class="ioOutClass(fid)">{{ ioOut(fid) }}</span>
                         <span class="ts-io-sep">|</span>
@@ -64,52 +64,71 @@
                     </div>
                 </div>
 
-                <!-- Container 3 — Actual field contents (scan result) -->
-                <div class="ts-panel ts-actual-panel">
-                    <div class="ts-ph">
-                        {{ scannedFieldId ? 'SCAN :: ' + scannedFieldId : 'SELECT FIELD TO SCAN' }}
-                    </div>
-                    <template v-if="scannedFieldId">
-                        <div v-for="entry in displayPackets" :key="entry.id"
-                             class="ts-pkt-row"
-                             :class="{ 'ts-pkt--bleed': entry.isBleed, 'ts-pkt--home': entry.isHome }">
-                            <span class="ts-pkt-name">{{ entry.displayName }}</span>
-                            <span class="ts-pkt-aff" :class="'ts-aff--' + entry.affinity">
-                                {{ entry.affinity === 'rig' ? '◈ RIG' : '◈ ENV' }}
-                            </span>
-                            <span class="ts-pkt-dest">
-                                {{ entry.isHome ? '✓ HOME' : '⟶ ' + entry.homeField }}
-                            </span>
-                        </div>
-                        <!-- Rig noise — phantom entries -->
-                        <template v-if="flickerPhantom && phantomEntries.length">
-                            <div v-for="(ph, i) in phantomEntries" :key="'ph' + i"
-                                 class="ts-pkt-row ts-pkt--phantom">
-                                <span class="ts-pkt-name">{{ ph }}</span>
-                                <span class="ts-pkt-aff">◈ ???</span>
-                                <span class="ts-pkt-dest">⟶ [UNKNOWN]</span>
+                <!-- Container 3 — File explorer -->
+                <div class="ts-panel ts-explorer-panel">
+                    <div class="ts-ph">DATA_FIELDS :: FILE EXPLORER</div>
+                    <div class="ts-explorer">
+                        <div class="ts-root-path">/splice/sys/node_{{ iceLevel }}/</div>
+                        <div v-for="fid in activeFieldIds" :key="fid" class="ts-folder-group">
+
+                            <!-- Folder row -->
+                            <div class="ts-folder-row"
+                                 :class="{ 'ts-folder--open': expandedFields.has(fid), 'ts-folder--bleed': fieldHasBleed(fid) }"
+                                 @click="toggleField(fid)">
+                                <span class="ts-fold-arrow">{{ expandedFields.has(fid) ? '▼' : '▶' }}</span>
+                                <span class="ts-fold-icon">{{ expandedFields.has(fid) ? '📂' : '📁' }}</span>
+                                <span class="ts-fold-name">{{ fid }}/</span>
+                                <span v-if="fieldHasBleed(fid)" class="ts-fold-warn">⚠ DATA BLEED</span>
                             </div>
-                        </template>
-                    </template>
-                    <div v-else class="ts-empty">// NO FIELD SELECTED</div>
+
+                            <!-- File rows -->
+                            <template v-if="expandedFields.has(fid)">
+                                <div v-for="entry in getFieldPackets(fid)" :key="entry.id"
+                                     class="ts-file-row"
+                                     :class="{ 'ts-file--bleed': entry.isBleed, 'ts-file--home': entry.isHome }">
+                                    <span class="ts-file-tree">{{ '│  ' }}</span>
+                                    <span class="ts-file-flag">{{ entry.isBleed ? '[!]' : '   ' }}</span>
+                                    <span class="ts-file-name">{{ entry.displayName }}.dat</span>
+                                    <span class="ts-file-aff" :class="'ts-aff--' + entry.affinity">
+                                        {{ entry.affinity === 'rig' ? '◈ RIG' : '◈ ENV' }}
+                                    </span>
+                                    <span class="ts-file-status">
+                                        {{ entry.isHome ? '✓ HOME' : '⟶ ' + entry.homeField }}
+                                    </span>
+                                </div>
+                                <!-- Rig noise — phantom files -->
+                                <template v-if="flickerPhantom && fid === focusedFieldId && phantomEntries.length">
+                                    <div v-for="(ph, i) in phantomEntries" :key="'ph' + i"
+                                         class="ts-file-row ts-file--phantom">
+                                        <span class="ts-file-tree">│  </span>
+                                        <span class="ts-file-flag">[?]</span>
+                                        <span class="ts-file-name">{{ ph }}.dat</span>
+                                        <span class="ts-file-aff">◈ ???</span>
+                                        <span class="ts-file-status">⟶ [UNKNOWN]</span>
+                                    </div>
+                                </template>
+                            </template>
+
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Container 4 — Expected field contents -->
                 <div class="ts-panel ts-expected-panel">
                     <div class="ts-ph">
-                        {{ scannedFieldId ? 'EXPECTED :: ' + scannedFieldId : 'FIELD SPECIFICATION' }}
+                        {{ focusedFieldId ? 'EXPECTED :: ' + focusedFieldId : 'FIELD SPECIFICATION' }}
                     </div>
-                    <template v-if="scannedFieldId">
+                    <template v-if="focusedFieldId">
                         <div v-for="name in expectedPackets" :key="name"
                              class="ts-pkt-row ts-pkt--expected"
-                             :class="{ 'ts-pkt--present': isPacketHome(name, scannedFieldId) }">
+                             :class="{ 'ts-pkt--present': isPacketHome(name, focusedFieldId) }">
                             <span class="ts-pkt-name">{{ name }}</span>
                             <span class="ts-pkt-status">
-                                {{ isPacketHome(name, scannedFieldId) ? '✓' : '✗' }}
+                                {{ isPacketHome(name, focusedFieldId) ? '✓' : '✗' }}
                             </span>
                         </div>
                     </template>
-                    <div v-else class="ts-empty">// SELECT FIELD TO VIEW SPECIFICATION</div>
+                    <div v-else class="ts-empty">// OPEN A FOLDER TO VIEW SPECIFICATION</div>
                 </div>
 
             </div>
@@ -315,7 +334,8 @@ const openSlotFieldId  = ref('');
 
 // ── UI state ───────────────────────────────────────────────────────────────────
 
-const scannedFieldId    = ref(null);
+const expandedFields    = ref(new Set());  // fieldIds open in the explorer
+const focusedFieldId    = ref(null);       // drives right panel expected contents
 const spliceFieldId     = ref('');
 const splicePacketId    = ref('');
 const spliceDestFieldId = ref('');
@@ -548,9 +568,9 @@ function corruptedName(name) {
 }
 
 const phantomEntries = computed(() => {
-    if (!flickerPhantom.value || !scannedFieldId.value || rig.value < 25) return [];
+    if (!flickerPhantom.value || !focusedFieldId.value || rig.value < 25) return [];
     const count = Math.min(3, Math.floor(rig.value / 25));
-    const def   = FIELD_DEFS[scannedFieldId.value];
+    const def   = FIELD_DEFS[focusedFieldId.value];
     if (!def) return [];
     const seed = corruptSeed.value;
     return def.packets.slice(0, count).map((name, pi) =>
@@ -565,9 +585,8 @@ const phantomEntries = computed(() => {
 
 // ── Computed — packet display ──────────────────────────────────────────────────
 
-const displayPackets = computed(() => {
-    if (!scannedFieldId.value) return [];
-    return (fieldSlots.value[scannedFieldId.value] ?? [])
+function getFieldPackets(fieldId) {
+    return (fieldSlots.value[fieldId] ?? [])
         .filter(id => id !== null)
         .map(id => {
             const p = packetDefs.value[id];
@@ -578,17 +597,17 @@ const displayPackets = computed(() => {
                 displayName: corruptedName(p.name),
                 homeField:   p.homeField,
                 affinity:    p.affinity,
-                isBleed:     p.homeField !== scannedFieldId.value,
-                isHome:      p.homeField === scannedFieldId.value,
+                isBleed:     p.homeField !== fieldId,
+                isHome:      p.homeField === fieldId,
             };
         })
         .filter(Boolean);
-});
+}
 
 const expectedPackets = computed(() => {
-    if (!scannedFieldId.value) return [];
+    if (!focusedFieldId.value) return [];
     return Object.values(packetDefs.value)
-        .filter(p => p.homeField === scannedFieldId.value)
+        .filter(p => p.homeField === focusedFieldId.value)
         .map(p => p.name);
 });
 
@@ -658,16 +677,23 @@ const envClass = computed(() => {
 
 // ── Actions ────────────────────────────────────────────────────────────────────
 
-function scanField(fieldId) {
-    scannedFieldId.value = fieldId;
+function toggleField(fieldId) {
+    const next = new Set(expandedFields.value);
+    if (next.has(fieldId)) {
+        next.delete(fieldId);
+    } else {
+        next.add(fieldId);
+        focusedFieldId.value = fieldId;
+    }
+    expandedFields.value = next;
 }
 
 function getActiveAffinity() {
     if (splicePacketId.value) {
         return packetDefs.value[splicePacketId.value]?.affinity ?? 'environment';
     }
-    if (scannedFieldId.value) {
-        return FIELD_DEFS[scannedFieldId.value]?.affinity ?? 'environment';
+    if (focusedFieldId.value) {
+        return FIELD_DEFS[focusedFieldId.value]?.affinity ?? 'environment';
     }
     return 'environment';
 }
@@ -1029,16 +1055,93 @@ onUnmounted(() => {
 .ts-io--red    { color: rgba(255,60,60,0.8); }
 .ts-io--corrupt { color: rgba(255,60,60,0.4); letter-spacing: 0.04em; }
 
-/* ── Containers 3 & 4: Packet panels ─────────────────────────────────────── */
+/* ── Container 3: File explorer ───────────────────────────────────────────── */
 
-.ts-actual-panel,
-.ts-expected-panel {
-    overflow-y: auto;
+.ts-explorer-panel { overflow-y: auto; }
+
+.ts-explorer {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
 }
+
+.ts-root-path {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: rgba(0,200,240,0.3);
+    padding: 4px 14px 8px;
+    border-bottom: 1px solid rgba(0,200,240,0.06);
+    margin-bottom: 4px;
+}
+
+.ts-folder-group { display: flex; flex-direction: column; }
+
+.ts-folder-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-left: 2px solid transparent;
+}
+.ts-folder-row:hover { background: rgba(0,200,240,0.04); }
+.ts-folder--open  { background: rgba(0,200,240,0.06); border-left-color: rgba(0,200,240,0.4); }
+.ts-folder--bleed { border-left-color: rgba(255,51,51,0.6); }
+.ts-folder--open.ts-folder--bleed { border-left-color: rgba(255,51,51,0.8); }
+
+.ts-fold-arrow { font-size: 8px; color: rgba(0,200,240,0.4); width: 10px; flex-shrink: 0; }
+.ts-fold-icon  { font-size: 11px; flex-shrink: 0; }
+.ts-fold-name  { font-size: 10px; letter-spacing: 0.1em; color: #00c8f0; flex: 1; }
+.ts-fold-warn  { font-size: 8px; letter-spacing: 0.1em; color: rgba(255,80,80,0.8); flex-shrink: 0; }
+
+.ts-file-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px;
+    border-bottom: 1px solid rgba(0,200,240,0.03);
+    transition: background 0.1s;
+}
+.ts-file--bleed   { background: rgba(255,51,51,0.03); }
+.ts-file--home    { background: rgba(0,255,100,0.02); }
+.ts-file--phantom { opacity: 0.4; cursor: default; }
+
+.ts-file-tree  { font-size: 10px; color: rgba(0,200,240,0.2); flex-shrink: 0; font-family: monospace; }
+.ts-file-flag  { font-size: 9px; color: rgba(255,80,80,0.8); width: 28px; flex-shrink: 0; letter-spacing: 0; }
+.ts-file-name  { font-size: 10px; letter-spacing: 0.06em; color: rgba(0,200,240,0.85); flex: 1; }
+.ts-file--bleed .ts-file-name  { color: rgba(255,120,120,0.9); }
+.ts-file--home .ts-file-name   { color: rgba(0,255,100,0.75); }
+.ts-file--phantom .ts-file-name { color: rgba(255,51,51,0.5); }
+
+.ts-file-aff {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.ts-aff--rig         { color: rgba(251,146,60,0.8); }
+.ts-aff--environment { color: rgba(163,230,53,0.8); }
+
+.ts-file-status {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    color: rgba(0,200,240,0.4);
+    flex-shrink: 0;
+    min-width: 140px;
+    text-align: right;
+}
+.ts-file--home .ts-file-status    { color: rgba(0,255,100,0.6); }
+.ts-file--bleed .ts-file-status   { color: rgba(255,140,60,0.7); }
+
+/* ── Container 4: Expected panel ──────────────────────────────────────────── */
+
+.ts-expected-panel { overflow-y: auto; }
 
 .ts-pkt-row {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     gap: 8px;
     align-items: center;
     padding: 6px 14px;
@@ -1046,36 +1149,21 @@ onUnmounted(() => {
     font-size: 10px;
 }
 
-.ts-pkt--bleed    { background: rgba(255,51,51,0.04); }
-.ts-pkt--home     { background: rgba(0,255,100,0.03); }
-.ts-pkt--phantom  { opacity: 0.45; color: rgba(255,51,51,0.6); cursor: default; }
-.ts-pkt--expected { color: rgba(0,200,240,0.6); }
+.ts-pkt--expected { color: rgba(0,200,240,0.55); }
 .ts-pkt--present .ts-pkt-name { color: rgba(0,255,100,0.8); }
 
 .ts-pkt-name {
     font-size: 10px;
     letter-spacing: 0.06em;
-    color: #00c8f0;
+    color: rgba(0,200,240,0.55);
 }
 
-.ts-pkt-aff {
-    font-size: 8px;
-    letter-spacing: 0.12em;
-    white-space: nowrap;
-}
-
-.ts-aff--rig { color: rgba(251,146,60,0.8); }
-.ts-aff--environment { color: rgba(163,230,53,0.8); }
-
-.ts-pkt-dest, .ts-pkt-status {
-    font-size: 8px;
+.ts-pkt-status {
+    font-size: 9px;
     letter-spacing: 0.1em;
-    white-space: nowrap;
-    color: rgba(0,200,240,0.4);
+    color: rgba(0,200,240,0.3);
 }
-
-.ts-pkt--home .ts-pkt-dest { color: rgba(0,255,100,0.6); }
-.ts-pkt--present .ts-pkt-status { color: rgba(0,255,100,0.8); }
+.ts-pkt--present .ts-pkt-status { color: rgba(0,255,100,0.7); }
 
 .ts-empty {
     padding: 20px 14px;
