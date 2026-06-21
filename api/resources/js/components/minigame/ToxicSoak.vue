@@ -78,24 +78,38 @@
                                 <span class="ts-fold-arrow">{{ expandedFields.has(fid) ? '▼' : '▶' }}</span>
                                 <span class="ts-fold-icon">{{ expandedFields.has(fid) ? '📂' : '📁' }}</span>
                                 <span class="ts-fold-name">{{ fid }}/</span>
+                                <span v-if="hasEmptySlot(fid)" class="ts-fold-open">◻ OPEN</span>
                                 <span v-if="fieldHasBleed(fid)" class="ts-fold-warn">⚠ DATA BLEED</span>
                             </div>
 
                             <!-- File rows -->
                             <template v-if="expandedFields.has(fid)">
-                                <div v-for="entry in getFieldPackets(fid)" :key="entry.id"
-                                     class="ts-file-row"
-                                     :class="{ 'ts-file--bleed': entry.isBleed, 'ts-file--home': entry.isHome }">
-                                    <span class="ts-file-tree">{{ '│  ' }}</span>
-                                    <span class="ts-file-flag">{{ entry.isBleed ? '[!]' : '   ' }}</span>
-                                    <span class="ts-file-name">{{ entry.displayName }}.dat</span>
-                                    <span class="ts-file-aff" :class="'ts-aff--' + entry.affinity">
-                                        {{ entry.affinity === 'rig' ? '◈ RIG' : '◈ ENV' }}
-                                    </span>
-                                    <span class="ts-file-status">
-                                        {{ entry.isHome ? '✓ HOME' : '⟶ ' + entry.homeField }}
-                                    </span>
-                                </div>
+                                <template v-for="entry in getFieldPackets(fid)" :key="entry.id">
+
+                                    <!-- Open slot entry -->
+                                    <div v-if="entry.isOpenSlot" class="ts-file-row ts-file--open-slot">
+                                        <span class="ts-file-tree">│  </span>
+                                        <span class="ts-file-flag">   </span>
+                                        <span class="ts-open-label">[ OPEN &gt;&gt;&gt;&gt; ]</span>
+                                        <span class="ts-file-aff" />
+                                        <span class="ts-file-status ts-open-status">SPLICE TARGET</span>
+                                    </div>
+
+                                    <!-- Packet entry -->
+                                    <div v-else class="ts-file-row"
+                                         :class="{ 'ts-file--bleed': entry.isBleed, 'ts-file--home': entry.isHome }">
+                                        <span class="ts-file-tree">│  </span>
+                                        <span class="ts-file-flag">{{ entry.isBleed ? '[!]' : '   ' }}</span>
+                                        <span class="ts-file-name">{{ entry.displayName }}.dat</span>
+                                        <span class="ts-file-aff" :class="'ts-aff--' + entry.affinity">
+                                            {{ entry.affinity === 'rig' ? '◈ RIG' : '◈ ENV' }}
+                                        </span>
+                                        <span class="ts-file-status">
+                                            {{ entry.isHome ? '✓ HOME' : '⟶ ' + entry.homeField }}
+                                        </span>
+                                    </div>
+
+                                </template>
                                 <!-- Rig noise — phantom files -->
                                 <template v-if="flickerPhantom && fid === focusedFieldId && phantomEntries.length">
                                     <div v-for="(ph, i) in phantomEntries" :key="'ph' + i"
@@ -156,13 +170,45 @@
                 <!-- Container 5 — SPLICE interface -->
                 <div class="ts-panel ts-splice-panel">
                     <div class="ts-ph">SPLICE INTERFACE</div>
+
+                    <!-- Topology readout -->
+                    <div class="ts-topo">
+                        <template v-if="!spliceFieldId">
+                            <span class="ts-topo-idle">// SELECT A SOURCE FIELD TO VIEW CONNECTIONS</span>
+                        </template>
+                        <template v-else>
+                            <div class="ts-topo-row">
+                                <span class="ts-topo-field">{{ spliceFieldId }}</span>
+                                <span class="ts-topo-arr">>></span>
+                                <span class="ts-topo-links">
+                                    <span v-for="(c, i) in topoSourceLinks" :key="c"
+                                          :class="c === spliceOpenField ? 'ts-topo-link--open' : 'ts-topo-link'">
+                                        {{ c }}<span v-if="i < topoSourceLinks.length - 1" class="ts-topo-pipe"> | </span>
+                                    </span>
+                                </span>
+                            </div>
+                            <div v-if="spliceOpenField" class="ts-topo-row ts-topo-dest-row">
+                                <span class="ts-topo-field ts-topo-field--open">{{ spliceOpenField }} [OPEN]</span>
+                                <span class="ts-topo-arr">>></span>
+                                <span class="ts-topo-links">
+                                    <span v-for="(c, i) in topoDestLinks" :key="c" class="ts-topo-link">
+                                        {{ c }}<span v-if="i < topoDestLinks.length - 1" class="ts-topo-pipe"> | </span>
+                                    </span>
+                                </span>
+                                <span class="ts-topo-expects">
+                                    &nbsp;:: {{ topoDestExpects }}
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+
                     <div class="ts-splice-chain">
 
                         <div class="ts-splice-step">
                             <label class="ts-slbl">SOURCE FIELD</label>
                             <select class="ts-sel" v-model="spliceFieldId" @change="onSrcFieldChange">
                                 <option value="">-- SELECT --</option>
-                                <option v-for="fid in activeFieldIds" :key="fid" :value="fid">{{ fid }}</option>
+                                <option v-for="fid in spliceSourceFields" :key="fid" :value="fid">{{ fid }}</option>
                             </select>
                         </div>
 
@@ -171,7 +217,6 @@
                         <div class="ts-splice-step">
                             <label class="ts-slbl">COMMON_DATA</label>
                             <select class="ts-sel" v-model="splicePacketId"
-                                    @change="onSrcPacketChange"
                                     :disabled="!spliceFieldId">
                                 <option value="">-- SELECT --</option>
                                 <option v-for="p in spliceSourcePackets" :key="p.id" :value="p.id">
@@ -182,27 +227,12 @@
 
                         <span class="ts-chain-sep">>>>></span>
 
-                        <div class="ts-splice-step">
-                            <label class="ts-slbl">DESTINATION FIELD</label>
-                            <select class="ts-sel" v-model="spliceDestFieldId"
-                                    @change="onDestFieldChange"
-                                    :disabled="!splicePacketId">
-                                <option value="">-- SELECT --</option>
-                                <option v-for="fid in spliceDestFields" :key="fid" :value="fid">{{ fid }}</option>
-                            </select>
-                        </div>
-
-                        <span class="ts-chain-sep">>>>></span>
-
-                        <div class="ts-splice-step">
-                            <label class="ts-slbl">POSITION</label>
-                            <select class="ts-sel" v-model="spliceDestSlot"
-                                    :disabled="!spliceDestFieldId">
-                                <option value="">-- SELECT --</option>
-                                <option v-for="idx in spliceDestEmptySlots" :key="idx" :value="idx">
-                                    SLOT {{ idx + 1 }}
-                                </option>
-                            </select>
+                        <div class="ts-splice-step ts-splice-dest-display">
+                            <label class="ts-slbl">DESTINATION</label>
+                            <div class="ts-dest-readout" :class="{ 'ts-dest--active': spliceOpenField }">
+                                {{ spliceOpenField ?? '-- NO OPEN SLOT --' }}
+                                <span v-if="spliceOpenField" class="ts-dest-open-tag">[ OPEN ]</span>
+                            </div>
                         </div>
 
                         <button class="ts-splice-btn"
@@ -353,8 +383,6 @@ const expandedFields    = ref(new Set());  // fieldIds open in the explorer
 const focusedFieldId    = ref(null);       // drives right panel expected contents
 const spliceFieldId     = ref('');
 const splicePacketId    = ref('');
-const spliceDestFieldId = ref('');
-const spliceDestSlot    = ref('');  // holds slot index (number) or ''
 
 // ── Noise state ────────────────────────────────────────────────────────────────
 
@@ -601,22 +629,23 @@ const phantomEntries = computed(() => {
 // ── Computed — packet display ──────────────────────────────────────────────────
 
 function getFieldPackets(fieldId) {
-    return (fieldSlots.value[fieldId] ?? [])
-        .filter(id => id !== null)
-        .map(id => {
-            const p = packetDefs.value[id];
-            if (!p) return null;
-            return {
-                id:          p.id,
-                name:        p.name,
-                displayName: corruptedName(p.name),
-                homeField:   p.homeField,
-                affinity:    p.affinity,
-                isBleed:     p.homeField !== fieldId,
-                isHome:      p.homeField === fieldId,
-            };
-        })
-        .filter(Boolean);
+    return (fieldSlots.value[fieldId] ?? []).map((id, slotIdx) => {
+        if (id === null) {
+            return { id: `__open_${fieldId}_${slotIdx}`, isOpenSlot: true, slotIdx };
+        }
+        const p = packetDefs.value[id];
+        if (!p) return null;
+        return {
+            id:          p.id,
+            name:        p.name,
+            displayName: corruptedName(p.name),
+            homeField:   p.homeField,
+            affinity:    p.affinity,
+            isBleed:     p.homeField !== fieldId,
+            isHome:      p.homeField === fieldId,
+            isOpenSlot:  false,
+        };
+    }).filter(Boolean);
 }
 
 const expectedPackets = computed(() => {
@@ -656,6 +685,45 @@ const syncCountClass = computed(() => {
 
 // ── Computed — SPLICE dropdowns ────────────────────────────────────────────────
 
+// The single field that currently holds the open (null) slot — the puzzle's sliding space
+const spliceOpenField = computed(() =>
+    activeFieldIds.value.find(fid => (fieldSlots.value[fid] ?? []).includes(null)) ?? null
+);
+
+// The index of the null slot within that field
+const spliceOpenSlotIdx = computed(() => {
+    if (!spliceOpenField.value) return -1;
+    return (fieldSlots.value[spliceOpenField.value] ?? []).indexOf(null);
+});
+
+// Only fields that are directly connected to the open-slot field can be source fields
+const spliceSourceFields = computed(() => {
+    if (!spliceOpenField.value) return [];
+    const adjacent = fieldConnections.value[spliceOpenField.value] ?? [];
+    // Must also have at least one non-null packet to pick from
+    return adjacent.filter(fid =>
+        (fieldSlots.value[fid] ?? []).some(s => s !== null)
+    );
+});
+
+// Topology readout — source field's neighbors
+const topoSourceLinks = computed(() => {
+    if (!spliceFieldId.value) return [];
+    return fieldConnections.value[spliceFieldId.value] ?? [];
+});
+
+// Topology readout — destination (open slot) field's neighbors + expected packet names
+const topoDestLinks = computed(() => {
+    if (!spliceOpenField.value) return [];
+    return fieldConnections.value[spliceOpenField.value] ?? [];
+});
+
+const topoDestExpects = computed(() => {
+    if (!spliceOpenField.value) return '';
+    const names = FIELD_DEFS[spliceOpenField.value]?.packets ?? [];
+    return names.slice(0, 3).join(' | ') + (names.length > 3 ? ' ...' : '');
+});
+
 const spliceSourcePackets = computed(() => {
     if (!spliceFieldId.value) return [];
     return (fieldSlots.value[spliceFieldId.value] ?? [])
@@ -664,6 +732,7 @@ const spliceSourcePackets = computed(() => {
         .filter(Boolean);
 });
 
+// (legacy — kept as dead ref guard; real logic now in spliceOpenField/spliceSourceFields)
 const spliceDestFields = computed(() => {
     if (!splicePacketId.value) return [];
     const pkt = packetDefs.value[splicePacketId.value];
@@ -681,8 +750,8 @@ const spliceDestEmptySlots = computed(() => {
 const canSplice = computed(() =>
     !!spliceFieldId.value &&
     !!splicePacketId.value &&
-    !!spliceDestFieldId.value &&
-    spliceDestSlot.value !== ''
+    spliceOpenField.value !== null &&
+    spliceOpenSlotIdx.value !== -1
 );
 
 const canDischarge = computed(() => dischargeCooldown.value === 0 && !gameResult.value);
@@ -759,45 +828,36 @@ function soak() { discharge('rig'); }
 function vent()  { discharge('environment'); }
 
 function onSrcFieldChange() {
-    splicePacketId.value    = '';
-    spliceDestFieldId.value = '';
-    spliceDestSlot.value    = '';
-}
-
-function onSrcPacketChange() {
-    spliceDestFieldId.value = '';
-    spliceDestSlot.value    = '';
-}
-
-function onDestFieldChange() {
-    spliceDestSlot.value = '';
+    splicePacketId.value = '';
 }
 
 function executeSplice() {
     if (!canSplice.value || gameResult.value) return;
 
-    const pkt    = packetDefs.value[splicePacketId.value];
+    const pkt = packetDefs.value[splicePacketId.value];
     if (!pkt) return;
 
+    const destField = spliceOpenField.value;
+    const dstIdx    = spliceOpenSlotIdx.value;
+    if (!destField || dstIdx === -1) return;
+
     const srcSlots = fieldSlots.value[spliceFieldId.value];
-    const dstSlots = fieldSlots.value[spliceDestFieldId.value];
-    const dstIdx   = Number(spliceDestSlot.value);
+    const dstSlots = fieldSlots.value[destField];
 
     const srcIdx = srcSlots.indexOf(splicePacketId.value);
     if (srcIdx === -1 || dstSlots[dstIdx] !== null) return;
 
-    srcSlots[srcIdx]   = null;
-    dstSlots[dstIdx]   = splicePacketId.value;
-    pkt.currentField   = spliceDestFieldId.value;
+    // Move packet into the open slot; open slot jumps back to the source position
+    srcSlots[srcIdx]  = null;
+    dstSlots[dstIdx]  = splicePacketId.value;
+    pkt.currentField  = destField;
 
     updateIoForField(spliceFieldId.value);
-    updateIoForField(spliceDestFieldId.value);
+    updateIoForField(destField);
 
-    // Reset SPLICE UI
-    spliceFieldId.value     = '';
-    splicePacketId.value    = '';
-    spliceDestFieldId.value = '';
-    spliceDestSlot.value    = '';
+    // Reset SPLICE UI — source field clears so player picks next move fresh
+    spliceFieldId.value  = '';
+    splicePacketId.value = '';
 }
 
 function purge() {
@@ -1130,6 +1190,7 @@ onUnmounted(() => {
 .ts-fold-arrow { font-size: 8px; color: rgba(0,200,240,0.4); width: 10px; flex-shrink: 0; }
 .ts-fold-icon  { font-size: 11px; flex-shrink: 0; }
 .ts-fold-name  { font-size: 10px; letter-spacing: 0.1em; color: #00c8f0; flex: 1; }
+.ts-fold-open  { font-size: 8px; letter-spacing: 0.12em; color: rgba(0,200,240,0.55); flex-shrink: 0; margin-right: 6px; }
 .ts-fold-warn  { font-size: 8px; letter-spacing: 0.1em; color: rgba(255,80,80,0.8); flex-shrink: 0; }
 
 .ts-file-row {
@@ -1140,9 +1201,32 @@ onUnmounted(() => {
     border-bottom: 1px solid rgba(0,200,240,0.03);
     transition: background 0.1s;
 }
-.ts-file--bleed   { background: rgba(255,51,51,0.03); }
-.ts-file--home    { background: rgba(0,255,100,0.02); }
-.ts-file--phantom { opacity: 0.4; cursor: default; }
+.ts-file--bleed     { background: rgba(255,51,51,0.03); }
+.ts-file--home      { background: rgba(0,255,100,0.02); }
+.ts-file--phantom   { opacity: 0.4; cursor: default; }
+.ts-file--open-slot {
+    background: rgba(0,200,240,0.04);
+    border-left: 2px dashed rgba(0,200,240,0.3);
+    animation: ts-open-pulse 2s ease-in-out infinite;
+}
+
+.ts-open-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: rgba(0,200,240,0.6);
+    flex: 1;
+    font-style: italic;
+}
+
+.ts-open-status {
+    color: rgba(0,200,240,0.4) !important;
+    font-style: italic;
+}
+
+@keyframes ts-open-pulse {
+    0%, 100% { background: rgba(0,200,240,0.04); }
+    50%       { background: rgba(0,200,240,0.08); }
+}
 
 .ts-file-tree  { font-size: 10px; color: rgba(0,200,240,0.2); flex-shrink: 0; font-family: monospace; }
 .ts-file-flag  { font-size: 9px; color: rgba(255,80,80,0.8); width: 28px; flex-shrink: 0; letter-spacing: 0; }
@@ -1336,6 +1420,97 @@ onUnmounted(() => {
 .ts-splice-btn:disabled {
     opacity: 0.25;
     cursor: not-allowed;
+}
+
+/* ── Topology readout ────────────────────────────────────────────────────────── */
+
+.ts-topo {
+    padding: 6px 10px 8px;
+    border-bottom: 1px solid rgba(0,200,240,0.1);
+    min-height: 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ts-topo-idle {
+    font-size: 9px;
+    color: rgba(0,200,240,0.2);
+    letter-spacing: 0.1em;
+}
+
+.ts-topo-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ts-topo-field {
+    font-size: 9px;
+    color: rgba(0,200,240,0.6);
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+}
+
+.ts-topo-field--open {
+    color: #00ff88;
+}
+
+.ts-topo-arr {
+    font-size: 9px;
+    color: rgba(0,200,240,0.25);
+    flex-shrink: 0;
+}
+
+.ts-topo-links {
+    font-size: 9px;
+    color: rgba(0,200,240,0.45);
+    letter-spacing: 0.06em;
+}
+
+.ts-topo-link--open {
+    color: #00ff88;
+}
+
+.ts-topo-pipe {
+    color: rgba(0,200,240,0.2);
+}
+
+.ts-topo-dest-row { margin-top: 2px; }
+
+.ts-topo-expects {
+    font-size: 9px;
+    color: rgba(0,255,136,0.35);
+    letter-spacing: 0.05em;
+    font-style: italic;
+}
+
+.ts-splice-dest-display { flex-shrink: 0; }
+
+.ts-dest-readout {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: rgba(0,200,240,0.3);
+    border: 1px solid rgba(0,200,240,0.15);
+    padding: 6px 10px;
+    min-width: 140px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ts-dest-readout.ts-dest--active {
+    color: rgba(0,200,240,0.85);
+    border-color: rgba(0,200,240,0.4);
+}
+
+.ts-dest-open-tag {
+    color: #00ff88;
+    font-size: 9px;
+    animation: ts-open-pulse 1.4s ease-in-out infinite;
 }
 
 /* ── Container 6: Action buttons ──────────────────────────────────────────── */
