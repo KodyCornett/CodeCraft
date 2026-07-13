@@ -4,7 +4,6 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BountyController;
 use App\Http\Controllers\TutorialController;
 use App\Http\Controllers\CombatChallengeController;
-use App\Http\Controllers\CombatController;
 use App\Http\Controllers\PacketHijackController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\NodeController;
@@ -90,12 +89,6 @@ Route::middleware('auth:sanctum')->group(function () {
 // Combat
 // ---------------------------------------------------------------------------
 
-    // result: 10/min — each player submits once per duel; any faster is a replay attempt
-    Route::post('/combat/result',                         [CombatController::class, 'result'])
-        ->middleware('throttle:10,1');
-    // getResult: 60/min — polled while waiting for opponent score (~1/s is normal)
-    Route::get('/combat/result/{id}',                     [CombatController::class, 'getResult'])
-        ->middleware('throttle:60,1');
     // challenge: 10/min — one challenge per node encounter; burst headroom for fast play
     Route::post('/combat/challenge',                      [CombatChallengeController::class, 'challenge'])
         ->middleware('throttle:10,1');

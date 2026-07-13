@@ -488,6 +488,14 @@ const inventory     = gameState?.inventory      ?? ref({ hardware: [], consumabl
 const useConsumable = gameState?.useConsumable  ?? null;
 const currentNodeId = gameState?.currentNodeId  ?? ref(null);
 
+// Resync helpers — pull authoritative state from /api/player/me after purchases
+// that change many fields at once (chassis upgrade, etc.) instead of manually
+// patching each ref field from the action response.
+const resyncPlayer  = gameState?.resyncPlayer   ?? (async () => null);
+const hydrateState  = gameState?.hydrateFromAuth ?? (() => {});
+const fetchCmds     = gameState?.fetchCommands   ?? (async () => {});
+const fetchInv      = gameState?.fetchInventory  ?? (async () => {});
+
 // Access is server-confirmed on mount via POST /api/cyberdoc/visit.
 // The server checks the player's current_node_id against node type === 'cyberdoc'.
 // Client-side location strings are not trusted for access control.
@@ -652,42 +660,13 @@ async function onPurchaseChassis(chassis) {
             tp_cost:      chassis.price.tp,
         });
 
-        const r = res.data;
-
-        // Sync rig from server-authoritative response
-        rig.value = {
-            chassis:        r.chassis,
-            tier:           r.tier,
-            cpu:            r.stats.cpu?.effective      ?? 0,
-            ram:            r.stats.ram?.effective      ?? 0,
-            firewall:       r.stats.firewall?.effective ?? 0,
-            storage:        r.stats.storage?.effective  ?? 0,
-            os:             r.stats.os?.effective       ?? 0,
-            uplink:         r.uplink,
-            caps: {
-                cpu:      r.caps.cpu,
-                ram:      r.caps.ram,
-                firewall: r.caps.firewall,
-                storage:  r.caps.storage,
-                os:       r.caps.os,
-            },
-            // pointsSpent/pointsCap must be set so chassisMaxed computes correctly
-            // against the new chassis cap (NullTek = 18, not 9).
-            pointsSpent:    r.points.spent,
-            pointsCap:      r.points.cap,
-            portSlots:      r.peripheral_slots,
-            investedPoints: { cpu: 0, ram: 0, os: 0, storage: 0, firewall: 0 },
-            currentSS:      r.current_ss,
-            maxSS:          r.max_ss,
-        };
-
-        // Sync player economy + derived resources
-        player.value.creds      = r.wallet_creds;
-        player.value.techPoints = r.tech_points;
-        player.value.uplink     = r.uplink;
-        player.value.maxUplink  = r.uplink;
-        player.value.currentSS  = r.current_ss;
-        player.value.maxSS      = r.max_ss;
+        // Full resync — chassis upgrade changes stats, caps, loadout slots, SS,
+        // uplink, peripheral slots, and economy all at once. Re-fetching
+        // /api/player/me via hydrateState ensures every shared ref stays correct
+        // without manually mapping every field from the chassis-upgrade response.
+        const syncData = await resyncPlayer();
+        if (syncData) hydrateState(syncData.player, syncData.rig);
+        await fetchCmds();
 
     } catch (e) {
         purchaseError.value = e?.response?.data?.message ?? 'Chassis upgrade failed.';
@@ -758,7 +737,7 @@ async function onBuy(item) {
                 peripheral_id: item.id,
             });
             player.value.creds = res.data.wallet_creds;
-            // Add to local uninstalled hardware so the button reflects ownership immediately
+            // Optimistic local push so ownership badge appears before the re-fetch lands
             inventory.value.hardware.push({
                 encrypt_id:    res.data.encrypt_id,
                 peripheral_id: item.id,
@@ -768,6 +747,7 @@ async function onBuy(item) {
                 rarity:        item.rarity,
                 port_cost:     item.port_cost,
             });
+            await fetchInv();   // authoritative sync — replaces local push with exact server shape
         } else {
             // software or repair
             const res = await axios.post('/api/store/purchase-consumable', {
@@ -837,9 +817,10 @@ async function onBuyCommand(cmd) {
             player_id:  player.value.id,
             command_id: cmd.id,
         });
-        cmd.owned = true;
+        cmd.owned = true;                            // optimistic — removes from purchasable list instantly
         player.value.creds      = res.data.wallet_creds;
         player.value.techPoints = res.data.tech_points;
+        await fetchCmds();                           // authoritative sync — picks up server-set fields
     } catch (e) {
         purchaseError.value = e?.response?.data?.message ?? 'Command purchase failed.';
         console.error('[STORE] Command purchase failed:', purchaseError.value);

@@ -27,11 +27,13 @@ export function useDepletion(playerId) {
     const error     = ref(null);
 
     /**
-     * deplete(nodeId, gameResource, rewardAmount)
+     * deplete(nodeId, gameResource, completionPct)
      *
      * @param {string} nodeId        - UUID from the enriched node (not canvasId)
      * @param {string} gameResource  - 'creds' | 'tech' | 'uplink'
-     * @param {number} rewardAmount  - creds awarded by GridBreach (0 for uplink/failed)
+     * @param {number} completionPct - fraction of GridBreach sequences completed (0.0–1.0).
+     *                                 Pass 0 for uplink hacks (no monetary reward).
+     *                                 Server computes the actual cred/tech award from this.
      *
      * @returns {object|null} patch object ready for updateNodeResources(), or null on failure
      *   {
@@ -42,7 +44,7 @@ export function useDepletion(playerId) {
      *     bountyEvent:      { type, data } | null,
      *   }
      */
-    async function deplete(nodeId, gameResource, rewardAmount = 0) {
+    async function deplete(nodeId, gameResource, completionPct = 1.0) {
         if (!nodeId) {
             console.warn('[DEPLETE] No nodeId — skipping API call');
             return null;
@@ -64,20 +66,10 @@ export function useDepletion(playerId) {
         error.value     = null;
 
         try {
-            // Preserve two decimal places for tech rewards (stored as decimal:2 server-side).
-            // Cred rewards are always whole numbers so integer rounding is fine there.
-            // Uplink (movement) hacks carry no reward_amount.
-            let roundedReward;
-            if (rewardAmount > 0) {
-                roundedReward = gameResource === 'tech'
-                    ? Math.round(rewardAmount * 100) / 100
-                    : Math.round(rewardAmount);
-            }
-
             const res = await axios.post(`/api/nodes/${nodeId}/deplete`, {
-                resource:      apiResource,
-                player_id:     pid,
-                reward_amount: roundedReward,
+                resource:       apiResource,
+                player_id:      pid,
+                completion_pct: completionPct > 0 ? completionPct : undefined,
             });
 
             const node = res.data.node ?? res.data;

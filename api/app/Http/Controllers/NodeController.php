@@ -195,24 +195,25 @@ class NodeController extends Controller
      * Called by the client after a successful GridBreach hack.
      *
      * Body:
-     *   resource       string  'creds' | 'movement'
-     *   player_id      string  UUID of the hacking player
-     *   reward_amount  int     (optional) creds actually awarded by GridBreach
+     *   resource        string   'creds' | 'movement' | 'tech'
+     *   completion_pct  float    0.0–1.0 — fraction of GridBreach sequences completed
+     *                            (omit or 1.0 for uplink/tech, which are always full)
+     *
+     * Reward formulas (server-authoritative):
+     *   creds   → round(node.ice × 25 × completion_pct × bounty_multiplier)
+     *   tech    → ICE-tier base × bounty_multiplier (no partial — always full on success)
+     *   uplink  → no monetary reward; restores current_uplink to chassis base
      *
      * Side effects:
      *   • Marks the node resource as depleted
-     *   • If resource === 'creds' and reward_amount > 0, credits player's pocket_creds
+     *   • Credits pocket_creds (creds) or tech_points (tech)
      *   • Records the hack on the player's bounty run counter (bounty escalation)
-     *
-     * The reward_amount comes from GridBreach — it accounts for partial completion,
-     * bounty multiplier, and command effects, so we trust the client value here.
-     * (Server-authoritative validation is a future hardening step.)
      */
     public function deplete(Request $request, string $nodeId): JsonResponse
     {
         $data = $request->validate([
-            'resource'      => ['required', 'in:creds,movement,tech'],
-            'reward_amount' => ['sometimes', 'numeric', 'min:0'],
+            'resource'       => ['required', 'in:creds,movement,tech'],
+            'completion_pct' => ['sometimes', 'numeric', 'min:0', 'max:1'],
         ]);
 
         // Pre-flight: node must exist before we acquire any lock
@@ -255,25 +256,23 @@ class NodeController extends Controller
             $currentUplink = null;
 
             if ($player !== null) {
-                $pocketBefore = (int) ($player->pocket_creds ?? 0);
+                $pocketBefore  = (int) ($player->pocket_creds ?? 0);
+                $bountyMult    = max(1.0, (float) ($player->bounty_multiplier ?? 1.0));
+                $completionPct = max(0.0, min(1.0, (float) ($data['completion_pct'] ?? 1.0)));
 
-                // Clamp the client-supplied reward to a server-authoritative ceiling so
-                // a crafted request cannot mint unlimited creds or tech points.
-                // Ceiling = node's current cred value × the player's bounty multiplier,
-                // rounded up. Tech hacks use the same node cred pool so the same cap applies.
-                // Movement hacks carry no monetary reward so the cap is irrelevant there.
-                $clientReward = (float) ($data['reward_amount'] ?? 0);
-                if ($data['resource'] !== 'movement' && $clientReward > 0) {
-                    $nodeCredCeiling  = $this->nodeService->currentCredValue($node);
-                    $multiplier       = max(1.0, (float) ($player->bounty_multiplier ?? 1.0));
-                    $rewardCeiling    = round($nodeCredCeiling * $multiplier * 2.25, 2); // 2.25 = max bounty multiplier
-                    $clientReward     = min($clientReward, $rewardCeiling);
+                // Server-authoritative reward — mirrors the GridBreach display formula exactly.
+                // creds:  node.ice × 25 × completion_pct × bounty_multiplier
+                // tech:   ICE-tier flat base × bounty_multiplier (no partial; always full on success)
+                // uplink: no monetary reward
+                if ($data['resource'] === 'creds') {
+                    $reward = (int) round($node->ice * 25 * $completionPct * $bountyMult);
+                } elseif ($data['resource'] === 'tech') {
+                    $ice  = (int) $node->ice;
+                    $base = $ice <= 1 ? 0.25 : ($ice === 2 ? 0.5 : max(1.0, $ice - 2));
+                    $reward = (float) (max(0.25, round($base * $bountyMult * 4) / 4));
+                } else {
+                    $reward = 0;
                 }
-
-                // reward_amount supports fractional values for tech hacks
-                $reward = $data['resource'] === 'tech'
-                    ? round($clientReward, 2)
-                    : (int) $clientReward;
 
                 if ($reward > 0) {
                     if ($data['resource'] === 'creds') {

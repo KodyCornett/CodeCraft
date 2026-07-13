@@ -4,17 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Command;
 use App\Models\Node;
-use App\Models\NodeTrap;
 use App\Models\Player;
 use App\Services\RigService;
+use App\Services\TrapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 class PlayerController extends Controller
 {
-    public function __construct(private readonly RigService $rigService) {}
+    public function __construct(
+        private readonly RigService  $rigService,
+        private readonly TrapService $trapService,
+    ) {}
 
     /**
      * GET /api/player/me
@@ -290,81 +292,26 @@ class PlayerController extends Controller
             $player->post_combat_silent_moves = max(0, $player->post_combat_silent_moves - 1);
         }
 
-        // ── Tick the placer's own trap TTLs ───────────────────────────────────
-        // Decrement placer_moves_left on every trap this player placed.
-        // Traps that hit 0 moves are pruned (they will never fire now).
-        NodeTrap::where('placer_id', $player->id)
-            ->where('consumed', false)
-            ->where('placer_moves_left', '>', 0)
-            ->decrement('placer_moves_left');
-
-        NodeTrap::where('placer_id', $player->id)
-            ->where('placer_moves_left', '<=', 0)
-            ->delete();
-
-        // ── Check for traps at the destination node ───────────────────────────
-        // Find the first active trap placed by any OTHER player on this node.
-        // Consume it immediately so only one player triggers it.
-        $trapTriggered = null;
-        $activeTrap = NodeTrap::where('node_id', $node->id)
-            ->where('placer_id', '!=', $player->id)
-            ->where('consumed', false)
-            ->where('placer_moves_left', '>', 0)
-            ->where('expires_at', '>', Carbon::now())
-            ->first();
-
-        if ($activeTrap !== null) {
-            $activeTrap->consumed = true;
-            $activeTrap->save();
-
-            $effect   = $activeTrap->effect_data ?? [];
-
-            // Timed stat effects (OS Exploit, Buffer Overflow, RootKit) — merge
-            // into active_effects before the single player save below.
-            // Slug matches client-side cmdSlug(): lowercase, spaces → underscores.
-            // (Str::snake is NOT used — it mishandles abbreviations like "OS" → "o_s".)
-            if (isset($effect['moves']) && ! isset($effect['uplink_drain'])) {
-                $trapSlug               = strtolower(preg_replace('/\s+/', '_', $activeTrap->command_name));
-                $effects                = $player->active_effects ?? [];
-                $effects[$trapSlug]     = (int) $effect['moves'];
-                $player->active_effects = $effects;
-            }
-
-            $trapTriggered = [
-                'command_name' => $activeTrap->command_name,
-                'effect'       => $effect,
-            ];
-
-            // Notify the placer in real-time — their trap just fired.
-            \App\Events\TrapTriggered::dispatch(
-                $activeTrap->placer_id,
-                $activeTrap->command_name,
-                $player->handle,
-                $node->canvas_id,
-            );
-        }
+        // ── Trap logic (delegated to TrapService) ────────────────────────────
+        $this->trapService->tickPlacerTraps($player);
+        $trapTriggered = $this->trapService->findAndConsume($node, $player);
+        // findAndConsume may have mutated $player->active_effects — single save below picks it up.
 
         // ── Single player save — position + effect decrements + any trap effect ─
         $player->save();
 
-        // ── Single rig save — move uplink cost + any trap effects on the rig ───
+        // ── Single rig save — move uplink cost + any trap rig effects ─────────
         $remainingUplink = null;
         $currentSS       = null;
         if ($rig !== null) {
-            $current             = $rig->current_uplink ?? $effectiveMax;
-            $rig->current_uplink = max(0, $current - $uplinkCost);
+            $rig->current_uplink = max(0, $curUplink - $uplinkCost);
 
-            // Uplink drain (Crash) applied on top of the move cost.
-            if ($activeTrap !== null && isset(($activeTrap->effect_data ?? [])['uplink_drain'])) {
-                $drain               = (int) $activeTrap->effect_data['uplink_drain'];
-                $rig->current_uplink = max(0, $rig->current_uplink - $drain);
-            }
+            // Trap rig effects (uplink drain, SS damage) are applied after the move cost.
+            // applyRigEffects returns true if applyDamage already saved the rig.
+            $rigSaveHandled = $trapTriggered !== null
+                && $this->trapService->applyRigEffects($trapTriggered['effect'], $rig, $player);
 
-            // SS damage (Packet Flood) — use RigService so critical failure is handled.
-            // applyDamage() persists both rig and player; skip the generic $rig->save() below.
-            if ($activeTrap !== null && isset(($activeTrap->effect_data ?? [])['ss_damage'])) {
-                $this->rigService->applyDamage($rig, (int) $activeTrap->effect_data['ss_damage'], 'pvp', $player);
-            } else {
+            if (!$rigSaveHandled) {
                 $rig->save();
             }
 
@@ -454,8 +401,10 @@ class PlayerController extends Controller
             return response()->json(['message' => 'ROOTKIT — command systems locked.'], 422);
         }
 
-        // Derive the slug from the command name ("Ghost Protocol" → "ghost_protocol")
-        $slug      = Str::snake($cmd->name);
+        // Derive the slug from the command name ("Ghost Protocol" → "ghost_protocol").
+        // Str::snake is NOT used — it mishandles abbreviations ("OS" → "o_s").
+        // Must match client-side cmdSlug() and the trap trigger slug in position().
+        $slug      = strtolower(preg_replace('/\s+/', '_', $cmd->name));
         $duration  = $cmd->duration ?? [];
         $movesLeft = (int) ($duration['moves'] ?? 0);
 

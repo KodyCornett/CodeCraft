@@ -3,18 +3,23 @@
 namespace App\Services;
 
 use App\Constants\PacketHijackConstants;
+use App\Models\CombatChallenge;
+use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Models\PlayerRig;
+use Illuminate\Support\Str;
 
 /**
- * PacketHijackMatchSetupService — RigService-dependent match setup.
+ * PacketHijackMatchSetupService — match creation and RigService-dependent setup generators.
  *
- * Owns the setup generators that require reading rig stats:
- *   - generatePortTopology() — bias-scaled port selection
- *   - generateFingerprint()  — credential tier generation + banner injection
- *   - generateFilesystem()   — Phase 3 directory tree + wallet placement
+ * Owns:
+ *   - createFromChallenge() — full match setup: IPs, suspect boards, topology,
+ *                              fingerprints, filesystems, and PacketHijackMatch::create()
+ *   - generatePortTopology() — bias-scaled port selection (per-player)
+ *   - generateFingerprint()  — credential tier generation + banner injection (per-player)
+ *   - generateFilesystem()   — Phase 3 directory tree + wallet placement (per-player)
  *
- * Pure data generation. No HTTP objects. No model persistence.
+ * No HTTP objects. All model persistence goes through createFromChallenge().
  */
 class PacketHijackMatchSetupService
 {
@@ -71,7 +76,94 @@ class PacketHijackMatchSetupService
         ['tmp', 'session', 'wallet'],
     ];
 
-    public function __construct(private readonly RigService $rigService) {}
+    public function __construct(
+        private readonly RigService                   $rigService,
+        private readonly PacketHijackLifecycleService $lifecycleService,
+    ) {}
+
+    // =========================================================================
+    // Match Creation
+    // =========================================================================
+
+    /**
+     * Build and persist a new PacketHijackMatch from a CombatChallenge.
+     *
+     * Generates unique rig IPs, suspect boards, port topologies, fingerprints,
+     * and filesystems for both players, then creates the match record.
+     *
+     * Called from CombatChallengeController::accept() — controller owns
+     * broadcasts and HTTP responses; this method owns all setup data work.
+     */
+    public function createFromChallenge(CombatChallenge $challenge): PacketHijackMatch
+    {
+        $challenger = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
+            ->find($challenge->challenger_id);
+        $defender = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
+            ->find($challenge->target_id);
+
+        // Generate unique rig IPs — the value each player must locate in Phase 1.
+        $challengerRigIp = $this->lifecycleService->generateRigIp();
+        $defenderRigIp   = $this->lifecycleService->generateRigIp();
+        while ($defenderRigIp === $challengerRigIp) {
+            $defenderRigIp = $this->lifecycleService->generateRigIp();
+        }
+
+        $challengerRig = $challenger?->rig;
+        $defenderRig   = $defender?->rig;
+
+        $challengerStats = $challengerRig ? $this->rigService->effectiveStats($challengerRig, $challenger) : null;
+        $defenderStats   = $defenderRig   ? $this->rigService->effectiveStats($defenderRig,   $defender)   : null;
+        $challengerOs    = (int) ($challengerStats['os']['effective'] ?? 1);
+        $defenderOs      = (int) ($defenderStats['os']['effective']   ?? 1);
+
+        // Suspect boards: challenger hunts defenderRigIp (seeded by defender's OS), vice versa.
+        $challengerSuspects = $this->lifecycleService->generateNodeConnections($defenderRigIp,   $defenderOs);
+        $defenderSuspects   = $this->lifecycleService->generateNodeConnections($challengerRigIp, $challengerOs);
+
+        $challengerRig = $challengerRig ?? $this->rigService->getRigForPlayer($challenger);
+        $defenderRig   = $defenderRig   ?? $this->rigService->getRigForPlayer($defender);
+
+        $challengerPorts = $challengerRig && $challenger
+            ? $this->generatePortTopology($challengerRig, $challenger)
+            : [];
+
+        $defenderPorts = $defenderRig && $defender
+            ? $this->generatePortTopology($defenderRig, $defender)
+            : [];
+
+        // Fingerprint: challenger attacks defender's system, defender attacks challenger's.
+        $challengerFingerprint = ($defenderRig && $defender)
+            ? $this->generateFingerprint($defenderRig, $defender, $defenderPorts)
+            : [];
+
+        $defenderFingerprint = ($challengerRig && $challenger)
+            ? $this->generateFingerprint($challengerRig, $challenger, $challengerPorts)
+            : [];
+
+        $challengerFilesystem = $this->generateFilesystem();
+        $defenderFilesystem   = $this->generateFilesystem();
+
+        return PacketHijackMatch::create([
+            'id'                     => (string) Str::uuid(),
+            'challenger_id'          => $challenge->challenger_id,
+            'defender_id'            => $challenge->target_id,
+            'status'                 => 'phase1',
+            'challenger_target_ip'   => $defenderRigIp,
+            'defender_target_ip'     => $challengerRigIp,
+            'challenger_suspects'    => $challengerSuspects,
+            'defender_suspects'      => $defenderSuspects,
+            'challenger_ports'       => $challengerPorts,
+            'challenger_fingerprint' => $challengerFingerprint,
+            'challenger_filesystem'  => $challengerFilesystem,
+            'defender_ports'         => $defenderPorts,
+            'defender_fingerprint'   => $defenderFingerprint,
+            'defender_filesystem'    => $defenderFilesystem,
+            'challenger_phase'       => 1,
+            'defender_phase'         => 1,
+            'started_at'             => now(),
+            'expires_at'             => now()->addMinutes(15),
+        ]);
+    }
 
     // =========================================================================
     // Port Topology

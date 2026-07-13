@@ -7,12 +7,10 @@ use App\Events\PacketHijackStarted;
 use App\Events\PlayerCombatStateChanged;
 use App\Models\CombatChallenge;
 use App\Models\Node;
-use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Services\BountyService;
-use App\Services\PacketHijackLifecycleService;
+use App\Services\CyberDocService;
 use App\Services\PacketHijackMatchSetupService;
-use App\Services\PacketHijackService;
 use App\Services\RigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,10 +48,9 @@ class CombatChallengeController extends Controller
     private const DECLINE_SS_DAMAGE = 20;
 
     public function __construct(
-        private readonly BountyService              $bountyService,
-        private readonly RigService                 $rigService,
-        private readonly PacketHijackService        $phService,
-        private readonly PacketHijackLifecycleService  $lifecycleService,
+        private readonly BountyService               $bountyService,
+        private readonly CyberDocService             $cyberDocService,
+        private readonly RigService                  $rigService,
         private readonly PacketHijackMatchSetupService $setupService,
     ) {}
 
@@ -217,8 +214,8 @@ class CombatChallengeController extends Controller
      *
      * Polled by the challenger after sending a challenge.
      * Returns the current challenge status so the challenger knows when the
-     * target has accepted (and can launch GridBreach) or declined (and can
-     * receive the decline penalty payload).
+     * target has accepted (triggers Packet Hijack via PacketHijackStarted WS event)
+     * or declined (and can receive the decline penalty payload).
      */
     public function status(Request $request, string $id): JsonResponse
     {
@@ -258,7 +255,6 @@ class CombatChallengeController extends Controller
         }
 
         $me = Player::where('user_id', $request->user()->id)->first();
-        \Log::error('ACCEPT DEBUG', ['me' => $me?->id, 'target' => $challenge?->target_id, 'challenge' => $id, 'user' => $request->user()?->id]);
         if ($me?->id !== $challenge->target_id) {
             return response()->json(['message' => 'Not your challenge.'], 403);
         }
@@ -273,82 +269,9 @@ class CombatChallengeController extends Controller
             \Log::warning('[CombatChallenge] accept broadcast failed', ['error' => $e->getMessage()]);
         }
 
-        // ── Create Packet Hijack match ────────────────────────────────────────
-        $challenger = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
-            ->find($challenge->challenger_id);
-        $defender   = Player::with(['rig.chassis', 'playerPeripherals.peripheral'])
-            ->find($challenge->target_id);
-
-        // Generate unique rig IPs for each player (what the opponent must locate)
-        $challengerRigIp = $this->lifecycleService->generateRigIp();
-        $defenderRigIp   = $this->lifecycleService->generateRigIp();
-
-        // Ensure the two generated IPs are distinct
-        while ($defenderRigIp === $challengerRigIp) {
-            $defenderRigIp = $this->lifecycleService->generateRigIp();
-        }
-
-        // challenger_target_ip = the IP the CHALLENGER must find = DEFENDER's rig
-        // defender_target_ip   = the IP the DEFENDER must find   = CHALLENGER's rig
-        $challengerRig = $challenger?->rig;
-        $defenderRig   = $defender?->rig;
-
-        $challengerStats = $challengerRig ? $this->rigService->effectiveStats($challengerRig, $challenger) : null;
-        $defenderStats   = $defenderRig   ? $this->rigService->effectiveStats($defenderRig,   $defender)   : null;
-        $challengerOs    = (int) ($challengerStats['os']['effective'] ?? 1);
-        $defenderOs      = (int) ($defenderStats['os']['effective']   ?? 1);
-
-        // Suspect boards: challenger hunts defenderRigIp in a board seeded by defender's OS.
-        // Defender hunts challengerRigIp in a board seeded by challenger's OS.
-        $challengerSuspects = $this->lifecycleService->generateNodeConnections($defenderRigIp,   $defenderOs);
-        $defenderSuspects   = $this->lifecycleService->generateNodeConnections($challengerRigIp, $challengerOs);
-
-        $challengerRig = $challengerRig ?? $this->rigService->getRigForPlayer($challenger);
-        $defenderRig   = $defenderRig   ?? $this->rigService->getRigForPlayer($defender);
-
-        $challengerPorts = $challengerRig && $challenger
-            ? $this->setupService->generatePortTopology($challengerRig, $challenger)
-            : [];
-
-        $defenderPorts = $defenderRig && $defender
-            ? $this->setupService->generatePortTopology($defenderRig, $defender)
-            : [];
-
-        // Phase 2 fingerprints — challenger attacks defender's system, defender attacks challenger's.
-        // Fingerprint derives Tier 1 credential prefixes from the TARGET's dominant stat.
-        $challengerFingerprint = ($defenderRig && $defender)
-            ? $this->setupService->generateFingerprint($defenderRig, $defender, $defenderPorts)
-            : [];
-
-        $defenderFingerprint = ($challengerRig && $challenger)
-            ? $this->setupService->generateFingerprint($challengerRig, $challenger, $challengerPorts)
-            : [];
-
-        // Phase 3 filesystems — one per player, wallet randomised per match.
-        $challengerFilesystem = $this->setupService->generateFilesystem();
-        $defenderFilesystem   = $this->setupService->generateFilesystem();
-
-        /** @var PacketHijackMatch $match */
-        $match = PacketHijackMatch::create([
-            'id'                       => (string) Str::uuid(),
-            'challenger_id'            => $challenge->challenger_id,
-            'defender_id'              => $challenge->target_id,
-            'status'                   => 'phase1',
-            'challenger_target_ip'     => $defenderRigIp,
-            'defender_target_ip'       => $challengerRigIp,
-            'challenger_suspects'      => $challengerSuspects,
-            'defender_suspects'        => $defenderSuspects,
-            'challenger_ports'         => $challengerPorts,
-            'challenger_fingerprint'   => $challengerFingerprint,
-            'challenger_filesystem'    => $challengerFilesystem,
-            'defender_ports'           => $defenderPorts,
-            'defender_fingerprint'     => $defenderFingerprint,
-            'defender_filesystem'      => $defenderFilesystem,
-            'challenger_phase'         => 1,
-            'defender_phase'           => 1,
-            'started_at'               => now(),
-            'expires_at'               => now()->addMinutes(15),
-        ]);
+        // ── Create Packet Hijack match (all setup delegated to service) ──────
+        $match      = $this->setupService->createFromChallenge($challenge);
+        $challenger = Player::find($challenge->challenger_id);
 
         // ── Broadcast started events — blank terminal, player types netstat ───
         try {
@@ -472,7 +395,7 @@ class CombatChallengeController extends Controller
                 'bounty_multiplier' => 1.0,
                 'is_open_season'    => false,
                 'respawn_canvas_id' => $spawnCanvasId,
-                'repair_cost'       => $rig ? $this->rigService->maxSs($rig) * 25 : 0,
+                'repair_cost'       => $rig ? $this->cyberDocService->repairCost($me) : 0,
             ];
         }
 

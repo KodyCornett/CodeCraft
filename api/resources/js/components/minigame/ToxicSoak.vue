@@ -732,21 +732,6 @@ const spliceSourcePackets = computed(() => {
         .filter(Boolean);
 });
 
-// (legacy — kept as dead ref guard; real logic now in spliceOpenField/spliceSourceFields)
-const spliceDestFields = computed(() => {
-    if (!splicePacketId.value) return [];
-    const pkt = packetDefs.value[splicePacketId.value];
-    if (!pkt) return [];
-    const connected = fieldConnections.value[pkt.currentField] ?? [];
-    return connected.filter(fid => hasEmptySlot(fid));
-});
-
-const spliceDestEmptySlots = computed(() => {
-    if (!spliceDestFieldId.value) return [];
-    const slots = fieldSlots.value[spliceDestFieldId.value] ?? [];
-    return slots.map((s, i) => i).filter(i => slots[i] === null);
-});
-
 const canSplice = computed(() =>
     !!spliceFieldId.value &&
     !!splicePacketId.value &&

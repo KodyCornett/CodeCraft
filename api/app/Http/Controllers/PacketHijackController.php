@@ -5,14 +5,12 @@ namespace App\Http\Controllers;
 use App\Events\PacketHijackCommandResult;
 use App\Events\PacketHijackMatchComplete;
 use App\Events\PacketHijackPhaseTransition;
-use App\Events\PlayerCombatStateChanged;
-use App\Models\CombatChallenge;
 use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Models\PlayerCommand;
-use App\Services\BountyService;
 use App\Services\PacketHijackLifecycleService;
 use App\Services\PacketHijackService;
+use App\Services\PvpResolutionService;
 use App\Services\RigService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -27,17 +25,17 @@ use Illuminate\Support\Facades\DB;
  *   - Delegate all game logic to PacketHijackService.
  *   - Persist match state changes.
  *   - Dispatch broadcast events.
- *   - Apply PvP economy consequences on match completion.
+ *   - PvP economy consequences delegated to PvpResolutionService.
  *
  * No game math lives here. No business logic lives here.
  */
 class PacketHijackController extends Controller
 {
     public function __construct(
-        private readonly PacketHijackService      $phService,
+        private readonly PacketHijackService          $phService,
         private readonly PacketHijackLifecycleService $lifecycleService,
-        private readonly RigService               $rigService,
-        private readonly BountyService            $bountyService,
+        private readonly RigService                   $rigService,
+        private readonly PvpResolutionService         $pvpResolutionService,
     ) {}
 
     // =========================================================================
@@ -913,22 +911,6 @@ class PacketHijackController extends Controller
         return $this->resolveMatch($match, $me, $role, $raw);
     }
 
-    private function getDirectoryEntries(array $tree, string $path): array
-    {
-        $parts = array_filter(explode('/', $path));
-        $node  = $tree;
-        foreach ($parts as $part) {
-            if (!isset($node[$part])) return [];
-            $node = $node[$part];
-        }
-        if (!is_array($node)) return [];
-        $entries = [];
-        foreach ($node as $name => $contents) {
-            $entries[] = ['name' => $name, 'is_dir' => is_array($contents), 'is_wallet' => $name === 'wallet' && $contents === null];
-        }
-        return $entries;
-    }
-
     // =========================================================================
     // Private — rig command handler (Phase 7)
     // =========================================================================
@@ -1168,76 +1150,20 @@ class PacketHijackController extends Controller
             ]);
         }
 
-        $loserId = $match->opponentIdOf($winner->id);
-        $loser   = Player::find($loserId);
-
-        if ($loser === null) {
-            return response()->json(['message' => 'Opponent player not found.'], 500);
+        // ── Economy, damage, bounty — delegated to PvpResolutionService ──────
+        try {
+            $resolution = $this->pvpResolutionService->resolve($match, $winner);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
         }
 
-        // ── 1. Resolve loot BEFORE damage (mirrors CombatController order) ────
-        $loserRig    = $this->rigService->getRigForPlayer($loser);
-        $winnerRig   = $this->rigService->getRigForPlayer($winner);
-        $damageEvent = null;
-
-        $loserFirewall = $loserRig
-            ? $this->rigService->effectiveStats($loserRig, $loser)['firewall']['effective']
-            : 0;
-        $winnerCpu = $winnerRig
-            ? $this->rigService->effectiveStats($winnerRig, $winner)['cpu']['effective']
-            : 1;
-
-        $pvpDamage     = max(15, 20 + ($winnerCpu * 5) - ($loserFirewall * 5));
-        $currentSs     = (int) ($loserRig?->current_ss ?? 0);
-        $isElimination = $loserRig !== null && ($currentSs - $pvpDamage) <= 0;
-
-        $loot = $this->bountyService->resolvePvpLoot($winner, $loser, $isElimination);
-
-        // ── 2. Apply PvP damage to loser ──────────────────────────────────────
-        if ($loserRig !== null) {
-            $damageResult = $this->rigService->applyDamage(
-                rig:    $loserRig,
-                amount: $pvpDamage,
-                source: 'pvp',
-                player: $loser,
-            );
-            $loserRig    = $damageResult['rig'];
-            $damageEvent = $damageResult['event'];
-        }
-
-        // ── 3. Post-combat silent moves + loser state reset ───────────────────
-        $winner->post_combat_silent_moves = 2;
-        $winner->save();
-
-        if ($damageEvent !== 'critical_failure') {
-            $this->bountyService->resetAfterPvpLoss($loser);
-        }
-        $loser->post_combat_silent_moves = 2;
-        $loser->save();
-
-        // ── 4. Winner bounty escalation ───────────────────────────────────────
-        $this->bountyService->recordPvpWin($winner);
-
-        // ── 5. Mark match complete ────────────────────────────────────────────
+        // ── Mark match complete ────────────────────────────────────────────────
         $match->winner_id    = $winner->id;
         $match->status       = 'complete';
         $match->completed_at = now();
         $match->save();
 
-        // ── 5b. Resolve the originating challenge and clear in-combat state ───
-        $challenge = CombatChallenge::where('challenger_id', $match->challenger_id)
-            ->where('target_id', $match->defender_id)
-            ->where('status', 'accepted')
-            ->first();
-
-        if ($challenge !== null) {
-            $challenge->status = 'resolved';
-            $challenge->save();
-            PlayerCombatStateChanged::dispatch($winner->id, $challenge->node_canvas_id, false);
-            PlayerCombatStateChanged::dispatch($loser->id,  $challenge->node_canvas_id, false);
-        }
-
-        // ── 6. Broadcast outcome to both players ──────────────────────────────
+        // ── Broadcast outcome to both players ──────────────────────────────────
         PacketHijackCommandResult::dispatch(
             matchId:     $match->id,
             playerId:    $winner->id,
@@ -1255,17 +1181,17 @@ class PacketHijackController extends Controller
             playerId:    $winner->id,
             isWinner:    true,
             winnerId:    $winner->id,
-            loserId:     $loser->id,
-            credsStolen: $loot['stolen'],
+            loserId:     $resolution['loser_id'],
+            credsStolen: $resolution['loot_stolen'],
         );
 
         PacketHijackMatchComplete::dispatch(
             matchId:     $match->id,
-            playerId:    $loser->id,
+            playerId:    $resolution['loser_id'],
             isWinner:    false,
             winnerId:    $winner->id,
-            loserId:     $loser->id,
-            credsStolen: $loot['stolen'],
+            loserId:     $resolution['loser_id'],
+            credsStolen: $resolution['loot_stolen'],
         );
 
         return response()->json(['ok' => true]);

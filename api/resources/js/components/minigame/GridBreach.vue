@@ -1076,7 +1076,7 @@ function onDismiss() {
         return;
     }
     if (status.value === 'success') {
-        emit('complete', { resource: props.resource, amount: rewardAmount.value });
+        emit('complete', { resource: props.resource, amount: rewardAmount.value, completionPct: scoreRatio.value });
     } else {
         emit('failed', { resource: props.resource, amount: 0 });
     }

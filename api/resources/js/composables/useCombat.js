@@ -10,9 +10,8 @@
  *   2. Target receives the challenge instantly via Echo private channel listener
  *      (replaces the former 2s GET /api/combat/pending poll)
  *   3. Target calls accept(challengeId) or decline(challengeId)
- *   4. Both clients enter GridBreach PvP mode
- *   5. Winner calls submitResult(winnerId, loserId, nodeId)
- *      -> POST /api/combat/result
+ *   4. On accept: server creates PacketHijackMatch and broadcasts PacketHijackStarted to both players
+ *   5. PacketHijackController resolves the match when the winner submits a verified breach payload
  */
 
 import { ref } from 'vue';
@@ -72,9 +71,6 @@ export function useCombat(playerId) {
         }
     }
 
-    // checkPending kept for any callers that may invoke it directly — no-op now.
-    async function checkPending() {}
-
     async function accept(challengeId) {
         busy.value  = true;
         error.value = null;
@@ -99,35 +95,6 @@ export function useCombat(playerId) {
         } catch { /* silent */ }
         incomingChallenge.value = null;
         return data;
-    }
-
-    // ── Result submission ─────────────────────────────────────────────────────
-
-    async function submitResult(challengeId, score, nodeCanvasId) {
-        busy.value  = true;
-        error.value = null;
-        try {
-            const res = await axios.post('/api/combat/result', {
-                challenge_id:   challengeId,
-                score,
-                node_canvas_id: nodeCanvasId,
-            });
-            return res.data;
-        } catch (e) {
-            error.value = e?.response?.data?.message ?? 'Result submit failed';
-            return null;
-        } finally {
-            busy.value = false;
-        }
-    }
-
-    async function pollResult(challengeId) {
-        try {
-            const res = await axios.get(`/api/combat/result/${challengeId}`);
-            return res.data;
-        } catch {
-            return { resolved: false };
-        }
     }
 
     /**
@@ -174,13 +141,10 @@ export function useCombat(playerId) {
         error,
         incomingChallenge,
         challenge,
-        checkPending,
         startPendingPoll,
         stopPendingPoll,
         accept,
         decline,
-        submitResult,
-        pollResult,
         pollChallengeStatus,
     };
 }

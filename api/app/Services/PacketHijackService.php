@@ -47,7 +47,6 @@ class PacketHijackService
 
     /** Lock duration in seconds when a player hits a honeypot. */
     private const HONEYPOT_LOCK_SECONDS = 3;
-    private const EXPLOIT_THRESHOLD = 25;
 
     /** Number of suspect IPs on the Phase 1 board. */
     private const SUSPECT_COUNT = 14;
