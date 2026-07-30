@@ -3,7 +3,7 @@
 
         <header class="tsg-header">
             <span class="tsg-title">◈ TOXIC_SOAK // OPERATOR MANUAL</span>
-            <span class="tsg-sub">Pressure management protocol — read before your first run</span>
+            <span class="tsg-sub">Cipher-ring decryption protocol — read before your first run</span>
         </header>
 
         <nav class="tsg-nav">
@@ -22,180 +22,134 @@
             <section v-if="activeSection === 'overview'">
                 <h2 class="sec-title">WHAT IS TOXIC_SOAK</h2>
                 <p class="sec-body">
-                    Toxic_Soak is a pressure-management sequence. You are feeding corrupted
-                    data into a sink node — the architecture is absorbing toxicity across
-                    multiple process vectors. Your job is to vent each vector before it
-                    overflows and destabilises your rig.
+                    Toxic_Soak is a cipher-cracking sequence. A stack of concentric rings sits
+                    over the node's encryption core — each ring holds a single digit (0–9) at
+                    the read marker. Rotate the rings until every marker digit matches the
+                    current target cipher, and the code cracks.
                 </p>
                 <p class="sec-body">
-                    Unlike most minigames, the absorption is working in your favour.
-                    The primary bar (ABSORPTION) fills automatically over time — when it
-                    completes, the soak is done and you win. The only way to fail is to
-                    let your stability crash before absorption finishes.
+                    Crack enough codes before the ICE trace locks your signal and you're
+                    through. Each successful crack rolls a fresh target and re-scrambles every
+                    ring — there is no partial credit carried between codes.
                 </p>
 
                 <div class="sec-rule">
                     <span class="rule-key hl-green">WIN</span>
-                    <span class="rule-val hl-green">The ABSORPTION bar reaches 100%. Hold position long enough and the soak completes.</span>
+                    <span class="rule-val hl-green">Crack the required number of codes (CODES CRACKED reaches its target) before time or trace run out.</span>
                 </div>
                 <div class="sec-rule">
                     <span class="rule-key hl-red">FAIL</span>
-                    <span class="rule-val hl-red">Rig stability depletes to zero. Too many vector overflows before absorption completes.</span>
+                    <span class="rule-val hl-red">The TRACE meter reaches 100% — ICE has pinpointed your signal.</span>
                 </div>
                 <div class="sec-rule">
                     <span class="rule-key">TIMER</span>
-                    <span class="rule-val">A secondary countdown runs. If it expires, the match fails regardless of absorption level.</span>
+                    <span class="rule-val">A countdown runs independently of trace. If it expires, the run fails regardless of trace level.</span>
                 </div>
                 <div class="sec-rule">
                     <span class="rule-key">KEY INSIGHT</span>
-                    <span class="rule-val">You are not racing to do anything — you are defending. Manage the vectors. Let the absorption fill itself.</span>
+                    <span class="rule-val">Trace climbs on its own the whole run — it isn't triggered by mistakes. Work fast; there's no penalty for a wrong rotation itself.</span>
                 </div>
             </section>
 
-            <!-- ── VECTORS ───────────────────────────────────────────────────── -->
-            <section v-if="activeSection === 'vectors'">
-                <h2 class="sec-title">PRESSURE VECTORS</h2>
+            <!-- ── RINGS ─────────────────────────────────────────────────────── -->
+            <section v-if="activeSection === 'rings'">
+                <h2 class="sec-title">CIPHER RINGS</h2>
                 <p class="sec-body">
-                    Each vector is a named process bleeding data into your architecture.
-                    Pressure builds automatically at a fixed rate per vector. When pressure
-                    hits 100%, the vector overflows — your stability takes a hit and pressure
-                    partially resets.
+                    Every ring cycles through digits 0–9. Only one digit per ring sits under
+                    the fixed marker at the top of the wheel at any time — that's the ring's
+                    current value. Rings are independent; rotating one never moves another.
                 </p>
 
-                <h3 class="subsec-title">VECTOR TYPES</h3>
+                <h3 class="subsec-title">RING COUNT</h3>
                 <div class="vec-block">
-                    <div class="vec-id">PROC_DELTA</div>
-                    <div class="vec-type">DATA_BLEED</div>
-                    <div class="vec-desc">Standard bleed rate. Present at all difficulties. Manageable if vented regularly.</div>
+                    <div class="vec-id">RING COUNT = ICE LEVEL</div>
+                    <div class="vec-type">1:1 SCALING</div>
+                    <div class="vec-desc">The node's ICE rating sets the ring count directly. ICE 3 nodes run a 3-ring cipher; ICE 8 nodes run the full 8-ring wheel — the hardest currently in the game.</div>
                 </div>
                 <div class="vec-block">
-                    <div class="vec-id">PROC_SIGMA</div>
-                    <div class="vec-type">CACHE_FLOOD</div>
-                    <div class="vec-desc">Slightly slower than DELTA. Present at D2+. Fills at a predictable pace.</div>
+                    <div class="vec-id">TARGET CIPHER</div>
+                    <div class="vec-type">ONE DIGIT PER RING</div>
+                    <div class="vec-desc">The target readout above the wheel shows one digit per ring. A digit lights green the instant that ring's current value matches it.</div>
                 </div>
                 <div class="vec-block">
-                    <div class="vec-id">PROC_OMEGA</div>
-                    <div class="vec-type">STACK_LEAK</div>
-                    <div class="vec-desc">Fastest steady build rate. Present at D2+. Will overflow quickly if ignored.</div>
-                </div>
-                <div class="vec-block vec-block--volatile">
-                    <div class="vec-id">PROC_NULL</div>
-                    <div class="vec-type">VOLATILE ⚠</div>
-                    <div class="vec-desc">
-                        D3 only. Unpredictable spikes fire every 3–7 seconds, jumping pressure by
-                        28–43% instantly. Normal build rate is slower than OMEGA — but the spikes
-                        will catch you off guard.
-                    </div>
+                    <div class="vec-id">CODES CRACKED</div>
+                    <div class="vec-type">EQUALS RING COUNT</div>
+                    <div class="vec-desc">The number of codes required to clear the node equals the ring count for that node — an 8-ring node needs 8 codes cracked, not just one.</div>
                 </div>
 
-                <h3 class="subsec-title" style="margin-top:20px">PRESSURE STATES</h3>
+                <h3 class="subsec-title" style="margin-top:20px">TRACE STATES</h3>
                 <div class="sec-rule">
                     <span class="rule-key hl-green">0–60%</span>
-                    <span class="rule-val">Safe. Bar fills green. You have time to vent other vectors first.</span>
+                    <span class="rule-val">Safe. Plenty of runway to work through remaining codes.</span>
                 </div>
                 <div class="sec-rule">
-                    <span class="rule-key hl-amber">60–85%</span>
-                    <span class="rule-val hl-amber">WARN state. Bar turns amber, border highlights. Vent soon.</span>
+                    <span class="rule-key hl-amber">60–90%</span>
+                    <span class="rule-val hl-amber">WARN state. Trace bar and readout turn amber. Pick up the pace.</span>
                 </div>
                 <div class="sec-rule">
-                    <span class="rule-key hl-red">85–100%</span>
-                    <span class="rule-val hl-red">CRITICAL. Bar turns red, border pulses. Vent immediately or overflow.</span>
-                </div>
-                <div class="sec-rule">
-                    <span class="rule-key hl-red">OVERFLOW</span>
-                    <span class="rule-val hl-red">Stability hit. Pressure resets to a partial level — not zero. The overflow tag flashes briefly.</span>
+                    <span class="rule-key hl-red">90–100%</span>
+                    <span class="rule-val hl-red">CRITICAL. Bar turns red and blinks. Screen glitch intensifies. One more tick can end the run.</span>
                 </div>
             </section>
 
-            <!-- ── VENTING ───────────────────────────────────────────────────── -->
-            <section v-if="activeSection === 'venting'">
-                <h2 class="sec-title">VENTING</h2>
+            <!-- ── CONTROLS ──────────────────────────────────────────────────── -->
+            <section v-if="activeSection === 'controls'">
+                <h2 class="sec-title">CONTROLS</h2>
                 <p class="sec-body">
-                    Each vector has a <span class="hl-green">[ VENT ]</span> button.
-                    Clicking it starts a continuous drain — pressure falls at the vent rate
-                    until the vector reaches zero. The button shows <span class="hl-amber">[ VENTING... ]</span>
-                    while draining and becomes available again when the vector empties.
+                    Each ring has its own control row: a <span class="hl-green">‹</span> and
+                    <span class="hl-green">›</span> button that step the ring backward or
+                    forward one digit at a time, plus a live readout of its current value.
+                    A row lights up and gets a <span class="hl-green">✓</span> the moment
+                    that ring matches the target.
                 </p>
                 <p class="sec-body">
-                    You can vent multiple vectors simultaneously. There is no cooldown — the
-                    only limit is that venting one vector does not pause another from building.
-                    All vectors build pressure independently at all times.
+                    When every ring shows a match simultaneously, the code cracks
+                    automatically — there's no separate submit button. The target re-rolls
+                    and every ring re-scrambles to a new random position immediately after,
+                    so the next code always starts from scratch.
                 </p>
 
-                <h3 class="subsec-title">VENT RATES BY DIFFICULTY</h3>
+                <h3 class="subsec-title">TIMING BY ICE LEVEL</h3>
                 <div class="sec-rule">
-                    <span class="rule-key">D1</span>
-                    <span class="rule-val">80% pressure drained per second. Fast relief.</span>
+                    <span class="rule-key">BASE TIMER</span>
+                    <span class="rule-val">210 seconds, plus any RAM bonus from your rig, for the full run regardless of ring count.</span>
                 </div>
                 <div class="sec-rule">
-                    <span class="rule-key">D2</span>
-                    <span class="rule-val">70% per second. Slightly slower — more risk at high pressure.</span>
-                </div>
-                <div class="sec-rule">
-                    <span class="rule-key">D3</span>
-                    <span class="rule-val">65% per second. Vent takes longer, and OMEGA + PROC_NULL build fast. Timing is critical.</span>
+                    <span class="rule-key">TRACE PACE</span>
+                    <span class="rule-val">Trace accelerates as it climbs — roughly 1%/tick early on, up to 4%/tick once trace passes 90%. The curve is the same at every ICE level.</span>
                 </div>
 
                 <div class="sec-callout sec-callout--amber" style="margin-top:20px">
                     <span class="callout-label">STRATEGY</span>
-                    Vent the fastest-building vector first — at D2+ that's PROC_OMEGA.
-                    Don't wait for vectors to hit CRITICAL before reacting. A brief vent
-                    when a vector hits 60% keeps everything manageable.
-                    At D3, watch PROC_NULL constantly — a spike at 70% can push it to overflow
-                    before you react if you're already venting something else.
+                    Because ring count and codes-required both scale with ICE, higher-ICE nodes
+                    don't get a harsher trace curve — they just need more simultaneous alignment
+                    per code and more codes overall. Work outer rings and inner rings in
+                    parallel rather than solving one ring fully before touching the next.
                 </div>
             </section>
 
             <!-- ── DIFFICULTY ────────────────────────────────────────────────── -->
             <section v-if="activeSection === 'difficulty'">
-                <h2 class="sec-title">DIFFICULTY TIERS</h2>
+                <h2 class="sec-title">DIFFICULTY BY ICE LEVEL</h2>
                 <p class="sec-body">
-                    Difficulty controls the number of vectors, their build rates, the overflow
-                    stability penalty, and the post-overflow pressure reset point.
-                    Higher difficulties add more vectors and punish each overflow more severely.
+                    Difficulty scales on a single axis — the node's ICE rating sets both the
+                    ring count and the number of codes required to clear it. The trace timer
+                    and countdown pace stay identical across all ICE levels.
                 </p>
 
-                <div class="diff-block diff-block--1">
-                    <div class="diff-header">
-                        <span class="diff-tier">D1</span>
-                        <span class="diff-name">CONTAINED LEAK</span>
-                    </div>
-                    <div class="sec-rule"><span class="rule-key">VECTORS</span><span class="rule-val">2 — PROC_DELTA (7.5%/s), PROC_SIGMA (6.0%/s)</span></div>
-                    <div class="sec-rule"><span class="rule-key">VENT RATE</span><span class="rule-val">80% / second</span></div>
-                    <div class="sec-rule"><span class="rule-key">OVERFLOW HIT</span><span class="rule-val">18% stability per overflow</span></div>
-                    <div class="sec-rule"><span class="rule-key">OVERFLOW RESET</span><span class="rule-val">Pressure resets to 20%</span></div>
-                </div>
-
-                <div class="diff-block diff-block--2" style="margin-top:12px">
-                    <div class="diff-header">
-                        <span class="diff-tier">D2</span>
-                        <span class="diff-name">SATURATED ENVIRONMENT</span>
-                    </div>
-                    <div class="sec-rule"><span class="rule-key">VECTORS</span><span class="rule-val">3 — DELTA (9.5%/s), SIGMA (8.0%/s), OMEGA (11.0%/s)</span></div>
-                    <div class="sec-rule"><span class="rule-key">VENT RATE</span><span class="rule-val">70% / second</span></div>
-                    <div class="sec-rule"><span class="rule-key">OVERFLOW HIT</span><span class="rule-val">24% stability per overflow</span></div>
-                    <div class="sec-rule"><span class="rule-key">OVERFLOW RESET</span><span class="rule-val">Pressure resets to 28%</span></div>
-                </div>
-
-                <div class="diff-block diff-block--3" style="margin-top:12px">
-                    <div class="diff-header">
-                        <span class="diff-tier">D3</span>
-                        <span class="diff-name">HOSTILE SATURATION</span>
-                    </div>
-                    <div class="sec-rule"><span class="rule-key">VECTORS</span><span class="rule-val">4 — DELTA (11.5%/s), SIGMA (10.0%/s), OMEGA (13.0%/s), NULL (8.5%/s + spikes)</span></div>
-                    <div class="sec-rule"><span class="rule-key">VENT RATE</span><span class="rule-val">65% / second</span></div>
-                    <div class="sec-rule"><span class="rule-key">OVERFLOW HIT</span><span class="rule-val">30% stability per overflow</span></div>
-                    <div class="sec-rule"><span class="rule-key">OVERFLOW RESET</span><span class="rule-val">Pressure resets to 32%</span></div>
-                    <div class="sec-rule"><span class="rule-key">PROC_NULL SPIKES</span><span class="rule-val">+28–43% pressure spike every 3–7 seconds</span></div>
-                </div>
+                <div class="sec-rule"><span class="rule-key">ICE 3</span><span class="rule-val">3 rings — 3 codes to crack</span></div>
+                <div class="sec-rule"><span class="rule-key">ICE 4</span><span class="rule-val">4 rings — 4 codes to crack</span></div>
+                <div class="sec-rule"><span class="rule-key">ICE 5</span><span class="rule-val">5 rings — 5 codes to crack</span></div>
+                <div class="sec-rule"><span class="rule-key">ICE 6</span><span class="rule-val">6 rings — 6 codes to crack</span></div>
+                <div class="sec-rule"><span class="rule-key">ICE 7</span><span class="rule-val">7 rings — 7 codes to crack</span></div>
+                <div class="sec-rule"><span class="rule-key hl-red">ICE 8</span><span class="rule-val hl-red">8 rings — 8 codes to crack (current max)</span></div>
 
                 <div class="sec-callout" style="margin-top:20px">
-                    <span class="callout-label">D3 WARNING</span>
-                    At D3, PROC_OMEGA builds to overflow in under 8 seconds from reset.
-                    After each overflow, it resets to 32% and is back to critical in roughly 5 seconds.
-                    PROC_NULL spikes can push a 50% vector to overflow before you can vent it.
-                    You will need to vent two vectors simultaneously at times.
-                    Three overflows at 30% each eliminates 90% of your stability — one more ends the run.
+                    <span class="callout-label">HIGH-ICE WARNING</span>
+                    At ICE 7–8, aligning all rings at once takes real time even when you know
+                    the target — that's where the fixed 210s timer and the accelerating trace
+                    curve start to bite. There's no way to slow trace down; the only lever you
+                    have is working faster.
                 </div>
             </section>
 
@@ -212,8 +166,8 @@ const activeSection = ref('overview');
 
 const sections = [
     { id: 'overview',   label: 'OVERVIEW'  },
-    { id: 'vectors',    label: 'VECTORS'   },
-    { id: 'venting',    label: 'VENTING'   },
+    { id: 'rings',      label: 'RINGS'     },
+    { id: 'controls',   label: 'CONTROLS'  },
     { id: 'difficulty', label: 'DIFFICULTY'},
 ];
 </script>
