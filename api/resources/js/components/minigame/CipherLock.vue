@@ -73,7 +73,7 @@
                     <div class="cl-legend">
                         <div v-for="entry in legendEntries" :key="entry.letter"
                              class="cl-legend-cell"
-                             :class="{ 'cl-legend-cell--solved': entry.solved }">
+                             :class="{ 'cl-legend-cell--solved': entry.solved, 'cl-legend-cell--wrong': entry.wrong }">
                             <span class="cl-legend-letter">{{ entry.letter }}</span>
                             <span class="cl-legend-code">{{ entry.code }}</span>
                         </div>
@@ -183,6 +183,7 @@ function makeStreamLine() {
 const phrase       = ref('');
 const cipherKey     = ref({ key: {}, reverseKey: {} });
 const solvedLetters = ref(new Set());
+const ruledOutLetters = ref(new Set()); // legend letters confirmed NOT in this phrase
 const guessCode      = ref('');
 const inputEl        = ref(null);
 const timeLeft        = ref(timeForIce(iceLevel.value));
@@ -222,6 +223,7 @@ const legendEntries = computed(() =>
             letter,
             code:   cipherKey.value.key[letter],
             solved: solvedLetters.value.has(letter),
+            wrong:  ruledOutLetters.value.has(letter),
         }))
 );
 
@@ -265,6 +267,12 @@ function submitGuess() {
         return;
     }
 
+    if (letter && ruledOutLetters.value.has(letter)) {
+        // Already confirmed dead — no penalty, just acknowledge.
+        flashFeedback('repeat', `${code} :: ALREADY RULED OUT`);
+        return;
+    }
+
     if (letter && uniqueLetters.value.has(letter)) {
         solvedLetters.value = new Set([...solvedLetters.value, letter]);
         flashFeedback('correct', `${code} :: ${letter}`);
@@ -273,6 +281,11 @@ function submitGuess() {
     }
 
     // Wrong: invalid code, or a valid code for a letter not in this phrase.
+    // When it resolves to a real letter that's just not in this phrase,
+    // flag that legend cell so it's not retried.
+    if (letter) {
+        ruledOutLetters.value = new Set([...ruledOutLetters.value, letter]);
+    }
     wrongGuesses.value++;
     timeLeft.value = Math.max(0, timeLeft.value - WRONG_GUESS_PENALTY);
     flashFeedback('wrong', `${code} :: REJECTED (-${WRONG_GUESS_PENALTY}s)`);
@@ -343,6 +356,7 @@ onMounted(() => {
     phrase.value      = pickNextPhrase();
     cipherKey.value   = makeCipherKey();
     solvedLetters.value = new Set();
+    ruledOutLetters.value = new Set();
 
     // Reveal a few free letters up front based on ICE tier, capped so at
     // least one letter is always left for the player to actually crack.
@@ -370,7 +384,7 @@ onUnmounted(() => {
 ══════════════════════════════════════════════════════════════════════════════ */
 
 .cl-canvas {
-    width: 1920px;
+    width: 100%;
     height: 100%;
     display: grid;
     grid-template-rows: 64px 1fr;
@@ -695,6 +709,17 @@ onUnmounted(() => {
 .cl-legend-cell--solved .cl-legend-letter,
 .cl-legend-cell--solved .cl-legend-code {
     color: rgba(0,255,100,0.5);
+    text-decoration: line-through;
+}
+
+.cl-legend-cell--wrong {
+    border-color: rgba(255,51,51,0.4);
+    background: rgba(20,0,0,0.5);
+}
+
+.cl-legend-cell--wrong .cl-legend-letter,
+.cl-legend-cell--wrong .cl-legend-code {
+    color: rgba(255,51,51,0.55);
     text-decoration: line-through;
 }
 </style>
