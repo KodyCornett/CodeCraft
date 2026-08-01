@@ -78,7 +78,7 @@ const props = defineProps({
 const LABELS = {
     disconnect_layer:   'DISCONNECT_LAYER',
     flush_buffer:       'FLUSH_BUFFER',
-    toxic_soak:         'TOXIC_SOAK',
+    toxic_soak:         'CIPHER_LOCK',
     archive_extraction: 'ARCHIVE_EXTRACTION',
     calibration_tether: 'CALIBRATION_TETHER',
 };

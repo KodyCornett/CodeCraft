@@ -96,14 +96,15 @@ const GAMES = [
         type:  'toxic_soak',
         built: true,
         quest: 'Quest 3 — Float / Spokane Valley',
-        brief: 'Vent pressure vectors before they overflow. Hold until absorption threshold is reached.',
+        brief: 'Decrypt the phrase by typing each letter\'s code from the legend. Wrong codes cost 15s. Edit skin.iceLevel below (3-8) to test different tiers.',
         skin: {
-            primaryBarLabel: 'ABSORPTION',
-            stabilityLabel:  'OVERLOAD',
-            objectiveText:   'Hold position. Anchor until saturation threshold.',
+            primaryBarLabel: 'DECRYPTED',
+            stabilityLabel:  'STABILITY',
+            objectiveText:   'Crack every letter in the phrase before the timer runs out.',
             fileName:        'SV-V9.sys',
-            hideBars:        false,
+            hideBars:        true,
             timeLimit:       240,
+            iceLevel:        5, // change this (3-8) to test different ICE tiers
         },
     },
     {
@@ -151,6 +152,10 @@ function onLaunch(game) {
         dealsDamageOnFail: false,
         difficulty:        selectedDiff.value,
         locksRequired:     selectedLocks.value,
+        // Games that care about ICE tier (e.g. cipher_lock/toxic_soak) can
+        // set skin.iceLevel directly in their GAMES entry above to override
+        // the shared D1/D2/D3 difficulty selector, since ICE runs 3-8.
+        iceLevel:          game.skin.iceLevel ?? selectedDiff.value,
     };
     launch('dev', game.type, skin);
 }

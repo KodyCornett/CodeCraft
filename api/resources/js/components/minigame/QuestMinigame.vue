@@ -21,7 +21,7 @@
 import { computed } from 'vue';
 import DisconnectLayer    from './DisconnectLayer.vue';
 import FlushBuffer        from './FlushBuffer.vue';
-import ToxicSoak          from './ToxicSoak.vue';
+import CipherLock         from './CipherLock.vue';
 import ArchiveExtraction  from './ArchiveExtraction.vue';
 
 // Register game components here as they are built.
@@ -29,7 +29,7 @@ import ArchiveExtraction  from './ArchiveExtraction.vue';
 const GAMES = {
     disconnect_layer:   DisconnectLayer,
     flush_buffer:       FlushBuffer,
-    toxic_soak:         ToxicSoak,
+    toxic_soak:         CipherLock,
     archive_extraction: ArchiveExtraction,
     // calibration_tether: CalibrationTether, -- not yet built
 };
