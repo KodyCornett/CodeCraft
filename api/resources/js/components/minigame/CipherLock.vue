@@ -105,6 +105,14 @@ function timeForIce(ice) {
     return TIME_AT_ICE_3 - (ice - 3) * TIME_STEP_PER_TIER;
 }
 
+// Free letters revealed before the timer starts — eases lower ICE tiers,
+// nothing given away at the top end.
+function freeLettersForIce(ice) {
+    if (ice <= 4) return 3;
+    if (ice <= 6) return 2;
+    return 0;
+}
+
 // ── Utilities ────────────────────────────────────────────────────────────────────
 
 function shuffle(arr) {
@@ -285,6 +293,13 @@ onMounted(() => {
     phrase.value      = pickNextPhrase();
     cipherKey.value   = makeCipherKey();
     solvedLetters.value = new Set();
+
+    // Reveal a few free letters up front based on ICE tier, capped so at
+    // least one letter is always left for the player to actually crack.
+    const pool     = shuffle([...uniqueLetters.value]);
+    const freeCount = Math.min(freeLettersForIce(iceLevel.value), Math.max(0, pool.length - 1));
+    solvedLetters.value = new Set(pool.slice(0, freeCount));
+
     timeLeft.value    = timeForIce(iceLevel.value);
     startTimer();
     nextTick(() => inputEl.value?.focus());
