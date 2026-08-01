@@ -20,6 +20,15 @@
                     <span class="cl-codes-lbl">LETTERS CRACKED</span>
                     <span class="cl-codes-val">{{ lettersCracked }} / {{ lettersRequired }}</span>
                 </div>
+                <div class="cl-wrong-readout">
+                    <span class="cl-wrong-lbl">WRONG GUESSES</span>
+                    <div class="cl-wrong-pips">
+                        <span v-for="i in WRONG_PIP_CAP" :key="i"
+                              class="cl-wrong-pip"
+                              :class="{ 'cl-wrong-pip--used': i <= wrongGuesses }">●</span>
+                    </div>
+                    <span class="cl-wrong-val" :class="{ 'cl-wrong-val--hot': wrongGuesses > 0 }">{{ wrongGuesses }}</span>
+                </div>
             </div>
 
             <!-- ══════════════════════════════════════════════════════════════
@@ -27,44 +36,56 @@
             ══════════════════════════════════════════════════════════════ -->
             <div class="cl-middle">
 
-                <!-- Blanked phrase -->
-                <div class="cl-phrase-row">
-                    <template v-for="(cell, i) in displayCells" :key="i">
-                        <span v-if="cell.type === 'space'" class="cl-space" />
-                        <span v-else class="cl-cell" :class="{ 'cl-cell--revealed': cell.revealed }">
-                            {{ cell.revealed ? cell.ch : '_' }}
-                        </span>
-                    </template>
+                <div class="cl-content">
+
+                    <!-- Blanked phrase -->
+                    <div class="cl-phrase-row">
+                        <template v-for="(cell, i) in displayCells" :key="i">
+                            <span v-if="cell.type === 'space'" class="cl-space" />
+                            <span v-else class="cl-cell" :class="{ 'cl-cell--revealed': cell.revealed }">
+                                {{ cell.revealed ? cell.ch : '_' }}
+                            </span>
+                        </template>
+                    </div>
+
+                    <!-- Feedback flash -->
+                    <div class="cl-feedback" :class="feedbackClass">{{ feedbackText }}</div>
+
+                    <!-- Input row -->
+                    <div class="cl-input-row">
+                        <span class="cl-input-lbl">DECRYPT KEY ::</span>
+                        <input
+                            ref="inputEl"
+                            v-model="guessCode"
+                            class="cl-input"
+                            type="text"
+                            maxlength="2"
+                            placeholder="__"
+                            :disabled="!!gameResult"
+                            @keyup.enter="submitGuess"
+                        />
+                        <button class="cl-submit-btn" :disabled="!!gameResult || !guessCode" @click="submitGuess">
+                            [ SUBMIT ]
+                        </button>
+                    </div>
+
+                    <!-- Cipher legend -->
+                    <div class="cl-legend">
+                        <div v-for="entry in legendEntries" :key="entry.letter"
+                             class="cl-legend-cell"
+                             :class="{ 'cl-legend-cell--solved': entry.solved }">
+                            <span class="cl-legend-letter">{{ entry.letter }}</span>
+                            <span class="cl-legend-code">{{ entry.code }}</span>
+                        </div>
+                    </div>
+
                 </div>
 
-                <!-- Feedback flash -->
-                <div class="cl-feedback" :class="feedbackClass">{{ feedbackText }}</div>
-
-                <!-- Input row -->
-                <div class="cl-input-row">
-                    <span class="cl-input-lbl">DECRYPT KEY ::</span>
-                    <input
-                        ref="inputEl"
-                        v-model="guessCode"
-                        class="cl-input"
-                        type="text"
-                        maxlength="2"
-                        placeholder="__"
-                        :disabled="!!gameResult"
-                        @keyup.enter="submitGuess"
-                    />
-                    <button class="cl-submit-btn" :disabled="!!gameResult || !guessCode" @click="submitGuess">
-                        [ SUBMIT ]
-                    </button>
-                </div>
-
-                <!-- Cipher legend -->
-                <div class="cl-legend">
-                    <div v-for="entry in legendEntries" :key="entry.letter"
-                         class="cl-legend-cell"
-                         :class="{ 'cl-legend-cell--solved': entry.solved }">
-                        <span class="cl-legend-letter">{{ entry.letter }}</span>
-                        <span class="cl-legend-code">{{ entry.code }}</span>
+                <!-- Decorative raw-stream panel — ambient hacking noise -->
+                <div class="cl-stream-panel">
+                    <span class="cl-stream-title">RAW STREAM // UNVERIFIED</span>
+                    <div class="cl-stream-body">
+                        <div v-for="(line, i) in streamLines" :key="i" class="cl-stream-line">{{ line }}</div>
                     </div>
                 </div>
 
@@ -85,6 +106,12 @@ import { pickNextPhrase } from '@/data/cipherLockPhrases.js';
 const WRONG_GUESS_PENALTY = 15; // seconds lost on a wrong guess
 const TIME_AT_ICE_3       = 240; // seconds
 const TIME_STEP_PER_TIER  = 30;  // seconds shaved off per ICE tier above 3
+const WRONG_PIP_CAP       = 8;   // pip slots shown in the top bar before they just stay lit
+
+// Decorative raw-stream panel — ambient noise, no gameplay effect.
+const STREAM_LINE_COUNT   = 22;
+const STREAM_GROUPS_PER_LINE = 7;
+const STREAM_TICK_MS      = 220; // how often a random line re-rolls
 
 // Characters used to build the 2-char decrypt codes. Deliberately excludes
 // 0/O and 1/I/L so codes stay readable at a glance.
@@ -143,6 +170,14 @@ function makeCipherKey() {
     return { key, reverseKey };
 }
 
+function makeStreamLine() {
+    return Array.from({ length: STREAM_GROUPS_PER_LINE }, () => {
+        const c1 = CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+        const c2 = CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+        return c1 + c2;
+    }).join(' ');
+}
+
 // ── Game state ───────────────────────────────────────────────────────────────────
 
 const phrase       = ref('');
@@ -155,7 +190,10 @@ const gameResult      = ref(null);   // null | 'success' | 'fail'
 const failReason      = ref('');
 const feedbackText    = ref('');
 const feedbackClass   = ref('');
+const wrongGuesses    = ref(0);
+const streamLines     = ref(Array.from({ length: STREAM_LINE_COUNT }, makeStreamLine));
 let feedbackTimer     = null;
+let streamTickHandle  = null;
 
 // ── Derived ────────────────────────────────────────────────────────────────────
 
@@ -235,6 +273,7 @@ function submitGuess() {
     }
 
     // Wrong: invalid code, or a valid code for a letter not in this phrase.
+    wrongGuesses.value++;
     timeLeft.value = Math.max(0, timeLeft.value - WRONG_GUESS_PENALTY);
     flashFeedback('wrong', `${code} :: REJECTED (-${WRONG_GUESS_PENALTY}s)`);
     if (timeLeft.value <= 0) {
@@ -270,6 +309,17 @@ function startTimer() {
     }, 1000);
 }
 
+// Purely cosmetic — re-rolls a couple of random stream lines each tick so
+// the panel feels "live" without meaning anything.
+function startStreamTick() {
+    streamTickHandle = setInterval(() => {
+        const idxA = Math.floor(Math.random() * streamLines.value.length);
+        const idxB = Math.floor(Math.random() * streamLines.value.length);
+        streamLines.value[idxA] = makeStreamLine();
+        streamLines.value[idxB] = makeStreamLine();
+    }, STREAM_TICK_MS);
+}
+
 // ── Chrome ─────────────────────────────────────────────────────────────────────
 
 const chrome = computed(() => ({
@@ -301,12 +351,15 @@ onMounted(() => {
     solvedLetters.value = new Set(pool.slice(0, freeCount));
 
     timeLeft.value    = timeForIce(iceLevel.value);
+    wrongGuesses.value = 0;
     startTimer();
+    startStreamTick();
     nextTick(() => inputEl.value?.focus());
 });
 
 onUnmounted(() => {
     clearInterval(tickHandle);
+    clearInterval(streamTickHandle);
     if (feedbackTimer) clearTimeout(feedbackTimer);
 });
 </script>
@@ -403,15 +456,100 @@ onUnmounted(() => {
     color: #00ff9d;
 }
 
+.cl-wrong-readout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.cl-wrong-lbl {
+    font-size: 8px;
+    letter-spacing: 0.16em;
+    color: rgba(0,200,240,0.4);
+}
+
+.cl-wrong-pips {
+    display: flex;
+    gap: 3px;
+}
+
+.cl-wrong-pip {
+    font-size: 9px;
+    color: rgba(255,51,51,0.15);
+    transition: color 0.15s;
+}
+
+.cl-wrong-pip--used {
+    color: #ff3333;
+    text-shadow: 0 0 6px rgba(255,51,51,0.6);
+}
+
+.cl-wrong-val {
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 16px;
+    color: rgba(255,51,51,0.5);
+}
+
+.cl-wrong-val--hot {
+    color: #ff3333;
+}
+
 /* ── Middle area ──────────────────────────────────────────────────────────── */
 
 .cl-middle {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    align-items: stretch;
+    gap: 24px;
+    padding: 32px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.cl-content {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 28px;
-    padding: 32px;
+    gap: 32px;
+    min-width: 0;
+}
+
+/* ── Raw-stream side panel (decorative) ──────────────────────────────────── */
+
+.cl-stream-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid rgba(0,200,240,0.15);
+    background: rgba(0,10,18,0.4);
+    overflow: hidden;
+}
+
+.cl-stream-title {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: rgba(0,200,240,0.35);
+    flex-shrink: 0;
+}
+
+.cl-stream-body {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, black 8%, black 92%, transparent);
+}
+
+.cl-stream-line {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: rgba(0,200,240,0.22);
+    white-space: nowrap;
 }
 
 /* ── Phrase display ───────────────────────────────────────────────────────── */
@@ -421,18 +559,18 @@ onUnmounted(() => {
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    max-width: 1200px;
+    gap: 8px;
+    max-width: 1300px;
 }
 
 .cl-cell {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 42px;
+    width: 44px;
+    height: 54px;
     border-bottom: 2px solid rgba(0,200,240,0.4);
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 700;
     color: rgba(0,200,240,0.35);
     transition: color 0.15s, border-color 0.15s;
@@ -522,29 +660,29 @@ onUnmounted(() => {
 
 .cl-legend {
     display: grid;
-    grid-template-columns: repeat(13, minmax(56px, 1fr));
-    gap: 6px;
-    max-width: 1000px;
+    grid-template-columns: repeat(13, minmax(68px, 1fr));
+    gap: 8px;
+    max-width: 1200px;
 }
 
 .cl-legend-cell {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    padding: 6px 4px;
+    gap: 4px;
+    padding: 10px 6px;
     border: 1px solid rgba(0,200,240,0.18);
     background: rgba(0,10,18,0.6);
 }
 
 .cl-legend-letter {
-    font-size: 12px;
+    font-size: 15px;
     font-weight: 700;
     color: rgba(0,200,240,0.7);
 }
 
 .cl-legend-code {
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.06em;
     color: rgba(0,200,240,0.4);
 }
