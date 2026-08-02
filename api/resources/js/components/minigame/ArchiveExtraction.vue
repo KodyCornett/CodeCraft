@@ -37,7 +37,12 @@
                             class="ae-nav-btn"
                             :disabled="!openFileNode && path.length === 0"
                             @click.stop="navBack"
-                        >[ &uarr; UP ]</button>
+                        >
+                            <svg class="ae-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                                <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+                            </svg>
+                            UP
+                        </button>
                         <div class="ae-addressbar">
                             <span
                                 v-for="(seg, i) in breadcrumbSegments"
@@ -64,11 +69,18 @@
                                 @click.stop="onNavRowClick(i)"
                                 @dblclick.stop="onNavRowDblClick(i)"
                             >
-                                <template v-if="entry.type === 'dir'">[DIR] {{ entry.node.name }}/</template>
-                                <template v-else>&nbsp;&nbsp;&nbsp;&nbsp;{{ entry.node.name }}</template>
+                                <svg v-if="entry.type === 'dir'" class="ae-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                                    <path d="M1.5 3.5h4l1.5 2h7.5v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" />
+                                </svg>
+                                <svg v-else class="ae-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                                    <path d="M3.5 1.5h6l3 3v9a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" />
+                                    <path d="M9.5 1.5v3h3" />
+                                </svg>
+                                <span>{{ entry.node.name }}{{ entry.type === 'dir' ? '/' : '' }}</span>
                             </div>
                             <div v-if="entries.length === 0" class="ae-empty-msg">// empty directory</div>
                         </template>
+                        <div v-if="!openFileNode" class="ae-item-count">{{ entries.length }} item{{ entries.length === 1 ? '' : 's' }}</div>
                     </div>
                 </div>
 
@@ -393,9 +405,15 @@ function onBreadcrumbClick(i) {
     openFileNode.value = null;
 }
 
+// Folders first, then files, each alphabetical — matches Explorer's default sort.
 const entries = computed(() => {
     const folder = resolveFolder(path.value);
-    return folder.children.map((c, idx) => ({ type: c.type, node: c, idx }));
+    return folder.children
+        .map((c, idx) => ({ type: c.type, node: c, idx }))
+        .sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+            return a.node.name.localeCompare(b.node.name);
+        });
 });
 
 function moveNav(delta) {
@@ -780,9 +798,12 @@ onUnmounted(() => {
     background: transparent;
     border: 1px solid rgba(0,255,100,0.35);
     color: rgba(0,255,100,0.75);
-    padding: 3px 9px;
+    padding: 3px 10px 3px 8px;
     cursor: pointer;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     transition: all 0.1s;
 }
 .ae-nav-btn:hover:not(:disabled) {
@@ -818,9 +839,12 @@ onUnmounted(() => {
 /* ── File navigator rows ──────────────────────────────────────────────────────── */
 
 .ae-nav-row {
-    padding: 1px 6px;
+    padding: 3px 6px;
     cursor: pointer;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 7px;
     transition: background 0.1s, color 0.1s;
     user-select: none;
 }
@@ -832,6 +856,19 @@ onUnmounted(() => {
 .ae-nav-row--selected {
     background: rgba(0,255,100,0.12);
     box-shadow: inset 2px 0 0 #00ff9d;
+}
+
+.ae-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.ae-item-count {
+    font-size: 8px;
+    color: rgba(0,255,100,0.2);
+    letter-spacing: 0.08em;
+    padding: 6px 6px 2px;
 }
 
 .ae-empty-msg {
