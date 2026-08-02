@@ -31,11 +31,25 @@
                 >
                     <div class="ae-pane-header">
                         <span class="ae-pane-title">FILE NAVIGATOR</span>
-                        <span class="ae-breadcrumb">{{ breadcrumb }}</span>
+                    </div>
+                    <div class="ae-toolbar">
+                        <button
+                            class="ae-nav-btn"
+                            :disabled="!openFileNode && path.length === 0"
+                            @click.stop="navBack"
+                        >[ &uarr; UP ]</button>
+                        <div class="ae-addressbar">
+                            <span
+                                v-for="(seg, i) in breadcrumbSegments"
+                                :key="i"
+                                class="ae-addr-seg"
+                                :class="{ 'ae-addr-seg--current': i === breadcrumbSegments.length - 1 }"
+                                @click.stop="onBreadcrumbClick(i)"
+                            >{{ seg }}<span v-if="i < breadcrumbSegments.length - 1" class="ae-addr-sep">/</span></span>
+                        </div>
                     </div>
                     <div class="ae-pane-body">
                         <template v-if="openFileNode">
-                            <div class="ae-file-name">&gt; {{ openFileNode.name }}</div>
                             <pre class="ae-file-content">{{ openFileNode.content }}</pre>
                         </template>
                         <template v-else>
@@ -48,11 +62,12 @@
                                     i === navIndex ? 'ae-nav-row--selected' : '',
                                 ]"
                                 @click.stop="onNavRowClick(i)"
+                                @dblclick.stop="onNavRowDblClick(i)"
                             >
-                                <template v-if="entry.type === 'up'">.. [ UP ]</template>
-                                <template v-else-if="entry.type === 'dir'">[DIR] {{ entry.node.name }}/</template>
+                                <template v-if="entry.type === 'dir'">[DIR] {{ entry.node.name }}/</template>
                                 <template v-else>&nbsp;&nbsp;&nbsp;&nbsp;{{ entry.node.name }}</template>
                             </div>
+                            <div v-if="entries.length === 0" class="ae-empty-msg">// empty directory</div>
                         </template>
                     </div>
                 </div>
@@ -360,20 +375,27 @@ function resolveFolder(pathArr) {
     return node;
 }
 
-const breadcrumb = computed(() => {
-    if (path.value.length === 0) return 'root/';
+// Explorer-style address bar: one clickable segment per folder level, plus
+// the open file's name as a trailing (non-navigable) segment when reading one.
+const breadcrumbSegments = computed(() => {
     let node = root;
     const parts = ['root'];
     for (const idx of path.value) { node = node.children[idx]; parts.push(node.name); }
-    return parts.join('/') + '/';
+    if (openFileNode.value) parts.push(openFileNode.value.name);
+    return parts;
 });
+
+function onBreadcrumbClick(i) {
+    const fileSegmentIndex = openFileNode.value ? breadcrumbSegments.value.length - 1 : -1;
+    if (i === fileSegmentIndex) return; // clicking the file's own trailing segment is a no-op
+    path.value = path.value.slice(0, i); // i=0 -> root
+    navIndex.value = 0;
+    openFileNode.value = null;
+}
 
 const entries = computed(() => {
     const folder = resolveFolder(path.value);
-    const list = [];
-    if (path.value.length > 0) list.push({ type: 'up' });
-    folder.children.forEach((c, idx) => list.push({ type: c.type, node: c, idx }));
-    return list;
+    return folder.children.map((c, idx) => ({ type: c.type, node: c, idx }));
 });
 
 function moveNav(delta) {
@@ -386,11 +408,7 @@ function moveNav(delta) {
 function activateNavEntry() {
     const entry = entries.value[navIndex.value];
     if (!entry) return;
-    if (entry.type === 'up') {
-        path.value.pop();
-        navIndex.value = 0;
-        openFileNode.value = null;
-    } else if (entry.type === 'dir') {
+    if (entry.type === 'dir') {
         path.value.push(entry.idx);
         navIndex.value = 0;
         openFileNode.value = null;
@@ -399,6 +417,9 @@ function activateNavEntry() {
     }
 }
 
+// Single control for "go up one level" — closes an open file first if one's
+// open, otherwise pops one folder level. Bound to the toolbar's UP button,
+// Escape, and Backspace so there's always an obvious, reachable way back.
 function navBack() {
     if (openFileNode.value) {
         openFileNode.value = null;
@@ -408,7 +429,13 @@ function navBack() {
     }
 }
 
+// Single click selects a row (Explorer convention); double-click or Enter opens it.
 function onNavRowClick(i) {
+    setFocusPane('nav');
+    navIndex.value = i;
+}
+
+function onNavRowDblClick(i) {
     setFocusPane('nav');
     navIndex.value = i;
     activateNavEntry();
@@ -582,7 +609,7 @@ function onGlobalKeydown(e) {
     if (e.key === 'ArrowDown') { e.preventDefault(); moveNav(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveNav(-1); }
     else if (e.key === 'Enter') { e.preventDefault(); activateNavEntry(); }
-    else if (e.key === 'Escape') { e.preventDefault(); navBack(); }
+    else if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); navBack(); }
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -726,7 +753,6 @@ onUnmounted(() => {
 
 .ae-pane-title { font-size: 9px; letter-spacing: 0.16em; color: rgba(0,255,100,0.5); }
 .ae-pane-title--decoder { color: rgba(255,50,50,0.5); }
-.ae-breadcrumb { font-size: 9px; color: rgba(0,255,100,0.3); }
 
 .ae-pane-body {
     flex: 1;
@@ -736,6 +762,59 @@ onUnmounted(() => {
     line-height: 1.6;
 }
 
+/* ── Explorer-style toolbar: UP button + clickable address bar ─────────────────── */
+
+.ae-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(0,255,100,0.1);
+    flex-shrink: 0;
+}
+
+.ae-nav-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    background: transparent;
+    border: 1px solid rgba(0,255,100,0.35);
+    color: rgba(0,255,100,0.75);
+    padding: 3px 9px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.1s;
+}
+.ae-nav-btn:hover:not(:disabled) {
+    background: rgba(0,255,100,0.08);
+    border-color: #00ff9d;
+    color: #00ff9d;
+}
+.ae-nav-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+.ae-addressbar {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    font-size: 9px;
+}
+
+.ae-addr-seg {
+    color: rgba(0,255,100,0.45);
+    cursor: pointer;
+}
+.ae-addr-seg:hover { color: #00ff9d; text-decoration: underline; }
+.ae-addr-seg--current {
+    color: rgba(0,255,100,0.7);
+    cursor: default;
+}
+.ae-addr-seg--current:hover { text-decoration: none; }
+.ae-addr-sep { color: rgba(0,255,100,0.2); margin: 0 3px; cursor: default; }
+
 /* ── File navigator rows ──────────────────────────────────────────────────────── */
 
 .ae-nav-row {
@@ -743,10 +822,10 @@ onUnmounted(() => {
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.1s, color 0.1s;
+    user-select: none;
 }
 .ae-nav-row:hover { background: rgba(0,255,100,0.06); }
 
-.ae-nav-row--up   { color: rgba(0,255,100,0.4); }
 .ae-nav-row--dir  { color: rgba(0,255,100,0.75); }
 .ae-nav-row--file { color: rgba(0,255,100,0.55); }
 
@@ -755,12 +834,11 @@ onUnmounted(() => {
     box-shadow: inset 2px 0 0 #00ff9d;
 }
 
-.ae-file-name {
-    color: rgba(0,255,100,0.55);
-    padding-bottom: 6px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid rgba(0,255,100,0.1);
-    font-size: 10px;
+.ae-empty-msg {
+    font-size: 9px;
+    color: rgba(0,255,100,0.2);
+    padding: 10px 0;
+    text-align: center;
 }
 
 .ae-file-content {
