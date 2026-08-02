@@ -93,7 +93,7 @@ const GAMES = [
         },
     },
     {
-        type:  'toxic_soak',
+        type:  'cipher_lock',
         built: true,
         quest: 'Quest 3 — Float / Spokane Valley',
         brief: 'Decrypt the phrase by typing each letter\'s code from the legend. Wrong codes cost 15s. Edit skin.iceLevel below (3-8) to test different tiers.',
@@ -111,7 +111,7 @@ const GAMES = [
         type:  'archive_extraction',
         built: true,
         quest: 'Quest 4 — Axiom / University District',
-        brief: 'Suppress real ICE probes. Ignore ghost signals. Let the archive pull itself out.',
+        brief: 'Read scattered log files to find plaintext/Base64 pairs, match each to a cipher slot, and decode all 3 before Trace hits 100%. Watch for decoy pairs and corrupted checksums.',
         skin: {
             primaryBarLabel: 'TRACE',
             stabilityLabel:  'STABILITY',
@@ -152,7 +152,7 @@ function onLaunch(game) {
         dealsDamageOnFail: false,
         difficulty:        selectedDiff.value,
         locksRequired:     selectedLocks.value,
-        // Games that care about ICE tier (e.g. cipher_lock/toxic_soak) can
+        // Games that care about ICE tier (e.g. cipher_lock) can
         // set skin.iceLevel directly in their GAMES entry above to override
         // the shared D1/D2/D3 difficulty selector, since ICE runs 3-8.
         iceLevel:          game.skin.iceLevel ?? selectedDiff.value,

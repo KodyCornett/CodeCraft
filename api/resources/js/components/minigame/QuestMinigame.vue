@@ -29,7 +29,7 @@ import ArchiveExtraction  from './ArchiveExtraction.vue';
 const GAMES = {
     disconnect_layer:   DisconnectLayer,
     flush_buffer:       FlushBuffer,
-    toxic_soak:         CipherLock,
+    cipher_lock:        CipherLock,
     archive_extraction: ArchiveExtraction,
     // calibration_tether: CalibrationTether, -- not yet built
 };

@@ -2,92 +2,118 @@
     <QuestMinigameChrome v-bind="chrome">
         <div class="ae-wrap">
 
-            <!-- Archive header -->
-            <div class="ae-header-row">
-                <span class="ae-node-label">ARCHIVE NODE // UD-v17 // PACKET EXTRACTION</span>
-                <span class="ae-block-counter">{{ blocksExtracted }}/{{ TOTAL_BLOCKS }} BLOCKS</span>
-            </div>
+            <!-- Ambient scanline texture — purely decorative -->
+            <div class="ae-noise" />
 
-            <!-- Extraction progress bar -->
-            <div class="ae-extraction-row">
-                <span class="ae-ext-label">EXTRACTION</span>
-                <div class="ae-ext-track">
-                    <div class="ae-ext-fill" :style="{ width: (extractionProgress * 100) + '%' }" />
+            <!-- Top status bar: TRACE meter + SLOTS DECODED readout -->
+            <div class="ae-top">
+                <div class="ae-meter-group">
+                    <span class="ae-meter-lbl">TRACE</span>
+                    <div class="ae-meter-track">
+                        <div class="ae-meter-fill" :class="traceFillClass" :style="{ width: (traceLevel * 100) + '%' }" />
+                    </div>
+                    <span class="ae-meter-val" :class="traceFillClass">{{ Math.round(traceLevel * 100) }}%</span>
                 </div>
-                <span class="ae-ext-pct">{{ Math.round(extractionProgress * 100) }}%</span>
+                <div class="ae-decoded-readout">
+                    <span class="ae-decoded-lbl">SLOTS DECODED</span>
+                    <span class="ae-decoded-val">{{ solvedCount }} / {{ targets.length }}</span>
+                </div>
             </div>
 
-            <!-- Data block grid -->
-            <div class="ae-blocks">
+            <!-- Dual window -->
+            <div class="ae-dual">
+
+                <!-- Left: File Navigator -->
                 <div
-                    v-for="i in TOTAL_BLOCKS"
-                    :key="i"
-                    class="ae-block"
-                    :class="i <= blocksExtracted ? 'ae-block--pulled' : 'ae-block--pending'"
-                >{{ blockLabels[i - 1] }}</div>
-            </div>
-
-            <!-- ICE monitor header -->
-            <div class="ae-monitor-row">
-                <span class="ae-monitor-label">ICE MONITOR</span>
-                <span class="ae-monitor-count" :class="probes.length > 0 ? 'ae-count--active' : ''">
-                    {{ probes.length }} ACTIVE
-                </span>
-                <span v-if="diffLevel === 2" class="ae-monitor-hint">// READ FULL SUFFIX TO CLASSIFY</span>
-                <span v-if="diffLevel === 3" class="ae-monitor-hint">// SRC FORMAT IDENTIFIES ORIGIN</span>
-            </div>
-
-            <!-- Probe feed -->
-            <div class="ae-probe-feed">
-                <TransitionGroup name="ae-probe">
-                    <div
-                        v-for="probe in probes"
-                        :key="probe.id"
-                        class="ae-probe"
-                        :class="{ 'ae-probe--urgent': probe.ttlFraction < 0.30 }"
-                    >
-                        <div class="ae-probe-top">
-                            <span class="ae-probe-id">{{ probe.id }}</span>
-                            <span class="ae-probe-class">{{ probe.classLabel }}</span>
-                            <span
-                                v-if="diffLevel === 1"
-                                class="ae-probe-tag"
-                                :class="probe.isReal ? 'ae-tag--real' : 'ae-tag--ghost'"
-                            >{{ probe.isReal ? '[ ICE ]' : '[ GHOST ]' }}</span>
-                        </div>
-                        <div class="ae-probe-sig">
-                            SRC: <span class="ae-src-val">{{ probe.src }}</span>
-                            &nbsp;// VEC: <span class="ae-vec-val">{{ probe.vec }}</span>
-                        </div>
-                        <div class="ae-probe-controls">
-                            <div class="ae-ttl-track">
-                                <div
-                                    class="ae-ttl-fill"
-                                    :class="probe.ttlFraction < 0.30 ? 'ae-ttl--urgent' : ''"
-                                    :style="{ width: (probe.ttlFraction * 100) + '%' }"
-                                />
+                    class="ae-pane"
+                    :class="{ 'ae-pane--focused': focusPane === 'nav' }"
+                    @click="setFocusPane('nav')"
+                >
+                    <div class="ae-pane-header">
+                        <span class="ae-pane-title">FILE NAVIGATOR</span>
+                        <span class="ae-breadcrumb">{{ breadcrumb }}</span>
+                    </div>
+                    <div class="ae-pane-body">
+                        <template v-if="openFileNode">
+                            <div class="ae-file-name">&gt; {{ openFileNode.name }}</div>
+                            <pre class="ae-file-content">{{ openFileNode.content }}</pre>
+                        </template>
+                        <template v-else>
+                            <div
+                                v-for="(entry, i) in entries"
+                                :key="i"
+                                class="ae-nav-row"
+                                :class="[
+                                    `ae-nav-row--${entry.type}`,
+                                    i === navIndex ? 'ae-nav-row--selected' : '',
+                                ]"
+                                @click.stop="onNavRowClick(i)"
+                            >
+                                <template v-if="entry.type === 'up'">.. [ UP ]</template>
+                                <template v-else-if="entry.type === 'dir'">[DIR] {{ entry.node.name }}/</template>
+                                <template v-else>&nbsp;&nbsp;&nbsp;&nbsp;{{ entry.node.name }}</template>
                             </div>
-                            <button class="ae-suppress-btn" @click="onSuppress(probe.id)">[ SUPPRESS ]</button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Right: Cipher Decoder -->
+                <div
+                    class="ae-pane"
+                    :class="{ 'ae-pane--focused': focusPane === 'decoder' }"
+                    @click="setFocusPane('decoder')"
+                >
+                    <div class="ae-pane-header">
+                        <span class="ae-pane-title ae-pane-title--decoder">CIPHER DECODER</span>
+                    </div>
+                    <div class="ae-pane-body ae-pane-body--decoder">
+                        <div
+                            v-for="(t, i) in targets"
+                            :key="i"
+                            class="ae-slot"
+                            :class="{
+                                'ae-slot--active': focusPane === 'decoder' && i === activeSlotIndex,
+                                'ae-slot--solved': t.solved,
+                            }"
+                        >
+                            <div class="ae-slot-top">
+                                <span class="ae-slot-label">SLOT_0{{ i + 1 }}</span>
+                                <span v-if="t.solved" class="ae-slot-badge">✔ DECODED</span>
+                            </div>
+                            <div class="ae-slot-target">
+                                TARGET: <span class="ae-slot-b64">'{{ t.b64 }}'</span>
+                            </div>
+                            <div class="ae-slot-controls">
+                                <input
+                                    :ref="el => setSlotInputRef(el, i)"
+                                    v-model="slotGuesses[i]"
+                                    class="ae-slot-input"
+                                    :class="{ 'ae-slot-input--shake': shakeFlags[i] }"
+                                    :disabled="t.solved || !!gameResult"
+                                    placeholder="deduced plaintext..."
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                    @focus="onSlotFocus(i)"
+                                    @keydown.up.prevent="moveSlot(-1)"
+                                    @keydown.down.prevent="moveSlot(1)"
+                                    @keyup.enter="submitSlot(i)"
+                                />
+                                <button
+                                    class="ae-slot-submit"
+                                    :disabled="t.solved || !!gameResult"
+                                    @click="submitSlot(i)"
+                                >[ DECODE ]</button>
+                            </div>
                         </div>
                     </div>
-                </TransitionGroup>
-
-                <div v-if="probes.length === 0" class="ae-clear-msg">
-                    // NO ACTIVE SIGNALS — EXTRACTION WINDOW CLEAR
                 </div>
+
             </div>
 
-            <!-- Penalty banners -->
-            <Transition name="ae-err">
-                <div v-if="ghostFlash" class="ae-err-banner">
-                    ⚠ GHOST SIGNAL SUPPRESSED — NOISE SPIKE GENERATED
-                </div>
-            </Transition>
-            <Transition name="ae-err">
-                <div v-if="realMissFlash" class="ae-err-banner ae-err-banner--trace">
-                    ⚠ ICE PROBE COMPLETED — TRACE VECTOR UPDATED
-                </div>
-            </Transition>
+            <!-- Key hint footer -->
+            <div class="ae-hints">
+                [ TAB ] SWITCH PANE &nbsp;&middot;&nbsp; [ &uarr; &darr; ] NAVIGATE &nbsp;&middot;&nbsp; [ ENTER ] OPEN / SUBMIT &nbsp;&middot;&nbsp; [ ESC ] BACK
+            </div>
 
         </div>
     </QuestMinigameChrome>
@@ -96,251 +122,479 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
-import { useQuestMinigameState } from '@/composables/useQuestMinigameState.js';
+
+/* ════════════════════════════════════════════════════════════════════════
+   ARCHIVE EXTRACTION — deduction game.
+   Read scattered log files in a procedurally generated directory tree to
+   find plaintext/Base64 pairs, match each pair's ciphertext to one of three
+   target cipher slots, and decode all three before Trace Level hits 100%.
+   Decoy files carry noise, corrupted checksums, or real-looking pairs for
+   words that AREN'T targets — the read has to be careful, not just fast.
+   ════════════════════════════════════════════════════════════════════════ */
 
 const props = defineProps({ skin: { type: Object, required: true } });
 const emit  = defineEmits(['complete', 'fail']);
 
 // ── Difficulty config ─────────────────────────────────────────────────────────
-
+// D1: fewer files, fewer red-herring pairs, generous trace budget.
+// D2: more files and red herrings, tighter budget.
+// D3: max file count and red herrings, tightest budget — every open file and
+//     every guess costs something.
 const CONFIGS = {
-    1: {
-        extractionDuration: 45,
-        spawnInterval:      { min: 3.0, max: 5.0 },
-        ttlDuration:        { min: 4.5, max: 6.5 },
-        maxActive:          2,
-        traceSpikeReal:     0.18,
-        stabilityHitGhost:  0.15,
-        traceBaseRate:      0.004,
-        stabilityDrain:     0.004,
-        classStyle:         'distinct',
-    },
-    2: {
-        extractionDuration: 50,
-        spawnInterval:      { min: 2.0, max: 3.5 },
-        ttlDuration:        { min: 2.5, max: 4.0 },
-        maxActive:          3,
-        traceSpikeReal:     0.22,
-        stabilityHitGhost:  0.18,
-        traceBaseRate:      0.006,
-        stabilityDrain:     0.006,
-        classStyle:         'similar',
-    },
-    3: {
-        extractionDuration: 55,
-        spawnInterval:      { min: 1.2, max: 2.2 },
-        ttlDuration:        { min: 1.0, max: 1.6 },
-        maxActive:          4,
-        traceSpikeReal:     0.28,
-        stabilityHitGhost:  0.22,
-        traceBaseRate:      0.009,
-        stabilityDrain:     0.008,
-        classStyle:         'src_only',
-    },
+    1: { totalFilesRange: [5, 6], decoyPairCount: 2, traceDurationS: 150, wrongGuessPenalty: 0.03 },
+    2: { totalFilesRange: [6, 7], decoyPairCount: 3, traceDurationS: 120, wrongGuessPenalty: 0.04 },
+    3: { totalFilesRange: [7, 8], decoyPairCount: 4, traceDurationS: 95,  wrongGuessPenalty: 0.05 },
 };
-
-// D1 class labels: clearly distinct words
-const CLASS_REAL_DISTINCT  = ['ICE_SWEEP', 'ICE_PING', 'ICE_TRACE'];
-const CLASS_GHOST_DISTINCT = ['GHOST_ECHO', 'GHOST_ARTIFACT', 'GHOST_BLEED'];
-
-// D2 class labels: share prefix, differ by suffix — must read carefully
-const CLASS_REAL_SIMILAR   = ['SWEEP_ACTIVE', 'PING_ACTIVE', 'TRACE_ACTIVE'];
-const CLASS_GHOST_SIMILAR  = ['SWEEP_ECHO', 'PING_RESIDUAL', 'TRACE_DECAY'];
-
-// D3: all identical — distinguish solely by SRC format
-const CLASS_SRC_ONLY = 'PROBE_SIGNAL';
 
 const diffLevel = props.skin.difficulty ?? 1;
 const config    = CONFIGS[diffLevel] ?? CONFIGS[1];
 
-// ── Shared minigame state ─────────────────────────────────────────────────────
-// We drive stability and primaryProgress manually — no tickShared.
+// ── Word / flavor pools ────────────────────────────────────────────────────────
 
-const {
-    stability, primaryProgress, timeLeft, result, failReason,
-    glitchActive, glitchType, glitchIntensity,
-    stabilityClass, timerClass,
-    applyHit, endGame,
-} = useQuestMinigameState(props.skin);
+const WORDS = [
+    'ghost', 'trace', 'vault', 'cipher', 'shadow', 'signal', 'breach', 'static',
+    'wraith', 'axiom', 'uplink', 'kernel', 'daemon', 'router', 'packet', 'proxy',
+    'nexus', 'splice', 'cache', 'relay', 'forge', 'byte',
+];
 
-// Override timeLeft to extraction duration (not skin.timeLimit which is the trace bar timer)
-timeLeft.value = config.extractionDuration;
+const FOLDER_NAMES = [
+    'sys_cache', 'audit_trail', 'user_partitions', 'archive_root', 'ghost_sectors',
+    'corp_backups', 'watchdog_logs', 'node_diagnostics', 'residual_data',
+    'session_vault', 'ice_quarantine', 'packet_captures', 'legacy_shard',
+];
 
-// ── Extraction state ──────────────────────────────────────────────────────────
+const FILE_NAMES = [
+    'session.log', 'auth_trace.log', 'node_diag.txt', 'packet_dump.log',
+    'watchdog.log', 'residual.dat', 'handshake.log', 'cache_flush.txt',
+    'audit_01.log', 'sector_scan.dat', 'trace_report.log', 'checksum.dat',
+    'link_status.log', 'archive_index.txt',
+];
 
-const TOTAL_BLOCKS      = 24;
-const extractionProgress = ref(0);
+// ── Utilities ──────────────────────────────────────────────────────────────────
 
-const blocksExtracted = computed(() =>
-    Math.min(TOTAL_BLOCKS, Math.floor(extractionProgress.value * TOTAL_BLOCKS))
-);
+function randInt(min, max) { return Math.floor(min + Math.random() * (max - min + 1)); }
+function pick(arr) { return arr[randInt(0, arr.length - 1)]; }
 
-// Pre-generate random hex labels for the data block grid
-const blockLabels = Array.from({ length: TOTAL_BLOCKS }, () =>
-    Math.random().toString(16).substr(2, 4).toUpperCase()
-);
-
-// ── Probe state ───────────────────────────────────────────────────────────────
-
-let probeCounter = 0;
-const probes     = ref([]);
-const ghostFlash     = ref(false);
-const realMissFlash  = ref(false);
-
-function randByte() { return String(Math.floor(Math.random() * 256)).padStart(3, '0'); }
-function randHex(n) {
-    return Math.random().toString(16).substr(2, n).toUpperCase().padStart(n, '0');
+function sampleDistinct(arr, n) {
+    const pool = [...arr];
+    const out = [];
+    while (out.length < n && pool.length > 0) {
+        out.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);
+    }
+    return out;
 }
-function randRange(min, max) { return min + Math.random() * (max - min); }
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-function generateProbe() {
-    const isReal = Math.random() < 0.55; // slight majority real so player has decisions to make
-    const id     = `SIG_${(++probeCounter).toString().padStart(3, '0')}`;
-    const ttl    = randRange(config.ttlDuration.min, config.ttlDuration.max);
+function ts() {
+    const h = String(randInt(0, 23)).padStart(2, '0');
+    const m = String(randInt(0, 59)).padStart(2, '0');
+    const s = String(randInt(0, 59)).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+}
+function hex(n) { return Array.from({ length: n }, () => randInt(0, 15).toString(16)).join('').toUpperCase(); }
+function arcAddr()   { return `ARC.10.${randInt(0, 255)}.${randInt(0, 255)}`; }
+function ghostAddr() { return `GHK.00.${randInt(0, 255)}.${randInt(0, 255)}`; }
 
-    let classLabel;
-    if (config.classStyle === 'distinct') {
-        classLabel = isReal ? pick(CLASS_REAL_DISTINCT) : pick(CLASS_GHOST_DISTINCT);
-    } else if (config.classStyle === 'similar') {
-        classLabel = isReal ? pick(CLASS_REAL_SIMILAR) : pick(CLASS_GHOST_SIMILAR);
+// ── Flavor line generation (decoy / ambient content) ──────────────────────────
+
+const FLAVOR_GENERATORS = [
+    () => `[${ts()}] watchdog: link nominal`,
+    () => `[${ts()}] handshake retry — packet malformed`,
+    () => `[${ts()}] ICE_SWEEP // ${arcAddr()} — no match`,
+    () => `[${ts()}] GHOST_ECHO // ${ghostAddr()} — dismissed`,
+    () => `%$#@ CORRUPT SECTOR 0x${hex(4)} — recovery failed`,
+    () => `ENCODED: '${hex(6)}==' [CHECKSUM FAIL]`,
+    () => `[${ts()}] node integrity nominal`,
+    () => `[${ts()}] session idle — no anomalies`,
+    () => `// SPLICE AUDIT — fragment ${hex(3)}`,
+    () => `[${ts()}] archive index rebuilt (${randInt(100, 999)} entries)`,
+    () => `[${ts()}] trace vector unresolved`,
+    () => `>>> buffer flush complete`,
+    () => `[${ts()}] cache miss — sector 0x${hex(3)}`,
+    () => `[${ts()}] axiom relay: heartbeat ok`,
+    () => `#### fragment unreadable — skipping ####`,
+];
+
+function sampleFlavorLines(min, max) {
+    return Array.from({ length: randInt(min, max) }, () => pick(FLAVOR_GENERATORS)());
+}
+function insertAtRandomPosition(lines, extra) {
+    const copy = [...lines];
+    copy.splice(randInt(0, copy.length), 0, extra);
+    return copy;
+}
+function buildTargetContent(word, b64) {
+    return insertAtRandomPosition(sampleFlavorLines(3, 5), `TOKEN: '${word}' | ENCODED: '${b64}'`).join('\n');
+}
+function buildFakePairContent(word, b64) {
+    return insertAtRandomPosition(sampleFlavorLines(2, 4), `TOKEN: '${word}' | ENCODED: '${b64}'`).join('\n');
+}
+function buildNoiseContent() {
+    return sampleFlavorLines(4, 6).join('\n');
+}
+
+// ── Procedural directory tree ─────────────────────────────────────────────────
+// Builds a 2-3 level folder tree, then scatters 3 target log files (each
+// holding one TOKEN/ENCODED pair matching a cipher slot) plus decoy files
+// (fake pairs for non-target words, or pure noise) across it.
+
+function buildFolderTree() {
+    const used = new Set();
+    function folderName() {
+        let n;
+        do { n = pick(FOLDER_NAMES); } while (used.has(n) && used.size < FOLDER_NAMES.length);
+        used.add(n);
+        return n;
+    }
+
+    const rootNode = { name: 'root', type: 'dir', children: [] };
+    const topCount = randInt(2, 3);
+    for (let i = 0; i < topCount; i++) {
+        const folder = { name: folderName(), type: 'dir', children: [] };
+        rootNode.children.push(folder);
+        if (Math.random() < 0.85) {
+            const subCount = randInt(1, 2);
+            for (let j = 0; j < subCount; j++) {
+                const sub = { name: folderName(), type: 'dir', children: [] };
+                folder.children.push(sub);
+                if (Math.random() < 0.25) {
+                    sub.children.push({ name: folderName(), type: 'dir', children: [] });
+                }
+            }
+        }
+    }
+    return rootNode;
+}
+
+function flattenFolders(node, acc) {
+    acc = acc || [];
+    acc.push(node);
+    node.children.forEach(c => { if (c.type === 'dir') flattenFolders(c, acc); });
+    return acc;
+}
+
+function uniqueFileNameFor(folder) {
+    const existing = new Set(folder.children.filter(c => c.type === 'file').map(c => c.name));
+    let candidates = FILE_NAMES.filter(n => !existing.has(n));
+    if (candidates.length === 0) candidates = FILE_NAMES;
+    let name = pick(candidates);
+    let suffix = 1;
+    while (existing.has(name)) {
+        name = `${pick(FILE_NAMES).replace(/\.[^.]+$/, '')}_${suffix}.log`;
+        suffix++;
+    }
+    return name;
+}
+
+function generateWorld() {
+    const rootNode   = buildFolderTree();
+    const allFolders = flattenFolders(rootNode);
+
+    const targetWords   = sampleDistinct(WORDS, 3);
+    const remainingPool = WORDS.filter(w => !targetWords.includes(w));
+    const decoyPairWords = sampleDistinct(remainingPool, Math.min(config.decoyPairCount, remainingPool.length));
+
+    const totalFiles = randInt(config.totalFilesRange[0], config.totalFilesRange[1]);
+
+    // Scatter target files across distinct folders rather than clumping them.
+    let targetFolders = sampleDistinct(allFolders, Math.min(3, allFolders.length));
+    while (targetFolders.length < 3) targetFolders.push(allFolders[targetFolders.length % allFolders.length]);
+
+    const targets = targetWords.map((word, i) => {
+        const b64    = btoa(word);
+        const folder = targetFolders[i];
+        folder.children.push({
+            name: uniqueFileNameFor(folder),
+            type: 'file',
+            kind: 'target',
+            word, b64,
+            content: buildTargetContent(word, b64),
+        });
+        return { word, b64, solved: false };
+    });
+
+    const remainingCount = Math.max(0, totalFiles - 3);
+    for (let i = 0; i < remainingCount; i++) {
+        const folder = pick(allFolders);
+        let content, kind;
+        if (decoyPairWords.length > 0 && Math.random() < 0.5) {
+            const w = pick(decoyPairWords);
+            content = buildFakePairContent(w, btoa(w));
+            kind = 'decoy-pair';
+        } else {
+            content = buildNoiseContent();
+            kind = 'decoy-noise';
+        }
+        folder.children.push({ name: uniqueFileNameFor(folder), type: 'file', kind, content });
+    }
+
+    return { root: rootNode, targets };
+}
+
+// ── Game state ─────────────────────────────────────────────────────────────────
+
+const world = generateWorld();
+const root  = world.root; // static once generated — plain object, no reactivity needed
+
+const targets = ref(world.targets);          // [{ word, b64, solved }]
+const path        = ref([]);                 // child-index chain from root
+const openFileNode = ref(null);              // file node currently being read, or null
+const navIndex     = ref(0);
+const focusPane     = ref('nav');            // 'nav' | 'decoder'
+const activeSlotIndex = ref(0);
+const slotGuesses  = ref(targets.value.map(() => ''));
+const shakeFlags   = ref(targets.value.map(() => false));
+
+const traceLevel  = ref(0);                  // 0..1
+const gameResult  = ref(null);                // null | 'success' | 'fail'
+const failReason  = ref('');
+const glitchPulse = ref(false);
+
+let tickHandle = null;
+const slotInputEls = []; // DOM refs, keyed by slot index — not reactive state
+
+// ── Tree navigation ────────────────────────────────────────────────────────────
+
+function resolveFolder(pathArr) {
+    let node = root;
+    for (const idx of pathArr) node = node.children[idx];
+    return node;
+}
+
+const breadcrumb = computed(() => {
+    if (path.value.length === 0) return 'root/';
+    let node = root;
+    const parts = ['root'];
+    for (const idx of path.value) { node = node.children[idx]; parts.push(node.name); }
+    return parts.join('/') + '/';
+});
+
+const entries = computed(() => {
+    const folder = resolveFolder(path.value);
+    const list = [];
+    if (path.value.length > 0) list.push({ type: 'up' });
+    folder.children.forEach((c, idx) => list.push({ type: c.type, node: c, idx }));
+    return list;
+});
+
+function moveNav(delta) {
+    if (openFileNode.value) return; // reading a file — arrows don't scroll the list
+    const list = entries.value;
+    if (list.length === 0) return;
+    navIndex.value = (navIndex.value + delta + list.length) % list.length;
+}
+
+function activateNavEntry() {
+    const entry = entries.value[navIndex.value];
+    if (!entry) return;
+    if (entry.type === 'up') {
+        path.value.pop();
+        navIndex.value = 0;
+        openFileNode.value = null;
+    } else if (entry.type === 'dir') {
+        path.value.push(entry.idx);
+        navIndex.value = 0;
+        openFileNode.value = null;
+    } else if (entry.type === 'file') {
+        openFileNode.value = entry.node;
+    }
+}
+
+function navBack() {
+    if (openFileNode.value) {
+        openFileNode.value = null;
+    } else if (path.value.length > 0) {
+        path.value.pop();
+        navIndex.value = 0;
+    }
+}
+
+function onNavRowClick(i) {
+    setFocusPane('nav');
+    navIndex.value = i;
+    activateNavEntry();
+}
+
+// ── Cipher decoder ─────────────────────────────────────────────────────────────
+
+const solvedCount = computed(() => targets.value.filter(t => t.solved).length);
+
+function setSlotInputRef(el, i) { if (el) slotInputEls[i] = el; }
+
+function ensureActiveSlotValid() {
+    const n = targets.value.length;
+    let i = activeSlotIndex.value;
+    let attempts = 0;
+    while (targets.value[i].solved && attempts < n) { i = (i + 1) % n; attempts++; }
+    activeSlotIndex.value = i;
+}
+
+function focusActiveSlotInput() {
+    const el = slotInputEls[activeSlotIndex.value];
+    if (el && !el.disabled) el.focus();
+}
+
+function moveSlot(delta) {
+    const n = targets.value.length;
+    let i = activeSlotIndex.value;
+    for (let attempts = 0; attempts < n; attempts++) {
+        i = (i + delta + n) % n;
+        if (!targets.value[i].solved) break;
+    }
+    activeSlotIndex.value = i;
+    focusActiveSlotInput();
+}
+
+function onSlotFocus(i) {
+    focusPane.value = 'decoder';
+    activeSlotIndex.value = i;
+}
+
+function triggerShake(i) {
+    shakeFlags.value[i] = true;
+    glitchPulse.value   = true;
+    setTimeout(() => {
+        shakeFlags.value[i] = false;
+        glitchPulse.value   = false;
+    }, 400);
+}
+
+function submitSlot(i) {
+    if (gameResult.value) return;
+    const target = targets.value[i];
+    if (target.solved) return;
+
+    const guess = (slotGuesses.value[i] || '').trim().toLowerCase();
+    if (guess.length === 0) return;
+
+    if (guess === target.word) {
+        target.solved = true;
+        slotGuesses.value[i] = target.word;
+        if (targets.value.every(t => t.solved)) {
+            endGame('success', '');
+        } else {
+            moveSlot(1);
+        }
     } else {
-        classLabel = CLASS_SRC_ONLY;
+        triggerShake(i);
+        bumpTrace(config.wrongGuessPenalty);
     }
-
-    // SRC — real: corporate ARC.10.xxx.xxx format; ghost: GHK.00.xxx.xxx
-    const src = isReal
-        ? `ARC.10.${randByte()}.${randByte()}`
-        : `GHK.00.${randByte()}.${randByte()}`;
-
-    const vec = `${randHex(2)}.${randHex(2)}`;
-
-    return { id, isReal, classLabel, src, vec, ttlMax: ttl, ttlLeft: ttl, ttlFraction: 1.0 };
 }
 
-// ── Player interaction ────────────────────────────────────────────────────────
+// ── Pane focus ─────────────────────────────────────────────────────────────────
 
-function onSuppress(id) {
-    if (result.value) return;
-    const idx = probes.value.findIndex(p => p.id === id);
-    if (idx === -1) return;
-
-    const probe = probes.value[idx];
-    probes.value.splice(idx, 1);
-
-    if (!probe.isReal) {
-        // Suppressing a ghost — stability hit (noise spike)
-        applyHit(config.stabilityHitGhost);
-        ghostFlash.value = true;
-        setTimeout(() => { ghostFlash.value = false; }, 1200);
+function setFocusPane(pane) {
+    if (focusPane.value === pane) {
+        if (pane === 'decoder') focusActiveSlotInput();
+        return;
     }
-    // Suppressing a real probe — correct, no penalty
+    focusPane.value = pane;
+    if (pane === 'nav') {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    } else {
+        ensureActiveSlotValid();
+        focusActiveSlotInput();
+    }
 }
 
-// ── Chrome passthrough ────────────────────────────────────────────────────────
+function togglePane() {
+    setFocusPane(focusPane.value === 'nav' ? 'decoder' : 'nav');
+}
+
+// ── Trace level ────────────────────────────────────────────────────────────────
+
+const traceFillClass = computed(() => {
+    if (traceLevel.value >= 0.85) return 'ae-meter--critical';
+    if (traceLevel.value >= 0.6)  return 'ae-meter--warn';
+    return '';
+});
+
+// Seconds remaining before ICE lockdown at the current trace rate — a live,
+// accurate estimate (not a fixed countdown), since wrong guesses spike it.
+const estimatedTimeToLockdown = computed(() =>
+    Math.max(0, (1 - traceLevel.value) * config.traceDurationS)
+);
+
+const timerClass = computed(() => {
+    if (traceLevel.value >= 0.85) return 'timer--critical';
+    if (traceLevel.value >= 0.6)  return 'timer--warn';
+    return '';
+});
+
+function bumpTrace(amount) {
+    traceLevel.value = Math.min(1, traceLevel.value + amount);
+    if (traceLevel.value >= 1) {
+        endGame('fail', '[ICE LOCK] — Trace vector resolved. Location compromised.');
+    }
+}
+
+// ── Win / lose ─────────────────────────────────────────────────────────────────
+
+function endGame(result, reason) {
+    if (gameResult.value) return;
+    gameResult.value = result;
+    failReason.value = reason ?? '';
+    if (tickHandle) clearInterval(tickHandle);
+    if (result === 'success') setTimeout(() => emit('complete'), 2200);
+    else setTimeout(() => emit('fail'), 2200);
+}
+
+// ── Chrome passthrough ─────────────────────────────────────────────────────────
+// Bars are hidden — TRACE / SLOTS DECODED readouts above are purpose-built for
+// this game instead of the generic trace/stability pair (same approach as
+// CipherLock and ToxicSoak use for their own custom layouts).
 
 const chrome = computed(() => ({
     skin:            props.skin,
-    timeLeft:        timeLeft.value,
-    primaryProgress: primaryProgress.value,
-    stability:       stability.value,
-    stabilityClass:  stabilityClass.value,
+    timeLeft:        estimatedTimeToLockdown.value,
+    primaryProgress: 0,
+    stability:       1,
+    stabilityClass:  '',
     timerClass:      timerClass.value,
-    glitchActive:    glitchActive.value,
-    glitchType:      glitchType.value,
-    glitchIntensity: glitchIntensity.value,
-    result:          result.value,
+    glitchActive:    glitchPulse.value,
+    glitchType:      'static',
+    glitchIntensity: 0.15,
+    result:          gameResult.value,
     failReason:      failReason.value,
+    hideBars:        true,
 }));
 
-// ── Game loop ─────────────────────────────────────────────────────────────────
+// ── Tick ───────────────────────────────────────────────────────────────────────
 
-let animFrame     = null;
-let lastTs        = null;
-let spawnTimer    = randRange(config.spawnInterval.min, config.spawnInterval.max);
+const TICK_MS = 200;
 
-function tick(ts) {
-    if (result.value) return;
-
-    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0;
-    lastTs = ts;
-
-    // Extraction progress — advances over extractionDuration
-    extractionProgress.value = Math.min(
-        1,
-        extractionProgress.value + dt / config.extractionDuration
-    );
-
-    // Win — archive fully extracted
-    if (extractionProgress.value >= 1) {
-        endGame('success');
-        setTimeout(() => emit('complete'), 2200);
-        return;
-    }
-
-    // Countdown timer (drives the header display)
-    timeLeft.value = Math.max(0, timeLeft.value - dt);
-
-    // Passive stability drain
-    stability.value = Math.max(0, stability.value - config.stabilityDrain * dt);
-
-    // Passive trace (ICE detection) advance
-    primaryProgress.value = Math.min(1, primaryProgress.value + config.traceBaseRate * dt);
-
-    // Fail — trace complete
-    if (primaryProgress.value >= 1) {
-        endGame('fail', '[ICE LOCK] — Trace vector resolved. Location compromised.');
-        setTimeout(() => emit('fail'), 2200);
-        return;
-    }
-
-    // Fail — stability gone
-    if (stability.value <= 0) {
-        endGame('fail', '[STABILITY CRITICAL] — Architecture saturated. Extraction aborted.');
-        setTimeout(() => emit('fail'), 2200);
-        return;
-    }
-
-    // Tick active probes — remove expired ones
-    const expired = [];
-    for (const p of probes.value) {
-        p.ttlLeft     = Math.max(0, p.ttlLeft - dt);
-        p.ttlFraction = p.ttlLeft / p.ttlMax;
-        if (p.ttlLeft <= 0) expired.push(p.id);
-    }
-
-    for (const id of expired) {
-        const idx   = probes.value.findIndex(p => p.id === id);
-        const probe = probes.value[idx];
-        probes.value.splice(idx, 1);
-
-        if (probe.isReal) {
-            // Real probe expired unhandled — ICE trace spikes
-            primaryProgress.value = Math.min(1, primaryProgress.value + config.traceSpikeReal);
-            realMissFlash.value   = true;
-            setTimeout(() => { realMissFlash.value = false; }, 1200);
-        }
-        // Ghost probe expired — correct, no penalty
-    }
-
-    // Spawn new probe
-    spawnTimer -= dt;
-    if (spawnTimer <= 0 && probes.value.length < config.maxActive) {
-        probes.value.push(generateProbe());
-        spawnTimer = randRange(config.spawnInterval.min, config.spawnInterval.max);
-    }
-
-    animFrame = requestAnimationFrame(tick);
+function startTrace() {
+    const tickAmount = (TICK_MS / 1000) / config.traceDurationS;
+    tickHandle = setInterval(() => {
+        if (gameResult.value) return;
+        bumpTrace(tickAmount);
+    }, TICK_MS);
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
+// ── Global keyboard — Tab always; nav-pane Arrows/Enter/Escape only when the
+//    nav pane is focused. Decoder-pane Arrows/Enter are bound on the slot
+//    inputs directly (see template) so normal typing isn't intercepted here.
+
+function onGlobalKeydown(e) {
+    if (gameResult.value) return;
+    if (e.key === 'Tab') { e.preventDefault(); togglePane(); return; }
+    if (focusPane.value !== 'nav') return;
+
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveNav(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveNav(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); activateNavEntry(); }
+    else if (e.key === 'Escape') { e.preventDefault(); navBack(); }
+}
+
+// ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(() => {
-    animFrame = requestAnimationFrame(tick);
+    document.addEventListener('keydown', onGlobalKeydown);
+    startTrace();
 });
 
 onUnmounted(() => {
-    if (animFrame) cancelAnimationFrame(animFrame);
+    document.removeEventListener('keydown', onGlobalKeydown);
+    if (tickHandle) clearInterval(tickHandle);
 });
 </script>
 
@@ -357,259 +611,271 @@ onUnmounted(() => {
     position: relative;
 }
 
-/* ── Archive header ──────────────────────────────────────────────────────────── */
+.ae-noise {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px,
+        rgba(0,255,100,0.008) 2px, rgba(0,255,100,0.008) 4px);
+}
 
-.ae-header-row {
+/* ── Top status bar ───────────────────────────────────────────────────────────── */
+
+.ae-top {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.ae-meter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.ae-meter-lbl {
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    color: rgba(255,50,50,0.5);
+    flex-shrink: 0;
+}
+
+.ae-meter-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(0,255,100,0.06);
+    overflow: hidden;
+}
+
+.ae-meter-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #003322, #00ff9d);
+    box-shadow: 0 0 8px rgba(0,255,100,0.3);
+    transition: width 0.2s linear, background 0.3s;
+}
+
+.ae-meter-fill.ae-meter--warn     { background: linear-gradient(90deg, #4a1500, #fb923c); }
+.ae-meter-fill.ae-meter--critical {
+    background: linear-gradient(90deg, #4a0000, #ff3333);
+    animation: ae-meter-pulse 0.5s ease infinite alternate;
+}
+
+.ae-meter-val {
+    font-size: 10px;
+    color: rgba(0,255,100,0.5);
+    width: 34px;
+    text-align: right;
+    flex-shrink: 0;
+}
+.ae-meter-val.ae-meter--warn     { color: #fb923c; }
+.ae-meter-val.ae-meter--critical { color: #ff3333; }
+
+.ae-decoded-readout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.ae-decoded-lbl { font-size: 8px; letter-spacing: 0.15em; color: rgba(0,255,100,0.35); }
+.ae-decoded-val { font-size: 11px; color: rgba(0,255,100,0.7); }
+
+@keyframes ae-meter-pulse {
+    from { box-shadow: 0 0 6px rgba(255,51,51,0.4); }
+    to   { box-shadow: 0 0 16px rgba(255,51,51,0.8); }
+}
+
+/* ── Dual window ──────────────────────────────────────────────────────────────── */
+
+.ae-dual {
+    flex: 1;
+    display: flex;
+    gap: 10px;
+    min-height: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.ae-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid rgba(0,255,100,0.15);
+    background: rgba(0,10,6,0.4);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: default;
+}
+
+.ae-pane--focused {
+    border-color: rgba(0,255,100,0.6);
+    box-shadow: inset 0 0 30px rgba(0,255,100,0.04), 0 0 16px rgba(0,255,100,0.08);
+}
+
+.ae-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(0,255,100,0.1);
+    flex-shrink: 0;
+}
+
+.ae-pane-title { font-size: 9px; letter-spacing: 0.16em; color: rgba(0,255,100,0.5); }
+.ae-pane-title--decoder { color: rgba(255,50,50,0.5); }
+.ae-breadcrumb { font-size: 9px; color: rgba(0,255,100,0.3); }
+
+.ae-pane-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 8px;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* ── File navigator rows ──────────────────────────────────────────────────────── */
+
+.ae-nav-row {
+    padding: 1px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
+}
+.ae-nav-row:hover { background: rgba(0,255,100,0.06); }
+
+.ae-nav-row--up   { color: rgba(0,255,100,0.4); }
+.ae-nav-row--dir  { color: rgba(0,255,100,0.75); }
+.ae-nav-row--file { color: rgba(0,255,100,0.55); }
+
+.ae-nav-row--selected {
+    background: rgba(0,255,100,0.12);
+    box-shadow: inset 2px 0 0 #00ff9d;
+}
+
+.ae-file-name {
+    color: rgba(0,255,100,0.55);
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(0,255,100,0.1);
+    font-size: 10px;
+}
+
+.ae-file-content {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    line-height: 1.7;
+    color: rgba(0,255,100,0.7);
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+}
+
+/* ── Cipher decoder ───────────────────────────────────────────────────────────── */
+
+.ae-pane-body--decoder {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ae-slot {
+    border: 1px solid rgba(0,255,100,0.15);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.ae-slot--active {
+    border-color: rgba(0,255,100,0.65);
+    box-shadow: 0 0 12px rgba(0,255,100,0.15);
+}
+
+.ae-slot--solved {
+    border-color: rgba(0,255,100,0.5);
+    background: rgba(0,255,100,0.05);
+}
+
+.ae-slot-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
-.ae-node-label    { font-size: 9px; color: rgba(0,255,100,0.25); letter-spacing: 0.18em; }
-.ae-block-counter { font-size: 9px; color: rgba(0,255,100,0.4);  letter-spacing: 0.1em; }
+.ae-slot-label { font-size: 9px; letter-spacing: 0.12em; color: rgba(0,255,100,0.4); }
 
-/* ── Extraction bar ──────────────────────────────────────────────────────────── */
+.ae-slot-badge {
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: #00ff9d;
+    border: 1px solid rgba(0,255,100,0.4);
+    padding: 1px 6px;
+}
 
-.ae-extraction-row {
+.ae-slot-target { font-size: 11px; color: rgba(0,255,100,0.7); }
+.ae-slot-b64 { color: #fb923c; }
+
+.ae-slot-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
-.ae-ext-label {
-    font-size: 8px;
-    color: rgba(0,255,100,0.35);
-    letter-spacing: 0.15em;
-    width: 90px;
-    flex-shrink: 0;
-}
-
-.ae-ext-track {
+.ae-slot-input {
     flex: 1;
-    height: 5px;
-    background: rgba(0,255,100,0.06);
-    overflow: hidden;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(0,255,100,0.25);
+    color: #00ff9d;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+}
+.ae-slot-input:focus { outline: none; border-color: #00ff9d; }
+.ae-slot-input:disabled {
+    color: rgba(0,255,100,0.7);
+    border-color: rgba(0,255,100,0.4);
+    background: rgba(0,255,100,0.05);
 }
 
-.ae-ext-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #003322, #00ff9d);
-    box-shadow: 0 0 8px rgba(0,255,100,0.3);
-    transition: width 0.2s linear;
+.ae-slot-input--shake { animation: ae-shake 0.35s ease; }
+@keyframes ae-shake {
+    0%, 100% { transform: translateX(0); border-color: rgba(0,255,100,0.25); }
+    20%, 60% { transform: translateX(-4px); border-color: #ff3333; }
+    40%, 80% { transform: translateX(4px); border-color: #ff3333; }
 }
 
-.ae-ext-pct {
-    font-size: 9px;
-    color: rgba(0,255,100,0.5);
-    width: 36px;
-    text-align: right;
-    flex-shrink: 0;
-}
-
-/* ── Data block grid ─────────────────────────────────────────────────────────── */
-
-.ae-blocks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px 0;
-    border-top: 1px solid rgba(0,255,100,0.06);
-    border-bottom: 1px solid rgba(0,255,100,0.06);
-}
-
-.ae-block {
-    font-size: 8px;
-    letter-spacing: 0.05em;
-    padding: 3px 5px;
-    border: 1px solid;
-    transition: all 0.3s ease;
-    min-width: 36px;
-    text-align: center;
-}
-
-.ae-block--pending {
-    color: rgba(0,255,100,0.12);
-    border-color: rgba(0,255,100,0.08);
-    background: transparent;
-}
-
-.ae-block--pulled {
-    color: rgba(0,255,100,0.55);
-    border-color: rgba(0,255,100,0.25);
-    background: rgba(0,255,100,0.04);
-}
-
-/* ── ICE monitor header ──────────────────────────────────────────────────────── */
-
-.ae-monitor-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding-top: 2px;
-}
-
-.ae-monitor-label { font-size: 8px; color: rgba(255,50,50,0.4); letter-spacing: 0.18em; }
-
-.ae-monitor-count {
-    font-size: 9px;
-    color: rgba(0,255,100,0.25);
-    letter-spacing: 0.1em;
-}
-
-.ae-count--active { color: #ff3333; text-shadow: 0 0 6px rgba(255,51,51,0.4); }
-
-.ae-monitor-hint {
-    font-size: 8px;
-    color: rgba(0,255,100,0.18);
-    letter-spacing: 0.1em;
-    margin-left: auto;
-}
-
-/* ── Probe feed ──────────────────────────────────────────────────────────────── */
-
-.ae-probe-feed {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    overflow-y: auto;
-    min-height: 0;
-}
-
-.ae-clear-msg {
-    font-size: 9px;
-    color: rgba(0,255,100,0.18);
-    letter-spacing: 0.12em;
-    padding: 16px 0;
-    text-align: center;
-}
-
-/* ── Individual probe ────────────────────────────────────────────────────────── */
-
-.ae-probe {
-    border: 1px solid rgba(255,50,50,0.2);
-    padding: 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    background: rgba(255,0,0,0.02);
-    transition: border-color 0.2s;
-}
-
-.ae-probe--urgent {
-    border-color: rgba(255,50,50,0.6);
-    background: rgba(255,0,0,0.05);
-    animation: ae-pulse-border 0.4s ease infinite alternate;
-}
-
-.ae-probe-top {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.ae-probe-id    { font-size: 9px;  color: rgba(255,100,100,0.6);  letter-spacing: 0.1em; }
-.ae-probe-class { font-size: 10px; color: rgba(255,160,160,0.75); letter-spacing: 0.08em; font-weight: 700; flex: 1; }
-
-.ae-probe-tag {
-    font-size: 8px;
-    letter-spacing: 0.15em;
-    padding: 2px 6px;
-    border: 1px solid;
-}
-
-.ae-tag--real  { color: #ff3333; border-color: rgba(255,51,51,0.4);  }
-.ae-tag--ghost { color: #4a9a7a; border-color: rgba(74,154,122,0.4); }
-
-.ae-probe-sig {
-    font-size: 9px;
-    color: rgba(0,255,100,0.3);
-    letter-spacing: 0.06em;
-}
-
-.ae-src-val { color: rgba(0,255,100,0.55); }
-.ae-vec-val { color: rgba(0,255,100,0.35); }
-
-.ae-probe-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.ae-ttl-track {
-    flex: 1;
-    height: 3px;
-    background: rgba(255,50,50,0.1);
-    overflow: hidden;
-}
-
-.ae-ttl-fill {
-    height: 100%;
-    background: rgba(255,100,100,0.5);
-    transition: width 0.05s linear, background 0.2s;
-}
-
-.ae-ttl--urgent {
-    background: #ff3333;
-    box-shadow: 0 0 6px rgba(255,51,51,0.5);
-}
-
-.ae-suppress-btn {
+.ae-slot-submit {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.12em;
     background: transparent;
-    border: 1px solid rgba(255,100,100,0.3);
-    color: rgba(255,100,100,0.6);
-    padding: 4px 12px;
+    border: 1px solid rgba(0,255,100,0.3);
+    color: rgba(0,255,100,0.6);
+    padding: 5px 10px;
     cursor: pointer;
     flex-shrink: 0;
     transition: all 0.1s;
 }
-
-.ae-suppress-btn:hover {
-    background: rgba(255,50,50,0.08);
-    border-color: #ff3333;
-    color: #ff6666;
+.ae-slot-submit:hover:not(:disabled) {
+    background: rgba(0,255,100,0.08);
+    border-color: #00ff9d;
+    color: #00ff9d;
 }
+.ae-slot-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* ── Penalty banners ─────────────────────────────────────────────────────────── */
+/* ── Key hint footer ──────────────────────────────────────────────────────────── */
 
-.ae-err-banner {
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 10px;
-    color: #4a9a7a;
-    letter-spacing: 0.15em;
-    background: rgba(0,20,10,0.95);
-    border: 1px solid rgba(74,154,122,0.4);
-    padding: 6px 18px;
-    white-space: nowrap;
-    pointer-events: none;
-}
-
-.ae-err-banner--trace {
-    color: #ff6666;
-    border-color: rgba(255,100,100,0.4);
-    background: rgba(20,0,0,0.95);
-}
-
-/* ── Transitions ─────────────────────────────────────────────────────────────── */
-
-.ae-probe-enter-active { transition: opacity 0.15s ease, transform 0.15s ease; }
-.ae-probe-leave-active { transition: opacity 0.12s ease; }
-.ae-probe-enter-from   { opacity: 0; transform: translateY(-4px); }
-.ae-probe-leave-to     { opacity: 0; }
-
-.ae-err-enter-active, .ae-err-leave-active { transition: opacity 0.2s; }
-.ae-err-enter-from,   .ae-err-leave-to     { opacity: 0; }
-
-/* ── Animations ──────────────────────────────────────────────────────────────── */
-
-@keyframes ae-pulse-border {
-    from { border-color: rgba(255,50,50,0.35); }
-    to   { border-color: rgba(255,50,50,0.75); }
+.ae-hints {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: rgba(0,255,100,0.22);
+    text-align: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
 </style>

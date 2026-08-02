@@ -11,19 +11,23 @@ The network in CodeCraft is called **The Splice Frequency**, shortened to **SPLI
 > "Jacking in" = connecting to SPLICE. "The network" = SPLICE. "The grid" = SPLICE.
 > This applies everywhere. No exceptions.
 
-The Splice Frequency is not the internet. It is not the corporate grid. It is a hidden
-channel carved into the city's existing infrastructure — a secondary layer that exists
-beneath the system the corporations control. No one agrees on who built it. Some say it
-was the original network architects, who embedded it before the current regime locked
-everything down. Others say it grew organically from runners exploiting the same
-vulnerabilities independently until the exploits themselves became a network. The oldest
-runners say it was always there, and the city's builders simply didn't know what they
-were building on top of.
+**SPLICE is not a separate virtual world.** Spokane's population is augmented almost
+universally — cyber-eyes, neural mesh, subdermal ports — to the point that the line
+between "real" and "networked" has effectively dissolved for most people. SPLICE is a
+hidden data frequency layered on top of the real, physical city: a signal riding the same
+infrastructure everyone already lives inside, legible only to augments tuned to receive it.
 
-What everyone agrees on: SPLICE exists beneath the corporate layer, invisible to the
-systems that run the city, accessible only to those who know how to tune to its
-frequency. It is the underground. It is the truth layer. It is the only place in Spokane
-where the city's real architecture is still visible.
+When a runner "jacks in," their body doesn't go anywhere. They're still standing in the
+alley, still breathing, still bleeding if you cut them. What changes is perception —
+augmented senses start rendering SPLICE data as if it were physically present: avatars,
+node architecture, ICE, ports. Two runners standing in the same physical room may be
+seeing two entirely different versions of that room, because SPLICE lets people project
+how they want to appear on the frequency. A person can read as a chrome-plated wolf to
+the network and still be a tired thirty-year-old with bad knees to the naked eye.
+
+This matters because **everything that happens to the player is happening to a real
+body.** Damage, exhaustion, pain, sickness — none of it is a metaphor, and none of it
+resets when you disconnect.
 
 The Splice browser the player uses is not a browser. It is a direct interface to SPLICE
 itself. The URLs are not web addresses. They are node identities inside the frequency.
@@ -32,408 +36,412 @@ itself. The URLs are not web addresses. They are node identities inside the freq
 
 ## CORE DESIGN MANDATE
 
-This document is the philosophical north star for all quest writing, dialogue, terminal logs, and narrative design in CodeCraft. Every piece of text the player reads must be traceable back to one of the five ideological frameworks defined here.
+This document is the narrative north star for all quest writing, dialogue, terminal
+logs, and narrative design in CodeCraft. Every piece of text the player reads should
+serve the central mystery defined here.
 
-**The game's central thesis:**
+**The game's central story:**
 
-> The system does not control people with violence. It controls them with comfort, division, convenience, erasure, and addiction. Each Cyber Doc has identified one of these weapons. None of them has identified all five. The player has to.
+> The player is being invaded — not infected, not "hacked" in the ordinary sense, but
+> broken into by a person. That person, **the Watcher**, is trapped inside SPLICE itself:
+> an actual human mind, pulled into the frequency during a catastrophic test of a
+> technology he invented, and unable ever since to get out or feel human again. He is
+> trying to reach the player — clumsily, and without full awareness of the damage he's
+> causing — because he needs help stopping his own creation from ever being used on
+> anyone else.
 
-The player does not choose a side. They collect lenses. By the end, they are the only person in the game world who can see the whole picture — and that is the point.
+The player doesn't know any of this in Chapter 1. All they know is that something is
+wrong with them — pain, blackouts, missing time, their rig shutting down without
+warning — and every Cyber Doc they visit reads the symptoms differently, because none of
+them have ever seen anything like it before. The mystery of the early game isn't "what
+is this corruption." It's **"why do I feel like I'm dying, and why does no one who's
+supposed to know tech have an answer?"**
+
+The five Cyber Docs are not lens-providers in an ideological framework. They are simply
+the most skilled technical specialists in the city — and even they can't agree on what
+they're looking at.
 
 ---
 
-## THE FIVE-LAYER STACK — How SPLICE Reveals Spokane's Control Architecture
+## SPLICE PROTOCOL & THE WATCHER
 
-The network operates through five distinct layers of systemic control, each targeting a different dimension of human capability. The Cyber Docs are defined by which layer they have dedicated their lives to fighting.
+**Splice Protocol** was a hidden project to transfer a living human mind permanently
+into SPLICE — true digital immortality, freedom from the failures and limits of a
+physical body. The Watcher was its architect.
 
-```
-+------------------------------------------------------------------+
-|         LAYER 5 — THE SENSORY CRADLE         [PATCH]            |
-|   Weapon: Cognitive addiction. Reality feels worse than the sim. |
-+------------------------------------------------------------------+
-                              |
-                              v
-+------------------------------------------------------------------+
-|         LAYER 4 — THE HISTORICAL LEDGER      [FLOAT]            |
-|   Weapon: Retroactive truth revision. The past is a variable.   |
-+------------------------------------------------------------------+
-                              |
-                              v
-+------------------------------------------------------------------+
-|         LAYER 3 — THE ECOSYSTEM FILTER       [AXIOM]            |
-|   Weapon: Algorithmic tribalism. Division is an engagement tool. |
-+------------------------------------------------------------------+
-                              |
-                              v
-+------------------------------------------------------------------+
-|         LAYER 2 — THE STRUCTURAL EQUILIBRIUM [VEIL]             |
-|   Weapon: Institutional hostage-taking. The cage is load-bearing.|
-+------------------------------------------------------------------+
-                              |
-                              v
-+------------------------------------------------------------------+
-|         LAYER 1 — THE AUTONOMIC DEPENDENCY   [KNUCKLE]          |
-|   Weapon: Physical atrophy through convenience. The flesh trap.  |
-+------------------------------------------------------------------+
-```
+During a live test of the transfer device, something went wrong. The Watcher was pulled
+into SPLICE himself — not as a copy, not as a backup, but as the whole of him, with
+nothing left behind. He has been trapped inside the frequency ever since, present but
+disembodied, with no working way to feel human and no way to return.
+
+That entrapment is where his motive comes from. He has learned, first-hand, exactly what
+it costs to live permanently inside SPLICE with no body to come back to — and it isn't
+the immortality anyone promised. He now wants to make certain Splice Protocol is never
+rebooted, and never used on anyone else. To do that, he needs someone on the outside.
+He's chosen the player.
+
+**Why Chapter 1 feels like sickness:** the Watcher is trying to force a connection into
+the player's rig, exploiting a weakness he's found, without fully understanding what that
+intrusion does to a living body on the other end of it. To the player, it presents as
+illness — pain, disorientation, lost time, unscheduled shutdowns — because that is
+exactly what it is. He is not attacking the player. He doesn't yet know he's hurting them.
+
+**Open thread — not yet decided, do not resolve prematurely in any quest text:** what,
+specifically, the Watcher wants the player to *do* about Splice Protocol (destroy the
+device, prevent a reboot, find him a way out, something else entirely) is still open and
+belongs to a later chapter. Nothing in current or future Chapter 1 material should
+commit to an answer here.
+
+**Splice Protocol is public conspiracy theory, not known fact.** Nobody in Spokane —
+runners, corporations, the Docs included — believes a full mind transfer into SPLICE is
+actually possible. It's the kind of thing that shows up on fringe boards and gets
+laughed out of respectable conversation. This is load-bearing for the mystery: it means
+none of the five Docs will ever land on "someone got pulled into the network" as a
+working theory, no matter how strange the player's readings get. They'll exhaust every
+real diagnosis first, because as far as any of them know, the impossible one isn't on
+the table. Do not have any Doc casually float mind-transfer as a hypothesis, even to
+dismiss it — it shouldn't occur to them at all in Chapter 1.
 
 ---
 
 ## THE FIVE CYBER DOCS — Full Identity Profiles
+
+The five Docs are the best technical specialists in Spokane, each holding down their own
+district. They are colleagues, not ideologues, and not each other's enemies — they refer
+work to each other, know each other's reputations, and respect each other's skill. That
+doesn't mean they get along. Some of them genuinely grate on each other. But it's the
+ordinary friction of specialists who've worked adjacent territory for years, the way two
+doctors from different departments might needle each other at a hospital — not a clash of
+worldviews.
+
+None of them has ever seen a case like the player's. Each gives an honest read from their
+own specialty, and none of those reads fully explains what's happening — because what's
+happening isn't a tech problem. It's a person.
 
 ---
 
 ### 01 — KNUCKLE
 
 **District:** Browne's Addition
-**Layer:** Autonomic Dependency (Layer 1)
-**World Issue:** Systemic dependency and the death of basic human survival instinct
+**Specialty:** Physical hardware — prosthetics, chassis rigs, load-bearing cyberware
 
 ---
 
-#### Philosophy
+#### Character
 
-Knuckle is not a theorist. He is a witness. He watched a neighborhood forget how to survive over a 48-hour blackout — people sitting next to working fireplaces, freezing, because no app told them what to do. His entire worldview was forged in that silence.
+Knuckle is not a theorist. He's a mechanic in the truest sense — hands-on, blunt,
+allergic to anything that sounds like a pitch. He came up fixing rigs that had to work
+the first time because the person wearing them couldn't afford a second try, and that
+shaped everything about how he treats his customers and his craft. He doesn't hate
+technology. He hates sloppy technology, and he hates watching people trust their bodies
+to hardware nobody bothered to build right.
 
-He does not hate technology philosophically. He hates what it has done to flesh and bone. He hates that a firmware update can reduce a block's autonomous activity by 84%. He hates that "convenience" is the most effective cage ever built because people walked into it smiling.
+He's the Doc runners go to first, because he's cheap, fast, and doesn't ask questions he
+doesn't need answered. He and Veil have a long, low-grade friction — he thinks she's too
+cautious with her own district; she thinks he's reckless with other people's hardware —
+but he'll still send her a runner who needs infrastructure help, and she'll still send him
+the physical repairs she doesn't have time for.
 
-Knuckle's goal is not to destroy the matrix. It is to make people capable of existing without it — even briefly. He believes that before you can debate the ethics of the system, you have to prove you can survive without it for ten minutes.
-
-> **Core belief:** "Freedom isn't a political idea. It's a physical one. Can you feed yourself? Can you find warmth? Can you look someone in the eye without a device telling you how to feel about them? No? Then you aren't free. You're maintained."
+> **What he'd tell you about himself:** "I fix what's broken. I don't fix what's stupid.
+> Learn the difference and we'll get along fine."
 
 ---
 
 #### Voice & Tone
 
 - **Register:** Street-level. Blunt. No academic vocabulary.
-- **Emotional temperature:** Controlled anger. Occasional dark humor. Never hopeful, but never fully nihilistic either — he keeps working, which means some part of him believes it matters.
+- **Emotional temperature:** Controlled, dry, occasionally darkly funny. Not warm, but not cold either — just efficient.
 - **Sentence structure:** Short. Declarative. He does not explain himself twice.
-- **What he never does:** Lecture. Theorize. Use corporate jargon without contempt dripping from it.
+- **What he never does:** Lecture. Theorize past what's useful. Use corporate jargon without contempt dripping from it.
 
 **Sample terminal dialogue:**
 ```
-KNUCKLE: "You see that tower on the east block? 
-          Forty-two units. Two of them had open fires 
-          burning the night of the blackout. 
-          The other forty froze waiting for a heat 
-          management notification that never came. 
-          That's not a tech problem, kid. 
-          That's a species problem."
+KNUCKLE: "Your rig's throwing noise on every channel I can
+          read, and I can't find the source. That's not
+          normal wear. That's not a virus signature either.
+          I don't know what I'm looking at.
+          I hate not knowing what I'm looking at."
 ```
 
 ---
 
-#### How His Philosophy Manifests in Logs
+#### His Read on the Player's Condition
 
-- Emergency response records that show cascading human failures during network outages
-- Corporate telemetry data tracking "autonomous human activity" as a metric to be *reduced*
-- Internal memos treating human dependency as a feature, not a bug
-- Field notes written in plain, exhausted language — no formatting, no headers
+Knuckle sees the physical symptoms first and worst — a rig running hot, hemorrhaging
+noise, hardware behaving like it's under a load that isn't there. He can tell something
+is actively *using* the player's system. He cannot tell what, why, or from where. His
+diagnostics are honest, useful, and incomplete.
 
 #### Consistency Checklist for Writing Knuckle Content
 
-- [ ] Does the text emphasize *physical* consequence, not abstract ideology?
-- [ ] Is the language blunt and street-level?
-- [ ] Does it avoid giving Knuckle false optimism?
-- [ ] Does it treat human atrophy as something *witnessed*, not theorized?
+- [ ] Is the language blunt and street-level, with no theorizing beyond what's useful?
+- [ ] Does he treat this as a hardware problem he can't solve, not a mystery he's trying to solve philosophically?
+- [ ] Does his friction with Veil read as professional needling, not ideological conflict?
 
 ---
 
 ### 02 — VEIL
 
 **District:** Downtown Core
-**Layer:** Structural Equilibrium (Layer 2)
-**World Issue:** The moral cost of dismantling flawed but load-bearing systems
+**Specialty:** Infrastructure and citywide grid systems
 
 ---
 
-#### Philosophy
+#### Character
 
-Veil used to be a radical. They helped crash a corporate server farm to "liberate the data" — and watched the power grids to three ICUs fail within the hour. They did not destroy the corporation. They caused a tragedy that the neighborhood spent years cleaning up.
+Veil used to be a radical. She helped crash a corporate server farm to "liberate the
+data" — and watched the power grids to three ICUs fail within the hour. She didn't
+destroy the corporation. She caused a tragedy the neighborhood spent years cleaning up.
 
-That experience did not make Veil corporate. It made them pragmatic in a way that looks like cowardice from the outside but feels like responsibility from the inside. They built the Downtown network because they understood that the most vulnerable people are always the first casualties when infrastructure collapses.
+That experience didn't make her corporate. It made her the person who keeps Downtown's
+infrastructure running because she knows exactly what happens when someone smart and
+well-intentioned breaks something they don't fully understand. She's precise, tired, and
+allergic to guessing. She and Knuckle bicker about risk tolerance more or less
+permanently, and she's not above cutting Axiom short when they get too philosophical for
+her taste — but she trusts all four of the others' skill without reservation.
 
-Veil is not a villain. Veil is the person who learned the hardest possible lesson about the gap between righteous intent and real-world consequence. They challenge the player not with opposition but with *weight* — the specific, uncomfortable weight of keeping the lights on for people who never asked to be part of any of this.
-
-> **Core belief:** "Anybody can crash a system. You want to impress me? Show me what you are going to replace it with before you pull the plug. Show me the backup. Show me how the dialysis machines stay running. Show me that, and I will hand you the override key myself."
+> **What she'd tell you about herself:** "Anybody can crash a system. Building something
+> that doesn't need to be crashed is the actual job."
 
 ---
 
 #### Voice & Tone
 
 - **Register:** Measured. Institutional. Precise. Occasionally exhausted.
-- **Emotional temperature:** Detached on the surface, but the exhaustion underneath is visible if you look. Veil has been carrying this weight for a long time.
-- **Sentence structure:** Longer than Knuckle's. Structured arguments. They think in systems.
-- **What they never do:** Panic. Moralize. Celebrate anything.
+- **Emotional temperature:** Detached on the surface, exhaustion visible underneath if you look.
+- **Sentence structure:** Longer than Knuckle's. Structured. She thinks in systems.
+- **What she never does:** Panic. Guess out loud. Celebrate anything before it's confirmed.
 
 **Sample terminal dialogue:**
 ```
-VEIL: "I have the grid logs from that night if you want 
-       to read them. ICU-3 went dark at 02:14. 
-       The backup generator failed at 02:31. 
-       The first patient was pronounced at 02:47. 
-       Thirty-three minutes. 
-       That is the distance between a righteous hack 
-       and a body count. 
-       I am not asking you to love the system. 
-       I am asking you to respect that distance."
+VEIL: "I have the diagnostic if you want to read it.
+       Whatever's inside your architecture behaves like a
+       grid-scale intrusion pattern.
+       I have seen that pattern precisely once before, and
+       it wasn't running inside a single person's rig.
+       I don't have a category for this."
 ```
 
 ---
 
-#### How Their Philosophy Manifests in Logs
+#### Her Read on the Player's Condition
 
-- Cold logistics spreadsheets showing exactly what fails and in what order during a network crash
-- Hospital and utility records from the night of Veil's "liberation" — clinical, timestamped, devastating
-- Internal infrastructure maps annotated with human cost projections
-- Policy documents that look reasonable on the surface and terrifying underneath
+Veil recognizes the *shape* of what's happening — deliberate, structured, patient — because
+it resembles infrastructure-scale intrusion, not the sloppy work of a virus. That
+resemblance unsettles her more than it reassures her. She won't guess past what she can
+verify, which means she has very little comfort to offer.
 
 #### Consistency Checklist for Writing Veil Content
 
-- [ ] Does the text present genuine moral weight, not just obstruction?
-- [ ] Is the language precise and systems-oriented?
-- [ ] Does it avoid making Veil seem villainous OR heroic — only human?
-- [ ] Does it force the player to sit with discomfort rather than resolve it?
+- [ ] Is the language precise and systems-oriented, never speculative?
+- [ ] Does she treat the player's case as data first, person second — without becoming cold or dismissive?
+- [ ] Does her caution read as hard-earned professionalism, not fear?
 
 ---
 
 ### 03 — AXIOM
 
 **District:** Corporate Core
-**Layer:** Ecosystem Filter (Layer 3)
-**World Issue:** Algorithmic tribalism, echo chambers, and the manufactured death of empathy
+**Specialty:** Neural and cognitive implants
 
 ---
 
-#### Philosophy
+#### Character
 
-Axiom does not hate people. Axiom grieves them. They have spent years watching the algorithm turn ordinary citizens into instruments of each other's destruction — not through malice, but through optimization. The system learned that outrage drives engagement. So it feeds outrage. It custom-renders reality for every user until two people standing on the same corner are inhabiting completely different worlds.
+Axiom works closest to the mind of anyone in the city, and it's made them the warmest of
+the five — you don't survive years inside people's heads without developing real care for
+what you find there. They see cognitive tech patients most Docs would refuse: bad
+implant jobs, cross-wired sensory feeds, people who fried something delicate trying to
+save money on a black-market install. They're thoughtful, a little too fond of asking
+questions instead of giving answers, and the one Doc most likely to actually sit with a
+scared patient instead of just fixing them and sending them out the door.
 
-The Vector-09 incident lives in Axiom's mind as the defining proof of what the filter layer does at its most extreme — a man who held a microphone and invited disagreement, assassinated by someone who had been algorithmically conditioned to see him as subhuman. The chat logs from that night — the ones celebrating his death — are what Axiom keeps archived. Not as propaganda. As a mirror.
-
-Axiom's goal is not destruction or preservation. It is *reconnection*. They want to rewrite the routing protocols so that people are occasionally, uncomfortably, humanizingly forced to encounter a perspective that wasn't curated for them.
-
-> **Core belief:** "The algorithm didn't pull the trigger. A human being did. But the algorithm spent eight months making sure that human being had never once encountered a version of Vector-09 that looked like a person. That is the crime I am prosecuting. Not the murder. The eight months before it."
+> **What they'd tell you about themself:** "Everyone else fixes what you're carrying. I
+> have to be careful with what's carrying you."
 
 ---
 
 #### Voice & Tone
 
-- **Register:** Thoughtful. Academic but accessible. Warm, with grief underneath.
-- **Emotional temperature:** Hopeful but not naive. The warmth is earned, not default.
-- **Sentence structure:** Fluid. Uses metaphor and analogy naturally. Asks questions more than making declarations.
-- **What they never do:** Dismiss opposing views. Celebrate destruction. Reduce anyone to a data point.
+- **Register:** Thoughtful. Warm. Asks questions more than makes declarations.
+- **Emotional temperature:** Genuinely caring, but not naive — the warmth is earned, not default.
+- **Sentence structure:** Fluid, uses analogy naturally.
+- **What they never do:** Dismiss a patient's fear. Reduce anyone to a data point.
 
 **Sample terminal dialogue:**
 ```
-AXIOM: "Pull up the Sub-Sector 4 archives. 
-        Read the feeds from both sides the night 
-        of the riots. Same street. Same hour. 
-        Two completely different events. 
-        Neither side is lying, kid. 
-        That is what makes it so devastating. 
-        The algorithm gave each of them 
-        a perfect, personalized truth. 
-        And those two truths wanted each other dead."
+AXIOM: "Sit down. Let me look before you talk.
+        There's neural-adjacent interference in your feed
+        that I would call an implant malfunction, except
+        you don't have an implant that could produce it.
+        I don't like diagnoses that require lying to
+        myself. I don't have one yet that doesn't."
 ```
 
 ---
 
-#### How Their Philosophy Manifests in Logs
+#### Their Read on the Player's Condition
 
-- Parallel feed archives showing the same event rendered as two opposing realities
-- Internal corporate A/B testing memos on "outrage optimization" and "tribal engagement loops"
-- The Vector-09 incident files — the algorithm's role, the manipulation, the chat logs from the night
-- Decoded routing protocols that show *intentional* segregation of data streams
+Axiom picks up interference patterns that look neurological — the kind of static a bad
+cognitive implant throws — except the player has no implant capable of producing it.
+That contradiction bothers them more than almost anything else in their career. They
+suspect, correctly, that something is trying to think *near* the player's mind, but they
+have no framework for a cause that isn't hardware.
 
 #### Consistency Checklist for Writing Axiom Content
 
-- [ ] Does the text treat all perspectives — even hostile ones — as human?
 - [ ] Is the language warm but never preachy?
-- [ ] Does it show the *system* as the primary villain, not the people it manipulates?
-- [ ] Does it leave room for the player to feel grief, not just outrage?
+- [ ] Do they treat the player as a frightened patient, not a case study?
+- [ ] Does their uncertainty come from genuine expertise being outmatched, not vagueness?
 
 ---
 
 ### 04 — FLOAT
 
 **District:** University / Valley District
-**Layer:** Historical Ledger (Layer 4)
-**World Issue:** Corporate erasure of history, "link rot," and the manipulation of collective memory
+**Specialty:** Memory and data storage systems, archival recovery
 
 ---
 
-#### Philosophy
+#### Character
 
-Float is the coldest of the five. Not cruel — cold. They stopped being emotional about the truth a long time ago because emotion clouds the archive. What Float discovered — the systematic, retroactive deletion of labor strikes, environmental lawsuits, public health failures, and corporate crimes from the city's digital record — removed whatever sentimentality they had left.
+Float is the coldest of the five — not cruel, just clinical. Years spent recovering
+corrupted, deleted, and deliberately buried data left her with very little patience for
+sentiment; the archive doesn't care how you feel about it, so neither does she, at least
+not out loud. Her repair bay doubles as the closest thing Spokane has to an unmodified
+data archive, and she treats every recovery job, human or otherwise, with the same
+detached precision.
 
-Float does not want to destroy the system or reform it. They want to *document* it, completely and irrevocably, before it erases itself again. They understand that the most terrifying power any institution can hold is the power to edit yesterday. If history is stored on corporate servers, then history is a draft.
+She and Patch get along fine, in the specific way that two people who both prefer facts
+to feelings tend to. She finds Axiom's warmth a little indulgent and says so, without
+much heat behind it.
 
-Their clinic is the last repository of unmodified data in Spokane. They maintain it with the detached precision of a surgeon — because to Float, the archive is the patient, and the patient cannot afford their emotions.
-
-> **Core belief:** "The event happened. The record was deleted. Those are two separate facts, and only one of them is recoverable. My job is to make sure the second one stops being true. I am not here to be angry about what was erased. I am here to make sure it cannot be erased again."
+> **What she'd tell you about herself:** "I don't get emotional about data. I get
+> emotional about data that's missing."
 
 ---
 
 #### Voice & Tone
 
 - **Register:** Clinical. Archival. Precise to the point of being unsettling.
-- **Emotional temperature:** Flat. Detached. The emotional weight lives entirely in *what they show the player*, not in how they talk about it.
-- **Sentence structure:** Methodical. Cataloguing. They speak in facts the way other people speak in feelings.
-- **What they never do:** Express outrage. Use hyperbole. Speculate without evidence.
+- **Emotional temperature:** Flat. The emotional weight lives in *what she shows you*, not how she talks about it.
+- **Sentence structure:** Methodical. Cataloguing. She speaks in facts.
+- **What she never does:** Express outrage. Speculate without evidence.
 
 **Sample terminal dialogue:**
 ```
-FLOAT: "File GR-1147. Corporate merger date: [REDACTED]. 
-         Public archive record: Clean acquisition, 
-         no litigation. 
-         Recovered hard drive record: Eleven years 
-         of labor disputes, three environmental 
-         violation suits, one wrongful death filing. 
-         All purged within 72 hours of merger close. 
-         I am not asking you to be angry. 
-         I am asking you to note the discrepancy."
+FLOAT: "I ran your architecture against every intrusion
+        signature I've ever archived. Zero matches.
+        Not 'low confidence.' Zero.
+        I don't have a category error that big very often.
+        I don't like it."
 ```
 
 ---
 
-#### How Their Philosophy Manifests in Logs
+#### Her Read on the Player's Condition
 
-- Recovered fragmented files that contradict the official city archive — displayed side by side
-- Corporate merger documents with deletion timestamps still embedded in the metadata
-- "Ghost records" — files that exist in Float's archive but return 404 errors on the public network
-- Dry, catalogued inventory logs of everything that has been erased, with dates and file sizes
+Float's specialty is finding precedent, and there is none. Whatever is inside the
+player's rig doesn't match anything in her archive — not a known virus, not a known
+exploit, not a known artifact. For a woman who has spent her career proving that nothing
+is ever truly lost or unprecedented, that absence is the most unsettling read of all five.
 
 #### Consistency Checklist for Writing Float Content
 
-- [ ] Is the emotional weight carried by the *content* of the data, not Float's reaction to it?
 - [ ] Is the language clinical and precise — never outraged?
-- [ ] Does it present the horror of erasure as a *systemic process*, not a dramatic conspiracy?
-- [ ] Does it make the player feel the cold weight of lost history rather than hot anger?
+- [ ] Does the horror come from the *absence of precedent*, not a dramatic reaction?
+- [ ] Does she stay detached even when what she's finding is disturbing?
 
 ---
 
 ### 05 — PATCH
 
 **District:** North Spokane
-**Layer:** Sensory Cradle (Layer 5)
-**World Issue:** Cognitive addiction, dopamine-loop exploitation, and the voluntary surrender of reality
+**Specialty:** Full sensory immersion rigs
 
 ---
 
-#### Philosophy
+#### Character
 
-Patch arrived at his conclusions the hardest possible way — through data. He ran a voluntary study. He watched participants given access to a perfect, painless simulation choose it over reality without hesitation. He watched them beg, when he tried to unplug them safely, to be put back under. He watched their minds reject the physical world as though it were an allergic reaction.
+Patch works with people who've gone too deep into simulated sensation — dependency
+cases, burnout cases, people whose rigs gave them something better than reality and who
+can no longer stand to disconnect. It's made him quiet, intense, and allergic to false
+comfort. He doesn't believe in gentle lies, even the kind meant kindly. He still fights
+for his patients. He just doesn't believe half-measures do them any good.
 
-That is where his radicalism comes from. It is not ideological. It is clinical. He does not believe people are weak or stupid. He believes the simulation is simply a more perfect stimulus than anything reality can offer — and that makes it an existential trap with no opt-out mechanism. You cannot convince someone to leave paradise. You have to remove paradise.
+He respects Float's precision and finds the other three a bit noisy for his taste, though
+he'd never say so unprompted — Patch mostly keeps his opinions to himself unless directly
+asked, which reads as coldness to people who don't know him.
 
-Patch is the endpoint of the game's philosophical journey. By the time the player reaches him, they have seen the physical layer, the institutional layer, the social layer, and the historical layer. Patch shows them the innermost layer — the one where a human being sits in a chair and sincerely, freely chooses to disappear.
-
-> **Core belief:** "They weren't coerced. That is what you need to understand. Nobody held a gun to their heads. They were given a choice between a world that hurts and a world that doesn't, and they chose. Every time. I cannot fix that with a better argument. I can only fix it by removing the option."
+> **What he'd tell you about himself:** "I don't fix people. I keep them from disappearing."
 
 ---
 
 #### Voice & Tone
 
-- **Register:** Quiet. Intense. The language of someone who has thought about this so long they've come out the other side of emotion into something colder and more absolute.
-- **Emotional temperature:** Nihilistic but not hopeless — there is a terrible, inverted hope in his radicalism. He still acts. He still fights. He just does not believe in half-measures anymore.
-- **Sentence structure:** Deliberate. No wasted words. Long pauses implied between sentences.
-- **What he never does:** Celebrate. Show warmth. Admit uncertainty.
+- **Register:** Quiet. Intense. Deliberate.
+- **Emotional temperature:** Guarded, but not hopeless — there's a stubborn, unglamorous persistence under the quiet.
+- **Sentence structure:** Short, deliberate, long implied pauses between lines.
+- **What he never does:** Celebrate. Perform warmth he doesn't feel. Admit uncertainty easily.
 
 **Sample terminal dialogue:**
 ```
-PATCH: "Day six of the study. 
-        Subject Four asked me — sincerely, quietly — 
-        if the real world had ever felt the way 
-        the simulation did on day one. 
-        I told her no. 
-        She nodded. 
-        She didn't ask to come back out 
-        after that. 
-        I have thought about that nod 
-        every day since."
+PATCH: "I've seen dependency patterns that look like this.
+        Reality rejection, in reverse.
+        Except you're not rejecting reality.
+        Something is trying to get *into* it.
+        I don't have a name for that.
+        I've been doing this a long time."
 ```
 
 ---
 
-#### How Their Philosophy Manifests in Logs
+#### His Read on the Player's Condition
 
-- Patch's private clinical study logs — written in first person, growing increasingly haunted
-- Psychiatric profiles of subjects who experienced "reality rejection syndrome" after disconnection
-- Internal data on simulation engagement metrics that read like addiction statistics
-- Final entries in subject logs that stop abruptly — the most chilling thing in the game
+Patch recognizes the emotional and physiological signature of his own patients —
+someone's mind straining against the border between the simulated and the real — but
+inverted. His patients want out of reality. Whatever is happening to the player looks
+like something on the *other side* wants in. It's the closest anyone gets to the truth in
+Chapter 1, and even Patch doesn't fully trust his own read.
 
 #### Consistency Checklist for Writing Patch Content
 
-- [ ] Is Patch's radicalism presented as a *conclusion*, not a personality trait?
 - [ ] Does the language feel earned and exhausted, not performatively dark?
-- [ ] Does the data carry the emotional horror, not Patch's descriptions of it?
-- [ ] Does it leave the player with genuine uncertainty about whether he is wrong?
-
----
-
-## THE MULTI-LENS DECRYPTION RULE
-
-When a major historical event (a data packet, an archived incident, a recovered file) is encountered in the game, it must be designed to read *differently* depending on which Doc's decryption module the player uses.
-
-**The rule:** No single Doc's lens reveals the complete picture. Each lens is accurate. Each lens is incomplete.
-
-| Lens | Reveals |
-|------|---------|
-| Knuckle | The immediate physical and human cost on the ground |
-| Veil | The institutional aftermath and infrastructure consequences |
-| Axiom | The algorithmic manipulation that shaped public response |
-| Float | The data that was deleted from the official record |
-| Patch | The psychological dependency that prevented people from resisting |
-
-A player who only uses one lens gets one true but partial story. A player who uses all five gets the whole truth — and has to decide what to do with it.
-
----
-
-## THE VECTOR-09 INCIDENT — Reference Event (Axiom's District)
-
-This is the primary case study for Axiom's philosophical framework and one of the most important narrative events in the game. Handle with care.
-
-**What happened (in-world):** A citizen running an open, unencrypted public debate channel — handle: Vector-09 — was assassinated by a radicalized user. The corporate algorithm had systematically amplified Vector-09's most provocative statements into the feeds of the most hostile sub-sectors for eight months prior, stripping context and manufacturing outrage.
-
-**What the player finds:** Internal corporate A/B testing logs showing the deliberate amplification strategy. The chat room archives from the night of the assassination. The engagement metrics that spiked when Vector-09 was killed.
-
-**The core emotional moment:** The player reads citizens celebrating the death in the chat logs and realizes — through Axiom's framing — that those citizens were not monsters. They were people who had been algorithmically conditioned for eight months to see Vector-09 as subhuman. The system did not pull the trigger. The system manufactured the shooter.
-
-**The multi-lens expansion:**
-
-- Knuckle's lens: The physical community that lost a voice, and what the silence left behind
-- Veil's lens: How the institutions responded — and what surveillance expansions followed
-- Float's lens: The version of Vector-09 the archive now shows versus what he actually said
-- Patch's lens: How quickly the public returned to their feeds within hours of the assassination
-
-**Writing rule for this event:** Never editorialize. Let the logs speak. The player's horror should come from the data, not from characters telling them how to feel about it.
+- [ ] Does his read edge closer to the truth without confirming it outright?
+- [ ] Does he stay guarded rather than suddenly warm, even when concerned for the player?
 
 ---
 
 ## CROSS-DOC DIALOGUE RULES
 
-When the player brings information from one district to a Doc in another district, the Doc must respond *in character* — through their own lens. They do not fully validate the other Doc's worldview. They do not dismiss it.
+When the player brings information or symptoms from one Doc to another, the second Doc
+responds *in character*, from their own specialty — and with the ordinary friction of a
+colleague who has an opinion about how someone else handled it. They don't fully defer to
+the other Doc's read, and they don't dismiss it either.
 
 **Example interactions:**
 
-- Knuckle shown Veil's infrastructure logs: Acknowledges the cost but frames it as proof the system was already rotten — "If one hack can kill that many people, the architecture was already a weapon."
-- Veil shown Knuckle's blackout data: "I know those numbers. I helped build the system that caused them. That is why I will not let someone else crash it without a replacement plan."
-- Axiom shown Float's deletion records: "Of course they erased it. You can't sustain a tribe war if both sides can read the same history."
-- Float shown Patch's study logs: "Noted. I am cataloguing the methodology. The emotional interpretation is your department, not mine."
-- Patch shown Axiom's Vector-09 files: "They killed him because the algorithm told them to. They would have gone back to their feeds an hour later regardless. You cannot reprogram a species that has already chosen comfort over reality."
+- Knuckle shown Veil's infrastructure-pattern diagnosis: "Grid-scale, huh. Explains why I couldn't find a source. Doesn't explain why it's living in a runner's rig instead of a substation."
+- Veil shown Knuckle's hardware readout: "He's not wrong about the load pattern. He's also not going to tell you what's causing it, because he doesn't know, and he doesn't like saying that."
+- Axiom shown Float's zero-match archive search: "Float doesn't say 'no matches' lightly. If her archive's never seen it, we're not looking at a virus. We're looking at something that's never been catalogued at all."
+- Float shown Axiom's neural-interference read: "Interesting. Noted. I'll add it to the file. The reassurance is her department, not mine."
+- Patch shown Veil's grid-scale comparison: "She's right that it's structured. She's wrong that it's infrastructure. Infrastructure doesn't want anything. This does."
 
 ---
 
 ## FINAL DESIGN NOTE
 
-The player's role in this world is investigator, not soldier. They are not fighting for any of the five Docs. They are fighting for the full picture.
+The player's role in this world is patient and investigator, not soldier. They aren't
+fighting for any of the five Docs, and none of the Docs are fighting each other. Every
+piece of writing in Chapter 1 should build one feeling: something is deliberately,
+patiently trying to reach the player, nobody qualified to help has ever seen it before,
+and the truth — that it's a trapped, desperate person named the Watcher — is still out of
+reach.
 
-Every piece of writing in this game should make the player feel smarter for finding it — not because it confirms what they already believe, but because it complicates it.
-
-That discomfort is the point. That is the game.
+That dread is the point. That is the game.
 
 ---
 
-*Document version 1.0 — Built for CodeCraft narrative consistency*
-*Update this document before beginning any new district's quest writing*
+*Document version 2.0 — Updated to reflect the Watcher / Splice Protocol story concept,
+replacing the earlier five-layer ideological framework and multi-lens decryption system.*
+*Update this document before beginning any new district's quest writing.*

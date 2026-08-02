@@ -269,7 +269,7 @@ class QuestStageSeeder extends Seeder
                 'reward_node_access' => null,
                 'reward_lore_key'    => null,
                 'node_canvas_id'     => 'SV-v9',
-                'minigame_type'      => 'toxic_soak',
+                'minigame_type'      => 'cipher_lock',
             ],
             [
                 'stage_number'       => 3,

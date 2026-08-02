@@ -29,7 +29,7 @@ import GridBreachGuide   from './pages/GridBreachGuide.vue';
 import PacketHijackGuide from './pages/PacketHijackGuide.vue';
 import DataGrabGuide     from './pages/DataGrabGuide.vue';
 import FlushBufferGuide  from './pages/FlushBufferGuide.vue';
-import ToxicSoakGuide    from './pages/ToxicSoakGuide.vue';
+import CipherLockGuide   from './pages/CipherLockGuide.vue';
 import GhostProtocol0   from './pages/GhostProtocol0.vue';
 import QuestLog      from './pages/QuestLog.vue';
 import PersonasPage    from './pages/PersonasPage.vue';
@@ -64,7 +64,7 @@ const ROUTES = [
     { url: 'splice://sys.local/guide/packethijack', title: 'Packet Hijack Manual',  component: PacketHijackGuide },
     { url: 'splice://sys.local/guide/datagrab',     title: 'Data_Grab Manual',      component: DataGrabGuide     },
     { url: 'splice://sys.local/guide/flushbuffer',  title: 'Flush_Buffer Manual',   component: FlushBufferGuide  },
-    { url: 'splice://sys.local/guide/toxicsoak',    title: 'Toxic_Soak Manual',     component: ToxicSoakGuide    },
+    { url: 'splice://sys.local/guide/cipherlock',   title: 'Cipher_Lock Manual',    component: CipherLockGuide   },
     { url: 'splice://sys.local/tutorial',         title: 'GHOST_PROTOCOL_0',   component: GhostProtocol0  },
     { url: 'splice://sys.local/terminal',         title: 'Mission Log',        component: QuestLog        },
     { url: 'splice://sys.local/archive',          title: 'Mission Archive',    component: ArchivePage     },
@@ -120,7 +120,7 @@ export const SPLICE = {
     PACKET_HIJACK_GUIDE: 'splice://sys.local/guide/packethijack',
     DATA_GRAB_GUIDE:     'splice://sys.local/guide/datagrab',
     FLUSH_BUFFER_GUIDE:  'splice://sys.local/guide/flushbuffer',
-    TOXIC_SOAK_GUIDE:    'splice://sys.local/guide/toxicsoak',
+    CIPHER_LOCK_GUIDE:   'splice://sys.local/guide/cipherlock',
     TUTORIAL:          'splice://sys.local/tutorial',
     TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app
     DEV_MINIGAMES:     'splice://dev/minigames',        // DEV ONLY — remove before release— Mission Log / Quest Log
