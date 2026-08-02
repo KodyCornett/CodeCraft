@@ -3,6 +3,9 @@
 
         <div class="cl-canvas">
 
+            <!-- Ambient scanline/noise texture — purely decorative -->
+            <div class="cl-noise" />
+
             <!-- ══════════════════════════════════════════════════════════════
                  Top bar — TIME | LETTERS CRACKED
             ══════════════════════════════════════════════════════════════ -->
@@ -41,24 +44,36 @@
                      its letter here green (in the phrase) or red (ruled out). -->
                 <div class="cl-legend-wrap">
                     <span class="cl-legend-title">CIPHER KEY // A&ndash;Z</span>
-                    <div class="cl-legend">
-                        <div v-for="entry in legendEntries" :key="entry.letter"
-                             class="cl-legend-cell"
-                             :class="{ 'cl-legend-cell--solved': entry.solved, 'cl-legend-cell--wrong': entry.wrong }">
-                            <span class="cl-legend-letter">{{ entry.letter }}</span>
-                            <span class="cl-legend-code">{{ entry.code }}</span>
+                    <div class="cl-frame">
+                        <span class="cl-corner cl-corner--tl" />
+                        <span class="cl-corner cl-corner--tr" />
+                        <span class="cl-corner cl-corner--bl" />
+                        <span class="cl-corner cl-corner--br" />
+                        <div class="cl-legend">
+                            <div v-for="entry in legendEntries" :key="entry.letter"
+                                 class="cl-legend-cell"
+                                 :class="{ 'cl-legend-cell--solved': entry.solved, 'cl-legend-cell--wrong': entry.wrong }">
+                                <span class="cl-legend-letter">{{ entry.letter }}</span>
+                                <span class="cl-legend-code">{{ entry.code }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Blanked phrase -->
-                <div class="cl-phrase-row">
-                    <template v-for="(cell, i) in displayCells" :key="i">
-                        <span v-if="cell.type === 'space'" class="cl-space" />
-                        <span v-else class="cl-cell" :class="{ 'cl-cell--revealed': cell.revealed }">
-                            {{ cell.revealed ? cell.ch : '_' }}
-                        </span>
-                    </template>
+                <div class="cl-frame cl-frame--phrase">
+                    <span class="cl-corner cl-corner--tl" />
+                    <span class="cl-corner cl-corner--tr" />
+                    <span class="cl-corner cl-corner--bl" />
+                    <span class="cl-corner cl-corner--br" />
+                    <div class="cl-phrase-row">
+                        <template v-for="(cell, i) in displayCells" :key="i">
+                            <span v-if="cell.type === 'space'" class="cl-space" />
+                            <span v-else class="cl-cell" :class="{ 'cl-cell--revealed': cell.revealed }">
+                                {{ cell.revealed ? cell.ch : '_' }}
+                            </span>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- Feedback flash -->
@@ -82,6 +97,18 @@
                     </button>
                 </div>
 
+                <!-- Terminal attempt log -->
+                <div class="cl-log">
+                    <span class="cl-log-title">ATTEMPT LOG</span>
+                    <div class="cl-log-body">
+                        <span v-if="!attemptLog.length" class="cl-log-empty">// no attempts yet</span>
+                        <div v-for="entry in attemptLog" :key="entry.id"
+                             class="cl-log-line" :class="`cl-log-line--${entry.kind}`">
+                            <span class="cl-log-prompt">&gt;</span> {{ entry.text }}
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -100,6 +127,7 @@ const WRONG_GUESS_PENALTY = 15; // seconds lost on a wrong guess
 const TIME_AT_ICE_3       = 240; // seconds
 const TIME_STEP_PER_TIER  = 30;  // seconds shaved off per ICE tier above 3
 const WRONG_PIP_CAP       = 8;   // pip slots shown in the top bar before they just stay lit
+const LOG_MAX_ENTRIES     = 7;   // attempt log keeps the most recent N entries
 
 // Characters used to build the 2-char decrypt codes. Deliberately excludes
 // 0/O and 1/I/L so codes stay readable at a glance.
@@ -172,6 +200,8 @@ const failReason      = ref('');
 const feedbackText    = ref('');
 const feedbackClass   = ref('');
 const wrongGuesses    = ref(0);
+const attemptLog      = ref([]); // most recent first — [{ id, code, kind, text }]
+let logIdCounter      = 0;
 let feedbackTimer     = null;
 
 // ── Derived ────────────────────────────────────────────────────────────────────
@@ -228,6 +258,10 @@ function flashFeedback(kind, text) {
     }, 1100);
 }
 
+function logAttempt(kind, code, text) {
+    attemptLog.value = [{ id: logIdCounter++, code, kind, text }, ...attemptLog.value].slice(0, LOG_MAX_ENTRIES);
+}
+
 // ── Guess handling ───────────────────────────────────────────────────────────────
 
 function submitGuess() {
@@ -242,18 +276,21 @@ function submitGuess() {
     if (letter && solvedLetters.value.has(letter)) {
         // Already-cracked letter — no penalty, just acknowledge.
         flashFeedback('repeat', `${code} :: ALREADY DECRYPTED`);
+        logAttempt('repeat', code, `${code} :: already decrypted (${letter})`);
         return;
     }
 
     if (letter && ruledOutLetters.value.has(letter)) {
         // Already confirmed dead — no penalty, just acknowledge.
         flashFeedback('repeat', `${code} :: ALREADY RULED OUT`);
+        logAttempt('repeat', code, `${code} :: already ruled out (${letter})`);
         return;
     }
 
     if (letter && uniqueLetters.value.has(letter)) {
         solvedLetters.value = new Set([...solvedLetters.value, letter]);
         flashFeedback('correct', `${code} :: ${letter}`);
+        logAttempt('correct', code, `${code} :: MATCH — ${letter}`);
         if (allSolved.value) endGame('success', '');
         return;
     }
@@ -267,6 +304,7 @@ function submitGuess() {
     wrongGuesses.value++;
     timeLeft.value = Math.max(0, timeLeft.value - WRONG_GUESS_PENALTY);
     flashFeedback('wrong', `${code} :: REJECTED (-${WRONG_GUESS_PENALTY}s)`);
+    logAttempt('wrong', code, `${code} :: REJECTED (-${WRONG_GUESS_PENALTY}s)`);
     if (timeLeft.value <= 0) {
         endGame('fail', '[TIMER EXPIRED] — Cipher could not be cracked in time.');
     }
@@ -333,6 +371,7 @@ onMounted(() => {
 
     timeLeft.value    = timeForIce(iceLevel.value);
     wrongGuesses.value = 0;
+    attemptLog.value = [];
     startTimer();
     nextTick(() => inputEl.value?.focus());
 });
@@ -349,6 +388,7 @@ onUnmounted(() => {
 ══════════════════════════════════════════════════════════════════════════════ */
 
 .cl-canvas {
+    position: relative;
     width: 100%;
     height: 100%;
     display: grid;
@@ -359,9 +399,30 @@ onUnmounted(() => {
     overflow: hidden;
 }
 
+/* ── Ambient noise layer ──────────────────────────────────────────────────── */
+
+.cl-noise {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,200,240,0.02) 2px, rgba(0,200,240,0.02) 4px),
+        radial-gradient(ellipse at 50% 30%, rgba(0,200,240,0.05), transparent 65%);
+    background-size: 100% 4px, 100% 100%;
+    animation: cl-noise-drift 9s linear infinite;
+}
+
+@keyframes cl-noise-drift {
+    0%   { background-position: 0 0, 0 0; }
+    100% { background-position: 0 400px, 0 0; }
+}
+
 /* ── Top bar ──────────────────────────────────────────────────────────────── */
 
 .cl-top {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 32px;
@@ -479,12 +540,14 @@ onUnmounted(() => {
 /* ── Middle area ──────────────────────────────────────────────────────────── */
 
 .cl-middle {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: 30px;
-    padding: 32px;
+    gap: 26px;
+    padding: 28px 32px;
     height: 100%;
     box-sizing: border-box;
     overflow-y: auto;
@@ -505,6 +568,33 @@ onUnmounted(() => {
     letter-spacing: 0.18em;
     color: rgba(0,200,240,0.4);
 }
+
+/* ── HUD corner-bracket frame ─────────────────────────────────────────────── */
+
+.cl-frame {
+    position: relative;
+    padding: 18px 22px;
+    border: 1px solid rgba(0,200,240,0.12);
+    background: rgba(0,10,18,0.35);
+}
+
+.cl-frame--phrase {
+    display: flex;
+    justify-content: center;
+}
+
+.cl-corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,200,240,0.55);
+    pointer-events: none;
+}
+
+.cl-corner--tl { top: -1px;    left: -1px;  border-right: none;  border-bottom: none; }
+.cl-corner--tr { top: -1px;    right: -1px; border-left: none;   border-bottom: none; }
+.cl-corner--bl { bottom: -1px; left: -1px;  border-right: none;  border-top: none; }
+.cl-corner--br { bottom: -1px; right: -1px; border-left: none;   border-top: none; }
 
 /* ── Phrase display ───────────────────────────────────────────────────────── */
 
@@ -610,6 +700,51 @@ onUnmounted(() => {
     cursor: not-allowed;
 }
 
+/* ── Terminal attempt log ─────────────────────────────────────────────────── */
+
+.cl-log {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 560px;
+    padding: 12px 16px;
+    border: 1px solid rgba(0,200,240,0.12);
+    background: rgba(0,10,18,0.35);
+}
+
+.cl-log-title {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    color: rgba(0,200,240,0.35);
+}
+
+.cl-log-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cl-log-empty {
+    font-size: 11px;
+    color: rgba(0,200,240,0.2);
+}
+
+.cl-log-line {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: rgba(0,200,240,0.45);
+}
+
+.cl-log-prompt {
+    color: rgba(0,200,240,0.3);
+    margin-right: 4px;
+}
+
+.cl-log-line--correct { color: rgba(0,255,157,0.8); }
+.cl-log-line--wrong    { color: rgba(255,51,51,0.75); }
+.cl-log-line--repeat   { color: rgba(0,200,240,0.35); }
+
 /* ── Legend grid ──────────────────────────────────────────────────────────── */
 
 .cl-legend {
@@ -630,36 +765,51 @@ onUnmounted(() => {
 }
 
 .cl-legend-letter {
-    font-size: 15px;
-    font-weight: 700;
-    color: rgba(0,200,240,0.7);
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(0,200,240,0.5);
+    letter-spacing: 0.04em;
 }
 
 .cl-legend-code {
-    font-size: 12px;
-    letter-spacing: 0.06em;
-    color: rgba(0,200,240,0.4);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #00c8f0;
+    text-shadow: 0 0 6px rgba(0,200,240,0.35);
 }
 
 .cl-legend-cell--solved {
-    border-color: rgba(0,255,100,0.4);
+    border-color: rgba(0,255,100,0.5);
     background: rgba(0,20,12,0.6);
+    box-shadow: 0 0 12px rgba(0,255,100,0.15);
 }
 
-.cl-legend-cell--solved .cl-legend-letter,
+.cl-legend-cell--solved .cl-legend-letter {
+    color: rgba(0,255,100,0.6);
+    text-decoration: line-through;
+}
+
 .cl-legend-cell--solved .cl-legend-code {
-    color: rgba(0,255,100,0.5);
+    color: #00ff9d;
+    text-shadow: 0 0 8px rgba(0,255,100,0.6);
     text-decoration: line-through;
 }
 
 .cl-legend-cell--wrong {
-    border-color: rgba(255,51,51,0.4);
+    border-color: rgba(255,51,51,0.5);
     background: rgba(20,0,0,0.5);
+    box-shadow: 0 0 12px rgba(255,51,51,0.15);
 }
 
-.cl-legend-cell--wrong .cl-legend-letter,
+.cl-legend-cell--wrong .cl-legend-letter {
+    color: rgba(255,51,51,0.65);
+    text-decoration: line-through;
+}
+
 .cl-legend-cell--wrong .cl-legend-code {
-    color: rgba(255,51,51,0.55);
+    color: #ff3333;
+    text-shadow: 0 0 8px rgba(255,51,51,0.6);
     text-decoration: line-through;
 }
 </style>
