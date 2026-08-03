@@ -23,6 +23,7 @@ import DisconnectLayer    from './DisconnectLayer.vue';
 import FlushBuffer        from './FlushBuffer.vue';
 import CipherLock         from './CipherLock.vue';
 import ArchiveExtraction  from './ArchiveExtraction.vue';
+import CalibrationTether  from './CalibrationTether.vue';
 
 // Register game components here as they are built.
 // Key = minigame_type string from quest_stages.minigame_type
@@ -31,7 +32,7 @@ const GAMES = {
     flush_buffer:       FlushBuffer,
     cipher_lock:        CipherLock,
     archive_extraction: ArchiveExtraction,
-    // calibration_tether: CalibrationTether, -- not yet built
+    calibration_tether: CalibrationTether,
 };
 
 const props = defineProps({

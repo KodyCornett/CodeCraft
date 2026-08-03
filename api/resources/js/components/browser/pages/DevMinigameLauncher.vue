@@ -123,9 +123,9 @@ const GAMES = [
     },
     {
         type:  'calibration_tether',
-        built: false,
+        built: true,
         quest: 'Quest 5 — Patch / North Spokane',
-        brief: 'Move volatile sub-routines to the drop-box before they drain your system.',
+        brief: 'Tether volatile sub-routines and nudge each one\'s calibration back into band before it destabilizes. Route stabilized ones to the drop-box. Two lapses close together cascade into a bigger hit.',
         skin: {
             primaryBarLabel: 'PAYLOAD',
             stabilityLabel:  'INTEGRITY',
