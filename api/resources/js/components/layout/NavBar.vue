@@ -30,6 +30,25 @@
             <span v-if="app.badged && hasTutorialBadge" class="tb-badge" />
         </button>
 
+        <div class="tb-sep" />
+
+        <!-- Frequency — live DOC comms hotkey. Not a SPLICE page launch, so it's
+             kept separate from the APPS loop above. Enabled/pulsing only while
+             standing at a hub with chat live (Knuckle only for now). -->
+        <button
+            id="nav-frequency"
+            class="tb-btn tb-freq"
+            :class="{ 'tb-btn--active': frequencyOpen, 'tb-freq--available': frequencyAvailable }"
+            :style="frequencyAvailable ? { '--freq-color': frequencyColor } : {}"
+            :disabled="!frequencyAvailable"
+            :title="frequencyAvailable ? 'Open Frequency' : 'No signal here'"
+            @click="$emit('toggle-frequency')"
+        >
+            <span class="tb-icon">≋</span>
+            <span class="tb-label">FREQUENCY</span>
+            <span v-if="frequencyAvailable && !frequencyOpen" class="tb-badge tb-freq-dot" />
+        </button>
+
         <div class="tb-fill" />
 
         <!-- Clock -->
@@ -49,11 +68,14 @@ import { SPLICE }   from '@/components/browser/SpliceRouter.js';
 import GameMenu from '@/components/layout/GameMenu.vue';
 
 const props = defineProps({
-    activeBrowserUrl:  { type: String,  default: null  },
-    hasTutorialBadge:  { type: Boolean, default: false },
+    activeBrowserUrl:   { type: String,  default: null  },
+    hasTutorialBadge:   { type: Boolean, default: false },
+    frequencyAvailable: { type: Boolean, default: false },
+    frequencyOpen:      { type: Boolean, default: false },
+    frequencyColor:     { type: String,  default: '#00FFC8' },
 });
 
-const emit = defineEmits(['launch', 'tutorial', 'logout']);
+const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency']);
 
 const APPS = [
     { url: SPLICE.STATS,     icon: '◈', label: 'STATUS',   tourId: 'nav-status'   },
@@ -154,6 +176,33 @@ onUnmounted(() => clearInterval(timer));
 .tb-app:hover .tb-label   { color: #00FFFF; }
 .tb-app.tb-btn--active .tb-icon  { color: #00FFFF; text-shadow: 0 0 8px rgba(0,255,255,0.6); }
 .tb-app.tb-btn--active .tb-label { color: rgba(0, 255, 255, 0.85); letter-spacing: 0.1em; }
+
+/* ── Frequency hotkey — live DOC comms ───────────────────────────────────── */
+.tb-freq .tb-icon  { font-size: 15px; color: rgba(255,255,255,0.18); line-height: 1; }
+.tb-freq .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(255,255,255,0.18); letter-spacing: 0.1em; }
+.tb-freq:disabled  { cursor: not-allowed; }
+
+.tb-freq--available .tb-icon,
+.tb-freq--available .tb-label {
+    color: color-mix(in srgb, var(--freq-color) 65%, white);
+}
+.tb-freq--available:hover .tb-icon,
+.tb-freq--available:hover .tb-label { color: var(--freq-color); }
+.tb-freq--available.tb-btn--active {
+    background: color-mix(in srgb, var(--freq-color) 8%, transparent);
+    border-bottom-color: var(--freq-color);
+}
+.tb-freq--available.tb-btn--active .tb-icon,
+.tb-freq--available.tb-btn--active .tb-label {
+    color: var(--freq-color);
+    text-shadow: 0 0 8px var(--freq-color);
+}
+
+/* Reuses .tb-badge's position/animation — just recolours it to the doc's accent */
+.tb-freq-dot {
+    background: var(--freq-color);
+    box-shadow: 0 0 6px var(--freq-color);
+}
 
 /* ── Badge dot — shown on TERMINAL when a quest step completes ────────────── */
 .tb-badge {

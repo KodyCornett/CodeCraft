@@ -237,9 +237,27 @@
         <NavBar
             :active-browser-url="activeBrowserUrl"
             :has-tutorial-badge="tutorial.hasBadge.value"
+            :frequency-available="frequencyAvailable"
+            :frequency-open="frequencyOpen"
+            :frequency-color="frequencyAccent"
             @launch="onLaunch"
             @tutorial="onTutorial"
             @logout="onLogout"
+            @toggle-frequency="toggleFrequency"
+        />
+
+        <!-- DOC hub live chat — opened via the FREQUENCY hotkey in NavBar -->
+        <DocChatWindow
+            :visible="frequencyOpen"
+            :messages="frequencyMessages"
+            :loading="frequencyLoading"
+            :sending="frequencySending"
+            :error="frequencyError"
+            :current-player-id="player.id"
+            :accent-color="frequencyAccent"
+            room-label="KNUCKLE'S CHANNEL"
+            @close="frequencyOpen = false"
+            @send="sendFrequencyMessage"
         />
 
         <!-- First-login welcome modal -->
@@ -282,6 +300,7 @@ import IdleWarning            from '@/components/shared/IdleWarning.vue';
 import ObjectiveTracker       from '@/components/shared/ObjectiveTracker.vue';
 import TrapFiredNotification  from '@/components/shared/TrapFiredNotification.vue';
 import UiTour                 from '@/components/shared/UiTour.vue';
+import DocChatWindow          from '@/components/shared/DocChatWindow.vue';
 // ── Extracted overlay components ──────────────────────────────────────────────
 import CriticalFailureOverlay from '@/components/shared/CriticalFailureOverlay.vue';
 import PvpChallengeOverlay    from '@/components/shared/PvpChallengeOverlay.vue';
@@ -327,6 +346,7 @@ import { useQuestArchive }     from '@/composables/useQuestArchive.js';
 import { useInactivityTimer }  from '@/composables/useInactivityTimer.js';
 import { useActiveObjective }  from '@/composables/useActiveObjective.js';
 import { useDialogue }         from '@/composables/useDialogue.js';
+import { useDocChat }          from '@/composables/useDocChat.js';
 // ── New composables ───────────────────────────────────────────────────────────
 import { useBountyEscalation }  from '@/composables/useBountyEscalation.js';
 import { useCommandEffects }    from '@/composables/useCommandEffects.js';
@@ -839,6 +859,41 @@ const currentNodeDialogueUrl = computed(() => {
     );
     console.log(`%c[DIALOGUE] ${node.npcHandle} — met=${doc.met} hasActiveDialogue=${hasDialogue}`, 'color:#00FFC8');
     return hasDialogue ? url : null;
+});
+
+// ── FREQUENCY — DOC hub live chat hotkey ──────────────────────────────────────
+// Available only while standing at a hub with chat live (Knuckle only for now
+// — other docs opt in the same way once their rooms are ready). The channel
+// connects lazily: walking near the hub only lights up the hotkey, it doesn't
+// join anything until the player actually opens the window.
+const frequencyOpen = ref(false);
+
+const frequencyHub = computed(() => {
+    const node = currentNode.value;
+    if (node?.type === 'cyberdoc' && node?.npcHandle?.toUpperCase() === 'KNUCKLE') {
+        return node.canvasId ?? null;
+    }
+    return null;
+});
+const frequencyAvailable = computed(() => !!frequencyHub.value);
+const frequencyAccent    = computed(() => docColorByName('Knuckle'));
+
+const {
+    messages: frequencyMessages,
+    loading:  frequencyLoading,
+    sending:  frequencySending,
+    error:    frequencyError,
+    send:     sendFrequencyMessage,
+} = useDocChat(frequencyHub, playerId, computed(() => frequencyOpen.value && frequencyAvailable.value));
+
+function toggleFrequency() {
+    if (!frequencyAvailable.value) return;
+    frequencyOpen.value = !frequencyOpen.value;
+}
+
+// Leaving the hub closes the window rather than leaving it open on a dead room
+watch(frequencyHub, (hub) => {
+    if (!hub) frequencyOpen.value = false;
 });
 
 // ── Watcher signal system ─────────────────────────────────────────────────────

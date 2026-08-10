@@ -60,7 +60,7 @@
         <!-- ── Section nav ────────────────────────────────────────────────────── -->
         <div class="store-nav">
             <button
-                v-for="cat in visibleCategories"
+                v-for="cat in categories"
                 :key="cat.id"
                 class="snav-btn"
                 :class="{ active: activeCategory === cat.id }"
@@ -315,22 +315,6 @@
         </div>
 
         <!-- ════════════════════════════════════════════════════════════════════
-             COMMS — DOC hub chat room (only reachable when enableChat is set)
-             ════════════════════════════════════════════════════════════════════ -->
-        <div v-else-if="activeCategory === 'comms'" class="comms-pane">
-            <DocChatPanel
-                :messages="chatMessages"
-                :loading="chatLoading"
-                :sending="chatSending"
-                :error="chatError"
-                :current-player-id="player?.id"
-                :accent-color="npc.theme?.color ?? '#00FFC8'"
-                :room-label="`${npc.handle}'S CHANNEL`"
-                @send="sendChatMessage"
-            />
-        </div>
-
-        <!-- ════════════════════════════════════════════════════════════════════
              ITEM GRID (hardware / software / repair / all) — dual pane
              ════════════════════════════════════════════════════════════════════ -->
         <div v-else class="dual-pane">
@@ -475,8 +459,6 @@
 import { ref, computed, inject, onMounted } from 'vue';
 import axios from 'axios';
 import { useUpgradeCosts } from '@/composables/useUpgradeCosts.js';
-import { useDocChat } from '@/composables/useDocChat.js';
-import DocChatPanel from '@/components/shared/DocChatPanel.vue';
 import { SPLICE } from '../SpliceRouter.js';
 
 const props = defineProps({
@@ -491,9 +473,6 @@ const props = defineProps({
             canvasId:  null,
         }),
     },
-    // Off by default — flip on per-doc wrapper page (e.g. CyberDocKnuckle.vue)
-    // once that hub's chat room is ready to go live.
-    enableChat: { type: Boolean, default: false },
 });
 
 // ── Splice navigation (provided by InGameBrowser) ────────────────────────────
@@ -551,22 +530,6 @@ async function visitCyberDoc() {
     }
 }
 
-// ── DOC hub chat room ─────────────────────────────────────────────────────────
-// Live only once this doc opts in (enableChat) AND the server has confirmed
-// the player is physically at this hub (atCyberDoc) — reuses the same
-// location gate the rest of the page already trusts.
-const chatHubCanvasId = computed(() => props.npc?.canvasId ?? null);
-const chatPlayerId    = computed(() => player.value?.id ?? null);
-const chatEnabled     = computed(() => props.enableChat && atCyberDoc.value);
-
-const {
-    messages: chatMessages,
-    loading:  chatLoading,
-    sending:  chatSending,
-    error:    chatError,
-    send:     sendChatMessage,
-} = useDocChat(chatHubCanvasId, chatPlayerId, chatEnabled);
-
 const playerCreds      = computed(() => player.value?.creds      ?? 0);
 const playerTechPoints = computed(() => player.value?.techPoints ?? 0);
 const upgradeError    = ref(null);
@@ -587,11 +550,6 @@ const categories = [
     { id: 'software', label: 'SOFTWARE'   },
     { id: 'repair',   label: 'REPAIR'     },
 ];
-
-// COMMS tab only appears for docs that have opted into chat (enableChat prop).
-const visibleCategories = computed(() =>
-    props.enableChat ? [...categories, { id: 'comms', label: 'COMMS' }] : categories
-);
 
 // ── Rig stat metadata ─────────────────────────────────────────────────────────
 const RIG_STATS = [
@@ -1351,15 +1309,6 @@ async function onUpgradeStat(stat, cost) {
     font-size: 9px;
     color: rgba(0,255,136,0.35);
     letter-spacing: 0.16em;
-}
-
-/* ── COMMS tab ────────────────────────────────────────────────────────────── */
-.comms-pane {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    padding: 12px 16px 16px;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
