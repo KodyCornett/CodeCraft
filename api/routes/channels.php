@@ -4,6 +4,7 @@ use App\Models\CombatChallenge;
 use App\Models\PacketHijackMatch;
 use App\Models\Player;
 use App\Services\BountyService;
+use App\Services\DocChatService;
 use App\Services\RigService;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -75,4 +76,16 @@ Broadcast::channel('node.{canvasId}', function ($user, string $canvasId) {
         })->exists(),
         'effective_firewall' => $effectiveFirewall,
     ];
+});
+
+// Private channel for a single DOC's hub chat room — one isolated room per
+// CyberDoc, keyed by the hub's node canvas_id (e.g. 'BA-hub' for Knuckle).
+// A player may only subscribe while physically standing on that hub's node
+// right now; leaving the hub drops the client-side subscription, and this
+// check is the server-authoritative backstop against a stale/forged listen.
+Broadcast::channel('doc-chat.{hubCanvasId}', function ($user, string $hubCanvasId) {
+    $player = Player::where('user_id', $user->id)->first();
+    if ($player === null) return false;
+
+    return app(DocChatService::class)->playerIsAtHub($player, $hubCanvasId);
 });

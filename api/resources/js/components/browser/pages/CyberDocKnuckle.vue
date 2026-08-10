@@ -1,5 +1,5 @@
 <template>
-    <CyberDocStore :npc="NPC" />
+    <CyberDocStore :npc="NPC" enable-chat />
 </template>
 
 <script setup>

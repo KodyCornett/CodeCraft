@@ -14,6 +14,7 @@ use App\Http\Controllers\WatcherController;
 use App\Http\Controllers\RigController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\CyberDocController;
+use App\Http\Controllers\DocChatController;
 use Illuminate\Support\Facades\Route;
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,19 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:20,1');
     // upgrade-command: 20/min — same cadence as stat upgrades
     Route::post('/cyberdoc/upgrade-command', [CyberDocController::class, 'upgradeCommand'])
+        ->middleware('throttle:20,1');
+
+// ---------------------------------------------------------------------------
+// DOC Chat — per-hub player rooms. One isolated room per CyberDoc, gated to
+// players physically standing on that hub's node. Enabled on Knuckle's page
+// only for now (CyberDocKnuckle.vue); other docs opt in the same way later.
+// ---------------------------------------------------------------------------
+
+    // messages (read): 30/min — panel fetches history on open, not polled
+    Route::get('/doc-chat/{hubCanvasId}/messages',  [DocChatController::class, 'index'])
+        ->middleware('throttle:30,1');
+    // messages (post): 20/min — real conversation cadence, still blocks flood/spam scripts
+    Route::post('/doc-chat/{hubCanvasId}/messages', [DocChatController::class, 'store'])
         ->middleware('throttle:20,1');
 
 // ---------------------------------------------------------------------------
