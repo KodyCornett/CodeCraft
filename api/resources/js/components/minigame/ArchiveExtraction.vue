@@ -162,6 +162,17 @@ import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
 const props = defineProps({ skin: { type: Object, required: true } });
 const emit  = defineEmits(['complete', 'fail']);
 
+// ── Timeout bookkeeping ────────────────────────────────────────────────────────
+// Fire-and-forget setTimeouts (shake flash, delayed emit) are tracked here so
+// onUnmounted can cancel anything still pending if the minigame is torn down
+// before they fire.
+const pendingTimeouts = new Set();
+function scheduleTimeout(fn, ms) {
+    const id = setTimeout(() => { pendingTimeouts.delete(id); fn(); }, ms);
+    pendingTimeouts.add(id);
+    return id;
+}
+
 // ── Difficulty config ─────────────────────────────────────────────────────────
 // D1: fewer files, fewer red-herring pairs, generous trace budget.
 // D2: more files and red herrings, tighter budget.
@@ -267,10 +278,15 @@ function buildNoiseContent() {
 function buildFolderTree() {
     const used = new Set();
     function folderName() {
-        let n;
-        do { n = pick(FOLDER_NAMES); } while (used.has(n) && used.size < FOLDER_NAMES.length);
-        used.add(n);
-        return n;
+        const n = pick(FOLDER_NAMES);
+        if (!used.has(n)) { used.add(n); return n; }
+        // Pool exhausted for a fresh pick — fall back to a numbered variant
+        // instead of risking a duplicate folder name in the same tree.
+        let suffix = 2;
+        let candidate = `${n}_${suffix}`;
+        while (used.has(candidate)) { suffix++; candidate = `${n}_${suffix}`; }
+        used.add(candidate);
+        return candidate;
     }
 
     const rootNode = { name: 'root', type: 'dir', children: [] };
@@ -497,7 +513,7 @@ function onSlotFocus(i) {
 function triggerShake(i) {
     shakeFlags.value[i] = true;
     glitchPulse.value   = true;
-    setTimeout(() => {
+    scheduleTimeout(() => {
         shakeFlags.value[i] = false;
         glitchPulse.value   = false;
     }, 400);
@@ -579,8 +595,8 @@ function endGame(result, reason) {
     gameResult.value = result;
     failReason.value = reason ?? '';
     if (tickHandle) clearInterval(tickHandle);
-    if (result === 'success') setTimeout(() => emit('complete'), 2200);
-    else setTimeout(() => emit('fail'), 2200);
+    if (result === 'success') scheduleTimeout(() => emit('complete'), 2200);
+    else scheduleTimeout(() => emit('fail'), 2200);
 }
 
 // ── Chrome passthrough ─────────────────────────────────────────────────────────
@@ -640,6 +656,8 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('keydown', onGlobalKeydown);
     if (tickHandle) clearInterval(tickHandle);
+    pendingTimeouts.forEach(id => clearTimeout(id));
+    pendingTimeouts.clear();
 });
 </script>
 

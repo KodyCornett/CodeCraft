@@ -155,11 +155,38 @@ const TOTAL = 5;
 const {
     stability, primaryProgress, timeLeft, result, failReason,
     glitchActive, glitchType, glitchIntensity,
-    stabilityClass, timerClass,
+    stabilityClass,
     applyHit, endGame,
 } = useQuestMinigameState(props.skin);
 
 timeLeft.value = config.duration;
+
+// Local timer class — the composable's own version divides by skin.timeLimit
+// (a stale placeholder, 30s), which would compress the warn/critical color
+// states into a tiny tail window instead of the real last 25%/10% of our
+// actual config.duration (90-110s).
+const timerClass = computed(() => {
+    const pct = timeLeft.value / config.duration;
+    if (pct <= 0.10) return 'timer--critical';
+    if (pct <= 0.25) return 'timer--warn';
+    return '';
+});
+
+// ── Timeout bookkeeping ────────────────────────────────────────────────────────
+// Every fire-and-forget setTimeout is tracked here so onUnmounted can cancel
+// anything still pending if the minigame is torn down early (quest abort,
+// parent navigation, etc.) — otherwise a late callback could still fire an
+// emit('complete'/'fail') or flip a flash flag after the component is gone.
+
+const pendingTimeouts = new Set();
+function scheduleTimeout(fn, ms) {
+    const id = setTimeout(() => { pendingTimeouts.delete(id); fn(); }, ms);
+    pendingTimeouts.add(id);
+    return id;
+}
+function clearScheduled(id) {
+    if (id !== null) { clearTimeout(id); pendingTimeouts.delete(id); }
+}
 
 // ── Sub-routine state ─────────────────────────────────────────────────────────
 
@@ -231,6 +258,12 @@ const routeFlash       = ref(false);
 const lostLabel        = ref('');
 const routedLabel      = ref('');
 
+// Per-banner timer ids — cleared before re-arming so two events in quick
+// succession can't race each other's hide-timer against the wrong label.
+let destabilizeFlashTimer = null;
+let cascadeFlashTimer     = null;
+let routeFlashTimer       = null;
+
 // ── Player actions ─────────────────────────────────────────────────────────────
 
 function onTether(id) {
@@ -269,12 +302,13 @@ function onRoute(id) {
     item.slotIndex = null;
 
     routedLabel.value = item.label;
-    routeFlash.value   = true;
-    setTimeout(() => { routeFlash.value = false; }, 1000);
+    clearScheduled(routeFlashTimer);
+    routeFlash.value = true;
+    routeFlashTimer  = scheduleTimeout(() => { routeFlash.value = false; }, 1000);
 
     if (deliveredCount.value >= TOTAL) {
         endGame('success', '');
-        setTimeout(() => emit('complete'), 2200);
+        scheduleTimeout(() => emit('complete'), 2200);
     }
 }
 
@@ -292,11 +326,13 @@ function destabilize(item) {
 
     lostLabel.value = item.label;
     if (cascading) {
+        clearScheduled(cascadeFlashTimer);
         cascadeFlash.value = true;
-        setTimeout(() => { cascadeFlash.value = false; }, 1400);
+        cascadeFlashTimer  = scheduleTimeout(() => { cascadeFlash.value = false; }, 1400);
     } else {
+        clearScheduled(destabilizeFlashTimer);
         destabilizeFlash.value = true;
-        setTimeout(() => { destabilizeFlash.value = false; }, 1200);
+        destabilizeFlashTimer  = scheduleTimeout(() => { destabilizeFlash.value = false; }, 1200);
     }
 }
 
@@ -336,7 +372,7 @@ function tick(ts) {
     timeLeft.value = Math.max(0, timeLeft.value - dt);
     if (timeLeft.value <= 0) {
         endGame('fail', '[WINDOW CLOSED] — Delivery window expired before all packages landed.');
-        setTimeout(() => emit('fail'), 2200);
+        scheduleTimeout(() => emit('fail'), 2200);
         return;
     }
 
@@ -383,7 +419,7 @@ function tick(ts) {
     );
     if (primaryProgress.value >= 1) {
         endGame('fail', '[PAYLOAD OVERFLOW] — Volatile signatures spiked past containment. ICE noticed.');
-        setTimeout(() => emit('fail'), 2200);
+        scheduleTimeout(() => emit('fail'), 2200);
         return;
     }
 
@@ -394,7 +430,7 @@ function tick(ts) {
     );
     if (stability.value <= 0) {
         endGame('fail', '[INTEGRITY COLLAPSE] — Containment failure. Rig destabilized.');
-        setTimeout(() => emit('fail'), 2200);
+        scheduleTimeout(() => emit('fail'), 2200);
         return;
     }
 
@@ -409,6 +445,8 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (animFrame) cancelAnimationFrame(animFrame);
+    pendingTimeouts.forEach(id => clearTimeout(id));
+    pendingTimeouts.clear();
 });
 </script>
 

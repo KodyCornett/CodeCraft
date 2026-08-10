@@ -76,6 +76,7 @@ export function useQuestMinigameState(skin) {
     }
 
     function endGame(outcome, reason) {
+        if (result.value) return; // already ended — ignore late/duplicate calls
         result.value     = outcome;
         failReason.value = reason ?? '';
     }

@@ -24,18 +24,18 @@ class CyberDocSeeder extends Seeder
             ],
             [
                 'handle' => 'Axiom',
-                'district' => 'Corporate Core',
-                'layer' => 'Ecosystem Filter',
+                'district' => 'University District',
+                'layer' => 'Archival Provenance',
             ],
             [
                 'handle' => 'Float',
-                'district' => 'University / Valley District',
+                'district' => 'Spokane Valley',
                 'layer' => 'Historical Ledger',
             ],
             [
                 'handle' => 'Patch',
                 'district' => 'North Spokane',
-                'layer' => 'Sensory Cradle',
+                'layer' => 'Sensory Immersion',
             ],
         ];
 

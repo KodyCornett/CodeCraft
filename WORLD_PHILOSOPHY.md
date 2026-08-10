@@ -63,6 +63,79 @@ they're looking at.
 
 ---
 
+## WRITING WORKFLOW & PROSE STANDARD
+
+**Workflow — script first, then story.** Always write or edit a scene in the chapter's
+`_SCRIPT.md` file first (e.g. `api/CHAPTER_1_SCRIPT.md`) — that's the production copy,
+tagged for ElevenLabs. Once a scene is locked there, mirror it into the matching
+`_STORY.md` read-through, stripped of IDs, audio tags, and FX tags. Read the mirrored
+version back top to bottom as prose, not as a checklist, and make whatever changes it
+needs to actually flow as a piece of writing. If the read-through exposes a clunky line, an
+underwritten beat, or a description that isn't earning its place, fix it in the Script
+file — the source of truth — and remirror. Never patch the Story copy in isolation; the two
+must stay identical in content, differing only in whether the technical tags are showing.
+
+**Prose standard.** This is written to be read the way a novel is read. The difference
+from an actual novel is that the player isn't watching the story happen to someone else —
+they're the one living it. That doesn't lower the bar; it raises it. Every line of
+narration should hold up to the standard of a published book: specific, sensory, doing
+more than one job at a time. Don't write "the room was cold" when you can write what the
+cold does to a body, what it looks like, what it implies about who's been meaning to fix
+the climate control and never gets around to it. Every location description should tell
+you something about the person who occupies it before they've said a word — Float's
+stacked-shipping-container repair bay reads "salvager, hoarder, practical" on sight;
+Axiom's shelves-into-darkness archive reads "patient, exacting, doesn't live by anyone
+else's clock" the same way. If a description could be lifted out of one Doc's scene and
+dropped into another's without anyone noticing, it isn't specific enough yet. Write toward
+that bar in every scene, not just the ones that feel important.
+
+**Give the mix something to build.** This is produced as fully voiced audio — ElevenLabs
+narration and dialogue, with sound design under it — not read silently. For every
+descriptive beat, ask what's actually happening in the mix while it plays: a sound
+stopping, a breath changing, a held silence, something felt in the body. "He looked
+concerned" or "the folders froze mid-air" gives the audio team nothing to build — no SFX
+cue, no line reading direction, just a picture with no producible counterpart. "His
+breathing slowed" or "the room's ambient rustle cut out at once" gives them something real
+to work with. When a scene's first draft leans on pure visual staging, that's a sign to
+pass back through it and find the sound or sensation underneath.
+
+---
+
+## VISUAL EMPHASIS TOOLKIT — GlitchEffect / WatcherSignal
+
+Two components exist to dramatize what's happening to the player as SPLICE contact
+escalates, on top of the writing itself. Both are already implemented — this section is
+the standing reference for when to reach for each one, so the choice doesn't have to be
+rediscovered every chapter.
+
+**GlitchEffect** (`api/resources/js/components/shared/GlitchEffect.vue`) — a modular,
+inline-or-overlay glitch layer: chromatic aberration, scanlines, displacement bars,
+static, dissolve, flicker, and character scramble, usable individually or combined, each
+with its own intensity on a 1–5 scale (`type="bars(2),chromatic(4)"`). This is the
+**ambient toll** — short, escalating bursts that fire during ordinary play (walking,
+mid-hack, mid-dialogue) so the player's condition worsening reads as a real, ongoing thing
+rather than something that only ever happens in a cutscene. It's also the tool for a
+scripted spike inside a specific scene — a live reaction to being examined, timed to an
+exact line.
+
+**WatcherSignal** (`api/resources/js/components/shared/WatcherSignal.vue`) — the
+full-screen intrusion cinematic: breach, override block, corrupt-to-clean token reveal,
+blackout, reboot. Reserved for major narrative beats only — the Chapter 1 cold open, a
+chapter's climax — never routine transitions. It's a hard stop that takes the screen away
+from the player; using it too often turns it into a loading screen instead of an event.
+
+**Which one for a given moment:** if the scene calls for the world to visibly worsen
+around the player without stopping play, that's GlitchEffect, tagged directly into the
+relevant line in that chapter's `_SCRIPT.md` with an FX tag (see the ID system at the top
+of each chapter's Script). If the beat is a genuine turning point that earns taking the
+screen away entirely, that's WatcherSignal.
+
+**FX tags live in the Script, never the Story.** Same rule as audio tags — they're
+production metadata, not narrative content. Strip them out when mirroring a locked scene
+into the `_STORY.md` read-through, same as IDs and audio paths.
+
+---
+
 ## SPLICE PROTOCOL & THE WATCHER
 
 **Splice Protocol** was a hidden project to transfer a living human mind permanently
@@ -120,10 +193,36 @@ happening isn't a tech problem. It's a person.
 
 ---
 
+## REPAIR FOCUS — What Each Doc Actually Fixes
+
+All five are working CyberDocs — SPLICE's underground medical team. Every one of them
+repairs rigs, and they divide the work the way specialists in any repair trade do: by
+which *part* of the tech is broken, not by who's willing to get their hands dirty. You
+don't send an engine to a transmission specialist. Nobody on this list is "the researcher
+who doesn't really fix anything" — they all fix things, they just each own a different,
+non-overlapping part of the rig.
+
+| Doc | Part of the Rig They Own | Method |
+|---|---|---|
+| **Knuckle** | The body — chassis, prosthetics, load-bearing cyberware. Structural damage, combat wear and tear. | Hands-on. Scans it, reads the damage, fixes what's in front of him. |
+| **Veil** | The grid connection — how a rig interfaces with citywide infrastructure. Signal bleed, cascading failures, anything painting a target on a runner. | Diagnostic and structural. Treats the rig as one node in a larger system. |
+| **Float** | The memory/storage — data integrity, corrupted or unfamiliar data, recovered hardware. | Archival. Cross-references against decades of recovered signatures she's personally catalogued. |
+| **Axiom** | The core architecture — CPU-level processing, especially old, exotic, or unclassifiable builds nobody else's toolkit can even parse. | Research-driven. Fixes by finding the historical or structural precedent that explains the problem, then treats from there. Slower than a mechanic's fix and it looks more like scholarship than surgery — but it is still a repair. |
+| **Patch** | The neural interface — where the rig meets the mind and senses. Burnout, sensory-immersion dependency, demands outpacing what a person can sustainably run. | Low-barrier, accessible care. The entry point for runners who are struggling or just starting out. |
+
+**On Axiom specifically:** his line "Understanding a thing and repairing a thing are not
+always the same profession. Mine has always been understanding" is characteristic
+self-deprecation about how his method differs from a mechanic's — not a claim that he
+doesn't fix rigs. He runs a working clinic like the other four. Write him fixing things by
+digging through the archive for how something like it worked, or failed, before — never
+write him out of repair work entirely.
+
+---
+
 ### 01 — KNUCKLE
 
 **District:** Browne's Addition
-**Specialty:** Physical hardware — prosthetics, chassis rigs, load-bearing cyberware
+**Specialty:** The body — physical hardware, prosthetics, chassis rigs, load-bearing cyberware
 
 ---
 
@@ -137,10 +236,12 @@ technology. He hates sloppy technology, and he hates watching people trust their
 to hardware nobody bothered to build right.
 
 He's the Doc runners go to first, because he's cheap, fast, and doesn't ask questions he
-doesn't need answered. He and Veil have a long, low-grade friction — he thinks she's too
-cautious with her own district; she thinks he's reckless with other people's hardware —
-but he'll still send her a runner who needs infrastructure help, and she'll still send him
-the physical repairs she doesn't have time for.
+doesn't need answered. If the problem is the body — chassis, prosthetics, the physical
+shell a runner lives inside — it's his before it's anyone else's. He and Veil have a long,
+low-grade friction — he thinks she's too cautious with her own district; she thinks he's
+reckless with other people's hardware — but he'll still send her a runner who needs
+infrastructure help, and she'll still send him the physical repairs she doesn't have time
+for.
 
 > **What he'd tell you about himself:** "I fix what's broken. I don't fix what's stupid.
 > Learn the difference and we'll get along fine."
@@ -183,7 +284,7 @@ diagnostics are honest, useful, and incomplete.
 ### 02 — VEIL
 
 **District:** Downtown Core
-**Specialty:** Infrastructure and citywide grid systems
+**Specialty:** The grid connection — infrastructure and citywide grid systems
 
 ---
 
@@ -195,10 +296,12 @@ destroy the corporation. She caused a tragedy the neighborhood spent years clean
 
 That experience didn't make her corporate. It made her the person who keeps Downtown's
 infrastructure running because she knows exactly what happens when someone smart and
-well-intentioned breaks something they don't fully understand. She's precise, tired, and
-allergic to guessing. She and Knuckle bicker about risk tolerance more or less
-permanently, and she's not above cutting Axiom short when they get too philosophical for
-her taste — but she trusts all four of the others' skill without reservation.
+well-intentioned breaks something they don't fully understand. If the problem is how a rig
+talks to the rest of the city — the grid connection itself, not the hardware on either end
+of it — it's hers before it's anyone else's. She's precise, tired, and allergic to
+guessing. She and Knuckle bicker about risk tolerance more or less permanently, and she's
+not above cutting Axiom short when he gets too philosophical for her taste — but she
+trusts all four of the others' skill without reservation.
 
 > **What she'd tell you about herself:** "Anybody can crash a system. Building something
 > that doesn't need to be crashed is the actual job."
@@ -241,65 +344,82 @@ verify, which means she has very little comfort to offer.
 
 ### 03 — AXIOM
 
-**District:** Corporate Core
-**Specialty:** Neural and cognitive implants
+**District:** University District
+**Specialty:** The core architecture — precedent-based repair, pre-collapse archives, historical systems, provenance
 
 ---
 
 #### Character
 
-Axiom works closest to the mind of anyone in the city, and it's made them the warmest of
-the five — you don't survive years inside people's heads without developing real care for
-what you find there. They see cognitive tech patients most Docs would refuse: bad
-implant jobs, cross-wired sensory feeds, people who fried something delicate trying to
-save money on a black-market install. They're thoughtful, a little too fond of asking
-questions instead of giving answers, and the one Doc most likely to actually sit with a
-scared patient instead of just fixing them and sending them out the door.
+Axiom is an archivist by trade and temperament — more at home among centuries of
+preserved data than in the urgency of a runner's day-to-day survival. His node renders
+as an impossible archive: shelves stretching up into darkness, folders drifting through
+the air in slow, deliberate orbits, endlessly reorganizing themselves around patterns
+only he seems to understand. He has spent eleven years trying to get an archive beneath
+the University District to cooperate with him, and talks about its stubbornness the way
+other people talk about a difficult relative.
 
-> **What they'd tell you about themself:** "Everyone else fixes what you're carrying. I
-> have to be careful with what's carrying you."
+He runs a working clinic like the other four Docs, but he isn't a hands-on mechanic, and
+says so plainly — understanding a thing and repairing a thing aren't always the same
+profession, and his instinct runs to the former. If the problem is buried in a rig's core
+architecture — the deep processing layer nobody else's toolkit can even parse, especially
+anything old, exotic, or unclassifiable — it's his before it's anyone else's. In practice
+that means his repairs start in the archive rather than at a workbench: he treats a
+problem by finding out what it actually is and what's happened like it before, then works
+from there. That distance
+can read as coldness until you notice how carefully he actually listens, how much he
+enjoys being handed a good puzzle, how reluctant he is to let a visitor leave without
+something honest to hold onto. His warmth doesn't announce itself. It shows up in the
+patience he spends on you, and in how rarely he lets a real question go unanswered, even
+when the honest answer is "I don't know." He treats the player less like a patient and
+more like an anomaly he's delighted, and quietly unsettled, to have found.
+
+> **What he'd tell you about himself:** "Understanding a thing and repairing a thing are
+> not always the same profession. Mine has always been understanding."
 
 ---
 
 #### Voice & Tone
 
-- **Register:** Thoughtful. Warm. Asks questions more than makes declarations.
-- **Emotional temperature:** Genuinely caring, but not naive — the warmth is earned, not default.
-- **Sentence structure:** Fluid, uses analogy naturally.
-- **What they never do:** Dismiss a patient's fear. Reduce anyone to a data point.
+- **Register:** Formal, unhurried, dry. Short clipped lines separated by long implied pauses ("Mm.", "Well.", "Curious.").
+- **Emotional temperature:** Warm underneath, but the warmth is expressed as attentiveness and wit, not overt comfort.
+- **Sentence structure:** Short, deliberate, often fragmented — one idea per line.
+- **What he never does:** Rush. Raise his voice. Pretend certainty he doesn't have.
 
 **Sample terminal dialogue:**
 ```
-AXIOM: "Sit down. Let me look before you talk.
-        There's neural-adjacent interference in your feed
-        that I would call an implant malfunction, except
-        you don't have an implant that could produce it.
-        I don't like diagnoses that require lying to
-        myself. I don't have one yet that doesn't."
+AXIOM: "Well.
+        That's curious.
+        Your architecture references systems that no
+        longer exist. Memory, after all, can be untidy.
+        It also references systems that never existed.
+        That is unusual."
 ```
 
 ---
 
-#### Their Read on the Player's Condition
+#### His Read on the Player's Condition
 
-Axiom picks up interference patterns that look neurological — the kind of static a bad
-cognitive implant throws — except the player has no implant capable of producing it.
-That contradiction bothers them more than almost anything else in their career. They
-suspect, correctly, that something is trying to think *near* the player's mind, but they
-have no framework for a cause that isn't hardware.
+Axiom recognizes the player's rig as carrying architecture that predates current systems
+by a significant margin — patterns that reference things that "no longer exist," and,
+more troublingly, things that "never existed" at all. He has no framework for that
+contradiction and doesn't pretend otherwise. He studies history, not futures, and
+whatever is running in the player is still actively writing itself — which puts it
+outside anything he's equipped to fully explain. He's honest about the limits of his own
+expertise in a way none of the other Docs quite manage.
 
 #### Consistency Checklist for Writing Axiom Content
 
-- [ ] Is the language warm but never preachy?
-- [ ] Do they treat the player as a frightened patient, not a case study?
-- [ ] Does their uncertainty come from genuine expertise being outmatched, not vagueness?
+- [ ] Is the language dry, unhurried, and slightly formal — short lines, long implied pauses?
+- [ ] Does his warmth come through as attentiveness and wit, not overt comforting?
+- [ ] Does his uncertainty come from genuine historical expertise being outmatched by something without precedent?
 
 ---
 
 ### 04 — FLOAT
 
-**District:** University / Valley District
-**Specialty:** Memory and data storage systems, archival recovery
+**District:** Spokane Valley
+**Specialty:** The memory/storage — data and archival recovery systems
 
 ---
 
@@ -308,13 +428,15 @@ have no framework for a cause that isn't hardware.
 Float is the coldest of the five — not cruel, just clinical. Years spent recovering
 corrupted, deleted, and deliberately buried data left her with very little patience for
 sentiment; the archive doesn't care how you feel about it, so neither does she, at least
-not out loud. Her repair bay doubles as the closest thing Spokane has to an unmodified
-data archive, and she treats every recovery job, human or otherwise, with the same
-detached precision.
+not out loud. If the problem lives in memory or storage — what a rig remembers, what it's
+lost, what's been recovered and never properly catalogued — it's hers before it's anyone
+else's. Her repair bay doubles as the closest thing Spokane has to an unmodified data
+archive, and she treats every recovery job, human or otherwise, with the same detached
+precision.
 
 She and Patch get along fine, in the specific way that two people who both prefer facts
-to feelings tend to. She finds Axiom's warmth a little indulgent and says so, without
-much heat behind it.
+to feelings tend to. She finds Axiom's patience for a good story a little indulgent and
+says so, without much heat behind it.
 
 > **What she'd tell you about herself:** "I don't get emotional about data. I get
 > emotional about data that's missing."
@@ -357,7 +479,7 @@ is ever truly lost or unprecedented, that absence is the most unsettling read of
 ### 05 — PATCH
 
 **District:** North Spokane
-**Specialty:** Full sensory immersion rigs
+**Specialty:** The neural interface — full sensory immersion rigs
 
 ---
 
@@ -365,24 +487,30 @@ is ever truly lost or unprecedented, that absence is the most unsettling read of
 
 Patch works with people who've gone too deep into simulated sensation — dependency
 cases, burnout cases, people whose rigs gave them something better than reality and who
-can no longer stand to disconnect. It's made him quiet, intense, and allergic to false
-comfort. He doesn't believe in gentle lies, even the kind meant kindly. He still fights
-for his patients. He just doesn't believe half-measures do them any good.
+can no longer stand to disconnect. If the problem is the interface itself — where the rig
+stops being hardware and starts being someone's mind — it's hers before it's anyone
+else's. It's serious work, but it hasn't made her serious. She runs her clinic out of a
+cluttered maintenance station that doubles as a home — plants growing under grow-lamps, a
+kettle always going, tools that never stay where she left them — and meets crisis with
+dry, deadpan humor rather than gravity. It isn't deflection. She's just found that
+treating a catastrophe like a catastrophe rarely helps the person having one.
 
-He respects Float's precision and finds the other three a bit noisy for his taste, though
-he'd never say so unprompted — Patch mostly keeps his opinions to himself unless directly
-asked, which reads as coldness to people who don't know him.
+She doesn't believe in gentle lies, even the kind meant kindly, but she delivers hard
+truths with a shrug and a joke rather than solemnity. She's made an unusual peace with
+the limits of her own knowledge, and treats not-knowing as an ordinary, faintly amusing
+part of the job rather than a failure. She respects Float's precision and finds the other
+three a bit noisy for her taste, though she'd never say so unprompted.
 
-> **What he'd tell you about himself:** "I don't fix people. I keep them from disappearing."
+> **What she'd tell you about herself:** "I don't fix people. I keep them from disappearing."
 
 ---
 
 #### Voice & Tone
 
-- **Register:** Quiet. Intense. Deliberate.
-- **Emotional temperature:** Guarded, but not hopeless — there's a stubborn, unglamorous persistence under the quiet.
-- **Sentence structure:** Short, deliberate, long implied pauses between lines.
-- **What he never does:** Celebrate. Perform warmth he doesn't feel. Admit uncertainty easily.
+- **Register:** Dry, deadpan, warm underneath. Short lines with real comic timing.
+- **Emotional temperature:** Genuinely caring, delivered as humor rather than sentiment — she'd rather make you laugh than watch you panic.
+- **Sentence structure:** Short, clipped, often landing on a punchline or a dry aside.
+- **What she never does:** Perform certainty she doesn't have. Let a joke replace an honest answer when one exists.
 
 **Sample terminal dialogue:**
 ```
@@ -390,25 +518,25 @@ PATCH: "I've seen dependency patterns that look like this.
         Reality rejection, in reverse.
         Except you're not rejecting reality.
         Something is trying to get *into* it.
-        I don't have a name for that.
-        I've been doing this a long time."
+        No idea what to call that.
+        Which is annoying. Interesting. But annoying."
 ```
 
 ---
 
-#### His Read on the Player's Condition
+#### Her Read on the Player's Condition
 
-Patch recognizes the emotional and physiological signature of his own patients —
+Patch recognizes the emotional and physiological signature of her own patients —
 someone's mind straining against the border between the simulated and the real — but
-inverted. His patients want out of reality. Whatever is happening to the player looks
+inverted. Her patients want out of reality. Whatever is happening to the player looks
 like something on the *other side* wants in. It's the closest anyone gets to the truth in
-Chapter 1, and even Patch doesn't fully trust his own read.
+Chapter 1, and even Patch doesn't fully trust her own read.
 
 #### Consistency Checklist for Writing Patch Content
 
-- [ ] Does the language feel earned and exhausted, not performatively dark?
-- [ ] Does his read edge closer to the truth without confirming it outright?
-- [ ] Does he stay guarded rather than suddenly warm, even when concerned for the player?
+- [ ] Does the warmth come through as dry humor, not overt comfort?
+- [ ] Does her read edge closer to the truth without confirming it outright?
+- [ ] Does she stay funny and self-aware even when concerned for the player, rather than turning solemn?
 
 ---
 
@@ -423,8 +551,8 @@ the other Doc's read, and they don't dismiss it either.
 
 - Knuckle shown Veil's infrastructure-pattern diagnosis: "Grid-scale, huh. Explains why I couldn't find a source. Doesn't explain why it's living in a runner's rig instead of a substation."
 - Veil shown Knuckle's hardware readout: "He's not wrong about the load pattern. He's also not going to tell you what's causing it, because he doesn't know, and he doesn't like saying that."
-- Axiom shown Float's zero-match archive search: "Float doesn't say 'no matches' lightly. If her archive's never seen it, we're not looking at a virus. We're looking at something that's never been catalogued at all."
-- Float shown Axiom's neural-interference read: "Interesting. Noted. I'll add it to the file. The reassurance is her department, not mine."
+- Axiom shown Float's zero-match archive search: "Mm. Float doesn't say 'no matches' lightly. If her archive's never seen it, we're not looking at a virus. We're looking at something that's never been catalogued at all."
+- Float shown Axiom's read on the player's anomalous pre-collapse architecture: "Interesting. Noted. I'll add it to the file. Reassurance was never my department anyway."
 - Patch shown Veil's grid-scale comparison: "She's right that it's structured. She's wrong that it's infrastructure. Infrastructure doesn't want anything. This does."
 
 ---
@@ -442,6 +570,13 @@ That dread is the point. That is the game.
 
 ---
 
-*Document version 2.0 — Updated to reflect the Watcher / Splice Protocol story concept,
-replacing the earlier five-layer ideological framework and multi-lens decryption system.*
+*Document version 2.2 — Added VISUAL EMPHASIS TOOLKIT section documenting GlitchEffect
+(ambient toll / scripted spikes) and WatcherSignal (major-beat cinematic only), and the
+rule that FX tags live in the Script and are stripped from the Story mirror, same as audio
+tags. Previously, version 2.1 added WRITING WORKFLOW & PROSE STANDARD and REPAIR FOCUS
+sections; each Doc's Specialty line and Character section now name the specific part of
+the rig they own, matching the REPAIR FOCUS table. Axiom rewritten to the shipped archivist
+characterization; Patch rewritten to the shipped she/her, dry-humor characterization;
+Float's district corrected to Spokane Valley. Supersedes the earlier five-layer
+ideological framework and multi-lens decryption system.*
 *Update this document before beginning any new district's quest writing.*

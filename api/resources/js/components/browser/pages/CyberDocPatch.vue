@@ -5,14 +5,14 @@
 <script setup>
 import CyberDocStore from './CyberDocStore.vue';
 
-// PATCH — Layer 5: Sensory Cradle / North Spokane
-// Philosophy: The simulation is a more perfect stimulus than reality. The only fix is removal.
-// Voice: Quiet. Intense. Deliberate. No warmth. No celebration. No uncertainty admitted.
+// PATCH — North Spokane
+// Voice: Dry, deadpan, warm underneath. Short lines with real comic timing.
+//        Delivers hard truths with a shrug and a joke rather than solemnity.
 const NPC = {
     handle:    'PATCH',
     storeName: "Patch's Clinic",
     district:  'North Spokane',
-    tagline:   'Field-grade repairs. No anesthetic. No records.',
+    tagline:   "Field-grade repairs. Terrible system. I've filed several complaints.",
     canvasId:  'NS-hub',
     theme: {
         color:      '#EF5350',
@@ -20,10 +20,10 @@ const NPC = {
         faintColor: 'rgba(239,83,80,0.03)',
         terminalLines: [
             '// PATCH CLINIC :: NORTH SPOKANE',
-            '// TERMINAL ACTIVE — SESSION UNMONITORED',
-            '// THE BODY REMEMBERS WHAT THE MIND PREFERS TO FORGET.',
+            '// TERMINAL ACTIVE — SOMEONE IS PROBABLY UPSIDE DOWN',
+            '// MOST THINGS MAKE SENSE EVENTUALLY. THIS ONE DOESN\'T.',
         ],
-        quote: "You came here. That means something. Most don't bother.",
+        quote: "Oh. You survived. Good. Sit down before you fall down.",
     },
 };
 </script>

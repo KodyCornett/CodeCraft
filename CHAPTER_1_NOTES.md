@@ -1,4 +1,9 @@
 # CodeCraft — Chapter 1 Planning Notes
+
+> **SUPERSEDED — see `CHAPTER_1_STORY.md` instead.** This file's content (minus the
+> embedded early scene draft, since dialogue now lives only in `api/CHAPTER_1_SCRIPT.md`)
+> has been consolidated there. Kept here only until confirmed safe to delete.
+
 ### The Watcher Arc — supersedes the old "Ghost-Kernel Arc" framing
 ---
 
@@ -61,8 +66,8 @@ Per `WORLD_PHILOSOPHY.md`, the specialist reads are:
 |---|---|---|---|
 | Knuckle | Browne's Addition | Physical hardware | Rig's under a load with no source. Hardware-honest, mechanism-blind. |
 | Veil | Downtown | Infrastructure/grid | Pattern reads as grid-scale intrusion — but it's running inside one person. |
-| Axiom | Corporate Core | Neural/cognitive implants | Neurological interference with no implant to explain it. |
-| Float | University/Valley | Memory & data archives | Zero matches against any known signature, ever. |
+| Axiom | University District | Pre-collapse archives/history | Rig's architecture references systems that no longer exist — and some that never did. |
+| Float | Spokane Valley | Memory & data archives | Zero matches against any known signature, ever. |
 | Patch | North Spokane | Sensory immersion | Recognizes the shape of his own patients' symptoms — inverted. Closest to the truth, still not there. |
 
 The order these are visited in can stay flexible or follow the existing district chain —
@@ -86,7 +91,7 @@ short, which is what should read as unsettling, not a near-miss on the truth.
 
 ---
 
-## Chapter 1 — Cold Open (Stage 0)
+## Chapter 1 — Cold Open (C1_S1_P1)
 
 Chapter 1 does not start with the player choosing to see a Doc. It starts mid-crisis,
 with no memory of how they got there.
@@ -147,7 +152,7 @@ The player has no memory of any of it. Just the pain.
 
 - The Docs currently investigate a "Ghost-Kernel" described as compressed consciousness/an artifact placed in the player deliberately by an unknown third party — this contradicts the new lore (it's the Watcher himself, reaching in, not an installed object).
 - Doc dialogue still carries some of the old ideological voice and cross-doc tension framing.
-- Quest 4 (Axiom) dialogue currently states "It is not a virus. It is not malware. It is a person" and mostly still fits — but the surrounding explanation (a "packet," someone "loading it onto the frequency and aiming it at you") implies a third-party delivery mechanism that no longer applies.
+- ~~Quest 4 (Axiom) dialogue~~ — **Resolved.** Quest 4 has been rewritten to match Axiom's shipped archivist characterization (see `api/PROLOGUE_SCRIPT.md`); the old "It is not a virus. It is not malware. It is a person" Ghost-Kernel framing and third-party-delivery explanation are gone.
 
 This wasn't in scope for this pass — flagging it so it doesn't get lost. Recommend a
 dedicated pass through `PROLOGUE_SCRIPT.md`, quest by quest, once the Doc voice rewrites

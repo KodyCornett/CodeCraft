@@ -560,7 +560,7 @@ These are the Ghost-Kernel's intrusion signals. They appear as corrupted system 
 **FLOAT**
 > The data you soaked — it reacted to what's in you. Bonded to it. That's not a coincidence. Whatever is running inside your rig has a specific affinity for this era of architecture. Like it's looking for something.
 >
-> There's someone at the University District who catalogues pre-collapse systems. Goes by Axiom. They'll want to see what you're carrying — and they'll have better answers than me.
+> There's someone at the University District who catalogues pre-collapse systems. Goes by Axiom. He'll want to see what you're carrying — and he'll have better answers than me.
 
 **PLAYER CHOICE**
 - `[GRATEFUL]` "Thank you. I mean it."
@@ -589,58 +589,98 @@ These are the Ghost-Kernel's intrusion signals. They appear as corrupted system 
 ### STAGE 1 — Find Axiom
 
 **Objective (shown in quest log):**
-> Float's lead puts you in the University District. You don't remember the transit — your system dropped out somewhere between the Valley and the campus and when your HUD rebooted you were already here.
+> Another fragment of the signal resolved the moment you left Spokane Valley. Same architecture. Same source.
 >
-> Find the UD-Hub. Axiom has apparently been tracking your signature. They already know what you're carrying.
+> This time it came through clean — two words and a coordinate: University District. Axiom.
+>
+> Get to the UD-Hub. Whoever Axiom is, the signal already knew where to send you.
 
 ---
 
 **Dialogue:**
 
 **NARRATOR**
-> Axiom Systems occupies a clean sub-level space beneath the University grid infrastructure. No clutter. No visible hardware. Just white surfaces, indirect light, and a terminal interface so precise it makes your rig feel like a salvage wreck by comparison.
+> Axiom's node renders as an impossible archive — shelves stretching upward into darkness, disappearing long before they reach a ceiling. Folders drift through the air in slow, deliberate orbits, endlessly reorganizing themselves around patterns only he seems to understand. Forgotten protocols, dead social spaces, and centuries of accumulated thought sit preserved behind translucent partitions. Nothing here feels abandoned. Nothing feels hurried either.
 >
-> Axiom doesn't introduce themselves. They're already reading your output on a display you can't see.
+> An older man sits at the center of it all behind a desk assembled more from memory than furniture. His silver hair is neatly kept, his clothes belong to no obvious era, and his posture carries the quiet confidence of someone who has spent his life teaching others. He doesn't notice you immediately. He's reading.
 
 **AXIOM**
-> You are leaking 4.3 terabytes of uncompressed pre-collapse data per hour. You have been doing this for approximately nine days.
->
-> Sit down. You are making my instruments anxious.
+> "Ah. One moment, if you please. I'd hate to lose my place."
 
 **NARRATOR**
-> They pull up a structural rendering of your rig's current state. The corruption doesn't look like corruption from here. It looks like an installation — deliberate, layered, patient.
+> Several folders shift overhead. Another disappears into the shelves. Only then does he close the file and finally look up. His eyes settle on you. Then your rig. Then back to you. A faint smile touches the corner of his mouth.
 
 **AXIOM**
-> The architecture inside your system predates the Frequency by eleven years. It should not be functional in a current-gen environment. The fact that it is suggests someone spent considerable time adapting it.
->
-> I have been searching for active instances of this code for three years. You walked in carrying one.
->
-> I require something from the University Archives in exchange for what I know. This is not negotiable.
+> "Well. That's curious. You do leave rather a trail behind you."
 
 **PLAYER CHOICE**
-- `[CURIOUS]` "What do you know?"
-- `[CAUTIOUS]` "What's in the Archives?"
-- `[RESIGNED]` "Fine. What do you need?"
+- `[TIRED]` "Everybody keeps saying that."
 
 **AXIOM**
-> The Archives contain a data packet from the original SPLICE construction logs. The ICE protecting it was written to stop clean systems — systems with legible, classifiable signatures.
->
-> Your rig reads as debris. The ICE will not recognise you as a threat.
->
-> Retrieve the packet and I will tell you what is inside you, where it came from, and what it is looking for.
+> "Mm. I imagine they do. Please. Sit. You're distracting several centuries."
+
+**NARRATOR**
+> A chair materializes opposite the desk. You don't remember it being there before. He folds his hands and studies you. Not your rig. You. Like a librarian trying to remember where he's seen a particular book before.
+
+**AXIOM**
+> "Curious."
+
+**NARRATOR**
+> Somewhere above, a folder changes position.
+
+**AXIOM**
+> "Your architecture references systems that no longer exist. Which happens. Memory, after all, can be untidy."
+
+**NARRATOR**
+> Another folder drifts overhead.
+
+**AXIOM**
+> "It also references systems that never existed."
+
+**NARRATOR**
+> He stops.
+
+**AXIOM**
+> "Well. That is unusual."
+
+**PLAYER CHOICE**
+- `[DIRECT]` "Do you know what it is?"
+
+**AXIOM**
+> "Mm. No, I'm afraid I don't. Though I appreciate your optimism."
+
+**NARRATOR**
+> He leans back slightly, considering.
+
+**AXIOM**
+> "Understanding a thing and repairing a thing are not always the same profession. Mine has always been understanding."
+
+**NARRATOR**
+> One of the folders settles into place behind him.
+
+**AXIOM**
+> "There is an archive beneath the University District. Construction records. Early documentation. I have spent eleven years attempting to access it. It dislikes me."
+
+**PLAYER CHOICE**
+- `[AMUSED]` "The archive dislikes you?"
+
+**AXIOM**
+> "Mm. Quite passionately. Fortunately, it appears to dislike things that make sense. Which brings us to your rather exceptional circumstances. Retrieve the packet. In exchange, I will tell you everything I know."
 
 ---
 
 ### STAGE 2 — Extract the Archive Packet
 
 **Objective (shown in quest log):**
-> Axiom needs a deep-packet from the University Archives at node UD-v17. The archive is locked behind the best ICE in the city — too clean, too precise for any normal operator to touch without triggering a cascade failure.
+> Axiom has spent eleven years trying to access an archive beneath the University District. Something in its architecture refuses to engage with clean systems — it reads them as hostile.
 >
-> Your rig is so corrupted that the ICE can't classify you. You read as background noise. System debris.
+> Yours doesn't read as clean.
 >
-> Get to UD-v17 and extract the packet.
+> Get to node UD-v17 and extract the data packet Axiom needs.
 >
-> [WARNING] — Whatever is inside your system will try to generate false alarms while you work. The ICE will spike. Your own security layer will scream at you. Treat it as background noise — it isn't real.
+> [WARNING] — The archive ICE will spike. Your rig will respond in kind. Keep working.
+>
+> Axiom said it dislikes things that make sense. Prove it right.
 
 *No dialogue — minigame only.*
 
@@ -649,32 +689,119 @@ These are the Ghost-Kernel's intrusion signals. They appear as corrupted system 
 ### STAGE 3 — Report Back
 
 **Objective (shown in quest log):**
-> The packet is yours. The data is clean. Your processor is not.
->
-> Get back to Axiom at the UD-Hub and deliver what they asked for.
+> The packet is out. Axiom is waiting. Return to the UD-Hub and collect what was promised.
 
 ---
 
 **Dialogue:**
 
+**NARRATOR**
+> When you return, the archive has changed. New folders drift among the old ones. Entire shelves have rearranged themselves. Thousands of tiny adjustments made by someone incapable of leaving knowledge alone. Axiom isn't reading when you arrive. He's waiting.
+
 **AXIOM**
-> The packet is intact. Thank you.
->
-> What you are carrying is called a Ghost-Kernel. It is not a virus. It is not malware. It is a person.
->
-> Not a full person — a compressed instance. A cognitive framework, preserved in pre-collapse architecture and adapted to run inside a host rig without that host's knowledge or consent. Someone's consciousness, or a significant fragment of it, is running inside your system.
+> "Ah. You survived. Good. I dislike unresolved stories."
+
+**NARRATOR**
+> The packet unfolds into the air between you. Thousands of pages flicker past in seconds. Axiom watches quietly. Patiently. Then he sighs.
+
+**AXIOM**
+> "Hm."
 
 **PLAYER CHOICE**
-- `[DISTURBED]` "Whose consciousness?"
-- `[FOCUSED]` "How do I get it out without killing it?"
-- `[SHAKEN]` "It's been in there since the beginning?"
+- `[FOCUSED]` "What does it say?"
 
 **AXIOM**
-> I don't know whose. The packet will take time to decode. What I can tell you is this: Ghost-Kernels don't travel passively. Someone loaded it onto the Frequency and aimed it at you. That targeting was deliberate.
->
-> There is a technician in North Spokane. Goes by Patch. They work in the Under-Grid — infrastructure layer, below the public Frequency. They will know how to isolate and communicate with what is inside you.
->
-> They will already know you are coming. They always do.
+> "Less than I hoped. More than I expected."
+
+**PLAYER CHOICE**
+- `[FLAT]` "That's not an answer."
+
+**AXIOM**
+> "No. It isn't."
+
+**NARRATOR**
+> He folds his hands atop the desk.
+
+**AXIOM**
+> "I study history. History is comforting. Events happen. Time passes. People assign meaning. But history only speaks after things are finished."
+
+**NARRATOR**
+> His eyes drift toward your rig.
+
+**AXIOM**
+> "Whatever is inside you... it is still writing itself."
+
+**PLAYER CHOICE**
+- `[FLAT]` "So you don't know."
+
+**AXIOM**
+> "Correct."
+
+**NARRATOR**
+> No embarrassment. No frustration. Just honesty.
+
+**AXIOM**
+> "Knuckle sees bodies. Veil sees systems. Float sees machines."
+
+**NARRATOR**
+> Another folder settles into place above him.
+
+**AXIOM**
+> "I see stories. And stories are difficult to understand while one is still living inside them."
+
+**PLAYER CHOICE**
+- `[BITTER]` "Nobody knows anything."
+
+**NARRATOR**
+> For the first time since you arrived — Axiom smiles.
+
+**AXIOM**
+> "Ah. I wouldn't say that. We know quite a lot, actually. We know it isn't killing you. We know it adapts. We know it remembers things nobody expected. And we know it possesses remarkable patience. Which, I confess, is more than I can say for most people."
+
+**PLAYER CHOICE**
+- `[FLAT]` "So that's it?"
+
+**NARRATOR**
+> Axiom sits quietly for a moment. Somewhere above, another folder settles into place. He watches it with the satisfaction of someone putting a book back where it belongs.
+
+**AXIOM**
+> "Mm. For now, I believe so."
+
+**PLAYER CHOICE**
+- `[FLAT]` "That's not very reassuring."
+
+**AXIOM**
+> "No. It isn't."
+
+**NARRATOR**
+> He folds his hands atop the desk.
+
+**AXIOM**
+> "The world has an unfortunate habit of refusing to reveal itself all at once. If it did, I suspect my profession would've become terribly boring centuries ago."
+
+**NARRATOR**
+> He smiles softly.
+
+**AXIOM**
+> "We spend our lives believing understanding arrives all at once. It rarely does. More often, it arrives one conversation at a time."
+
+**PLAYER CHOICE**
+- `[QUIET]` "And if it doesn't?"
+
+**NARRATOR**
+> The old man considers the question carefully.
+
+**AXIOM**
+> "Then we live with what we know. And remain grateful for what we don't."
+
+**NARRATOR**
+> He rises from his desk and carefully returns the file he'd been reading to the endless shelves above. Several folders shift to accommodate it. Satisfied, he turns back to you.
+
+**AXIOM**
+> "You've been carrying questions for quite some time. I imagine they must be heavy. Go get some rest."
+
+**NARRATOR**
+> And just like that, the conversation is over. Not because he is finished with you. Not because he lacks answers. Simply because, in Axiom's view, there is nothing more to say today.
 
 *→ Watcher Interrupt #4 fires when player leaves UD-hub.*
 
@@ -693,93 +820,321 @@ These are the Ghost-Kernel's intrusion signals. They appear as corrupted system 
 ### STAGE 1 — Find Patch
 
 **Objective (shown in quest log):**
-> Axiom's lead puts you in North Spokane. Your deck is barely functional. The virus is forcing a recursive loop, burning cycles trying to lead you somewhere specific — somewhere it recognises.
+> Another fragment hit your system leaving the University District.
 >
-> Get to the NS-Hub. Patch communicates through a shielded remote terminal. They won't let you inside.
+> Same source. Same impossible architecture.
+>
+> This time it resolved into something cleaner: North Spokane. Patch.
+>
+> You barely remember leaving the University District. Your deck is running at critical temperature. Your HUD freezes for seconds at a time. Entire moments arrive out of order. Sometimes your avatar moves before you tell it to. Sometimes it doesn't move at all.
+>
+> Whatever is inside your system isn't slowing down.
+>
+> And neither is the thing trying to remove it.
+>
+> Every hour hurts more than the last.
+>
+> Get to the NS-Hub before your rig gives out completely.
 
 ---
 
 **Dialogue:**
 
 **NARRATOR**
-> The NS-Hub terminal is a grille-covered access panel mounted into a concrete wall at the edge of the Under-Grid maintenance corridor. There is no door. No signage. A single line of green text cycles on the screen:
+> Patch's node renders as an old maintenance station buried beneath North Spokane — exposed pipes, concrete walls and bundles of cable disappearing into the dark like roots. Nothing here was designed to be lived in.
 >
-> `> AWAITING INPUT`
-
-**PATCH**
-> `> You took longer than I expected.`
-> `> Your rig is broadcasting on seventeen simultaneous frequencies. You have been for eight days.`
-> `> I have been listening to all of them.`
+> Over the years, someone changed their mind.
+>
+> Plants grow beneath artificial lamps. Half-finished electronics cover every available surface. A kettle simmers quietly on a hotplate that somehow still works. Several terminals drift lazily through the air around the room, opening and closing according to a logic known only to their owner.
+>
+> The whole place feels less like a workshop and more like somewhere somebody forgot to leave.
 
 **NARRATOR**
-> There is a long pause. More text appears.
+> Her avatar is compact and practical, dressed in patched work clothes with tools hanging from her belt that never seem to stay in the same place twice. Dark hair tied back with whatever happened to be closest. One sleeve rolled up, the other forgotten.
+>
+> She's hanging upside down beneath a maintenance platform.
+>
+> Somehow.
+>
+> She notices you.
+>
+> Keeps working.
+>
+> You take another step.
+>
+> Your vision smears.
+>
+> The room jumps sideways.
+>
+> Something screams through your audio feed.
+>
+> Your knees buckle.
+>
+> By the time the node catches up again, you're on the floor.
 
 **PATCH**
-> `> The Ghost-Kernel inside your system has been trying to establish a handshake with the Under-Grid infrastructure since it activated. It is using your rig as a bridge.`
-> `> It is looking for a specific node. One that does not appear on any current grid map.`
-> `> I know where it is.`
-> `> I will not tell you for free.`
+> Oh.
+>
+> That's significantly worse than I expected.
+
+**NARRATOR**
+> She's beside you immediately. One of the floating terminals abandons whatever it was doing and starts throwing diagnostics into the air. Another begins screaming warning tones.
+>
+> Patch ignores both.
+
+**PATCH**
+> Hey.
+>
+> Stay with me.
+>
+> You can pass out later.
+>
+> I'd rather introduce myself first.
+
+**NARRATOR**
+> She helps you upright.
+>
+> One look at your architecture and her expression changes.
+>
+> Not fear.
+>
+> Not confusion.
+>
+> Professional irritation.
+>
+> The sort reserved for problems that refuse to explain themselves.
+
+**PATCH**
+> Wow.
+>
+> That's rude.
 
 **PLAYER CHOICE**
-- `[WARY]` "What do you want?"
-- `[DIRECT]` "Tell me about the node first."
-- `[EXHAUSTED]` "Everyone wants something. Fine."
+- `[DESPERATE]` "Please tell me somebody knows what's happening."
 
 **PATCH**
-> `> There is a cache of volatile sub-routines at NS-v13. Unstable code — it fights anything clean that touches it. I cannot retrieve it safely.`
-> `> You can. Whatever is inside you is too broken to register as a threat. The sub-routines will let you carry them.`
-> `> Move them to my drop-box. I will tell you everything I know about the node the Kernel is searching for.`
-> `> Do not read the sub-routines while you carry them. Do not open the packets. Move them and nothing else.`
-> `> The Kernel will try to help you. Let it.`
+> Maybe.
+>
+> Probably not.
+>
+> But maybe.
+
+**NARRATOR**
+> She circles you once, studying the readouts hanging around your rig. Her eyes move faster than the terminals.
+>
+> She frowns.
+
+**PATCH**
+> I need calibration packages from NS-v13.
+>
+> Volatile sub-routines.
+>
+> Ugly things.
+>
+> Nobody wants them.
+>
+> Which makes them my responsibility.
+>
+> Bring them back.
+>
+> I'll see what I can see.
 
 ---
 
-### STAGE 2 — Haul the Sub-Routines
+### STAGE 2 — Calibration Tether
 
 **Objective (shown in quest log):**
-> Patch won't touch your rig — you're too dangerous to bring inside. But they have work that's equally dangerous: a cache of volatile sub-routines at node NS-v13, code so unstable it actively fights to overwrite anything it touches.
+> Patch needs volatile calibration packages from node NS-v13.
 >
-> Get to NS-v13 and move the sub-routines to Patch's drop-box. You carry them because you're the only thing in this city broken enough to not notice the difference.
+> Nobody wants them.
 >
-> [WARNING] — These sub-routines will fight back. Every packet in your buffer will actively drain your stability. The faster you move them, the less damage they do.
+> Which, according to Patch, makes them her problem.
+>
+> Retrieve the packages and bring them back to her node.
+>
+> [WARNING] — The sub-routines are unstable and actively resist containment. Every packet carried will drain your stability.
+>
+> Your own system is unstable.
+>
+> Move quickly.
 
 *No dialogue — minigame only.*
 
 ---
 
-### STAGE 3 — Collect Your Cut
+### STAGE 3 — Report Back
 
 **Objective (shown in quest log):**
-> The sub-routines are in the drop-box. Patch has already severed the connection — you aren't getting a debrief, just the credits.
+> The packages are secured.
 >
-> Return to the NS-Hub terminal and collect your payout.
+> Your deck isn't.
 >
-> You've run the full circuit. Five docs. Five jobs. You're more broken than when you started, and you still have no idea what's living in your system. But whatever it is — it's been with you since the beginning. And it's still trying to teach you something.
+> Return to Patch and collect your payment.
+>
+> Five docs. Five jobs. No answers.
+>
+> And whatever is inside you is only getting louder.
 
 ---
 
 **Dialogue:**
 
+**NARRATOR**
+> The kettle whistles when you return.
+>
+> Patch doesn't.
+>
+> She's sitting cross-legged on the floor surrounded by open terminals and handwritten notes.
+>
+> One of the plants has somehow acquired a screwdriver.
+>
+> She doesn't seem surprised.
+
 **PATCH**
-> `> Sub-routines received. Intact.`
-> `> The node the Kernel is searching for is called ORIGIN_NULL. It predates the Frequency by eleven years. It was the first node ever connected to what would become SPLICE — a test relay that was officially decommissioned and scrubbed from the public grid index.`
-> `> It was not actually scrubbed.`
-> `> The Ghost-Kernel was written at ORIGIN_NULL. Whoever preserved it intended it to find its way back.`
-> `> I do not know why. I do not know who.`
-> `> But the Kernel does.`
-> `> You just have to ask it.`
+> Welcome back.
+>
+> Oh.
+>
+> You survived.
+>
+> Good.
+
+**NARRATOR**
+> Several terminals wake up when your signal enters the room.
+>
+> They begin comparing diagnostics.
+>
+> Patch studies them.
+>
+> Frowns.
+>
+> Studies them again.
+>
+> Then rubs her eyes.
+
+**PATCH**
+> Hm.
+>
+> Hm.
 
 **PLAYER CHOICE**
-- `[RESOLVED]` "I'll find ORIGIN_NULL."
-- `[UNCERTAIN]` "How do I ask a piece of compressed consciousness something?"
-- `[QUIET]` "I think I already know the answer."
+- `[DIRECT]` "Just tell me what's wrong with me."
 
 **PATCH**
-> `> Your credits have been transferred.`
-> `> One more thing.`
-> `> The Kernel has been broadcasting on the Watcher channel since it activated. If you have not been reading those signals — read them.`
-> `> It has been trying to tell you something since the beginning.`
-> `> Connection terminated.`
+> No idea.
+
+**PLAYER CHOICE**
+- `[FLAT]` "Seriously?"
+
+**PATCH**
+> Mm.
+>
+> Sorry.
+
+**NARRATOR**
+> She doesn't sound embarrassed.
+>
+> Just disappointed.
+>
+> Not in you.
+>
+> In the data.
+
+**PATCH**
+> Most things make sense eventually.
+>
+> Dependency.
+>
+> Attachment.
+>
+> Addiction.
+>
+> Habit.
+>
+> Comfort.
+>
+> People are wonderfully predictable.
+
+**PLAYER CHOICE**
+- `[FLAT]` "And this isn't?"
+
+**PATCH**
+> No.
+>
+> Which is annoying.
+>
+> Interesting.
+>
+> But annoying.
+
+**PLAYER CHOICE**
+- `[BITTER]` "Nobody knows anything."
+
+**PATCH**
+> Ah.
+>
+> I wouldn't say that.
+>
+> I think everybody knows something.
+>
+> Which is considerably more inconvenient.
+
+**PLAYER CHOICE**
+- `[FLAT]` "Meaning?"
+
+**PATCH**
+> Meaning nobody gets to be entirely correct.
+>
+> Terrible system.
+>
+> I've filed several complaints.
+
+**PLAYER CHOICE**
+- `[DRY]` "Did anyone answer?"
+
+**PATCH**
+> No.
+>
+> Which rather proves the point.
+
+**NARRATOR**
+> One of the terminals chirps.
+>
+> Patch reaches over and removes a screwdriver from a potted plant.
+
+**PATCH**
+> Honestly, I still haven't figured out how that keeps happening.
+
+**PLAYER CHOICE**
+- `[DRY]` "That's your professional advice?"
+
+**PATCH**
+> Mm.
+>
+> Disappointing, isn't it?
+>
+> Get some sleep.
+>
+> Eat something.
+>
+> Try not to panic.
+>
+> Humanity's been using that strategy for thousands of years.
+>
+> Seems rude not to continue the tradition.
+
+**NARRATOR**
+> And just like that she's already halfway back into whatever she was doing before you arrived.
+>
+> Not because she doesn't care.
+>
+> Not because she's dismissing you.
+>
+> Simply because she's reached the edge of what she knows.
+>
+> And unlike most people—
+>
+> Patch has made peace with that.
 
 ---
 

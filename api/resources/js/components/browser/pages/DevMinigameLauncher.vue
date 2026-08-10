@@ -118,7 +118,7 @@ const GAMES = [
             objectiveText:   'Extract the packet. Avoid triggering live ICE.',
             fileName:        'UD-V17.sys',
             hideBars:        false,
-            timeLimit:       55,
+            timeLimit:       110, // cosmetic only — the component computes its own trace-duration budget (95-150s) internally
         },
     },
     {
@@ -132,7 +132,7 @@ const GAMES = [
             objectiveText:   'Deliver the sub-routines. Do not let the chain cascade.',
             fileName:        'NS-V13.sys',
             hideBars:        false,
-            timeLimit:       30,
+            timeLimit:       100, // cosmetic only — the component computes its own duration budget (90-110s) internally
         },
     },
 ];

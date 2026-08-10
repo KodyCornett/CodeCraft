@@ -32,7 +32,7 @@ CodeCraft is a real-time multiplayer cyberpunk hacking game. Players move across
 | Backend | Laravel 11, PHP 8.5, SQLite (dev) |
 | Auth | Laravel Sanctum — session-based for the SPA |
 | Frontend | Vue 3 (Composition API), Inertia.js, Vite |
-| Realtime | Laravel Reverb (WebSocket) — pending installation |
+| Realtime | Laravel Reverb (WebSocket) — live via Laravel Echo (`window.Echo`, gated by `VITE_ENGINE_ENABLED`) |
 | Font | JetBrains Mono (monospace throughout) |
 | Map | SVG hex grid, 228 canvas nodes |
 
@@ -121,8 +121,10 @@ api/
       usePacketHijack.js    Packet Hijack WebSocket state + command dispatch
       useUpgradeCosts.js    Client-side upgrade cost projection for store UI display only
                             (server recomputes all actual costs via RigService)
-      useWebSocket.js       WS stub — silent no-op until Laravel Echo + Reverb is installed
-                            Do NOT add logic to this stub
+      useWebSocket.js       Thin wrapper around window.Echo (Laravel Echo → Reverb) — connected reflects
+                            live socket state; joinChannel() for public channels. Private/presence
+                            channels (combat, packet-hijack, node presence, bounty board) are managed
+                            directly by their own composables via window.Echo, not through this wrapper.
       useBrowserState.js    Controls which SPLICE panel URL is active at the Game.vue level
       useBrowser.js         Internal navigation history inside InGameBrowser.vue
       useAudio.js           Sound effect playback helpers
@@ -354,7 +356,7 @@ Sanctum's `EnsureFrontendRequestsAreStateful` middleware is prepended to the API
 4. **Cache = CPU + RAM effective values.** Recompute server-side after every stat change.
 5. **Pocket vs wallet distinction is load-bearing.** Hacks → pocket. CyberDoc bank → wallet. Store purchases → wallet only.
 6. **Node presence polling must not run pre-auth.** `useNodePresence` guards `fetchPresence()` with an auth token check.
-7. **WebSocket is a stub.** `useWebSocket` returns a silent no-op. It will be replaced by Laravel Echo pointed at Reverb when real-time is installed. Do not add logic to the stub.
+7. **Reverb is live.** `useWebSocket` wraps `window.Echo` (Laravel Echo → Reverb, gated by `VITE_ENGINE_ENABLED`) and its `connected` ref reflects the real socket state. Private/presence channels (combat, packet-hijack, node presence, bounty board) are managed directly by their own composables via `window.Echo` — don't route new realtime features through `useWebSocket` unless they're public channels.
 8. **The SPLICE browser routes are all in `SpliceRouter.js`**. Add new pages there — nothing else needs changing.
 9. **Pings are client-side only for now.** The WebSocket engine will broadcast real pings when it's live. Client-side pings are approximations.
 10. **One migration per change.** Never alter existing migration files — always add a new one.

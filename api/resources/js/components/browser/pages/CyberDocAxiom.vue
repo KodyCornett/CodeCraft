@@ -5,26 +5,25 @@
 <script setup>
 import CyberDocStore from './CyberDocStore.vue';
 
-// AXIOM — Layer 3: Ecosystem Filter / Corporate Core
-// Philosophy: Algorithmic tribalism. The algorithm didn't pull the trigger — it spent
-//             eight months making sure the shooter had never seen a human version of the target.
-// Voice: Thoughtful. Warm but with grief underneath. Asks questions more than declares.
+// AXIOM — Archivist, University District
+// Voice: Formal, unhurried, dry. Short clipped lines, long implied pauses ("Mm.", "Well.").
+//        Warmth expressed as attentiveness and wit, not overt comfort.
 const NPC = {
     handle:    'AXIOM',
     storeName: 'Axiom Systems',
-    district:  'Corporate Core',
-    tagline:   'Open routing. Unfiltered access. Come as you are.',
+    district:  'University District',
+    tagline:   'Understanding a thing and repairing a thing are not always the same profession.',
     canvasId:  'UD-hub',
     theme: {
-        color:      '#26C6DA',
-        dimColor:   'rgba(38,198,218,0.18)',
-        faintColor: 'rgba(38,198,218,0.03)',
+        color:      '#FFD700',
+        dimColor:   'rgba(255,215,0,0.18)',
+        faintColor: 'rgba(255,215,0,0.03)',
         terminalLines: [
-            '// AXIOM SYSTEMS :: CORPORATE CORE DISTRICT',
-            '// OPEN NETWORK — ALL RUNNERS WELCOME',
-            '// ROUTING: UNFILTERED. NO ECHO CHAMBER DETECTED.',
+            '// AXIOM SYSTEMS :: UNIVERSITY DISTRICT',
+            '// ARCHIVE ACCESS — ELEVEN YEARS AND COUNTING',
+            '// CATALOGUING: PRE-COLLAPSE ARCHITECTURE',
         ],
-        quote: "Before you buy anything — look around the room. Who's here with you? Do you actually know them, or just their feed?",
+        quote: "Mm. Quite curious. You do leave rather a trail behind you.",
     },
 };
 </script>

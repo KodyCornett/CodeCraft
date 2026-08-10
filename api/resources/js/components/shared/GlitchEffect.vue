@@ -3,7 +3,7 @@
         <div
             v-if="active"
             class="ge-root"
-            :class="[`ge-root--${type.replace(/,/g, '-')}`, overlay ? 'ge-root--overlay' : 'ge-root--inline']"
+            :class="[`ge-root--${type.replace(/\(\d+(\.\d+)?\)/g, '').replace(/,/g, '-')}`, overlay ? 'ge-root--overlay' : 'ge-root--inline']"
             :style="rootStyle"
             aria-hidden="true"
         >
@@ -86,6 +86,11 @@ const props = defineProps({
      *   'full'        — all of the above (Viral Breach level)
      *
      * Can also be a comma-separated combination: 'chromatic,bars,scan'
+     *
+     * Each effect in the list can carry its own intensity override on a 1–5
+     * scale, in parentheses: 'bars(2),chromatic(4)' runs bars light and
+     * chromatic heavy, regardless of the global `intensity` prop below.
+     * Effects without a parenthetical value fall back to `intensity`.
      */
     type: {
         type:    String,
@@ -165,34 +170,69 @@ watch(active, (v) => {
 onUnmounted(() => clearTimeout(durationTimer));
 
 // ── Type parsing ──────────────────────────────────────────────────────────────
+//
+// type also accepts a per-effect intensity override in parentheses, on a 1–5
+// scale: type="bars(2),chromatic(4)" runs bars at 2/5 and chromatic at 4/5,
+// independent of the global `intensity` prop. Effects listed without a
+// parenthetical value fall back to the global `intensity` prop as before.
 
-const activeTypes = computed(() => {
+const EFFECT_NAMES = ['chromatic', 'scan', 'bars', 'static', 'dissolve', 'flicker', 'scramble'];
+
+const parsedTypes = computed(() => {
+    const map = new Map(); // effectName -> override intensity (0-1), or null (use global)
     if (props.type === 'full') {
-        return new Set(['chromatic', 'scan', 'bars', 'static', 'dissolve', 'flicker', 'scramble']);
+        EFFECT_NAMES.forEach(name => map.set(name, null));
+        return map;
     }
-    return new Set(props.type.split(',').map(t => t.trim()));
+    props.type.split(',').forEach(raw => {
+        const match = raw.trim().match(/^(\w+)(?:\((\d+(?:\.\d+)?)\))?$/);
+        if (!match) return;
+        const [, name, level] = match;
+        if (!EFFECT_NAMES.includes(name)) return;
+        map.set(name, level != null ? Math.max(0, Math.min(1, Number(level) / 5)) : null);
+    });
+    return map;
 });
 
 function shows(t) {
-    return activeTypes.value.has(t);
+    return parsedTypes.value.has(t);
 }
 
 // ── Intensity helpers ─────────────────────────────────────────────────────────
 
 const i = computed(() => Math.max(0, Math.min(1, props.intensity)));
 
+// Resolves the effective 0-1 intensity for a single effect — its own
+// parenthetical override if it has one, otherwise the global intensity prop.
+function intensityFor(t) {
+    const override = parsedTypes.value.get(t);
+    return override != null ? override : i.value;
+}
+
+// Highest resolved intensity across all active effects — drives the root
+// container's overall opacity so a low global intensity doesn't clip a
+// deliberately high per-effect override.
+const maxIntensity = computed(() => {
+    let max = 0;
+    parsedTypes.value.forEach((override) => {
+        const v = override != null ? override : i.value;
+        if (v > max) max = v;
+    });
+    return max || i.value;
+});
+
 // ── Root style ────────────────────────────────────────────────────────────────
 
 const rootStyle = computed(() => ({
     '--ge-color':     props.color,
-    '--ge-intensity': i.value,
-    opacity:          0.3 + i.value * 0.7,
+    '--ge-intensity': maxIntensity.value,
+    opacity:          0.3 + maxIntensity.value * 0.7,
 }));
 
 // ── Chromatic ─────────────────────────────────────────────────────────────────
 
 function chromaticStyle(channel) {
-    const shift = i.value * 6;
+    const shift = intensityFor('chromatic') * 6;
     const offsets = {
         r: `translateX(${shift}px)`,
         g: `translateX(-${shift * 0.5}px) translateY(${shift * 0.3}px)`,
@@ -203,26 +243,30 @@ function chromaticStyle(channel) {
 
 // ── Scanlines ─────────────────────────────────────────────────────────────────
 
-const scanStyle = computed(() => ({
-    backgroundSize: `100% ${Math.round(2 + i.value * 4)}px`,
-    opacity:        0.03 + i.value * 0.08,
-}));
+const scanStyle = computed(() => {
+    const v = intensityFor('scan');
+    return {
+        backgroundSize: `100% ${Math.round(2 + v * 4)}px`,
+        opacity:        0.03 + v * 0.08,
+    };
+});
 
 // ── Bars ──────────────────────────────────────────────────────────────────────
 
-const barCount = computed(() => Math.round(3 + i.value * 12));
+const barCount = computed(() => Math.round(3 + intensityFor('bars') * 12));
 
 function barStyle(idx) {
     // Deterministic-ish but visually varied per bar
+    const v      = intensityFor('bars');
     const seed   = idx * 137.5;
     const top    = (seed % 100);
-    const h      = 1 + (seed % 7) * i.value;
-    const offset = ((seed % 20) - 10) * i.value;
+    const h      = 1 + (seed % 7) * v;
+    const offset = ((seed % 20) - 10) * v;
     return {
         top:       `${top}%`,
         height:    `${h}px`,
         transform: `translateX(${offset}px)`,
-        opacity:   0.2 + (idx % 3) * 0.15 * i.value,
+        opacity:   0.2 + (idx % 3) * 0.15 * v,
         animationDuration: `${0.08 + (idx % 4) * 0.03}s`,
         animationDelay:    `${(idx % 5) * 0.02}s`,
     };
@@ -231,23 +275,24 @@ function barStyle(idx) {
 // ── Static ────────────────────────────────────────────────────────────────────
 
 const staticStyle = computed(() => ({
-    opacity: 0.04 + i.value * 0.18,
+    opacity: 0.04 + intensityFor('static') * 0.18,
 }));
 
 // ── Dissolve ──────────────────────────────────────────────────────────────────
 
-const dissolveCount = computed(() => Math.round(4 + i.value * 8));
+const dissolveCount = computed(() => Math.round(4 + intensityFor('dissolve') * 8));
 
 function dissolveStyle(idx) {
+    const v      = intensityFor('dissolve');
     const seed   = idx * 73.1;
     const top    = (seed % 100);
-    const h      = 2 + (seed % 20) * i.value;
-    const skew   = ((seed % 10) - 5) * i.value;
+    const h      = 2 + (seed % 20) * v;
+    const skew   = ((seed % 10) - 5) * v;
     return {
         top:              `${top}%`,
         height:           `${h}px`,
         transform:        `skewX(${skew}deg)`,
-        opacity:          0.3 + i.value * 0.5,
+        opacity:          0.3 + v * 0.5,
         animationDuration:`${0.3 + (idx % 5) * 0.1}s`,
         animationDelay:   `${(idx % 6) * 0.04}s`,
     };
@@ -255,10 +300,13 @@ function dissolveStyle(idx) {
 
 // ── Flicker ───────────────────────────────────────────────────────────────────
 
-const flickerStyle = computed(() => ({
-    animationDuration: `${0.05 + (1 - i.value) * 0.1}s`,
-    opacity: i.value * 0.15,
-}));
+const flickerStyle = computed(() => {
+    const v = intensityFor('flicker');
+    return {
+        animationDuration: `${0.05 + (1 - v) * 0.1}s`,
+        opacity: v * 0.15,
+    };
+});
 
 // ── Scramble ──────────────────────────────────────────────────────────────────
 
@@ -267,11 +315,12 @@ const scrambledChars = ref([]);
 let scrambleTimer = null;
 
 function refreshScramble() {
-    const count = Math.round(8 + i.value * 24);
+    const v     = intensityFor('scramble');
+    const count = Math.round(8 + v * 24);
     scrambledChars.value = Array.from({ length: count }, (_, idx) => ({
         id:      idx,
         c:       GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)],
-        opacity: 0.1 + Math.random() * 0.6 * i.value,
+        opacity: 0.1 + Math.random() * 0.6 * v,
     }));
 }
 
