@@ -869,9 +869,12 @@ const currentNodeDialogueUrl = computed(() => {
 const frequencyOpen = ref(false);
 
 const frequencyHub = computed(() => {
-    const node = currentNode.value;
+    // currentNode only ever holds { canvasId, x, y } (see useMapInteraction's
+    // onPlayerMoved) — type/npcHandle live on the DB-merged record, so look it
+    // up by the authoritative currentNodeId instead of trusting currentNode.
+    const node = getByCanvasId(currentNodeId.value);
     if (node?.type === 'cyberdoc' && node?.npcHandle?.toUpperCase() === 'KNUCKLE') {
-        return node.canvasId ?? null;
+        return node.canvasId ?? currentNodeId.value;
     }
     return null;
 });
