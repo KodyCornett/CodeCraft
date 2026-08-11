@@ -17,8 +17,17 @@ use App\Models\Player;
  */
 class DocChatService
 {
-    private const MAX_BODY_LENGTH = 240;
-    private const HISTORY_LIMIT   = 50;
+    private const MAX_BODY_LENGTH    = 240;
+    private const HISTORY_LIMIT      = 50;
+    // Short TTL — this is meant to feel like live proximity chatter, not a
+    // permanent transcript. Mirrors the expires_at pattern node_traces already
+    // uses; expired rows are filtered at read time and opportunistically
+    // deleted (see pruneExpired()) rather than via a scheduled job.
+    private const RETENTION_MINUTES  = 45;
+
+    public function __construct(
+        private readonly ProfanityFilterService $profanityFilter,
+    ) {}
 
     /**
      * True if the given hub_canvas_id is a real CyberDoc node and the player's
@@ -39,16 +48,31 @@ class DocChatService
     }
 
     /**
-     * Most recent messages for one hub's room, oldest first.
+     * Most recent, unexpired messages for one hub's room, oldest first.
      */
     public function recentMessages(string $hubCanvasId): array
     {
+        $this->pruneExpired($hubCanvasId);
+
         return DocChatMessage::where('hub_canvas_id', $hubCanvasId)
+            ->where('expires_at', '>', now())
             ->orderBy('created_at')
             ->limit(self::HISTORY_LIMIT)
             ->get()
             ->map(fn (DocChatMessage $message) => $this->present($message))
             ->all();
+    }
+
+    /**
+     * Delete this hub's expired messages. Called on every history fetch
+     * instead of a scheduled job — cheap, no extra infra, and it keeps the
+     * table from accumulating a permanent log of hub conversations.
+     */
+    private function pruneExpired(string $hubCanvasId): void
+    {
+        DocChatMessage::where('hub_canvas_id', $hubCanvasId)
+            ->where('expires_at', '<=', now())
+            ->delete();
     }
 
     /**
@@ -62,6 +86,9 @@ class DocChatService
         if ($trimmed === '') {
             throw new \InvalidArgumentException('Message cannot be empty.');
         }
+        if ($this->profanityFilter->containsProfanity($trimmed)) {
+            throw new \InvalidArgumentException('Message blocked — contains restricted language.');
+        }
         if (mb_strlen($trimmed) > self::MAX_BODY_LENGTH) {
             $trimmed = mb_substr($trimmed, 0, self::MAX_BODY_LENGTH);
         }
@@ -71,6 +98,7 @@ class DocChatService
             'player_id'     => $player->id,
             'handle'        => $player->handle,
             'body'          => $trimmed,
+            'expires_at'    => now()->addMinutes(self::RETENTION_MINUTES),
         ]);
 
         broadcast(new DocChatMessageSent($message));

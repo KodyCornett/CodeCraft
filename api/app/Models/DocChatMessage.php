@@ -15,6 +15,11 @@ class DocChatMessage extends Model
         'player_id',
         'handle',
         'body',
+        'expires_at',
+    ];
+
+    protected $casts = [
+        'expires_at' => 'datetime',
     ];
 
     public function player(): BelongsTo
