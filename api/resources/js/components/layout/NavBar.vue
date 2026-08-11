@@ -34,7 +34,7 @@
 
         <!-- Frequency — live DOC comms hotkey. Not a SPLICE page launch, so it's
              kept separate from the APPS loop above. Enabled/pulsing only while
-             standing at a hub with chat live (Knuckle only for now). -->
+             standing at any CyberDoc hub — one isolated room per doc. -->
         <button
             id="nav-frequency"
             class="tb-btn tb-freq"

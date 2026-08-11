@@ -237,6 +237,28 @@ function fadeInAfterDialogue() {
 }
 
 /**
+ * Partial duck — for field comms calls, which run alongside live gameplay
+ * rather than taking over a scene. Fades music down to 35% of its current
+ * volume instead of fadeOutForDialogue()'s full silence, so the game still
+ * feels "on" underneath the call.
+ */
+function duckForCall() {
+    clearFade();
+    if (!_audio || muted.value) return;
+    fadeTo(_audio, MUSIC_VOL * 0.35, 500, null);
+}
+
+/**
+ * Restore full music volume after a field comms call ends.
+ */
+function unduckAfterCall() {
+    if (!_started || !_unlocked) return;
+    clearFade();
+    if (!_audio) return;
+    fadeTo(_audio, muted.value ? 0 : MUSIC_VOL, 700, null);
+}
+
+/**
  * Instantly silence and pause — for dramatic story interrupts.
  */
 function cutAudio() {
@@ -316,6 +338,8 @@ export function useAudio() {
         resumeAudio,
         fadeOutForDialogue,
         fadeInAfterDialogue,
+        duckForCall,
+        unduckAfterCall,
         toggleMute,
         setMusicVolume,
         setStoryVolume,

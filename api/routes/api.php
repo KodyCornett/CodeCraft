@@ -145,8 +145,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // ---------------------------------------------------------------------------
 // DOC Chat — per-hub player rooms. One isolated room per CyberDoc, gated to
-// players physically standing on that hub's node. Enabled on Knuckle's page
-// only for now (CyberDocKnuckle.vue); other docs opt in the same way later.
+// players physically standing on that hub's node. Live for all 5 docs —
+// access is enforced generically in DocChatService::playerIsAtHub().
 // ---------------------------------------------------------------------------
 
     // messages (read): 30/min — panel fetches history on open, not polled

@@ -79,6 +79,13 @@ class QuestStageSeeder extends Seeder
                 'title'              => 'Deploy DISCONNECT_LAYER',
                 'objective_text'     => "Knuckle doesn't have answers — he has work. A residential block in Browne's Addition is locked at 50 degrees, grid-capped to redirect power to corporate sectors.\n\nHe's handed you a DISCONNECT_LAYER exploit. Get to node BA-v14 and strip the system-governor. Give those people their heat back.\n\n[WARNING] — Your rig is still leaking. Something inside your system is fighting for bandwidth during every operation. Watch your stability.",
                 'dialogue'           => null,
+                'field_comms'        => [
+                    ['speaker' => 'doc', 'text' => "Diagnostics are live on my end. Don't get cute out there — that governor's got teeth."],
+                    ['speaker' => 'doc', 'text' => "...that's odd. Your rig just spiked. Wasn't the node — that was you."],
+                    ['speaker' => 'doc', 'text' => "Keep working. I'll flag it if it gets worse."],
+                    ['speaker' => 'doc', 'text' => "Strip the layer and get out. We'll talk about the rest back here."],
+                    ['speaker' => 'player', 'text' => "Copy. Finishing the strip — we'll figure out the rest after."],
+                ],
                 'rep_reward'         => 0,
                 'is_branch'          => false,
                 'branch_options'     => null,

@@ -58,6 +58,8 @@ api/
       StoreController            /api/store/catalog, /api/store/purchase-*
       InventoryController        /api/inventory, /api/inventory/use
       TutorialController         /api/tutorial/reward
+      DocChatController          GET/POST /api/doc-chat/{hubCanvasId}/messages — history + send,
+                                 gated by DocChatService::playerIsAtHub()
     Models/
       User                  Laravel auth user (email + password)
       Player                Game identity — handle, economy, bounty state, active_effects
@@ -76,6 +78,8 @@ api/
       PacketHijackMatch     Active Packet Hijack session — phase, port pool, chain state
       StreetDoc             Street Doc NPC locations (legacy name — maps to CyberDoc NPCs)
       HardwareEncrypt       Encryption hardware item (status: verify active usage)
+      DocChatMessage        FREQUENCY hub chat message — hub_canvas_id, player_id, handle, body,
+                            expires_at (45min TTL)
     Services/
       RigService            All stat calculation — effectiveStats(), maxSs(), loadoutSlots(),
                             applyDamage(), enforceRamCap(), enforceCpuCommandCap()
@@ -85,6 +89,13 @@ api/
       InventoryService      Consumable use effects
       PacketHijackService   Full Packet Hijack game logic — Phase 1 recon, Phase 2 exploit chain,
                             rig commands, port pool generation, chain generation, command parsing
+      DocChatService        FREQUENCY hub chat — playerIsAtHub() presence gate, recentMessages(),
+                            postMessage() (profanity check + 45min TTL + broadcast), pruneExpired()
+      ProfanityFilterService Blocklist filter for DocChatService — leetspeak normalization +
+                            run-length-aware stretch matching (e.g. "fuuuuuck"), backed by
+                            config/profanity.php
+    Events/
+      DocChatMessageSent    ShouldBroadcastNow → PrivateChannel('doc-chat.{hubCanvasId}')
     DTOs/
       BountyEvent           Value object carrying bounty state for broadcast events
   database/
@@ -92,6 +103,9 @@ api/
     seeders/
       ChassisTemplateSeeder Chassis catalog (run after migrations)
       PlayerSeeder          Test player + rig
+  config/
+    profanity.php           Blocklist config for ProfanityFilterService — categorized word/phrase
+                            list, see file comments for expansion sources
   resources/js/
     Pages/
       Game.vue              Root game component — wires all composables together (integration layer only)
@@ -103,7 +117,10 @@ api/
       panel/                NodeInfoBlock, LoadoutBlock, BountyBlock, PanelBlock
       browser/              InGameBrowser, SpliceRouter.js, pages/
       minigame/             GridBreach, PacketHijack
-      shared/               BootSequence, NeonBorder, OpenSeasonNotification, SSBar, TerminalText
+      shared/               BootSequence, NeonBorder, OpenSeasonNotification, SSBar, TerminalText,
+                            DocChatPanel (presentational FREQUENCY log + input), DocChatWindow
+                            (floating shell, teleport-to-body), FieldCommsWindow (one-way DOC
+                            voice-call ticker, ringing→live phase machine)
     composables/
       useAuth.js            Fetches /api/player/me — session cookie handles auth
       useGameState.js       Reactive player/rig/commands/inventory refs (hydrated from API on login)
@@ -127,8 +144,14 @@ api/
                             directly by their own composables via window.Echo, not through this wrapper.
       useBrowserState.js    Controls which SPLICE panel URL is active at the Game.vue level
       useBrowser.js         Internal navigation history inside InGameBrowser.vue
-      useAudio.js           Sound effect playback helpers
+      useAudio.js           Sound effect playback helpers; duckForCall()/unduckAfterCall() partially
+                            fade music under a field comms call instead of full silence
       useTutorial.js        Tutorial quest state + POST /api/tutorial/reward
+      useDocChat.js          FREQUENCY hub chat — joins/leaves the private doc-chat.{hub} Echo
+                            channel per active hub, fetches history, optimistic send
+      useFieldComms.js       DOC field comms call queue (one-way voice-call check-ins during a
+                            mission stage); FieldCommsWindow.vue owns reveal timing + audio,
+                            same split as useWatcher.js / WatcherSignal.vue
 ```
 
 ---

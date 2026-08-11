@@ -92,7 +92,9 @@ watch(() => props.messages.length, async () => {
     height: 100%;
     min-height: 0;
     font-family: 'JetBrains Mono', monospace;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(4, 4, 14, 0.94);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border: 1px solid var(--doc-accent-dim, color-mix(in srgb, var(--doc-accent) 20%, transparent));
 }
 

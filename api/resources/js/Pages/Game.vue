@@ -255,9 +255,15 @@
             :error="frequencyError"
             :current-player-id="player.id"
             :accent-color="frequencyAccent"
-            room-label="KNUCKLE'S CHANNEL"
+            :room-label="frequencyRoomLabel"
             @close="frequencyOpen = false"
             @send="sendFrequencyMessage"
+        />
+
+        <!-- DOC field comms — voice-call check-ins during field missions -->
+        <FieldCommsWindow
+            :call="fieldCommsActiveCall"
+            @complete="onFieldCommsComplete"
         />
 
         <!-- First-login welcome modal -->
@@ -301,6 +307,7 @@ import ObjectiveTracker       from '@/components/shared/ObjectiveTracker.vue';
 import TrapFiredNotification  from '@/components/shared/TrapFiredNotification.vue';
 import UiTour                 from '@/components/shared/UiTour.vue';
 import DocChatWindow          from '@/components/shared/DocChatWindow.vue';
+import FieldCommsWindow       from '@/components/shared/FieldCommsWindow.vue';
 // ── Extracted overlay components ──────────────────────────────────────────────
 import CriticalFailureOverlay from '@/components/shared/CriticalFailureOverlay.vue';
 import PvpChallengeOverlay    from '@/components/shared/PvpChallengeOverlay.vue';
@@ -347,6 +354,7 @@ import { useInactivityTimer }  from '@/composables/useInactivityTimer.js';
 import { useActiveObjective }  from '@/composables/useActiveObjective.js';
 import { useDialogue }         from '@/composables/useDialogue.js';
 import { useDocChat }          from '@/composables/useDocChat.js';
+import { useFieldComms }       from '@/composables/useFieldComms.js';
 // ── New composables ───────────────────────────────────────────────────────────
 import { useBountyEscalation }  from '@/composables/useBountyEscalation.js';
 import { useCommandEffects }    from '@/composables/useCommandEffects.js';
@@ -355,7 +363,7 @@ import { usePvpFlow }           from '@/composables/usePvpFlow.js';
 import { useResourceReplenish } from '@/composables/useResourceReplenish.js';
 import { useBrowserNavigation } from '@/composables/useBrowserNavigation.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
-import { docColorByName }      from '@/constants/docColors.js';
+import { docColorByName, docColor } from '@/constants/docColors.js';
 import { WATCHER_TRANSITIONS } from '@/constants/watcherTransitions.js';
 import { SPLICE }              from '@/components/browser/SpliceRouter.js';
 
@@ -834,6 +842,59 @@ const questMarkers = computed(() => {
     return markers;
 });
 
+// ── Field comms — DOC voice-call check-ins during field missions ─────────────
+// Distinct from the hub chat (FREQUENCY/DocChatWindow, player-initiated) and
+// the CyberDoc terminal dialogue (useDialogue) — this fires on its own when
+// the player arrives at an active stage's field node, scripted per-stage via
+// the field_comms column on quest_stages.
+const {
+    activeCall:     fieldCommsActiveCall,
+    triggerCall:    triggerFieldComms,
+    onCallComplete: onFieldCommsComplete,
+} = useFieldComms();
+
+// The active stage across all docs, but only when it's a field-work stage
+// (has a minigame + a scripted call) — mirrors useActiveObjective's traversal,
+// kept separate since it needs different fields (node_canvas_id, minigame_type,
+// field_comms) that useActiveObjective's reduced shape doesn't expose.
+const activeFieldStage = computed(() => {
+    for (const doc of questDocs.value ?? []) {
+        for (const arc of doc.arcs ?? []) {
+            if (arc.status !== 'active') continue;
+            const stage = (arc.stages ?? []).find(s => s.status === 'active');
+            if (!stage) continue;
+            if (!stage.minigame_type || !stage.node_canvas_id) return null;
+            if (!stage.field_comms || stage.field_comms.length === 0) return null;
+
+            return {
+                stageId:      stage.id,
+                nodeCanvasId: stage.node_canvas_id,
+                docHandle:    doc.name?.match(/^([A-Za-z]+)/)?.[1]?.toUpperCase() ?? 'UNKNOWN',
+                accentColor:  docColorByName(doc.name),
+                lines:        stage.field_comms,
+            };
+        }
+    }
+    return null;
+});
+
+// Fire the call on arrival at the field node. Requires both newVal and oldVal
+// (skips the initial spawn/restore assignment) — same guard the tutorial
+// step watcher below uses for the same reason: currentNodeId gets reassigned
+// several times during boot before the player has actually "arrived" anywhere.
+watch(currentNodeId, (newNode, oldNode) => {
+    if (!newNode || !oldNode) return;
+    const stage = activeFieldStage.value;
+    if (!stage || newNode !== stage.nodeCanvasId) return;
+
+    triggerFieldComms({
+        stageId:     stage.stageId,
+        docHandle:   stage.docHandle,
+        accentColor: stage.accentColor,
+        lines:       stage.lines,
+    });
+});
+
 // Dialogue SPLICE URL for the selected CyberDoc node
 const NPC_DIALOGUE_URL = {
     KNUCKLE: SPLICE.DIALOGUE_KNUCKLE,
@@ -862,24 +923,25 @@ const currentNodeDialogueUrl = computed(() => {
 });
 
 // ── FREQUENCY — DOC hub live chat hotkey ──────────────────────────────────────
-// Available only while standing at a hub with chat live (Knuckle only for now
-// — other docs opt in the same way once their rooms are ready). The channel
-// connects lazily: walking near the hub only lights up the hotkey, it doesn't
-// join anything until the player actually opens the window.
+// Available at any CyberDoc hub — one isolated room per doc, same as the
+// backend (DocChatService::playerIsAtHub / routes/channels.php) already
+// enforces generically. The channel connects lazily: walking near a hub only
+// lights up the hotkey, it doesn't join anything until the player actually
+// opens the window.
 const frequencyOpen = ref(false);
 
-const frequencyHub = computed(() => {
+const frequencyNode = computed(() => {
     // currentNode only ever holds { canvasId, x, y } (see useMapInteraction's
     // onPlayerMoved) — type/npcHandle live on the DB-merged record, so look it
     // up by the authoritative currentNodeId instead of trusting currentNode.
     const node = getByCanvasId(currentNodeId.value);
-    if (node?.type === 'cyberdoc' && node?.npcHandle?.toUpperCase() === 'KNUCKLE') {
-        return node.canvasId ?? currentNodeId.value;
-    }
-    return null;
+    return node?.type === 'cyberdoc' ? node : null;
 });
+const frequencyHub       = computed(() => frequencyNode.value?.canvasId ?? null);
 const frequencyAvailable = computed(() => !!frequencyHub.value);
-const frequencyAccent    = computed(() => docColorByName('Knuckle'));
+const frequencyAccent    = computed(() => docColor(frequencyHub.value ?? ''));
+const frequencyDocHandle = computed(() => frequencyNode.value?.npcHandle ?? 'CYBERDOC');
+const frequencyRoomLabel = computed(() => `${frequencyDocHandle.value.toUpperCase()}'S CHANNEL`);
 
 const {
     messages: frequencyMessages,

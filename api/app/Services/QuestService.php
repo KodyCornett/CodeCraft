@@ -79,12 +79,20 @@ class QuestService
                         ? (is_string($rawDialogue) ? json_decode($rawDialogue, true) : $rawDialogue)
                         : null;
 
+                    // field_comms — in-field voice-call lines, same active-only
+                    // visibility rule as dialogue so nothing is spoiled early.
+                    $rawFieldComms = $stage->field_comms;
+                    $fieldComms    = $stageStatus === 'active'
+                        ? (is_string($rawFieldComms) ? json_decode($rawFieldComms, true) : $rawFieldComms)
+                        : null;
+
                     $stages[] = [
                         'id'                 => $stage->id,
                         'stage_number'       => $stage->stage_number,
                         'title'              => $stage->title,
                         'objective_text'     => $stageStatus !== 'locked' ? $stage->objective_text : null,
                         'dialogue'           => $dialogue,
+                        'field_comms'        => $fieldComms,
                         'status'             => $stageStatus,
                         'is_branch'          => $stage->is_branch,
                         'branch_options'     => $stage->branch_options,
