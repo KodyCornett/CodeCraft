@@ -1,5 +1,12 @@
 <template>
     <Teleport to="body">
+        <GlitchEffect
+            v-if="activeFx"
+            :type="activeFx.type"
+            :duration="activeFx.duration"
+            overlay
+            @done="activeFx = null"
+        />
         <Transition name="fcw">
             <div v-if="call" class="fcw-root" :style="{ '--doc-accent': call.accentColor }">
 
@@ -41,10 +48,17 @@
  * useWatcher.js / WatcherSignal.vue.
  *
  * Props.call shape:
- *   { stageId, docHandle, accentColor, lines: [{ text, audio?, speaker? }] }
+ *   { stageId, docHandle, accentColor, lines: [{ text, audio?, speaker?, fx? }] }
  * speaker defaults to 'doc' when omitted. A trailing entry with
  * speaker: 'player' renders as the call's closing acknowledgment — written
  * as part of that stage's story beat, not a player-selectable choice.
+ *
+ * fx is optional per line: { type: string, duration?: number }, passed
+ * straight through to GlitchEffect as `type`/`duration` (overlay, so it
+ * reads across the whole screen, not just the call ticker) — the same idea
+ * as the `[FX: type(level) — duration]` tags in CHAPTER_1_SCRIPT.md, just
+ * structured JSON instead of a bracketed prose tag since this lives in the
+ * field_comms column. See VISUAL EMPHASIS TOOLKIT in WORLD_PHILOSOPHY.md.
  *
  * Audio is optional per line — omit it and the line holds for a reading-time
  * estimate instead, same graceful fallback DialoguePage.vue uses for a
@@ -53,6 +67,7 @@
  */
 import { ref, watch, onUnmounted } from 'vue';
 import { useAudio } from '@/composables/useAudio.js';
+import GlitchEffect from './GlitchEffect.vue';
 
 const props = defineProps({
     call: { type: Object, default: null },
@@ -65,6 +80,7 @@ const HOLD_AFTER_LAST_MS  = 2500;
 
 const phase        = ref('idle');   // idle | ringing | live
 const visibleLines = ref([]);       // capped to MAX_VISIBLE, oldest drops first
+const activeFx     = ref(null);     // { type, duration } — current line's FX cue, if any
 
 const { duckForCall, unduckAfterCall, storyVolume, muted } = useAudio();
 
@@ -129,6 +145,10 @@ function _revealNext() {
     _lineIdx++;
     _pushLine(line.text, line.speaker);
 
+    if (line.fx) {
+        activeFx.value = { type: line.fx.type, duration: line.fx.duration ?? 400 };
+    }
+
     if (line.audio) {
         _playLineAudio(line.audio, line.text, _revealNext);
     } else {
@@ -159,6 +179,7 @@ function _finish() {
     }
     phase.value        = 'idle';
     visibleLines.value = [];
+    activeFx.value      = null;
     unduckAfterCall();
     emit('complete');
 }
@@ -174,6 +195,7 @@ onUnmounted(() => {
         _lineAudio.src = '';
         _lineAudio = null;
     }
+    activeFx.value = null;
 });
 </script>
 

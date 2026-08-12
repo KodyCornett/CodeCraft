@@ -15,7 +15,7 @@
  *   stageId:     string,               // guards against re-triggering the same stage
  *   docHandle:   string,               // e.g. 'KNUCKLE'
  *   accentColor: string,
- *   lines:       [{ text: string, audio?: string }],
+ *   lines:       [{ text: string, audio?: string, speaker?: string, fx?: { type: string, duration?: number } }],
  * }
  */
 

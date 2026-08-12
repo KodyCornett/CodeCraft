@@ -99,6 +99,94 @@ breathing slowed" or "the room's ambient rustle cut out at once" gives them some
 to work with. When a scene's first draft leans on pure visual staging, that's a sign to
 pass back through it and find the sound or sensation underneath.
 
+**The prose is the whole experience.** There's no visual layer under this game's dynamic
+moments beyond the FX tag toolkit (GlitchEffect / WatcherSignal) and static UI chrome — no
+character models, no animation, no expression on a screen for the player to read. Whatever
+the player experiences, they experience because the narration put it there. This goes
+beyond sound design: physical sensation, emotional weight, spatial orientation — all of it
+has to be written into the words themselves, not implied and left for a picture that
+doesn't exist to carry. This matters most where the game and the player's body meet:
+cyberware is wired into a living person, not equipped from a menu. When a part fails, gets
+pulled, or gets seated, the player should feel something happen to them specifically — a
+pressure, a numbness, a sound going quiet somewhere it's never been quiet before — not just
+watch a stat change or an item swap in a log. Treat every mechanical beat (installs,
+repairs, damage, stat changes surfaced narratively) as a chance to write the sensation, not
+just the event. This is a hard rule from here forward, not a nice-to-have — check every new
+scene against it before calling it locked.
+
+**Gameplay alone can't build the world — the words have to.** The player-facing loop is
+intentionally simple: move across a hex grid, click a node, run a lightweight minigame.
+None of that mechanically communicates atmosphere, texture, or the sense of a lived-in
+city — it's abstraction by design, not a placeholder waiting for better art later. That
+means every sense of place the player gets — what a district feels like at street level,
+what's changed since a Doc's last appearance, what the city carries at 3am versus mid
+Open Season — has to arrive through narration, because nothing else in the game is going
+to supply it. This isn't limited to scripted dialogue scenes: field job objective text,
+node arrival flavor, and ambient description carry the same weight and deserve the same
+care as a locked scene, not treatment as disposable functional copy.
+
+---
+
+## INVESTIGATIVE STRUCTURE — No Fixed Rhythm
+
+This is a cybernetically paranormal investigative hacker sim — closer in spirit to a
+long-form investigative fiction podcast (think *Tanis*) than to a linear quest chain. The
+player should feel like they're assembling a mosaic out of partial, sometimes
+contradictory sources, not walking down a hallway of NPCs in order.
+
+**No doc-job-doc rhythm.** Nothing requires a fixed pattern of hub scene, then field job,
+then report-back, then referral, repeated identically for every Doc. Any order, any mix,
+any weighting is fair game — Doc, Doc, Doc, Job, Doc, Job, Job, Doc, whatever a given
+thread actually calls for. A repeating shape is the thing to avoid, not the thing to aim
+for.
+
+**Docs stay reachable, not consumed.** Once a Doc has had their scene, they aren't done —
+they're a contact the player can hear from again. A Doc can go quiet mid-thread and
+resurface later, unprompted, with something new. A job that seemed closed can produce a
+loose end that pulls the player back to a Doc they thought they'd finished with. Treat
+every Doc like an open contact, not a level the player clears.
+
+**Not everything resolves, and that's correct.** Some threads should stay open past a
+chapter's end, the same way plenty of threads in investigative fiction never fully close.
+Forcing every loose end to a tidy conclusion works against the tone — resist it.
+
+**Investigating has consequences, and those consequences can outlive the scene.** Already
+established for the Watcher escalation specifically (see WRITING WORKFLOW above and VISUAL
+EMPHASIS TOOLKIT below) — asking questions, running diagnostics, pulling a thread, changes
+something. Extend that past the FX escalation ladder: evidence that's supposedly "closed"
+or removed can still be doing something. A part pulled out of a player's rig and replaced
+doesn't have to go inert just because it's no longer installed — if it's still drawing
+power, still transmitting, still doing anything at all without a host to run on, that's
+exactly the kind of detail that should exist and get reported back to the player, plainly,
+by whichever Doc noticed it. Nobody needs a theory for why. The fact alone is the horror.
+
+---
+
+## CHAPTER OPENERS — Setting the Scene Before Scene 1
+
+Every chapter opens on a short, standalone piece before any Doc's Scene 1 — flavor and
+atmosphere, not narrative. Its job is to make the world feel like it's been running the
+whole time the player wasn't looking, and to build a little anticipation before the player
+takes control, not to advance the plot or reveal information the Docs haven't earned yet.
+
+**Stay in strict parity with the player.** Default to the same not-knowing the player
+experiences everywhere else — no outside-POV fragments, no hints from "the other side."
+The dramatic-irony version of this technique (letting the *reader* know something the
+player-character doesn't) is real and can work, but it's a bigger swing that risks
+undercutting rules like "the player should not learn there's a person behind this" — hold
+it in reserve for a chapter that's actually allowed to let the audience get ahead, rather
+than spending it here by default.
+
+**It's fine to hint at what's about to happen to the player specifically** — a bad night
+coming, a shape to the dread — as long as it never implies an external agent or intent.
+"Someone's about to have a very bad night" is fine. "Something is about to reach for them"
+is not, in Chapter 1 at least.
+
+**ID and placement.** Each chapter opener gets its own ID outside the Scene/Part numbering
+— `C{chapter}_OPEN` — sitting before that chapter's Scene 1 in the `_SCRIPT.md` file.
+Narrator audio for it lives directly under `narrator/chapter_{n}/`, not nested inside any
+specific Doc's folder, since it isn't tied to one Doc's POV or location.
+
 ---
 
 ## VISUAL EMPHASIS TOOLKIT — GlitchEffect / WatcherSignal
@@ -133,6 +221,16 @@ screen away entirely, that's WatcherSignal.
 **FX tags live in the Script, never the Story.** Same rule as audio tags — they're
 production metadata, not narrative content. Strip them out when mirroring a locked scene
 into the `_STORY.md` read-through, same as IDs and audio paths.
+
+**Two different meanings, two different effect vocabularies.** `static` (and the
+static/flicker combinations building through Axiom's scenes) is reserved for the signal
+*reacting to being examined* — an external response, part of the escalation ladder, and it
+should keep climbing in intensity as the chapter goes on. Sensory disorientation that isn't
+a response to investigation — waking up mid-collapse, a stutter in the player's own voice —
+should reach for a different vocabulary entirely (`chromatic`/`flicker` for blurred
+perception, `scramble` for broken speech or output) so the two never get confused, and so
+an early sensory beat doesn't accidentally read as a bigger "response" than a later one
+actually is.
 
 ---
 
@@ -216,6 +314,35 @@ self-deprecation about how his method differs from a mechanic's — not a claim 
 doesn't fix rigs. He runs a working clinic like the other four. Write him fixing things by
 digging through the archive for how something like it worked, or failed, before — never
 write him out of repair work entirely.
+
+---
+
+## PROBLEM-SOLVING STYLE — Hands-On vs. Systems Thinking
+
+Beyond which part of the rig they own, the five split along a second axis: *how* they
+actually think through a problem. Nobody in-world would name this grouping — it's a
+consistency lens for voice and pacing, not a piece of lore.
+
+**Hands-on — Knuckle, Float.** Immediate, physical, tactile. They assess what's in front
+of them and hit their limit fast rather than theorizing past it. Knuckle reads damage and
+fixes what he can see. Float catalogues and cross-references, but her whole professional
+identity is built around physically handling recovered hardware, not reasoning about
+abstract systems — she's the closest thing to a hybrid of the two groups, but belongs here
+over reaching for pattern-level explanations the way Veil or Axiom do.
+
+**Systems thinking — Veil, Axiom, Patch.** Pattern-matching, precedent, structural
+reasoning. They're the ones who keep almost-but-not-quite connecting the player's case to
+something bigger, because that's how they think by default — Axiom reaches for historical
+precedent, Veil reaches for infrastructure-scale pattern recognition, Patch reaches for the
+shape of a diagnosis she already knows, inverted. This is also why a break in discipline
+means more coming from this group — Veil abandoning her own "never guess out loud" rule is
+a bigger character event than the same lapse would be from Knuckle, who was never that
+disciplined about theorizing in the first place.
+
+**Why this matters for pacing, not just voice.** The hands-on pair's scenes can move fast
+and dead-end quickly — a physical limit stated plainly, no drawn-out investigation. The
+systems-thinking trio's scenes are where the mystery is allowed to linger, because turning
+a problem over and over is literally their method.
 
 ---
 
@@ -570,10 +697,39 @@ That dread is the point. That is the game.
 
 ---
 
-*Document version 2.2 — Added VISUAL EMPHASIS TOOLKIT section documenting GlitchEffect
-(ambient toll / scripted spikes) and WatcherSignal (major-beat cinematic only), and the
-rule that FX tags live in the Script and are stripped from the Story mirror, same as audio
-tags. Previously, version 2.1 added WRITING WORKFLOW & PROSE STANDARD and REPAIR FOCUS
+*Document version 2.8 — Extended "The prose is the whole experience" with "Gameplay alone
+can't build the world — the words have to": the player-facing loop (hex grid movement,
+node clicks, lightweight minigames) is deliberately abstract and mechanically incapable of
+carrying atmosphere or a sense of place, so narration — including field job objective text
+and node arrival flavor, not just locked dialogue scenes — has to do that work every time.
+Previously, version 2.7 added "The prose is the whole experience" rule to WRITING WORKFLOW
+& PROSE STANDARD: this game has no visual layer under its dynamic moments beyond the FX
+toolkit and static chrome, so narration is the only vehicle for sensation, emotion, and
+spatial experience — physical beats (cyberware installs, repairs, damage) must render as
+something felt in the player's body specifically, not a stat readout or an item swap. Hard
+rule going forward, prompted by the felt-sensation beat added to Knuckle's repair scene
+(`C1_S4_P2`). Previously, version 2.6 — Added CHAPTER OPENERS section: every chapter opens on a short,
+standalone flavor/atmosphere piece before Scene 1 (`C{chapter}_OPEN`), staying in strict
+parity with the player by default (no outside-POV dramatic irony), which is held in reserve
+for a later chapter that's actually allowed to let the audience get ahead. Previously,
+version 2.5 added INVESTIGATIVE STRUCTURE section: this is a cybernetically
+paranormal investigative hacker sim, closer to long-form investigative fiction (Tanis) than
+a linear quest chain — no fixed doc-job-doc rhythm, Docs stay reachable rather than
+consumed, not everything needs to resolve, and consequences of investigating can outlive
+the scene they happened in. Previously, version 2.4 added PROBLEM-SOLVING STYLE section:
+Knuckle/Float grouped as
+hands-on (immediate, physical, dead-ends fast), Veil/Axiom/Patch grouped as systems
+thinking (pattern-matching, precedent, lingers on a problem) — a consistency lens for voice
+and pacing, not in-world lore. Previously, version 2.3 added the two-vocabulary FX rule:
+`static`/response cues are
+reserved for the signal reacting to examination (the escalation ladder starting at Axiom),
+while sensory disorientation not tied to investigation (the C1_S1_P1 cold open) uses a
+separate vocabulary (`chromatic`/`flicker`/`scramble`) so the two are never confused. Added
+the "give the mix something to build" rule to the Prose Standard. Previously, version 2.2
+added the VISUAL EMPHASIS TOOLKIT section documenting GlitchEffect (ambient toll / scripted
+spikes) and WatcherSignal (major-beat cinematic only), and the rule that FX tags live in
+the Script and are stripped from the Story mirror, same as audio tags. Version 2.1 added
+WRITING WORKFLOW & PROSE STANDARD and REPAIR FOCUS
 sections; each Doc's Specialty line and Character section now name the specific part of
 the rig they own, matching the REPAIR FOCUS table. Axiom rewritten to the shipped archivist
 characterization; Patch rewritten to the shipped she/her, dry-humor characterization;

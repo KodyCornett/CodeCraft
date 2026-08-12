@@ -1,5 +1,11 @@
 # CodeCraft — Prologue Script
-### The Ghost-Kernel Arc
+### "Background Process" — The Ghost-Kernel Arc
+
+*Retroactive title, named as a set alongside Chapter 1 ("Static") and Chapter 2
+("Persistence") — the three track the story's own escalation: something quietly running
+unnoticed, then interference nobody can explain, then the word that finally sticks.
+Documentation label only — not shown to the player as an in-game title card, since the
+Prologue already ships without one.*
 
 All dialogue, narrator lines, player choices, and Watcher interrupts for the five-doc prologue chain.  
 **Edit this file and hand sections back to update the seeder.**

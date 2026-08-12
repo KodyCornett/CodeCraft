@@ -1,5 +1,5 @@
 # CodeCraft — Chapter 1 Script
-### The Watcher Arc
+### "Static" — The Watcher Arc
 Companion to `WORLD_PHILOSOPHY.md` (v2.0) and `CHAPTER_1_NOTES.md`. Full dialogue and
 narrator lines for Chapter 1, written scene by scene. Supersedes the old "Ghost-Kernel"
 framing in `api/PROLOGUE_SCRIPT.md`, which remains unchanged (see that file's Open Work
@@ -30,6 +30,10 @@ follows is a field job with no dialogue, so it stays unnumbered. Her report-back
 job hand-off is `C1_S2_P1`, and his (not yet written) report-back will be `C1_S2_P2`.
 
 Headers in this file are labeled `## C{n}_S{n}_P{n} — Title (Doc)`.
+
+**Chapter openers** are the one exception — a short flavor/atmosphere piece before Scene 1,
+outside the Scene/Part numbering entirely, tagged `C{n}_OPEN`. See CHAPTER OPENERS in
+`WORLD_PHILOSOPHY.md`.
 
 **Line-level audio IDs and folder structure.** The Prologue's audio (already recorded,
 already referenced in `api/database/seeders/QuestStageSeeder.php`) lives flat inside each
@@ -82,6 +86,39 @@ Format: `[FX: type(level),type(level) — duration]`, matching the `GlitchEffect
 own `type="bars(2),chromatic(4)"` syntax (1–5 scale). FX tags are production metadata, same
 as audio tags — they get stripped out when a scene mirrors into `CHAPTER_1_STORY.md`.
 
+**FX in field comms.** The same idea applies to `field_comms` lines (the DOC's in-field
+voice-call check-ins, rendered by `FieldCommsWindow.vue` — distinct from hub scenes), just
+as structured JSON instead of a bracket tag, since those lines live in the database rather
+than prose: `{ text, audio?, speaker?, fx?: { type: string, duration?: number } }`. When
+drafting field comms content here for reference, write it the same bracket-tag way for
+readability; convert to the JSON shape when it's actually seeded.
+
+---
+
+## C1_OPEN — The City, Before
+
+Flavor/atmosphere piece, not narrative — sits before Scene 1, outside the Scene/Part
+numbering. See CHAPTER OPENERS in `WORLD_PHILOSOPHY.md`: strict parity with the player, no
+outside-POV hints, just mood. Audio lives directly under `narrator/chapter_1/`, not nested
+inside any Doc's folder.
+
+---
+
+**NARRATOR** `narrator/chapter_1/c1_open_l1.mp3`
+> Spokane doesn't sleep so much as it flickers — neon breathing through rain nobody's
+> bothered to name a color for in years. Underneath the corporate grid everyone agrees to
+> see, a second signal runs the way blood runs under skin: unlicensed, unregulated, older
+> than anyone currently using it. Runners call it the Splice Frequency. Everyone else
+> doesn't call it anything, because everyone else doesn't know it's there.
+
+**NARRATOR** `narrator/chapter_1/c1_open_l2.mp3`
+> Tonight it's just another Tuesday on the grid — small hacks, small scores, the ordinary
+> hum of a city that never fully goes dark.
+
+**NARRATOR** `narrator/chapter_1/c1_open_l3.mp3`
+> Somewhere in Spokane Valley, someone is about to have a very bad night, and won't
+> remember how it started.
+
 ---
 
 ## C1_S1_P1 — Cold Open (Float)
@@ -91,6 +128,7 @@ as audio tags — they get stripped out when a scene mirrors into `CHAPTER_1_STO
 ---
 
 **NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l1.mp3`
+[FX: chromatic(2),flicker(1) — 700ms]
 > The diagnostic lead clicks into your collar before you're even conscious enough to feel
 > the cold alloy. You wake up suspended in Float's rig, suspended in static. Your temple
 > is throbbing — a rhythmic, dull-blade pulse right behind your left eye. The shop's
@@ -111,6 +149,7 @@ as audio tags — they get stripped out when a scene mirrors into `CHAPTER_1_STO
 > You reach for the memory of five minutes ago. There's no door, no walk, no panic. Just
 > an empty grey void where the timeline should be.
 >
+[FX: scramble(1) — 400ms]
 > You open your mouth to explain, but your vocal synth stutters. The words fracture into
 > raw phonemes, lagging half a beat behind your jaw.
 
@@ -471,7 +510,428 @@ as audio tags — they get stripped out when a scene mirrors into `CHAPTER_1_STO
 
 ---
 
-*Document version 2.0 — C1_S2_P2 (Axiom's report-back) written and locked: the repaired
+## C1_S3_P1 — The Persistence Theory (Veil)
+**Location:** Veil's node, Downtown Core
+**Contractor:** Veil
+
+---
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l1.mp3`
+> Veil's node renders the way it always has — a sprawling workspace under warm hanging
+> lights, exposed conduits and maintenance terminals crowding every surface, status boards
+> and infrastructure maps floating overhead like constellations nobody's bothered to name.
+> Massive windows look out over the distant glow of the Frequency, rain drifting lazily
+> against glass that was never meant to be decorative and isn't. Every cable here is
+> labeled. Every tool has a place. The whole room still carries that same feeling — a
+> station that was supposed to close years ago, and never did.
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l2.mp3`
+> She's watching six terminals at once when you arrive, dark hair loosely tied back, the
+> long coat she wears instead of armor hung with pockets and utility straps. One display
+> shifts to your signal. Her eyes hold on it half a second longer than the others got.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l3.mp3`
+> "Axiom's package. Twenty minutes ago. Four reads. Still not enough."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l4.mp3`
+> She finally looks up. Not startled. Not concerned. Just tired, the way someone gets when
+> strange problems stopped surprising them a long time ago.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l5.mp3`
+> "Sit. I'd rather look at you than a report about you."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l6.mp3`
+> A chair rises from the floor, spare, unpadded — nothing like Axiom's or Float's. She runs
+> a slow pass with something that reads more like a level than a scanner, checking you
+> against a baseline only she can see.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l7.mp3`
+> "He's right that it's reaching. Wrong that it's rare."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l8.mp3`
+> An alarm flashes amber somewhere behind her. She kills it with a flick of two fingers,
+> without looking.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l9.mp3`
+> "I've seen this pattern. Once. A substation. Grid-scale. It doesn't run inside a person.
+> Or it didn't."
+
+**PLAYER** `player/chapter_1/c1_s3_p1_l10.mp3`
+> "Where was it running?"
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l11.mp3`
+> "Years ago. Before I did this for a living instead of against it."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l12.mp3`
+> Something in how she says it tells you not to ask further, so you don't.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l13.mp3`
+> "There's a name for it. On the boards where people build religions out of infrastructure
+> failures. They call it—"
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l14.mp3`
+[FX: static(4),flicker(3),bars(2) — 900ms, on the interrupted word]
+> She doesn't finish. The word gets halfway out — *the Persist—* — and something inside
+> your skull goes off like a struck bell.
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l15.mp3`
+> Pain doesn't describe it. Closer to feedback — a shriek pitched straight into the base of
+> your neural housing, gone as fast as it hit, a thin thread of smoke curling up behind
+> your left ear. Something back there just stopped working. Mid-sentence. Same as her.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l16.mp3`
+> "—Theory."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l17.mp3`
+> She finishes it anyway. Quieter now. Like completing the sentence outranks whatever just
+> happened to you.
+
+**PLAYER** `player/chapter_1/c1_s3_p1_l18.mp3`
+> "What was that?"
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l19.mp3`
+> "Resonance dampener. Failed. Hold still."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l20.mp3`
+> She's already moving — fast, precise, the reflex of someone who's handled hardware
+> failure a thousand times and refuses to let this be anything else. Pulse. Burn. Readout
+> again. By the time she's done, her voice is flat, controlled, all the way back inside its
+> usual register.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l21.mp3`
+> "Rig under stress. Threw an error. Bad timing. That's all this is."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l22.mp3`
+> She doesn't sound like she believes it. She sounds like someone choosing, on purpose, not
+> to say the rest of it twice.
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l23.mp3`
+> "Dampener's interface hardware. Not mine to fix. Knuckle can patch you functional. Go."
+
+**PLAYER** `player/chapter_1/c1_s3_p1_l24.mp3`
+> "And the name. The one you didn't finish."
+
+**VEIL** `veil/chapter_1/c1_s3_p1_l25.mp3`
+> "A mistake. Fringe theory. Debunked years ago — fabricated, by people who wanted a better
+> story than the boring truth. Not relevant."
+
+**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l26.mp3`
+> She's back at the readouts before you're fully standing, already pulling the next task
+> into the air — but her hand, for one second before it steadies, isn't as sure of itself
+> as the rest of her.
+
+---
+
+## C1_S4_P1 — The Dead End (Knuckle)
+**Location:** Knuckle's wagon, Browne's Addition
+**Contractor:** Knuckle
+
+---
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l1.mp3`
+> Knuckle's wagon is the same cramped, low-ceiling space it's always been — walls patched
+> together from stolen network architecture, the seams still visible where different
+> systems were forced to talk to each other. Medical readouts float at chest height, most
+> of them running amber. His hulking asymmetrical frame doesn't turn when you walk in. One
+> of his two diagnostic arms is already extended, pulling your signal before you've said a
+> word.
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l2.mp3`
+> The readout it throws onto the wall comes back red, then narrows, then goes still on one
+> specific spot behind your ear.
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p1_l3.mp3`
+> "Whoever told you to hold still was right. You're lucky it cauterized instead of
+> spreading."
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l4.mp3`
+> He pulls a handheld scanner into the other arm and runs it slow along the burn, the way
+> he runs everything — no wasted motion, no urgency he hasn't decided to have. A burner
+> cigarette materializes between two fingers of the arm he isn't using. He doesn't light it
+> yet.
+
+**PLAYER** `player/chapter_1/c1_s4_p1_l5.mp3`
+> "Can you fix it?"
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p1_l6.mp3`
+> "Housing, yeah. Whatever burned out inside it, no."
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l7.mp3`
+> He pulls the burned component free with a short mechanical click, turns it over once in
+> the scanner's light, and doesn't bother hiding his opinion of it.
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p1_l8.mp3`
+> "This isn't chassis. This is interface — the part that talks to your head, not the part
+> that holds you together. I don't stock interface. Never have."
+
+**PLAYER** `player/chapter_1/c1_s4_p1_l9.mp3`
+> "So who does?"
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p1_l10.mp3`
+> "Patch. North Spokane. Tell her Knuckle sent you for a standard dampener, not a consult —
+> she'll try to turn it into one anyway."
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l11.mp3`
+> He finally lights the cigarette, already turning back to the readouts, done with you in
+> the specific, efficient way of a man who never had more than two minutes to spend on
+> anyone.
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p1_l12.mp3`
+> "Bring it back. I'll seat it. Won't take long."
+
+---
+
+## C1_S5_P1 — Patch's Pickup (Patch)
+**Location:** Patch's station, North Spokane
+**Contractor:** Patch
+
+**Mechanic note:** This scene fires only after the player completes the store purchase.
+Knuckle's job unlocks the resonance dampener as a one-time item in Patch's catalog (via
+`CyberDocInventoryService::grantCatalogItem()`, `stock_limit: 1`, `is_exclusive: true`,
+`source: 'mission:c1_s4_p1'`). If the player can't afford it, they have to earn the creds
+first — the scene below assumes the sale has already gone through.
+**NOT YET IMPLEMENTED:** this is design-only. The dampener has no `Peripheral`/item row,
+no seeder or mission-handler call to `grantCatalogItem()`, and no trigger wiring it to
+Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real engine work.
+
+---
+
+**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l1.mp3`
+> Patch's station is an old maintenance dig buried beneath North Spokane — exposed pipes,
+> concrete walls, bundles of cable disappearing into the dark like roots. Nothing here was
+> built to be lived in. Somebody clearly changed their mind anyway: plants grow under
+> grow-lamps in the corner, a kettle simmers on a hotplate that has no business still
+> working, and half a dozen terminals drift lazily through the air, opening and closing to
+> a logic only she seems to track.
+
+**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l2.mp3`
+> She's got both arms inside an open panel when you arrive, one sleeve rolled up, the other
+> forgotten, dark hair tied back with something that wasn't originally meant for hair.
+
+**PATCH** `patch/chapter_1/c1_s5_p1_l3.mp3`
+> "Knuckle called ahead. Said 'dampener, not a consult,' like that's a sentence he gets to
+> finish for me."
+
+**PLAYER** `player/chapter_1/c1_s5_p1_l4.mp3`
+> "It's just the part. I'm kind of in a hurry."
+
+**PATCH** `patch/chapter_1/c1_s5_p1_l5.mp3`
+> "Sure. Course you are."
+
+**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l6.mp3`
+> The sale's barely finished processing — the case already in your hand — when she does
+> the thing every Doc apparently can't help doing: stops treating you like a transaction
+> and starts treating you like a patient.
+
+**PATCH** `patch/chapter_1/c1_s5_p1_l7.mp3`
+> "Huh."
+
+**PLAYER** `player/chapter_1/c1_s5_p1_l8.mp3`
+> "What?"
+
+**PATCH** `patch/chapter_1/c1_s5_p1_l9.mp3`
+> "Nothing you need to hear standing up in my doorway. Take the part. Get it seated. Come
+> back when you've got twenty minutes I can actually use."
+
+**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l10.mp3`
+> She's already back at the panel, not waiting for you to agree — but she says it again
+> anyway, quieter, like she wants to make sure it landed.
+
+**PATCH** `patch/chapter_1/c1_s5_p1_l11.mp3`
+> "I mean that. Not a threat. Just — twenty minutes. I think I want to see this properly."
+
+---
+
+## C1_S4_P2 — Repair (Knuckle)
+**Location:** Knuckle's wagon, Browne's Addition
+**Contractor:** Knuckle
+
+---
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p2_l1.mp3`
+> Same wagon, same amber readouts drifting at chest height. Knuckle doesn't ask if you got
+> it — just holds one of his diagnostic arms out, palm up, waiting.
+
+**PLAYER** `player/chapter_1/c1_s4_p2_l2.mp3`
+> "Patch says hi. Sort of."
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p2_l3.mp3`
+> "She never says hi. Sit."
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p2_l4.mp3`
+> He has the panel open before you're fully seated, the burned housing already out and set
+> aside like he's been holding the shape of it in his head since you left. The new
+> component goes in without ceremony — one motion, a short mechanical click.
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p2_l5.mp3`
+> "Give it a second."
+
+**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p2_l6.mp3`
+> You feel it before the readout even changes — a cold, precise pressure behind your ear,
+> there and gone, like something exhaling on your behalf. The low, constant wrongness
+> that's been sitting in that spot since Veil's office goes with it. On the wall, the
+> readout follows a beat later: red, then amber, then a flat, uneventful green.
+
+**PLAYER** `player/chapter_1/c1_s4_p2_l7.mp3`
+> "That's it?"
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p2_l8.mp3`
+> "That's it. Told you it wouldn't take long."
+
+---
+
+## C1_S4_P3 — Still Live (Knuckle)
+**Delivery:** `FieldCommsWindow` — unprompted field comms check-in, not a hub scene. Fires
+wherever the player currently is, not tied to a specific node arrival. Voice-only, one-way,
+with an optional trailing player acknowledgment per `useFieldComms.js`'s design. Drafted
+here in bracket-tag shorthand per the FX-in-field-comms convention; convert to the
+`field_comms` JSON shape (`{ text, audio?, speaker?, fx? }`) when actually seeded.
+
+---
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p3_l1.mp3`
+> "Hey. It's me. Nothing's wrong with the new part — don't worry about that."
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p3_l2.mp3`
+> "The old one. The one I pulled out of you. I didn't scrap it — left it on the bench,
+> figured I'd strip it for parts later."
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p3_l3.mp3`
+[FX: flicker(1) — 300ms, on "still drawing"]
+> "It's still drawing current. No host. No reason to. Sitting on my bench pulling power
+> like it thinks it's still seated in you."
+
+**KNUCKLE** `knuckle/chapter_1/c1_s4_p3_l4.mp3`
+> "Don't know what that means. Not gonna pretend I do. Just didn't feel right sitting on
+> it."
+
+**PLAYER** `player/chapter_1/c1_s4_p3_l5.mp3` *(acknowledgment)*
+> "...Yeah. Good call. Thanks, Knuckle."
+
+---
+
+## C1_S3_P2 — We Need to Speak (Veil) — CHAPTER CLOSE
+**Delivery:** Starts in `FieldCommsWindow` (unprompted, wherever the player is), same as
+Knuckle's callback — then hands off to the full `WatcherSignal` cinematic mid-call, then
+`ChapterTitleCard` for Chapter 2. This is the first time `WatcherSignal` fires anywhere in
+Chapter 1 — every prior escalation beat stayed in the ambient `GlitchEffect` tier
+deliberately, saving the full cinematic for exactly this moment. Ends Chapter 1.
+
+**NOT YET IMPLEMENTED:** design-only, same as every other cross-component trigger in this
+chapter. Nothing currently wires `FieldCommsWindow` into `WatcherSignal`, or `WatcherSignal`'s
+`reboot` phase into `ChapterTitleCard`. Chapter 1 has no seed data at all yet regardless.
+
+---
+
+**VEIL** `veil/chapter_1/c1_s3_p2_l1.mp3`
+> "Well. Look at that."
+
+**VEIL** `veil/chapter_1/c1_s3_p2_l2.mp3`
+> "Ran your telemetry against every pattern I could pull. Couldn't find a clean line
+> between your signal and a theory I called fabricated three days ago."
+
+**VEIL** `veil/chapter_1/c1_s3_p2_l3.mp3`
+> "Axiom's archive did the actual sorting. I just asked it the right question."
+
+**PLAYER** `player/chapter_1/c1_s3_p2_l4.mp3`
+> "What. Out with it already."
+
+**VEIL** `veil/chapter_1/c1_s3_p2_l5.mp3`
+> "...Persistence Theory."
+
+**[WATCHER SIGNAL TRIGGER]** — Veil's line cuts dead mid-word, the call ripped away rather
+than ended. `WatcherSignal` takes the full screen through its existing phase machine:
+
+- **breach** — full-assault glitch + red strobe, `Intrusion.mp3` plays, same as any other
+  breach.
+- **override** — the override box slams in as usual.
+- **intrusion** — token reveal fires against a `signal_text` of **"PERSISTENCE THEORY"**
+  instead of the Watcher's usual generic corrupted text. Pass 1 snaps to the corrupted
+  (zalgo) form; ~2s later, Pass 2 re-scrambles and snaps clean — the player watches the
+  Watcher itself resolve the exact words Veil just said, as if it heard her say them and is
+  handing them back. No further explanation attached — the theory's actual content stays
+  undefined per "What the Player Should NOT Learn in Chapter 1."
+- **blackout** → **reboot** — standard reboot sequence, existing player-data reboot lines
+  (`handle` / `persona` / `persona_desc`), unchanged from how `WatcherSignal` already works
+  elsewhere.
+
+**[CHAPTER TITLE CARD]** — The instant `WatcherSignal` emits `complete`, `ChapterTitleCard`
+fires: `chapterNumber="2"`, `title="Persistence"`. Chapter 1 ends here — no further dialogue,
+no player acknowledgment, no resolution. The title card is the last thing on screen.
+
+---
+
+*Document version 2.8 — C1_S3_P2 ("We Need to Speak," Veil) written and locked: 5 spoken
+lines, closing Chapter 1. Delivered as a `FieldCommsWindow` call that gets forcibly taken
+over by `WatcherSignal` mid-word — the Watcher reacting to its own signal being named by two
+Docs cross-referencing data, the biggest examination of the pattern yet, which is why this
+is the chapter's first and only full `WatcherSignal` use rather than another ambient
+`GlitchEffect` escalation. The intrusion phase's token reveal is fed "PERSISTENCE THEORY" as
+its `signal_text`, so the corrupt-to-clean resolve reads as the Watcher echoing back exactly
+what Veil just said — confirmation that it's listening, not confirmation of what the theory
+means. `ChapterTitleCard` fires immediately after reboot for Chapter 2 ("Persistence") — the
+first real use of the trigger, deliberately not touching the already-shipped Prologue flow
+per the earlier caution, since this is new Chapter 1→2 content. Entire sequence flagged
+NOT YET IMPLEMENTED — no engine wiring exists between these three components yet, and
+Chapter 1 has no seed data at all regardless. This closes the Chapter 1 closing arc that
+began with C1_S3_P1: Veil is now non-contiguous across the chapter exactly as planned in
+INVESTIGATIVE STRUCTURE, and both loose ends (Knuckle's still-live part, Veil's Persistence
+Theory match) land within one scene of each other rather than resolving separately.*
+
+*Document version 2.7 — C1_S4_P3 ("Still Live," Knuckle) written and locked: 5 lines, his
+shortest beat yet, delivered through `FieldCommsWindow` rather than a hub scene per the
+Open Threads plan — unprompted, landing wherever the player is. He reports the fact and
+refuses to theorize, per PROBLEM-SOLVING STYLE, which is what makes the moment land. FX is
+a single light flicker, not the static escalation vocabulary — this is an ambient wrongness
+in the world, not the Watcher reacting to an examination, so it stays in the "sensory
+disorientation" bucket per the two-vocabulary rule. No narrator lines available (voice-only
+delivery), so the eeriness is carried entirely through Knuckle's word choice instead — per
+"the prose is the whole experience" and "gameplay alone can't build the world."*
+
+*Document version 2.6 — C1_S4_P2 ("Repair," Knuckle) written and locked: 8 lines, shorter
+than his first scene per PROBLEM-SOLVING STYLE. Adds a felt-sensation beat to the repair
+(cold pressure behind the ear, tied explicitly back to the injury site from Veil's scene)
+so the moment isn't purely external/visual — per the "give the mix something to build" rule
+and the reminder that these are body-connected parts the player experiences, not props.*
+
+*Document version 2.5 — C1_S5_P1 ("Patch's Pickup," Patch) written and locked: 11 lines.
+Verified against Patch's shipped Prologue introduction before drafting (maintenance dig,
+grow-lamps, kettle, drifting terminals, clipped/staccato dry voice). Structured around a
+real store purchase, not a free handoff — the resonance dampener is a one-time catalog item
+gated by `CyberDocInventoryService::grantCatalogItem()`, so a short-on-cash player has to
+earn it first. The scene's opening reaction beat is written to fire as a direct consequence
+of the completed sale (she looks closely at what she just sold into, not at a handed-over
+part), per the user's sequencing note. Saves her real diagnostic read for later — this is a
+dead-end-fast intro per PROBLEM-SOLVING STYLE, same as Knuckle's.*
+
+*Document version 2.4 — C1_S4_P1 ("The Dead End," Knuckle) written and locked: 12 lines,
+noticeably shorter than Veil's scene per PROBLEM-SOLVING STYLE. Verified against Knuckle's
+shipped Prologue introduction before drafting — added the hulking asymmetrical frame, two
+diagnostic arms, handheld scanner motion, and burner cigarette detail that a first pass had
+missed, and picked up "wagon" as what he calls his own node. Confirms the resonance
+dampener is interface hardware, not chassis, and refers the player to Patch by name for the
+part specifically — not a full diagnostic referral. Previously, version 2.3 — C1_S3_P1 (Veil, "The Persistence Theory") written and locked: her
+node and physical description matched against the shipped Prologue seeder (warm
+maintenance-workspace environment, six-terminal multitasking, clipped staccato dialogue
+style) rather than invented fresh. Scene lands the chapter's biggest escalation yet —
+Veil's mid-word interruption saying the fringe theory's name, a fried "resonance dampener"
+(deliberate echo of Axiom's burned-out resonance coil), FX escalated past C1_S2_P2's peak
+to static(4),flicker(3),bars(2). She rationalizes the reaction in the moment and refers the
+player to Knuckle without revealing what she was about to say — sets up her later
+unprompted transmission (C1_S3_P2, not yet written). Previously, version 2.2 added
+C1_OPEN, the chapter's flavor/atmosphere opener (3 lines,
+sits before Scene 1, outside Scene/Part numbering) — city-scale mood-setting, strict parity
+with the player, no hint of an external agent. See CHAPTER OPENERS in WORLD_PHILOSOPHY.md.
+Previously, version 2.1 added FX tags to C1_S1_P1's cold open (l1: chromatic(2),flicker(1)
+on waking mid-collapse; l5: scramble(1) on the vocal stutter), using a deliberately
+different effect vocabulary than Axiom's static-based response cues — these are sensory
+disorientation, not the signal reacting to examination, and shouldn't read as part of that
+escalation ladder. Also documented FX authoring for field_comms (structured JSON, same
+bracket-tag shorthand for drafting) now that `useFieldComms.js`/`FieldCommsWindow.vue` are
+confirmed built (FX support added to FieldCommsWindow.vue to match). Float's and Axiom's
+field comms content discussed but not yet written in; still pending, along with Chapter 1's
+arc/seeder. See VISUAL EMPHASIS TOOLKIT in WORLD_PHILOSOPHY.md for the two-vocabulary rule.
+Previously, version 2.0 locked C1_S2_P2 (Axiom's report-back): the repaired
 reader runs the real scan, the archive's ambient sound cuts out and a pressure/pain spike
 lands (FX-tagged, escalated past C1_S2_P1's static(2) to static(3),flicker(2)), and Axiom's
 read shifts from "old architecture" to "old architecture that's actively reaching for

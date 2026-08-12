@@ -1,5 +1,5 @@
 # CodeCraft — Chapter 1 Story
-### The Watcher Arc — master planning document
+### "Static" — The Watcher Arc — master planning document
 ---
 
 ## What This Document Is
@@ -37,6 +37,20 @@ feels generic, or if a beat is underwritten, that's a signal to go fix it in the
 file and remirror — not to patch it here in isolation. See "WRITING WORKFLOW & PROSE
 STANDARD" in `WORLD_PHILOSOPHY.md`: this is meant to read like a novel the player gets to
 play a role in, not a functional recap of what happens.*
+
+### The City, Before
+
+Spokane doesn't sleep so much as it flickers — neon breathing through rain nobody's
+bothered to name a color for in years. Underneath the corporate grid everyone agrees to
+see, a second signal runs the way blood runs under skin: unlicensed, unregulated, older
+than anyone currently using it. Runners call it the Splice Frequency. Everyone else doesn't
+call it anything, because everyone else doesn't know it's there.
+
+Tonight it's just another Tuesday on the grid — small hacks, small scores, the ordinary hum
+of a city that never fully goes dark.
+
+Somewhere in Spokane Valley, someone is about to have a very bad night, and won't remember
+how it started.
 
 ### Cold Open — Float's repair bay, Spokane Valley
 
@@ -323,7 +337,239 @@ idea whether that's better news, or considerably worse."
 destination, she's the only one left who'd recognize the footprint before it arrives. Tell
 her I said it reached—she'll know exactly how unhappy that should make her."
 
-*[End of scenes locked so far. Veil's Scene 3 not yet started.]*
+### The Persistence Theory — Veil's node, Downtown Core
+
+Veil's node renders the way it always has — a sprawling workspace under warm hanging
+lights, exposed conduits and maintenance terminals crowding every surface, status boards
+and infrastructure maps floating overhead like constellations nobody's bothered to name.
+Massive windows look out over the distant glow of the Frequency, rain drifting lazily
+against glass that was never meant to be decorative and isn't. Every cable here is
+labeled. Every tool has a place. The whole room still carries that same feeling — a
+station that was supposed to close years ago, and never did.
+
+She's watching six terminals at once when you arrive, dark hair loosely tied back, the
+long coat she wears instead of armor hung with pockets and utility straps. One display
+shifts to your signal. Her eyes hold on it half a second longer than the others got.
+
+**VEIL:** "Axiom's package. Twenty minutes ago. Four reads. Still not enough."
+
+She finally looks up. Not startled. Not concerned. Just tired, the way someone gets when
+strange problems stopped surprising them a long time ago.
+
+**VEIL:** "Sit. I'd rather look at you than a report about you."
+
+A chair rises from the floor, spare, unpadded — nothing like Axiom's or Float's. She runs
+a slow pass with something that reads more like a level than a scanner, checking you
+against a baseline only she can see.
+
+**VEIL:** "He's right that it's reaching. Wrong that it's rare."
+
+An alarm flashes amber somewhere behind her. She kills it with a flick of two fingers,
+without looking.
+
+**VEIL:** "I've seen this pattern. Once. A substation. Grid-scale. It doesn't run inside a
+person. Or it didn't."
+
+**PLAYER:** "Where was it running?"
+
+**VEIL:** "Years ago. Before I did this for a living instead of against it."
+
+Something in how she says it tells you not to ask further, so you don't.
+
+**VEIL:** "There's a name for it. On the boards where people build religions out of
+infrastructure failures. They call it—"
+
+She doesn't finish. The word gets halfway out — *the Persist—* — and something inside your
+skull goes off like a struck bell.
+
+Pain doesn't describe it. Closer to feedback — a shriek pitched straight into the base of
+your neural housing, gone as fast as it hit, a thin thread of smoke curling up behind your
+left ear. Something back there just stopped working. Mid-sentence. Same as her.
+
+**VEIL:** "—Theory."
+
+She finishes it anyway. Quieter now. Like completing the sentence outranks whatever just
+happened to you.
+
+**PLAYER:** "What was that?"
+
+**VEIL:** "Resonance dampener. Failed. Hold still."
+
+She's already moving — fast, precise, the reflex of someone who's handled hardware failure
+a thousand times and refuses to let this be anything else. Pulse. Burn. Readout again. By
+the time she's done, her voice is flat, controlled, all the way back inside its usual
+register.
+
+**VEIL:** "Rig under stress. Threw an error. Bad timing. That's all this is."
+
+She doesn't sound like she believes it. She sounds like someone choosing, on purpose, not
+to say the rest of it twice.
+
+**VEIL:** "Dampener's interface hardware. Not mine to fix. Knuckle can patch you
+functional. Go."
+
+**PLAYER:** "And the name. The one you didn't finish."
+
+**VEIL:** "A mistake. Fringe theory. Debunked years ago — fabricated, by people who wanted
+a better story than the boring truth. Not relevant."
+
+She's back at the readouts before you're fully standing, already pulling the next task
+into the air — but her hand, for one second before it steadies, isn't as sure of itself as
+the rest of her.
+
+### The Dead End — Knuckle's wagon, Browne's Addition
+
+Knuckle's wagon is the same cramped, low-ceiling space it's always been — walls patched
+together from stolen network architecture, the seams still visible where different
+systems were forced to talk to each other. Medical readouts float at chest height, most
+of them running amber. His hulking asymmetrical frame doesn't turn when you walk in. One
+of his two diagnostic arms is already extended, pulling your signal before you've said a
+word.
+
+The readout it throws onto the wall comes back red, then narrows, then goes still on one
+specific spot behind your ear.
+
+**KNUCKLE:** "Whoever told you to hold still was right. You're lucky it cauterized instead
+of spreading."
+
+He pulls a handheld scanner into the other arm and runs it slow along the burn, the way he
+runs everything — no wasted motion, no urgency he hasn't decided to have. A burner
+cigarette materializes between two fingers of the arm he isn't using. He doesn't light it
+yet.
+
+**PLAYER:** "Can you fix it?"
+
+**KNUCKLE:** "Housing, yeah. Whatever burned out inside it, no."
+
+He pulls the burned component free with a short mechanical click, turns it over once in
+the scanner's light, and doesn't bother hiding his opinion of it.
+
+**KNUCKLE:** "This isn't chassis. This is interface — the part that talks to your head,
+not the part that holds you together. I don't stock interface. Never have."
+
+**PLAYER:** "So who does?"
+
+**KNUCKLE:** "Patch. North Spokane. Tell her Knuckle sent you for a standard dampener, not
+a consult — she'll try to turn it into one anyway."
+
+He finally lights the cigarette, already turning back to the readouts, done with you in
+the specific, efficient way of a man who never had more than two minutes to spend on
+anyone.
+
+**KNUCKLE:** "Bring it back. I'll seat it. Won't take long."
+
+### Patch's Pickup — Patch's station, North Spokane
+
+*This scene fires after the player buys the resonance dampener from Patch's store — a
+one-time catalog item Knuckle's referral unlocks, so a short-on-cash player has to earn the
+creds first.*
+
+Patch's station is an old maintenance dig buried beneath North Spokane — exposed pipes,
+concrete walls, bundles of cable disappearing into the dark like roots. Nothing here was
+built to be lived in. Somebody clearly changed their mind anyway: plants grow under
+grow-lamps in the corner, a kettle simmers on a hotplate that has no business still
+working, and half a dozen terminals drift lazily through the air, opening and closing to a
+logic only she seems to track.
+
+She's got both arms inside an open panel when you arrive, one sleeve rolled up, the other
+forgotten, dark hair tied back with something that wasn't originally meant for hair.
+
+**PATCH:** "Knuckle called ahead. Said 'dampener, not a consult,' like that's a sentence he
+gets to finish for me."
+
+**PLAYER:** "It's just the part. I'm kind of in a hurry."
+
+**PATCH:** "Sure. Course you are."
+
+The sale's barely finished processing — the case already in your hand — when she does the
+thing every Doc apparently can't help doing: stops treating you like a transaction and
+starts treating you like a patient.
+
+**PATCH:** "Huh."
+
+**PLAYER:** "What?"
+
+**PATCH:** "Nothing you need to hear standing up in my doorway. Take the part. Get it
+seated. Come back when you've got twenty minutes I can actually use."
+
+She's already back at the panel, not waiting for you to agree — but she says it again
+anyway, quieter, like she wants to make sure it landed.
+
+**PATCH:** "I mean that. Not a threat. Just — twenty minutes. I think I want to see this
+properly."
+
+### Repair — Knuckle's wagon, Browne's Addition
+
+Same wagon, same amber readouts drifting at chest height. Knuckle doesn't ask if you got
+it — just holds one of his diagnostic arms out, palm up, waiting.
+
+**PLAYER:** "Patch says hi. Sort of."
+
+**KNUCKLE:** "She never says hi. Sit."
+
+He has the panel open before you're fully seated, the burned housing already out and set
+aside like he's been holding the shape of it in his head since you left. The new component
+goes in without ceremony — one motion, a short mechanical click.
+
+**KNUCKLE:** "Give it a second."
+
+You feel it before the readout even changes — a cold, precise pressure behind your ear,
+there and gone, like something exhaling on your behalf. The low, constant wrongness that's
+been sitting in that spot since Veil's office goes with it. On the wall, the readout
+follows a beat later: red, then amber, then a flat, uneventful green.
+
+**PLAYER:** "That's it?"
+
+**KNUCKLE:** "That's it. Told you it wouldn't take long."
+
+### Still Live — field comms, unprompted
+
+*Delivered via `FieldCommsWindow`, not a hub scene — Knuckle reaching out unprompted,
+wherever the player currently is.*
+
+**KNUCKLE:** "Hey. It's me. Nothing's wrong with the new part — don't worry about that."
+
+**KNUCKLE:** "The old one. The one I pulled out of you. I didn't scrap it — left it on the
+bench, figured I'd strip it for parts later."
+
+**KNUCKLE:** "It's still drawing current. No host. No reason to. Sitting on my bench
+pulling power like it thinks it's still seated in you."
+
+**KNUCKLE:** "Don't know what that means. Not gonna pretend I do. Just didn't feel right
+sitting on it."
+
+**PLAYER:** "...Yeah. Good call. Thanks, Knuckle."
+
+### We Need to Speak — field comms → WatcherSignal → Chapter Title (CHAPTER CLOSE)
+
+*Starts as a `FieldCommsWindow` call, same as Knuckle's callback — then gets forcibly taken
+over by the full `WatcherSignal` cinematic mid-word, the first time it fires anywhere in
+Chapter 1. Ends on the Chapter 2 title card. Design-only — no engine wiring exists for this
+sequence yet.*
+
+**VEIL:** "Well. Look at that."
+
+**VEIL:** "Ran your telemetry against every pattern I could pull. Couldn't find a clean
+line between your signal and a theory I called fabricated three days ago."
+
+**VEIL:** "Axiom's archive did the actual sorting. I just asked it the right question."
+
+**PLAYER:** "What. Out with it already."
+
+**VEIL:** "...Persistence Theory."
+
+Her line cuts dead mid-word — the call ripped away, not ended. The screen breaches: full
+glitch, red strobe, the override box slamming in exactly like every other Watcher
+intrusion. But this time the reveal isn't the Watcher's usual corrupted noise — it resolves,
+corrupt to clean, into two words: **PERSISTENCE THEORY**. The exact thing Veil just said,
+handed back. Not an explanation. Just proof it heard her.
+
+Blackout. Reboot. And then, before anything else can happen, the screen doesn't return to
+the world — it holds on a single card:
+
+**CHAPTER 2 — PERSISTENCE**
+
+*[End of scenes locked so far. This closes Chapter 1 — "Static."]*
 
 ---
 
@@ -418,15 +664,27 @@ Scene/Part IDs follow `C{chapter}_S{scene}_P{part}` — one Scene per Doc, Parts
 scripted dialogue beats only (minigame-only field jobs stay unnumbered). See "Scene / Part
 ID System" at the top of `api/CHAPTER_1_SCRIPT.md`.
 
-| ID | Status | Doc | Summary |
-|---|---|---|---|
-| C1_S1_P1 — Cold Open | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Float | Player wakes mid-diagnostic at Float's, no memory of arriving — he broke her lock, kicked her door off its track, and collapsed after seconds of garbled speech. She finds a pre-collapse background process running 10 minutes before he dropped. Zero archive matches. She agrees to keep digging in the background if he covers the cost with a job. |
-| C1_S1 — Relay Retrieval (field job, no dialogue) | Objective written, field scene not yet written | Float | Player travels to a decommissioned relay station on the edge of the Valley grid to retrieve an intact memory core before scrappers strip it. Mundane job on the surface — deliberately unconnected to the player's condition or Splice Protocol (see "What the Player Should NOT Learn," above). Real purpose: covers the cost of Float's background diagnostics. |
-| C1_S1_P2 — Report Back | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Float | Player hands off the core. Float reveals her background dig found the spike isn't noise — it corrects itself over repetitions, like something practicing. She's unqualified to say whether it's failing or learning, and refers the player to Axiom (archivist, pre-collapse systems specialty) for a read. Resolves the "how does the player move Doc to Doc" open thread: colleague referral, not Watcher-routed. |
-| C1_S2_P1 — Axiom's Broken Rig | **Scripted through job hand-off** (see `api/CHAPTER_1_SCRIPT.md`) | Axiom | Axiom reframes Float's data as a signal correcting itself against feedback — "learning," not corruption, said plainly rather than as a scare. Wants to lay it against the archive's oldest layers, but his diagnostic reader's depth-read component is burned out. Replacement is stuck at a courier depot two nodes away with a disputed access-rights problem. New job: retrieve the part from UD-v9. |
-| C1_S2_P2 — Report Back | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Axiom | Player returns with the part; Axiom repairs the reader and runs the real scan. Result: the architecture isn't just old, it's actively *reaching* — a four-second attempt to touch something beyond the rig itself, mid-scan. That's a grid question, outside Axiom's specialty. He refers the player to Veil (Downtown Core), locking her as the third Doc. Escalation: the diagnostic-failure spike from C1_S2_P1 (light) is followed here by a stronger pain/pressure spike (FX-tagged, worse than before) — the pattern of each examination provoking a harder response is now established across two scenes. |
-| C1_S3 — Veil | Not yet written | Veil | — |
-| C1_S4+ | Not yet written | Knuckle, Patch (order TBD) | — |
+**Seq** is separate from the ID and tracks actual play order, since per INVESTIGATIVE
+STRUCTURE in `WORLD_PHILOSOPHY.md` a Doc's Parts don't have to land contiguously — Veil's
+two Parts bookend the whole chapter here, not sit back to back. The ID groups by Doc; Seq
+is what we'd actually seed stages against. See conversation notes for how the two differ.
+
+| Seq | ID | Status | Doc | Summary |
+|---|---|---|---|---|
+| — | C1_TITLE — "Static" title card | **Built, not wired** (`ChapterTitleCard.vue`) | — | Full-screen title reveal, before C1_OPEN. Title resolves letter by letter out of static noise. [FX: static, GlitchEffect] — audio is a user-supplied static/noise SFX (`audio` prop on the component), not yet recorded/placed. Not wired into the Prologue-completion trigger yet by design — that touches already-shipped flow, held off deliberately. |
+| 0 | C1_OPEN — The City, Before | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | — | Flavor/atmosphere piece, outside Scene/Part numbering — sets the city and the Splice Frequency before the player takes control. Strict parity with the player, no hint of an external agent. See CHAPTER OPENERS in `WORLD_PHILOSOPHY.md`. |
+| 1 | C1_S1_P1 — Cold Open | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Float | Player wakes mid-diagnostic at Float's, no memory of arriving — he broke her lock, kicked her door off its track, and collapsed after seconds of garbled speech. She finds a pre-collapse background process running 10 minutes before he dropped. Zero archive matches. She agrees to keep digging in the background if he covers the cost with a job. |
+| 2 | C1_S1 — Relay Retrieval (field job, no dialogue) | Objective written, field scene not yet written | Float | Player travels to a decommissioned relay station on the edge of the Valley grid to retrieve an intact memory core before scrappers strip it. Mundane job on the surface — deliberately unconnected to the player's condition or Splice Protocol (see "What the Player Should NOT Learn," above). Real purpose: covers the cost of Float's background diagnostics. |
+| 3 | C1_S1_P2 — Report Back | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Float | Player hands off the core. Float reveals her background dig found the spike isn't noise — it corrects itself over repetitions, like something practicing. She's unqualified to say whether it's failing or learning, and refers the player to Axiom (archivist, pre-collapse systems specialty) for a read. Resolves the "how does the player move Doc to Doc" open thread: colleague referral, not Watcher-routed. |
+| 4 | C1_S2_P1 — Axiom's Broken Rig | **Scripted through job hand-off** (see `api/CHAPTER_1_SCRIPT.md`) | Axiom | Axiom reframes Float's data as a signal correcting itself against feedback — "learning," not corruption, said plainly rather than as a scare. Wants to lay it against the archive's oldest layers, but his diagnostic reader's depth-read component is burned out. Replacement is stuck at a courier depot two nodes away with a disputed access-rights problem. New job: retrieve the part from UD-v9. |
+| 5 | C1_S2 — Depot Retrieval (field job, no dialogue) | Objective written, field scene not yet written | Axiom | Player travels to a courier depot two nodes from University District to retrieve the burned-out reader's replacement component. Access rights disputed since the depot changed hands. |
+| 6 | C1_S2_P2 — Report Back | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Axiom | Player returns with the part; Axiom repairs the reader and runs the real scan. Result: the architecture isn't just old, it's actively *reaching* — a four-second attempt to touch something beyond the rig itself, mid-scan. That's a grid question, outside Axiom's specialty. He refers the player to Veil (Downtown Core), locking her as the third Doc. Escalation: the diagnostic-failure spike from C1_S2_P1 (light) is followed here by a stronger pain/pressure spike (FX-tagged, worse than before) — the pattern of each examination provoking a harder response is now established across two scenes. |
+| 7 | C1_S3_P1 — The Persistence Theory | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Veil | Player arrives with Axiom's telemetry. Veil confirms it's reaching, and recognizes the pattern from a grid-scale incident years ago — a substation, not a person. Mid-sentence, naming the fringe theory people call it, the player has a violent reaction that fries their "resonance dampener" (deliberate echo of Axiom's burned-out resonance coil) — the chapter's biggest escalation yet (FX: static(4),flicker(3),bars(2), past C1_S2_P2's peak). She rationalizes it as a stress error, refers the player to Knuckle for the physical repair, and dismisses the theory as fabricated nonsense — withholding that she's actually turning it over in her head. |
+| 8 | C1_S4_P1 — The Dead End | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Knuckle | Fast, physical read — confirms the resonance dampener is interface hardware, not chassis, and he's never stocked interface. Sends the player to Patch by name for the specific part, not a fuller diagnosis. Notably shorter than Veil's scene per PROBLEM-SOLVING STYLE — no theorizing, dead-ends fast. |
+| 9 | C1_S5_P1 — Patch's Pickup | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) — store item **not implemented** | Patch | Brief, no minigame. Player must buy the resonance dampener from her store first — a one-time catalog item unlocked by Knuckle's referral (`CyberDocInventoryService::grantCatalogItem()`, `stock_limit: 1`), so a short-on-cash player has to earn the creds before the scene plays. The scene itself is a direct reaction to the completed sale, not a free handoff. Introduces her voice and clinic without spending her real diagnostic read, which is saved for Chapter 2. **The dampener doesn't exist as a real item yet** — no `Peripheral`/item row, no seeder or mission-handler call to `grantCatalogItem()`, nothing wired to Knuckle's referral. Dialogue is written and locked; the purchase mechanic is design-only until Chapter 1's seed data work happens. |
+| 10 | C1_S4_P2 — Repair | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Knuckle | Short closing scene — 8 lines, his shortest yet. Repair completes with a felt physical beat (cold pressure behind the ear as the dampener seats, tied back to the exact injury site from Veil's scene) rather than a purely visual readout change — per "give the mix something to build" and the reminder that these are parts wired into the player's body. Hands-on Doc, dead-ends fast per PROBLEM-SOLVING STYLE — no hint of the coming callback. |
+| 11 | C1_S4_P3 — Still Live | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) | Knuckle | 5 lines, his shortest beat. Delivered through `FieldCommsWindow`, not a hub scene — unprompted, wherever the player is. The old, removed part is still active on his bench — still drawing power, still transmitting — with no host installed. He reports the fact and refuses to theorize, per PROBLEM-SOLVING STYLE. Light `flicker(1)` FX only, not the static escalation vocabulary — this is ambient world-wrongness, not the Watcher reacting to an examination. |
+| 12 | C1_S3_P2 — We Need to Speak | **Scripted** (see `api/CHAPTER_1_SCRIPT.md`) — trigger chain **not implemented** | Veil | 5 spoken lines, closing Chapter 1. Starts as a `FieldCommsWindow` call — Veil breaks her own "never guess out loud" rule, credits Axiom's archive for the cross-reference, and names "Persistence Theory" — then gets forcibly taken over mid-word by `WatcherSignal`, the chapter's only full cinematic use. Its intrusion phase resolves a corrupted-then-clean echo of "PERSISTENCE THEORY" instead of the usual generic text — the Watcher reacting to hearing its own signal named, not confirming what it means. `ChapterTitleCard` fires immediately after reboot for Chapter 2 ("Persistence"). No engine wiring exists for any leg of this chain yet. |
 
 **C1_S1 field job objective text — Relay Retrieval (quest log copy, not narration):**
 
@@ -468,8 +726,10 @@ an accurate map without needing to read the full script.
 - ~~How the player moves from Doc to Doc after Float~~ — **Resolved.** Colleague referral: Float can't interpret pattern-shaped data against pre-collapse architecture, refers the player to Axiom directly (see C1_S1_P2). Confirmed pattern going forward — each Doc refers to whichever specialist their dead end points toward, rather than a fixed prologue-style order.
 - ~~Doc order after Axiom~~ — **Partially resolved.** Axiom's report-back (C1_S2_P2) closes on an explicit referral to Veil — his "reaching" result is a grid-scale question, which is her specialty, not his. Order locked so far: Float → Axiom → Veil. Knuckle and Patch remain unordered after Veil's scene.
 - **Escalation pattern, now established.** C1_S2_P1 and C1_S2_P2 both land a spike tied directly to the diagnostic attempt itself (the reader failing on contact, then a stronger pain/pressure spike once it actually runs) — each examination provoking a harder response than the last. Veil's scene should continue that ladder at a higher intensity; see VISUAL EMPHASIS TOOLKIT in `WORLD_PHILOSOPHY.md` for the FX tag mechanics.
+- ~~Chapter 1 closing arc~~ — **Resolved, fully scripted.** All five closing beats are locked: `C1_S4_P1` (Knuckle's dead end), `C1_S5_P1` (Patch's pickup, gated by a real store purchase), `C1_S4_P2` (Knuckle's repair), `C1_S4_P3` (Knuckle's callback — the old part still transmitting with no host), and `C1_S3_P2` (Veil's closing transmission). Veil is non-contiguous across the chapter exactly as planned (`C1_S3_P1` the reaction, `C1_S3_P2` the close), and the two loose ends — Knuckle's still-live part and Veil's Persistence Theory match — land one scene apart rather than resolving separately. Chapter 1 ends on `WatcherSignal`'s first and only full-cinematic use this chapter (see Seq 12) — Veil's call gets forcibly cut off mid-word, the intrusion phase echoes "PERSISTENCE THEORY" back at the player corrupt-to-clean, and `ChapterTitleCard` fires for Chapter 2 immediately after reboot. That whole trigger chain (`FieldCommsWindow` → `WatcherSignal` → `ChapterTitleCard`) is design-only — none of it is wired, and Chapter 1 has no seed data at all yet.
 - **Player voice/audio pipeline.** The player now has fixed, non-branching, voiced lines (C1_S1_P1 establishes this) — this doesn't exist anywhere in the current game engine. `PLAYER_CHOICE` options in the real seeder (`api/database/seeders/QuestStageSeeder.php`) have no audio field, and chosen options only ever echo back as silent text (`PLAYER_SAID`). Supporting a voiced player line is new engine work, not yet scoped or scheduled.
 - **Chapter/arc data structure.** There is no "chapter" concept in the schema yet (`quest_arcs` / `player_arc_progress` currently only model the prologue). Chapter 1 will need its own arc/seeding setup before any of this becomes playable. Not yet scoped.
+- **Resonance dampener store item — not implemented.** `C1_S5_P1`'s purchase mechanic (see Seq 9 above) is design-only right now. `CyberDocInventoryService::grantCatalogItem()` already supports the pattern (verified by reading the service), but nothing has actually been built: no `Peripheral`/item-model row for the dampener, no seeder or mission-completion handler calling `grantCatalogItem()` for it, and no trigger tying it to Knuckle's referral in `C1_S4_P1`. Needs real implementation work before the scene is playable, not just Chapter 1's general seed data.
 
 ---
 
@@ -497,7 +757,55 @@ contained an early, now-replaced draft of the C1_S1_P1 scene. This document repl
 
 ---
 
-*Document version 1.3 — Mirrored C1_S2_P2 (Axiom's Report Back) into "The Story So Far,"
+*Document version 2.3 — Mirrored C1_S3_P2 ("We Need to Speak," Veil) into "The Story So
+Far," matching `api/CHAPTER_1_SCRIPT.md` v2.8. This closes Chapter 1 — "Static." Updated
+the Stage-by-Stage row from planned to scripted (trigger chain flagged not implemented),
+and resolved the "Chapter 1 closing arc" Open Thread as fully scripted. Veil's call gets
+forcibly taken over mid-word by `WatcherSignal` — the chapter's first and only full
+cinematic use, deliberately held in reserve until now — whose intrusion phase echoes back a
+corrupt-to-clean "PERSISTENCE THEORY" instead of the usual generic text, then hands off to
+`ChapterTitleCard` for Chapter 2 ("Persistence") on reboot. All nine Chapter 1 dialogue
+beats (Seq 0–12, excluding unscripted field-job objectives) are now scripted; nothing is
+wired into the live game yet. Previous version 2.2 — Mirrored C1_S4_P3 ("Still Live," Knuckle) into "The Story So Far,"
+matching `api/CHAPTER_1_SCRIPT.md` v2.7. Updated the Stage-by-Stage row from planned to
+scripted. Delivered via `FieldCommsWindow`, not a hub scene — the first Chapter 1 beat to
+use it. Knuckle's full arc for the chapter is now closed: dead end, repair, callback.
+Previous version 2.1 — Mirrored C1_S4_P2 ("Repair," Knuckle) into "The Story So Far,"
+matching `api/CHAPTER_1_SCRIPT.md` v2.6. Updated the Stage-by-Stage row from planned to
+scripted. This scene adds the session's felt-sensation reminder — parts are wired into the
+player's body, not just visual props — into the repair beat itself, and closes the Knuckle
+thread fully clean, with no hint of the coming callback per INVESTIGATIVE STRUCTURE. Previous version 2.0 — Mirrored C1_S5_P1 ("Patch's Pickup," Patch) into "The Story So
+Far," matching `api/CHAPTER_1_SCRIPT.md` v2.5. Updated the Stage-by-Stage row from planned
+to scripted, and documented the store-purchase mechanic: the resonance dampener is a real,
+one-time catalog item (`CyberDocInventoryService::grantCatalogItem()`, `stock_limit: 1`,
+`is_exclusive: true`) unlocked by Knuckle's referral, so a short-on-cash player has to earn
+the creds before the scene can play. The scene's opening reaction beat was written as a
+direct consequence of the completed sale rather than a narrated free handoff, per the
+user's sequencing note. Previous version 1.9 — Mirrored C1_S4_P1 ("The Dead End," Knuckle) into "The Story So
+Far," matching `api/CHAPTER_1_SCRIPT.md` v2.4. Updated the Stage-by-Stage row from planned
+to scripted. Knuckle's wagon/appearance were verified against the shipped Prologue seeder
+before drafting — added details a first pass missed (diagnostic arms, cigarette, scanner
+motion). Previously, version 1.8 — Mirrored C1_S3_P1 ("The Persistence Theory," Veil) into "The Story
+So Far," matching `api/CHAPTER_1_SCRIPT.md` v2.3. Updated the Stage-by-Stage row from
+planned to scripted. Veil's node/appearance/voice were corrected against the shipped
+Prologue seeder during drafting — busier, warmer maintenance-workspace environment and
+clipped staccato dialogue, not the sparse minimalist version first drafted. Previously,
+version 1.7 added a C1_TITLE row to Stage-by-Stage Progress for the "Static"
+title card (`ChapterTitleCard.vue`, built but not wired to any trigger yet), noting the
+static SFX as a user-supplied placeholder. Previously, version 1.6 added "The City, Before"
+(mirrors C1_OPEN) to the top of "The Story
+So Far," and a Seq 0 row to Stage-by-Stage Progress — the chapter's flavor/atmosphere opener,
+outside Scene/Part numbering. See CHAPTER OPENERS in WORLD_PHILOSOPHY.md. Previously,
+version 1.5 added a Seq column to Stage-by-Stage Progress, tracking actual play
+order separately from the Scene/Part ID grouping, and expanded the table with the full
+planned closing arc (rows 7–12: Veil's reaction, Knuckle's dead end, Patch's pickup, the
+repair, Knuckle's callback, and Veil's closing transmission) plus the previously-missing
+C1_S2 field job row. All of rows 7–12 are planning-stage, not yet scripted. Previously,
+version 1.4 captured the planned Chapter 1 closing arc in Open Threads: Veil's
+fried-cyberware reaction and referral, Knuckle's repair needing a part from Patch, Patch's
+brief no-minigame pickup, Knuckle's later callback about the removed part still being
+active with no host, and Veil's closing transmission ("Persistence Theory?"). Version 1.3
+mirrored C1_S2_P2 (Axiom's Report Back) into "The Story So Far,"
 matching `api/CHAPTER_1_SCRIPT.md` v2.0. Locked Float → Axiom → Veil as the confirmed Doc
 order (Axiom's scene closes on an explicit referral to Veil), updated the specialist-read
 table and Stage-by-Stage Progress table, and noted the now-established escalation pattern
