@@ -13,6 +13,7 @@
  */
 
 import { ref } from 'vue';
+import { useCodexFind } from './useCodexFind.js';
 
 const MIN_ICE        = 3;
 const ICE_ESCALATION = 2;  // successful hacks per +1 effective ICE on a node
@@ -29,6 +30,8 @@ export function useHackFlow({
     tutorial, gbTour,
     applyCriticalFailure,
 }) {
+    const codexFind = useCodexFind();
+
     // Track successful hacks per node UUID this session — drives effective ICE escalation.
     const nodeHackCounts = ref(new Map());
 
@@ -101,6 +104,9 @@ export function useHackFlow({
             ` | bounty LVL ${player.value.bountyLevel}` +
             ` | hacks #${hackCount.value}`
         );
+
+        // Roll for a "Codex — Found" prompt — no-op unless a thread is active.
+        codexFind.rollForFind();
 
         // Tell the backend — server computes the authoritative reward from completion_pct.
         // amount is used for the optimistic local update above; server value synced below.

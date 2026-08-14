@@ -39,6 +39,7 @@
 
 import { ref, readonly } from 'vue';
 import axios from 'axios';
+import { useCodex } from './useCodex.js';
 
 export function useQuestLog() {
     const docs    = ref([]);
@@ -69,6 +70,12 @@ export function useQuestLog() {
             const payload = turnedIntoDocId ? { turned_into_doc_id: turnedIntoDocId } : {};
             const res = await axios.post(`/api/quests/stage/${stageId}/complete`, payload);
             await fetchQuestLog();
+            // A stage can activate a codex thread on completion — refresh the
+            // shared codex state immediately rather than waiting for the
+            // player to happen to open the Codex Archive.
+            if (res.data?.codex_thread_activated) {
+                await useCodex().fetchState();
+            }
             return res.data;
         } catch (e) {
             const msg = e?.response?.data?.message ?? e.message ?? 'Failed to complete stage';

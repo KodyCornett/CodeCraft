@@ -110,13 +110,13 @@ const GAMES = [
     {
         type:  'archive_extraction',
         built: true,
-        quest: 'Quest 4 — Axiom / University District',
-        brief: 'Read scattered log files to find plaintext/Base64 pairs, match each to a cipher slot, and decode all 3 before Trace hits 100%. Watch for decoy pairs and corrupted checksums.',
+        quest: 'Codex System — free-roam find (not a story mission)',
+        brief: 'No longer tied to a Doc\'s job — this is the Codex system\'s dedicated discovery minigame, offered via a random "Codex — Found" prompt after routine node hacks while a codex thread is active (see useCodexFind.js). No stakes on a loss. Read scattered log files to find plaintext/Base64 pairs, match each to a cipher slot, and decode all 3 before Trace hits 100%. Watch for decoy pairs and corrupted checksums.',
         skin: {
             primaryBarLabel: 'TRACE',
             stabilityLabel:  'STABILITY',
-            objectiveText:   'Extract the packet. Avoid triggering live ICE.',
-            fileName:        'UD-V17.sys',
+            objectiveText:   'Extract the fragment before the trace resolves.',
+            fileName:        'UNTRACED_FRAGMENT.sys',
             hideBars:        false,
             timeLimit:       110, // cosmetic only — the component computes its own trace-duration budget (95-150s) internally
         },

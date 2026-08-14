@@ -1,0 +1,20 @@
+================================================================================
+S.T.I.T.C.H.E.R.S. CLEARINGHOUSE // SURGICAL HARDWARE MARKET
+[OFFLINE / ONION ROUTED NODE]
+================================================================================
+
+[UNVERIFIED INVENTORY LISTINGS]:
+--------------------------------------------------------------------------------
+LOT #9901: Aetheron Series-7 Sensory Bus (Grade-B / Used)
+- Source: Recovered / Serial Shaved
+- Status: Minor neural feedback recorded prior to extraction. 
+- Price: 0.4 ETH (No refunds once spliced)
+
+LOT #9905: Mil-Spec Ocular Neural Mesh
+- Source: Unknown
+- Status: UNTESTED. Requires Cyber Doc to clear residual memory cache.
+--------------------------------------------------------------------------------
+
+[SERIAL CHECKER]: Test if your hardware serial is flagged on Monolith/Providence 
+stolen asset registries before installation.
+[ INPUT SERIAL: _ _ _ _ _ _ _ _ _ _ ]

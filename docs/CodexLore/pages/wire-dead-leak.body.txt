@@ -1,0 +1,17 @@
+================================================================================
+WIRE-DEAD // PIRATE DATA DUMP & RAW LEAK FEED
+"NO EDITORS. NO CORPORATE FILTER. PURE SIGNAL."
+================================================================================
+
+[RAW DUMP #9942]: MONOLITH PATROL SCHEDULE (SPRAGUE CORRIDOR)
+Timestamp: 08.12.2026 - 03:14:00 PST
+Source: Intercepted Tactical Feed
+
+02:00 - Sector 1 Patrol (Downtown Core) -> CLEAR
+03:00 - Sector 2 Patrol (Sprague Ave / Valley Rail) -> DELAYED 20 MINS (Shift Change)
+04:00 - Sector 3 Patrol (Riverfront Park Vaults) -> HEAVY PATROL [ORDERS TO SHOOT ON SIGHT]
+
+[AUDIO LEAK]: Intercepted A.V.I.S.T.A. Engineer Communication
+Audio Waveform: [ ▶ PLAY AUDIO_LEAK_SUB09.WAV ]
+Transcript: "It's not a short circuit, Dave! The power line is broadcasting human voice data! 
+It's coming from inside the hydro pipe under the Monroe Street Bridge!"

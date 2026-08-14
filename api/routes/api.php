@@ -14,6 +14,7 @@ use App\Http\Controllers\WatcherController;
 use App\Http\Controllers\RigController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\CyberDocController;
+use App\Http\Controllers\CodexController;
 use App\Http\Controllers\DocChatController;
 use Illuminate\Support\Facades\Route;
 
@@ -208,6 +209,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/quests',                               [QuestController::class, 'index']);
     Route::get('/quests/archive',                       [QuestController::class, 'archive']);
     Route::post('/quests/stage/{stageId}/complete',     [QuestController::class, 'completeStage']);
+
+// ---------------------------------------------------------------------------
+// Codex — optional investigative side system. While a codex thread is
+// active, winning Archive Extraction anywhere has a chance to drop a key;
+// keys resolve at the Codex Archive to a document (real or red herring), or
+// "nothing left" once a thread's pool is fully explored. No stakes, no
+// requirement — see CodexService.
+// ---------------------------------------------------------------------------
+
+    Route::get('/codex/state',   [CodexController::class, 'state']);
+    // archive-win: 10/min — one per Archive Extraction win, same cadence as other win reports
+    Route::post('/codex/archive-win', [CodexController::class, 'archiveWin'])
+        ->middleware('throttle:10,1');
+    // resolve: 20/min — a player might clear several queued keys back to back
+    Route::post('/codex/resolve', [CodexController::class, 'resolve'])
+        ->middleware('throttle:20,1');
+    Route::get('/codex/page/{slug}', [CodexController::class, 'showPage']);
+    // solve: 20/min — retries are free and expected, still throttled against scripted brute-force
+    Route::post('/codex/page/{splicePageId}/solve', [CodexController::class, 'solvePage'])
+        ->middleware('throttle:20,1');
 
 // ---------------------------------------------------------------------------
 // Watcher

@@ -36,6 +36,8 @@ use Illuminate\Database\Seeder;
  *   reward_tech_points  — tech points granted on completion (0.0 = none)
  *   reward_node_access  — canvas_id of node to unlock (null = none)
  *   reward_lore_key     — string key unlocking a Splice page or archive entry (null = none)
+ *   codex_thread_key    — activates an optional Codex investigation thread on completion
+ *                         (null = none). See CodexService — not required progress.
  *   node_canvas_id      — map node the player must be at to trigger (null = no requirement)
  *   minigame_type       — null | 'data_grab' | 'system_override'
  */
@@ -208,6 +210,7 @@ class QuestStageSeeder extends Seeder
                 'reward_tech_points' => 1,
                 'reward_node_access' => null,
                 'reward_lore_key'    => null,
+                'codex_thread_key'   => 'monroe-street-signal',
                 'node_canvas_id'     => 'DT-hub',
                 'minigame_type'      => null,
             ],
@@ -643,6 +646,7 @@ class QuestStageSeeder extends Seeder
                         'reward_tech_points'  => $stageData['reward_tech_points'] ?? 0,
                         'reward_node_access'  => $stageData['reward_node_access'] ?? null,
                         'reward_lore_key'     => $stageData['reward_lore_key']    ?? null,
+                        'codex_thread_key'    => $stageData['codex_thread_key']   ?? null,
                         'node_canvas_id'      => $stageData['node_canvas_id']     ?? null,
                         'minigame_type'       => $stageData['minigame_type']      ?? null,
                     ],

@@ -15,6 +15,7 @@ class QuestService
     public function __construct(
         private readonly WatcherService  $watcherService,
         private readonly QuestLogService $questLogService,
+        private readonly CodexService    $codexService,
     ) {}
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -298,6 +299,10 @@ class QuestService
         // Deliver Watcher signal if one is attached to this stage
         $watcherDelivery = $this->watcherService->deliverForStage($player, $stage->id);
 
+        // Activate a codex thread if this stage grants one — separate
+        // optional side system, see CodexService.
+        $codexActivation = $this->codexService->activateThreadForStage($player, $stage);
+
         return [
             'stage_id'           => $stage->id,
             'already_complete'   => false,
@@ -308,6 +313,7 @@ class QuestService
             'referral_doc_id'    => $stage->referral_doc_id,
             'watcher_signal'     => $watcherDelivery !== null,
             'watcher_message_id' => $watcherDelivery?->watcher_message_id,
+            'codex_thread_activated' => $codexActivation?->thread_key,
         ];
     }
 

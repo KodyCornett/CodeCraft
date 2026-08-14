@@ -1,0 +1,21 @@
+================================================================================
+N.U.L.L. // NEURAL UNCOUPLING & LOGIC LIBERATION FRONT
+"THE FREQUENCY BELONGS TO EVERYONE"
+================================================================================
+
+  _  _ _  _ _    _    
+  |\ | |  | |   | |   
+  | \| |__| |___| |___
+
+[THREAD: Persistence Theory is Real — Proof inside A.V.I.S.T.A. Logs]
+Posted by: @ghost_signal_99 [08.10.2026]
+
+"If you splice into the 115kV tap under Monroe Street Bridge at 441.25MHz, 
+you don't just get power—you pick up audio echoes from the old 2024 Gonzaga 
+lab meltdown. The frequency is keeping the data alive inside the iron pipes. 
+Apex knows about it. Monolith knows about it. They're trying to burn out 
+the substation to erase it."
+
+[RECENT EXPLOIT DROPS]:
+- `itron_telemetry_dump.sh` (Exploits unencrypted port 8088)
+- `providence_firmware_bypass.bin` (Overrides Series-7 brick commands)

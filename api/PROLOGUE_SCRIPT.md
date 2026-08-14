@@ -1,5 +1,5 @@
 # CodeCraft — Prologue Script
-### "Background Process" — The Ghost-Kernel Arc
+### "Background Process" — The Watcher Arc
 
 *Retroactive title, named as a set alongside Chapter 1 ("Static") and Chapter 2
 ("Persistence") — the three track the story's own escalation: something quietly running
@@ -9,6 +9,20 @@ Prologue already ships without one.*
 
 All dialogue, narrator lines, player choices, and Watcher interrupts for the five-doc prologue chain.  
 **Edit this file and hand sections back to update the seeder.**
+
+**Lore status note (see `CHAPTER_1_STORY.md` "Open Work — Not Done Yet"):** every spoken
+line below is already voice-recorded and referenced by real audio files in
+`QuestStageSeeder.php` — 152 lines across all five quests, confirmed against
+`public/audio/Sound/`. That means the dialogue text below still reflects the old
+"Ghost-Kernel" framing (an artifact deliberately installed by an unknown third party) in
+places — most directly Knuckle's "someone wrote this specifically to sit inside a runner's
+rig" (Quest 1) and Veil's "the loop recognized it" (Quest 2) — which contradicts the
+current lore (`WORLD_PHILOSOPHY.md`): it's the Watcher himself, a trapped person reaching
+in, not an installed object. Fixing those lines for real means new lines, which means
+re-recording audio, so they're deliberately left untouched here. Only non-voiced text
+(titles, this note, the Watcher Interrupt framing description below) has been updated to
+current terminology. Treat a full quest-by-quest dialogue rewrite as its own scoped task,
+not a side effect of a documentation pass.
 
 ---
 
@@ -33,7 +47,7 @@ TUTORIAL → CortexInstall complete
 
 ## WATCHER INTERRUPTS
 
-These are the Ghost-Kernel's intrusion signals. They appear as corrupted system broadcasts — the player cannot ignore them or dismiss them. They are the only voice that threads all five quests together.
+These are the Watcher's intrusion signals. They appear as corrupted system broadcasts — the player cannot ignore them or dismiss them. They are the only voice that threads all five quests together.
 
 ---
 
@@ -815,7 +829,7 @@ These are the Ghost-Kernel's intrusion signals. They appear as corrupted system 
 
 ---
 
-## QUEST 5 — The Ghost-Kernel Calibration
+## QUEST 5 — The Volatile Calibration
 **Contractor:** Patch  
 **District:** North Spokane  
 **Target Node:** NS-v13  

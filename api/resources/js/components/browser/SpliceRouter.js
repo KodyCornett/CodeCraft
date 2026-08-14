@@ -38,6 +38,7 @@ import ArchivePage     from './pages/ArchivePage.vue';
 import BankPage      from './pages/BankPage.vue';
 import SystemUpdate    from './pages/SystemUpdate.vue';
 import DocDialoguePage from './pages/DocDialoguePage.vue';
+import Decrypter        from './pages/Decrypter.vue';
 import DevMinigameLauncher from './pages/DevMinigameLauncher.vue';
 import NotFound        from './pages/NotFound.vue';
 
@@ -68,6 +69,7 @@ const ROUTES = [
     { url: 'splice://sys.local/tutorial',         title: 'GHOST_PROTOCOL_0',   component: GhostProtocol0  },
     { url: 'splice://sys.local/terminal',         title: 'Mission Log',        component: QuestLog        },
     { url: 'splice://sys.local/archive',          title: 'Mission Archive',    component: ArchivePage     },
+    { url: 'splice://sys.local/codex',            title: 'Codex Archive',      component: Decrypter      },
     { url: 'splice://sys.local/personas',         title: 'Runner Personas',    component: PersonasPage    },
     // Hidden — not linked anywhere. Discoverable only via the Watcher glitch sequence.
     { url: 'splice://watcher',                   title: '[ENCRYPTED_CHANNEL]', component: WatcherChannel  },
@@ -125,6 +127,7 @@ export const SPLICE = {
     TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app
     DEV_MINIGAMES:     'splice://dev/minigames',        // DEV ONLY — remove before release— Mission Log / Quest Log
     ARCHIVE:           'splice://sys.local/archive',   // Chronological story archive
+    CODEX:             'splice://sys.local/codex',     // Codex Archive — key resolution & history
     PERSONAS:          'splice://sys.local/personas',  // Runner Personas reference
     INVENTORY:    'splice://sys.local/inventory',
     BANK:         'splice://bank.ch/hct',

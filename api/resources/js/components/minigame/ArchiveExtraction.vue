@@ -149,6 +149,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import QuestMinigameChrome from './chrome/QuestMinigameChrome.vue';
+import { useCodex } from '@/composables/useCodex.js';
 
 /* ════════════════════════════════════════════════════════════════════════
    ARCHIVE EXTRACTION — deduction game.
@@ -392,6 +393,29 @@ const gameResult  = ref(null);                // null | 'success' | 'fail'
 const failReason  = ref('');
 const glitchPulse = ref(false);
 
+// ── Codex integration ──────────────────────────────────────────────────────────
+// A win here is reported to the Codex Archive regardless of how this minigame
+// was launched (quest delivery or free-roam node hacking) — the drop roll only
+// ever does anything if the player has an active codex thread, so this is a
+// harmless no-op the rest of the time. See CodexService::grantKeyFromWin().
+const { reportArchiveWin, fetchState: fetchCodexState } = useCodex();
+const codexKeyDropped = ref(null); // null = unknown/not applicable, true/false = resolved
+
+async function reportCodexWin() {
+    try {
+        const res = await reportArchiveWin();
+        codexKeyDropped.value = res?.dropped ?? null;
+        // Refresh the shared codex state so the new key shows up in the
+        // queue immediately, wherever it's read from — not just next time
+        // Decrypter.vue happens to mount.
+        if (codexKeyDropped.value) await fetchCodexState();
+    } catch {
+        // No active codex thread, or the request failed — both are expected,
+        // silent no-ops from the player's perspective. Nothing to report here.
+        codexKeyDropped.value = null;
+    }
+}
+
 let tickHandle = null;
 const slotInputEls = []; // DOM refs, keyed by slot index — not reactive state
 
@@ -595,8 +619,12 @@ function endGame(result, reason) {
     gameResult.value = result;
     failReason.value = reason ?? '';
     if (tickHandle) clearInterval(tickHandle);
-    if (result === 'success') scheduleTimeout(() => emit('complete'), 2200);
-    else scheduleTimeout(() => emit('fail'), 2200);
+    if (result === 'success') {
+        reportCodexWin();
+        scheduleTimeout(() => emit('complete'), 2200);
+    } else {
+        scheduleTimeout(() => emit('fail'), 2200);
+    }
 }
 
 // ── Chrome passthrough ─────────────────────────────────────────────────────────
@@ -605,7 +633,9 @@ function endGame(result, reason) {
 // CipherLock and ToxicSoak use for their own custom layouts).
 
 const chrome = computed(() => ({
-    skin:            props.skin,
+    skin: codexKeyDropped.value
+        ? { ...props.skin, successText: `${props.skin.successText} // CODEX KEY ACQUIRED — resolve it at the Codex Archive.` }
+        : props.skin,
     timeLeft:        estimatedTimeToLockdown.value,
     primaryProgress: 0,
     stability:       1,

@@ -74,6 +74,13 @@
                     @done="showOpenSeason = false"
                 />
 
+                <!-- Codex find prompt — rolled by useHackFlow after a successful routine hack -->
+                <CodexFindPopup
+                    :visible="codexFindPending"
+                    @play="onCodexFindPlay"
+                    @pass="onCodexFindPass"
+                />
+
                 <!-- Map loading indicator -->
                 <div v-if="mapLoading" class="map-loading">// LOADING NETWORK DATA...</div>
 
@@ -301,6 +308,7 @@ import WorldTone              from '@/components/shared/WorldTone.vue';
 import WatcherSignal          from '@/components/shared/WatcherSignal.vue';
 import DocNotification        from '@/components/shared/DocNotification.vue';
 import OpenSeasonNotification from '@/components/shared/OpenSeasonNotification.vue';
+import CodexFindPopup         from '@/components/shared/CodexFindPopup.vue';
 import CommandHitNotification from '@/components/shared/CommandHitNotification.vue';
 import IdleWarning            from '@/components/shared/IdleWarning.vue';
 import ObjectiveTracker       from '@/components/shared/ObjectiveTracker.vue';
@@ -359,6 +367,8 @@ import { useFieldComms }       from '@/composables/useFieldComms.js';
 import { useBountyEscalation }  from '@/composables/useBountyEscalation.js';
 import { useCommandEffects }    from '@/composables/useCommandEffects.js';
 import { useHackFlow }          from '@/composables/useHackFlow.js';
+import { useCodex }             from '@/composables/useCodex.js';
+import { useCodexFind }         from '@/composables/useCodexFind.js';
 import { usePvpFlow }           from '@/composables/usePvpFlow.js';
 import { useResourceReplenish } from '@/composables/useResourceReplenish.js';
 import { useBrowserNavigation } from '@/composables/useBrowserNavigation.js';
@@ -550,6 +560,10 @@ const {
     applyCriticalFailure,
 });
 
+// ── Codex find prompt — rolled by useHackFlow on a successful routine hack ─────
+const { pendingFind: codexFindPending, accept: onCodexFindPlay, decline: onCodexFindPass } = useCodexFind();
+const { fetchState: fetchCodexState } = useCodex();
+
 // ── PvP flow ──────────────────────────────────────────────────────────────────
 const {
     pvpResult, awaitingChallenge,
@@ -573,6 +587,10 @@ async function onQuestMinigameComplete() {
     if (!activeMinigame.value) return;
     const { stageId } = activeMinigame.value;
     clearMinigame();
+    // Freeform launches (e.g. a Codex find, dev launcher) carry no stageId —
+    // there's no quest stage to complete, so there's nothing further to do.
+    // ArchiveExtraction.vue already reports its own win to the Codex system.
+    if (!stageId) return;
     try {
         await completeQuestStage(stageId);
         await Promise.all([fetchQuestLog(), fetchArchive()]);
@@ -1131,6 +1149,7 @@ onMounted(async () => {
         await Promise.all([
             fetchCommands(), fetchInventory(), fetchMyTraps(),
             fetchWatcherUnread(), fetchQuestLog(), fetchArchive(),
+            fetchCodexState(),
             tutorial.hydrate(),
         ]);
         // Re-fetch quest log after tutorial.hydrate() — ensures Knuckle's arc is present

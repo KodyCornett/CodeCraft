@@ -103,4 +103,19 @@ class Player extends Model
     {
         return $this->hasMany(PlayerStageProgress::class);
     }
+
+    public function documentKeys(): HasMany
+    {
+        return $this->hasMany(PlayerDocumentKey::class);
+    }
+
+    public function spliceUnlocks(): HasMany
+    {
+        return $this->hasMany(PlayerSpliceUnlock::class);
+    }
+
+    public function codexActivations(): HasMany
+    {
+        return $this->hasMany(PlayerCodexActivation::class);
+    }
 }

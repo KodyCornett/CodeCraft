@@ -26,6 +26,8 @@ class QuestStage extends Model
         'reward_command_id',
         'reward_node_access',
         'reward_lore_key',
+        // Codex
+        'codex_thread_key',
         // Triggers
         'node_canvas_id',
         'minigame_type',
