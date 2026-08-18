@@ -81,6 +81,7 @@
             <!-- History / tracking -->
             <div class="dcx-section">
                 <div class="dcx-section-title">HISTORY</div>
+                <div class="dcx-section-hint">[ SELECT AN ENTRY TO NAVIGATE TO THE REAL PAGE ]</div>
                 <div v-if="!history.length" class="dcx-empty">
                     [ NOTHING DECRYPTED YET ]
                 </div>
@@ -89,7 +90,6 @@
                         v-for="entry in history"
                         :key="entry.id"
                         class="dcx-history-row"
-                        :class="{ 'dcx-history-row--active': entry.slug === activeSlug }"
                         @click="openPage(entry.slug)"
                     >
                         <span class="dcx-history-type" :class="`dcx-history-type--${entry.type}`">
@@ -102,83 +102,9 @@
                         >
                             {{ entry.status === 'completed' ? '✓ COMPLETED' : '○ UNRESOLVED' }}
                         </span>
+                        <span class="dcx-history-open">OPEN →</span>
                     </button>
                 </div>
-            </div>
-
-            <div class="dcx-rule" />
-
-            <!-- Reader -->
-            <div class="dcx-section dcx-reader">
-                <div class="dcx-section-title">READER</div>
-
-                <div v-if="pageError" class="dcx-error">[ ERROR ] {{ pageError }}</div>
-                <div v-else-if="!activePage" class="dcx-empty">
-                    [ SELECT AN ENTRY FROM HISTORY TO READ IT ]
-                </div>
-                <template v-else>
-                    <div class="dcx-page-title">{{ activePage.title }}</div>
-                    <div class="dcx-page-body">{{ activePage.body }}</div>
-
-                    <!-- Codex login widget -->
-                    <div v-if="activePage.type === 'codex'" class="dcx-login">
-                        <div class="dcx-login-header">
-                            [ RESTRICTED SECTION —
-                            {{ activePage.solved ? 'ACCESS GRANTED' : 'CREDENTIALS REQUIRED' }} ]
-                        </div>
-                        <div class="dcx-login-user">
-                            USER: {{ activePage.login_username || 'unknown' }}
-                        </div>
-
-                        <template v-if="!activePage.solved">
-                            <div
-                                v-for="label in activePage.credential_labels"
-                                :key="label"
-                                class="dcx-login-row"
-                            >
-                                <input
-                                    v-model="answerInputs[label]"
-                                    class="dcx-login-input"
-                                    type="text"
-                                    :placeholder="label.toUpperCase().replace(/_/g, ' ')"
-                                    @keydown.enter="onSolve"
-                                />
-                            </div>
-                            <button class="dcx-login-btn" :disabled="solving" @click="onSolve">
-                                {{ solving ? '...' : 'LOG IN' }}
-                            </button>
-                            <div v-if="solveMsg" class="dcx-solve-msg" :class="solveMsgClass">
-                                {{ solveMsg }}
-                            </div>
-
-                            <div v-if="activePage.leads?.length" class="dcx-leads">
-                                <div class="dcx-leads-label">REFERENCED LEADS —</div>
-                                <button
-                                    v-for="lead in activePage.leads"
-                                    :key="lead.slug"
-                                    class="dcx-lead-btn"
-                                    @click="openPage(lead.slug)"
-                                >
-                                    → {{ lead.title }}
-                                </button>
-                            </div>
-                        </template>
-
-                        <div v-else class="dcx-solved-banner">
-                            Access granted.
-                            <span v-if="lastReward">
-                                +{{ lastReward.reward_creds || 0 }}₡
-                                <span v-if="lastReward.reward_tech_points">
-                                    / +{{ lastReward.reward_tech_points }} tech
-                                </span>
-                            </span>
-                        </div>
-
-                        <div v-if="activePage.solved && activePage.unlocked_body" class="dcx-unlocked-body">
-                            {{ activePage.unlocked_body }}
-                        </div>
-                    </div>
-                </template>
             </div>
         </template>
 
@@ -186,19 +112,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, inject } from 'vue';
 import { useCodex } from '../../../composables/useCodex.js';
+import { routeForSlug } from '../../../composables/codexPageRoutes.js';
 
 const {
     unresolvedKeys, history, loading, error,
-    fetchState, resolveKey, fetchPage, solvePage,
+    fetchState, resolveKey,
 } = useCodex();
 
-// Note: ArchiveExtraction.vue reports wins via useCodex().reportArchiveWin()
-// (fire-and-forget — a miss or "no active thread" is a normal, silent
-// no-op there). Still open: no "codex active" prompt at nodes yet, and
-// Archive Extraction is still only launchable through the quest-minigame
-// pipeline rather than freely at any node — separate follow-up work.
+// Every unlocked document now lives on its own bespoke SPLICE page (see
+// codexPageRoutes.js) rather than being rendered inline here — Decrypter.vue
+// is purely the key-resolve + tracking hub. ArchiveExtraction.vue reports
+// wins via useCodex().reportArchiveWin() (fire-and-forget — a miss or "no
+// active thread" is a normal, silent no-op there).
+const spliceNavigate = inject('spliceNavigate', () => {});
 
 const resolvingId     = ref(null);
 const lastResolveMsg   = ref('');
@@ -249,16 +177,6 @@ function runDecryptAnimation(targetText) {
     });
 }
 
-const activeSlug  = ref(null);
-const activePage  = ref(null);
-const pageError    = ref(null);
-
-const answerInputs   = ref({}); // keyed by credential label
-const solving         = ref(false);
-const solveMsg        = ref('');
-const solveMsgClass   = ref('');
-const lastReward      = ref(null);
-
 function fmtTime(iso) {
     if (!iso) return '';
     return new Date(iso).toLocaleString('en-US', { hour12: false, dateStyle: 'short', timeStyle: 'short' });
@@ -306,52 +224,9 @@ async function onResolve(keyId) {
     }
 }
 
-async function openPage(slug) {
-    activeSlug.value  = slug;
-    pageError.value    = null;
-    answerInputs.value = {};
-    solveMsg.value      = '';
-    lastReward.value    = null;
-    try {
-        activePage.value = await fetchPage(slug);
-        for (const label of activePage.value?.credential_labels ?? []) {
-            answerInputs.value[label] = '';
-        }
-    } catch (e) {
-        activePage.value = null;
-        pageError.value   = e?.response?.data?.message ?? e.message ?? 'Page unavailable';
-    }
-}
-
-async function onSolve() {
-    if (!activePage.value) return;
-    const labels = activePage.value.credential_labels ?? [];
-    if (labels.some((label) => !answerInputs.value[label]?.trim())) return;
-
-    solving.value = true;
-    solveMsg.value = '';
-    try {
-        const result = await solvePage(activePage.value.id, { ...answerInputs.value });
-        if (result.solved) {
-            solveMsg.value      = '[ MATCH — ACCESS GRANTED ]';
-            solveMsgClass.value = 'dcx-solve-msg--hit';
-            lastReward.value     = result;
-            activePage.value     = {
-                ...activePage.value,
-                solved: true,
-                unlocked_body: result.unlocked_body ?? activePage.value.unlocked_body,
-            };
-            await fetchState();
-        } else {
-            solveMsg.value      = '[ ACCESS DENIED — NO MATCH ]';
-            solveMsgClass.value = 'dcx-solve-msg--miss';
-        }
-    } catch (e) {
-        solveMsg.value      = `[ ERROR ] ${e?.response?.data?.message ?? e.message}`;
-        solveMsgClass.value = 'dcx-solve-msg--miss';
-    } finally {
-        solving.value = false;
-    }
+function openPage(slug) {
+    const target = routeForSlug(slug);
+    if (target) spliceNavigate(target);
 }
 
 onMounted(refresh);
@@ -485,6 +360,8 @@ onMounted(refresh);
 .dcx-resolve-banner--hit   { color: #00ff9d; }
 .dcx-resolve-banner--empty { color: #6a7a72; }
 
+.dcx-section-hint { font-size: 8px; color: #3a5a4a; letter-spacing: 0.05em; margin-top: -2px; }
+
 /* History */
 .dcx-history-list { display: flex; flex-direction: column; gap: 2px; }
 .dcx-history-row {
@@ -493,8 +370,7 @@ onMounted(refresh);
     background: none; cursor: pointer; text-align: left;
     font-family: inherit; width: 100%;
 }
-.dcx-history-row:hover { background: rgba(0,255,100,0.03); }
-.dcx-history-row--active { border-left-color: #00ff9d; background: rgba(0,255,100,0.05); }
+.dcx-history-row:hover { background: rgba(0,255,100,0.03); border-left-color: #00ff9d; }
 
 .dcx-history-type {
     font-size: 8px; font-weight: 700; letter-spacing: 0.1em;
@@ -507,48 +383,8 @@ onMounted(refresh);
 .dcx-history-status { font-size: 8px; letter-spacing: 0.05em; flex-shrink: 0; }
 .dcx-history-status--completed  { color: #00ff9d; }
 .dcx-history-status--unresolved { color: #d4a72c; }
-
-/* Reader */
-.dcx-reader { padding-bottom: 10px; }
-.dcx-page-title { font-size: 12px; color: #00ff9d; font-weight: 700; margin-bottom: 4px; }
-.dcx-page-body {
-    font-size: 10px; color: #8ab0a0; line-height: 1.7; white-space: pre-wrap;
-    padding: 8px 10px; border-left: 1px solid rgba(0,255,100,0.08); margin-bottom: 8px;
+.dcx-history-open {
+    font-size: 8px; color: #4a7a6a; letter-spacing: 0.05em; flex-shrink: 0;
 }
-
-.dcx-login { border: 1px solid #3a2a10; background: rgba(212,167,44,0.03); padding: 10px; }
-.dcx-login-header { font-size: 9px; color: #d4a72c; letter-spacing: 0.1em; margin-bottom: 4px; }
-.dcx-login-user   { font-size: 10px; color: #8a9a92; margin-bottom: 8px; }
-.dcx-login-row    { display: flex; gap: 6px; margin-bottom: 6px; }
-.dcx-login-input {
-    flex: 1; background: rgba(0,0,0,0.3); border: 1px solid #3a2a10; color: #d4a72c;
-    font-family: inherit; font-size: 10px; padding: 5px 8px;
-}
-.dcx-login-input:focus { outline: none; border-color: #d4a72c; }
-.dcx-login-btn {
-    background: none; border: 1px solid #5a4a1e; color: #d4a72c;
-    font-family: inherit; font-size: 9px; padding: 5px 12px; cursor: pointer; letter-spacing: 0.1em;
-}
-.dcx-login-btn:hover:not(:disabled) { border-color: #d4a72c; background: rgba(212,167,44,0.08); }
-.dcx-login-btn:disabled { opacity: 0.4; cursor: default; }
-
-.dcx-solve-msg { font-size: 9px; margin-top: 6px; letter-spacing: 0.05em; }
-.dcx-solve-msg--hit  { color: #00ff9d; }
-.dcx-solve-msg--miss { color: #ff6666; }
-
-.dcx-solved-banner { font-size: 10px; color: #00ff9d; letter-spacing: 0.05em; }
-
-.dcx-unlocked-body {
-    margin-top: 10px; padding: 8px 10px; border-left: 2px solid #00ff9d;
-    background: rgba(0,255,157,0.04); font-size: 10px; line-height: 1.6;
-    color: #d6e8e0; white-space: pre-wrap;
-}
-
-.dcx-leads { margin-top: 10px; display: flex; flex-direction: column; gap: 3px; }
-.dcx-leads-label { font-size: 8px; color: #6a7a72; letter-spacing: 0.1em; margin-bottom: 2px; }
-.dcx-lead-btn {
-    background: none; border: none; color: #7ab8a0; text-align: left;
-    font-family: inherit; font-size: 10px; padding: 3px 0; cursor: pointer;
-}
-.dcx-lead-btn:hover { color: #00ff9d; }
+.dcx-history-row:hover .dcx-history-open { color: #00ff9d; }
 </style>

@@ -67,6 +67,25 @@ class QuestController extends Controller
     }
 
     /**
+     * POST /api/quests/arc/{arcId}/watcher-signal-sent
+     *
+     * Marks that the client has displayed the Watcher interrupt cinematic
+     * tied to this arc's completion. Fire-and-forget from the frontend at
+     * the moment the interrupt actually shows. Idempotent.
+     */
+    public function markWatcherSignalSent(Request $request, string $arcId): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $this->questService->markWatcherSignalSent($player, $arcId);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * GET /api/quests/archive
      *
      * Returns the full chronological story log for the player.

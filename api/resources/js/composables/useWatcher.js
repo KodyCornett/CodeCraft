@@ -1,79 +1,28 @@
 /**
  * useWatcher
  *
- * Manages the Watcher signal interrupt system.
- *
- * On boot, polls GET /api/watcher/unread.
- * When unread signals exist, fires triggerSignal() which:
- *   1. Sets the active signal for WatcherSignal.vue to render
- *   2. The component handles the glitch → message → collapse sequence
- *   3. After the sequence, hasUnread stays true until the player
- *      opens the Watcher channel page (which calls markAllRead)
+ * Manages the Watcher signal interrupt cinematic — the corrupted broadcast
+ * overlay (WatcherSignal.vue) that plays the tutorial/prologue intrusion
+ * signals. Story-triggered only: callers push a signal object directly via
+ * triggerSignal(), there is no server-backed message feed or archive here.
+ * (An earlier DB-backed archive/unread system was removed — it was never
+ * populated by any content and had no reachable UI. See WATCHER_TRANSITIONS
+ * in constants/watcherTransitions.js for how the prologue interrupts are
+ * triggered and made reload-safe.)
  *
  * External API:
- *   triggerSignal(signal)  — fire the interrupt manually (called by WatcherSignal.vue after fetch)
- *   fetchUnread()          — poll for pending signals
- *   markAllRead()          — called when player opens the Watcher channel
+ *   triggerSignal(signal)  — queue a signal for display: { id, signal_text }
  *   activeSignal           — the signal currently being displayed (null = none)
- *   hasUnread              — true if any unread signals exist (drives HUD glitch indicator)
- *   allSignals             — full signal log for the Watcher channel page
- *   fetchAll()             — fetch the full log
+ *   onSignalComplete()     — called by the interrupt component when its
+ *                            glitch → message → collapse sequence finishes;
+ *                            advances to the next queued signal, if any
  */
 
 import { ref, readonly } from 'vue';
-import axios from 'axios';
 
 export function useWatcher() {
     const activeSignal = ref(null);   // signal currently showing in WatcherSignal.vue
-    const hasUnread    = ref(false);
-    const allSignals   = ref([]);
     const queue        = ref([]);     // signals waiting to display (if multiple pending)
-
-    // ── Fetch ─────────────────────────────────────────────────────────────────
-
-    async function fetchUnread() {
-        try {
-            const res = await axios.get('/api/watcher/unread');
-            hasUnread.value = res.data.has_unread ?? false;
-            const signals   = res.data.signals    ?? [];
-
-            // Queue any signals not already queued
-            signals.forEach(sig => {
-                if (!queue.value.find(q => q.id === sig.id)) {
-                    queue.value.push(sig);
-                }
-            });
-
-            _processQueue();
-        } catch (e) {
-            console.warn('[WATCHER] fetchUnread failed:', e?.message);
-        }
-    }
-
-    async function fetchAll() {
-        try {
-            const res  = await axios.get('/api/watcher/all');
-            allSignals.value = res.data.signals ?? [];
-        } catch (e) {
-            console.warn('[WATCHER] fetchAll failed:', e?.message);
-        }
-    }
-
-    async function markAllRead() {
-        try {
-            await axios.post('/api/watcher/read-all');
-            hasUnread.value = false;
-            // Update local read state
-            allSignals.value = allSignals.value.map(s => ({
-                ...s,
-                read_at: s.read_at ?? new Date().toISOString(),
-            }));
-        } catch (e) {
-            console.warn('[WATCHER] markAllRead failed:', e?.message);
-        }
-    }
-
-    // ── Signal display ────────────────────────────────────────────────────────
 
     /**
      * Called by the interrupt component when it has finished its sequence.
@@ -106,12 +55,7 @@ export function useWatcher() {
     }
 
     return {
-        activeSignal:    readonly(activeSignal),
-        hasUnread:       readonly(hasUnread),
-        allSignals:      readonly(allSignals),
-        fetchUnread,
-        fetchAll,
-        markAllRead,
+        activeSignal: readonly(activeSignal),
         triggerSignal,
         onSignalComplete,
     };

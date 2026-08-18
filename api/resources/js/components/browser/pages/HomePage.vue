@@ -65,6 +65,7 @@
 <script setup>
 import { ref, inject, onMounted, onUnmounted } from 'vue';
 import { SPLICE } from '@/components/browser/SpliceRouter.js';
+import { findCompanyByQuery } from '@/composables/codexPageRoutes.js';
 
 defineProps({ url: { type: String, default: '' } });
 
@@ -86,9 +87,16 @@ onUnmounted(() => clearInterval(timer));
 function focusSearch() { searchInput.value?.focus(); }
 
 function onGo() {
-    let url = query.value.trim();
-    if (!url) return;
-    if (!url.includes('://')) url = 'splice://' + url;
+    const raw = query.value.trim();
+    if (!raw) return;
+
+    let url = raw;
+    if (!url.includes('://')) {
+        // Not a literal address — try resolving it as a company name first
+        // (e.g. "avista", "the valley voice") before falling back to
+        // treating it as a bare domain.
+        url = findCompanyByQuery(raw) ?? ('splice://' + raw);
+    }
     spliceNavigate(url);
     query.value = '';
 }

@@ -13,7 +13,6 @@ use Illuminate\Support\Carbon;
 class QuestService
 {
     public function __construct(
-        private readonly WatcherService  $watcherService,
         private readonly QuestLogService $questLogService,
         private readonly CodexService    $codexService,
     ) {}
@@ -107,13 +106,14 @@ class QuestService
                 }
 
                 $docArcs[] = [
-                    'id'             => $arc->id,
-                    'sequence_order' => $arc->sequence_order,
-                    'title'          => $arc->title,
-                    'status'         => $arcStatus,
-                    'unlocked_at'    => $arcProg?->unlocked_at,
-                    'completed_at'   => $arcProg?->completed_at,
-                    'stages'         => $stages,
+                    'id'                    => $arc->id,
+                    'sequence_order'        => $arc->sequence_order,
+                    'title'                 => $arc->title,
+                    'status'                => $arcStatus,
+                    'unlocked_at'           => $arcProg?->unlocked_at,
+                    'completed_at'          => $arcProg?->completed_at,
+                    'watcher_signal_sent'   => $arcProg?->watcher_signal_sent_at !== null,
+                    'stages'                => $stages,
                 ];
             }
 
@@ -296,9 +296,6 @@ class QuestService
             );
         }
 
-        // Deliver Watcher signal if one is attached to this stage
-        $watcherDelivery = $this->watcherService->deliverForStage($player, $stage->id);
-
         // Activate a codex thread if this stage grants one — separate
         // optional side system, see CodexService.
         $codexActivation = $this->codexService->activateThreadForStage($player, $stage);
@@ -311,8 +308,6 @@ class QuestService
             'arcs_unlocked'      => $arcsUnlocked,
             'referral_issued'    => $stage->referral_doc_id !== null,
             'referral_doc_id'    => $stage->referral_doc_id,
-            'watcher_signal'     => $watcherDelivery !== null,
-            'watcher_message_id' => $watcherDelivery?->watcher_message_id,
             'codex_thread_activated' => $codexActivation?->thread_key,
         ];
     }
@@ -366,6 +361,24 @@ class QuestService
         );
 
         return [$nextArc->id];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Watcher interrupt delivery
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Record that the client has displayed the Watcher interrupt cinematic
+     * tied to this arc's completion (see WATCHER_TRANSITIONS on the frontend).
+     * Idempotent. Re-checked on every quest-log load so a reload between arc
+     * completion and leaving the hub node can't drop the interrupt.
+     */
+    public function markWatcherSignalSent(Player $player, string $arcId): void
+    {
+        PlayerArcProgress::where('player_id', $player->id)
+            ->where('quest_arc_id', $arcId)
+            ->whereNull('watcher_signal_sent_at')
+            ->update(['watcher_signal_sent_at' => Carbon::now()]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

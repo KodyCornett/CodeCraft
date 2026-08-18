@@ -122,7 +122,6 @@ onUnmounted(() => fadeInAfterDialogue());
 
 // ── Navigation + callbacks ────────────────────────────────────────────────────
 const spliceNavigate          = inject('spliceNavigate',          () => {});
-const onDocDialogueComplete   = inject('onDocDialogueComplete',   () => {});
 
 // ── DialoguePage ref — used to stop audio and read completion state ───────────
 const dialoguePageRef = ref(null);
@@ -132,16 +131,13 @@ const dialoguePageRef = ref(null);
 const stageCompleted = ref(false);
 
 // ── Core stage-complete API call — fire-and-forget, no loading state ───────────
+// Watcher transition arming is handled in Game.vue by watching questDocs
+// directly (server-derived, reload-safe) — this just completes the stage.
 async function _doCompleteStage() {
     if (!activeStage.value || !questLog) return;
     try {
         const completeStage = questLog.completeStage ?? questLog.complete;
-        const stageResult   = completeStage ? await completeStage(activeStage.value.id) : null;
-        // Arm the Watcher transition when the arc just ended — detected by the server
-        // returning next_stage_id: null (no further stage exists in this arc).
-        if (!stageResult?.next_stage_id) {
-            onDocDialogueComplete(docHandle.value);
-        }
+        if (completeStage) await completeStage(activeStage.value.id);
     } catch (e) {
         console.warn('[DocDialogue] completeStage failed:', e.message ?? e);
     }

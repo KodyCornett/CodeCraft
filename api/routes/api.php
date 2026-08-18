@@ -10,7 +10,6 @@ use App\Http\Controllers\NodeController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\QuestController;
-use App\Http\Controllers\WatcherController;
 use App\Http\Controllers\RigController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\CyberDocController;
@@ -209,6 +208,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/quests',                               [QuestController::class, 'index']);
     Route::get('/quests/archive',                       [QuestController::class, 'archive']);
     Route::post('/quests/stage/{stageId}/complete',     [QuestController::class, 'completeStage']);
+    Route::post('/quests/arc/{arcId}/watcher-signal-sent', [QuestController::class, 'markWatcherSignalSent']);
 
 // ---------------------------------------------------------------------------
 // Codex — optional investigative side system. While a codex thread is
@@ -229,13 +229,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // solve: 20/min — retries are free and expected, still throttled against scripted brute-force
     Route::post('/codex/page/{splicePageId}/solve', [CodexController::class, 'solvePage'])
         ->middleware('throttle:20,1');
-
-// ---------------------------------------------------------------------------
-// Watcher
-// ---------------------------------------------------------------------------
-
-    Route::get('/watcher/unread',   [WatcherController::class, 'unread']);
-    Route::get('/watcher/all',      [WatcherController::class, 'all']);
-    Route::post('/watcher/read-all',[WatcherController::class, 'readAll']);
 
 });

@@ -242,6 +242,30 @@
                 </g>
             </g>
 
+            <!-- Tracked markers — player-pinned via the Splice Site map search -->
+            <g class="tracked-marker-layer" pointer-events="none">
+                <g
+                    v-for="marker in resolvedTrackedMarkers"
+                    :key="'track-' + marker.canvasId"
+                    class="tracked-marker"
+                >
+                    <circle
+                        :cx="marker.x"
+                        :cy="marker.y"
+                        r="10"
+                        class="tm-pulse"
+                        :style="{ stroke: marker.color }"
+                    />
+                    <circle
+                        :cx="marker.x"
+                        :cy="marker.y"
+                        r="3.5"
+                        class="tm-dot"
+                        :style="{ fill: marker.color, stroke: marker.color }"
+                    />
+                </g>
+            </g>
+
             <!-- Player marker — pulsing ring above everything else -->
             <g v-if="playerToken" class="player-marker">
                 <circle
@@ -352,6 +376,11 @@ const props = defineProps({
     traps:         { type: Array,   default: () => [] },
     // questMarkers: [{ canvasId: 'BA-hub', color: '#FF6B35', docName: 'Knuckle' }, ...]
     questMarkers:  { type: Array,   default: () => [] },
+    // trackedMarkers: [{ canvasId: 'DT-v1', color: '#00E5FF', label: 'AVISTA_CORP_NET' }, ...]
+    // Player-pinned via the Splice Site map search (useNodeTracking.js) —
+    // rendered in its own layer, deliberately styled apart from quest
+    // markers so a self-found lead never reads as a quest objective.
+    trackedMarkers: { type: Array,  default: () => [] },
     currentNodeId: { type: String,  default: null     },
     playerUplink:  { type: Number,  default: 3        },
     playerSs:      { type: Number,  default: 100      },
@@ -1237,6 +1266,20 @@ const resolvedQuestMarkers = computed(() =>
         .filter(Boolean)
 );
 
+// ── Tracked marker positions ────────────────────────────────────────────────
+// Same resolution pattern as quest markers, kept as a separate computed/prop
+// so the two layers can evolve independently — this one has no doc/color
+// logic tied to it, just whatever the player pinned from the map search.
+const resolvedTrackedMarkers = computed(() =>
+    props.trackedMarkers
+        .map(m => {
+            const node = ALL_NODES.get(m.canvasId);
+            if (!node) return null;
+            return { ...m, x: node.x, y: node.y };
+        })
+        .filter(Boolean)
+);
+
 // ── DB node lookup ────────────────────────────────────────────────────────────
 // Build a canvasId → DB node map from the nodes prop for zone_type lookups.
 const dbNodeMap = computed(() => {
@@ -1874,5 +1917,20 @@ defineExpose({
 @keyframes qm-diamond-pulse {
     0%, 100% { opacity: 0.85; }
     50%       { opacity: 0.5; }
+}
+
+/* ── Tracked markers (Splice Site pins) ──────────────────────────────────── */
+.tm-pulse {
+    fill: none;
+    stroke-width: 1.5;
+    opacity: 0.85;
+    animation: tm-pulse 2s ease-in-out infinite;
+}
+@keyframes tm-pulse {
+    0%, 100% { r: 8;  opacity: 0.9; }
+    50%       { r: 13; opacity: 0.3; }
+}
+.tm-dot {
+    opacity: 0.95;
 }
 </style>

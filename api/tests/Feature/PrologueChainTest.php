@@ -493,6 +493,128 @@ class PrologueChainTest extends TestCase
     }
 
     // =========================================================================
+    // field_comms — regression coverage for the seeder bug where
+    // QuestStageSeeder::run() dropped the 'field_comms' key from the
+    // updateOrCreate() payload, so it never reached the DB despite being
+    // defined in the STAGES array. Mirrors the existing dialogue tests above.
+    // =========================================================================
+
+    public function test_stage_2_field_comms_persist_through_seeder(): void
+    {
+        foreach (self::CHAIN as $canvasId => $handle) {
+            $stage2 = $this->stages($canvasId)[1];
+            $this->assertNotNull($stage2->field_comms, "{$handle} stage 2 must have field_comms persisted by the seeder");
+            $this->assertIsArray($stage2->field_comms, 'field_comms must decode to an array via the QuestStage array cast');
+            $this->assertNotEmpty($stage2->field_comms, "{$handle} stage 2 field_comms must not be an empty array");
+        }
+    }
+
+    public function test_active_stage_2_exposes_field_comms_via_quest_log(): void
+    {
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/tutorial/complete');
+        $stages = $this->stages('BA-hub');
+        $this->completeStage($stages[0]->id); // stage 2 now active
+
+        $entry  = $this->questDoc('BA-hub');
+        $stage2 = $entry['arcs'][0]['stages'][1];
+
+        $this->assertEquals('active', $stage2['status']);
+        $this->assertNotNull($stage2['field_comms'], 'Knuckle stage 2 must expose field_comms once active');
+        $this->assertIsArray($stage2['field_comms'], 'field_comms must be a decoded array, not a raw JSON string');
+        $this->assertNotEmpty($stage2['field_comms']);
+    }
+
+    public function test_locked_stage_2_field_comms_not_leaked(): void
+    {
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/tutorial/complete');
+        // Stage 1 not completed yet — stage 2 is still locked.
+        $entry  = $this->questDoc('BA-hub');
+        $stage2 = $entry['arcs'][0]['stages'][1];
+
+        $this->assertEquals('locked', $stage2['status']);
+        $this->assertNull($stage2['field_comms'], 'Locked stage must not leak field_comms to the client');
+    }
+
+    // =========================================================================
+    // watcher_signal_sent — reload-durability fix for the Watcher interrupt
+    // cinematic. The client (Game.vue) re-derives whether a transition is
+    // pending from this server-persisted flag instead of a one-shot in-memory
+    // ref, so a reload between arc completion and leaving the hub can't drop
+    // the interrupt. This covers the backend half only — the frontend
+    // arming/firing logic in Game.vue is Vue reactivity with no test runner
+    // in this repo, so it stays playtest-verified.
+    // =========================================================================
+
+    public function test_watcher_signal_sent_defaults_false_until_marked(): void
+    {
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/tutorial/complete');
+        $this->completeArc('BA-hub');
+
+        $entry = $this->questDoc('BA-hub');
+        $arc   = $entry['arcs'][0];
+
+        $this->assertEquals('complete', $arc['status']);
+        $this->assertArrayHasKey('watcher_signal_sent', $arc);
+        $this->assertFalse($arc['watcher_signal_sent'], 'watcher_signal_sent must default false even after the arc completes');
+    }
+
+    public function test_marking_watcher_signal_sent_persists_and_is_reflected_in_quest_log(): void
+    {
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/tutorial/complete');
+        $this->completeArc('BA-hub');
+        $arcId = $this->arc('BA-hub')->id;
+
+        $this->actingAs($this->user, 'sanctum')
+             ->postJson("/api/quests/arc/{$arcId}/watcher-signal-sent")
+             ->assertOk()
+             ->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('player_arc_progress', [
+            'player_id'    => $this->player->id,
+            'quest_arc_id' => $arcId,
+        ]);
+        $progress = PlayerArcProgress::where('player_id', $this->player->id)
+            ->where('quest_arc_id', $arcId)
+            ->firstOrFail();
+        $this->assertNotNull($progress->watcher_signal_sent_at);
+
+        $entry = $this->questDoc('BA-hub');
+        $this->assertTrue($entry['arcs'][0]['watcher_signal_sent'], 'watcher_signal_sent must read true after marking');
+    }
+
+    public function test_marking_watcher_signal_sent_twice_does_not_move_the_timestamp(): void
+    {
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/tutorial/complete');
+        $this->completeArc('BA-hub');
+        $arcId = $this->arc('BA-hub')->id;
+
+        $this->actingAs($this->user, 'sanctum')->postJson("/api/quests/arc/{$arcId}/watcher-signal-sent")->assertOk();
+        $first = PlayerArcProgress::where('player_id', $this->player->id)
+            ->where('quest_arc_id', $arcId)
+            ->firstOrFail()
+            ->watcher_signal_sent_at;
+
+        $this->actingAs($this->user, 'sanctum')->postJson("/api/quests/arc/{$arcId}/watcher-signal-sent")->assertOk();
+        $second = PlayerArcProgress::where('player_id', $this->player->id)
+            ->where('quest_arc_id', $arcId)
+            ->firstOrFail()
+            ->watcher_signal_sent_at;
+
+        $this->assertTrue($first->equalTo($second), 'A second call must be a no-op, not refresh the timestamp');
+    }
+
+    public function test_marking_watcher_signal_sent_for_unknown_arc_is_a_safe_no_op(): void
+    {
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/tutorial/complete');
+
+        // Bogus arc id — must not error, and must not touch any real progress row.
+        $this->actingAs($this->user, 'sanctum')
+             ->postJson('/api/quests/arc/00000000-0000-0000-0000-000000000000/watcher-signal-sent')
+             ->assertOk()
+             ->assertJson(['ok' => true]);
+    }
+
+    // =========================================================================
     // Guard: completed stages cannot be re-completed
     // =========================================================================
 

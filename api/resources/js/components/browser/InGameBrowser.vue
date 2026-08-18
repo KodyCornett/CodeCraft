@@ -78,6 +78,7 @@
 import { ref, computed, watch, provide, toRef } from 'vue';
 import { useBrowser }                   from '@/composables/useBrowser.js';
 import { resolveRoute, getPageTitle, SPLICE } from './SpliceRouter.js';
+import { findCompanyByQuery } from '@/composables/codexPageRoutes.js';
 
 const props = defineProps({
     initialUrl: { type: String, default: 'splice://home' },
@@ -126,9 +127,16 @@ function onAddrFocus() {
 function onAddrBlur()  { addressInput.value = toDisplayUrl(currentUrl.value); }
 
 function onNavigate() {
-    let url = addressInput.value.trim();
-    if (!url) return;
-    if (!url.includes('://')) url = 'splice://' + url;
+    const raw = addressInput.value.trim();
+    if (!raw) return;
+
+    let url = raw;
+    if (!url.includes('://')) {
+        // Not a literal address — try resolving it as a company name first
+        // (e.g. "avista", "the valley voice") before falling back to
+        // treating it as a bare domain.
+        url = findCompanyByQuery(raw) ?? ('splice://' + raw);
+    }
     navigate(url);
     addrInputEl.value?.blur();
 }

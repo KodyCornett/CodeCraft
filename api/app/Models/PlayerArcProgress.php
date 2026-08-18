@@ -16,11 +16,13 @@ class PlayerArcProgress extends Model
         'status',
         'unlocked_at',
         'completed_at',
+        'watcher_signal_sent_at',
     ];
 
     protected $casts = [
-        'unlocked_at'  => 'datetime',
-        'completed_at' => 'datetime',
+        'unlocked_at'            => 'datetime',
+        'completed_at'           => 'datetime',
+        'watcher_signal_sent_at' => 'datetime',
     ];
 
     public function player(): BelongsTo

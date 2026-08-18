@@ -24,6 +24,16 @@ re-recording audio, so they're deliberately left untouched here. Only non-voiced
 current terminology. Treat a full quest-by-quest dialogue rewrite as its own scoped task,
 not a side effect of a documentation pass.
 
+**Sync note:** this file had drifted from `QuestStageSeeder.php`/`QuestArcSeeder.php` — the
+actual shipped content, not this doc, is authoritative when the two disagree. As of this
+pass: all five quest titles below now match the seeded arc titles (Quest 1 was "The Climate
+Override," is now "The Viral Breach"; similar trims on 2/4/5). Quest 3's entire Stage 1 and
+Stage 3 dialogue was rewritten in the seeder at some point and never backported here — it's
+now replaced wholesale with the shipped text, including the minigame name fix (TOXIC_SOAK →
+CIPHER_LOCK, renamed in migration `2026_08_01_000001`). `PLAYER CHOICE` blocks in Quests 1
+and 2 that listed three flavor options now show only the one the seeder actually implements.
+Quests 1, 2, 4, and 5's dialogue otherwise already matched the seeder and was left alone.
+
 ---
 
 ## How the Prologue Flows
@@ -155,7 +165,7 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 
 ---
 
-## QUEST 1 — The Climate Override
+## QUEST 1 — The Viral Breach
 **Contractor:** Knuckle  
 **District:** Browne's Addition  
 **Target Node:** BA-v14  
@@ -193,9 +203,7 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 > And it's not finished. Whatever got into your system is still... settling in.
 
 **PLAYER CHOICE**
-- `[EXHAUSTED]` "Just tell me how to get it out."
 - `[COLD]` "Is it going to kill me?"
-- `[PANICKED]` "What do you mean it's not finished?"
 
 **NARRATOR**
 > He's not looking at you. He's watching the smoke dissolve into the node's recycled air.
@@ -220,7 +228,8 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 >
 > [WARNING] — Your rig is still leaking. Something inside your system is fighting for bandwidth during every operation. Watch your stability.
 
-*No dialogue — minigame only.*
+*No terminal dialogue — minigame only. In-field DOC voice-call check-ins play during
+the run (`field_comms` in `QuestStageSeeder.php`) — text only, not yet voiced.*
 
 ---
 
@@ -244,9 +253,7 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 > I don't know what that means yet. But it's something.
 
 **PLAYER CHOICE**
-- `[FLAT]` "Credits. Then I'm gone."
 - `[UNCERTAIN]` "How long before you know more?"
-- `[TIRED]` "I just want one day where my rig isn't on fire."
 
 **NARRATOR**
 > A transfer chip materializes on the bench between you — the standard end of a clean transaction in his node. No ceremony. One of the diagnostic arms nudges it forward an inch, like even that much is more than the job deserved.
@@ -264,7 +271,7 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 
 ---
 
-## QUEST 2 — The Downtown Smoothing Protocol
+## QUEST 2 — The Smoothing Protocol
 **Contractor:** Veil  
 **District:** Downtown  
 **Target Node:** DT-v8  
@@ -328,8 +335,6 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 > Or something dangerous.
 
 **PLAYER CHOICE**
-- `[GUARDED]` "Can you remove it?"
-- `[IRRITATED]` "Everybody keeps saying that."
 - `[DIRECT]` "What's it doing?"
 
 **NARRATOR** `narrator/veil/v_s1_l5.mp3`
@@ -381,7 +386,8 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 >
 > Just flush it.
 
-*No dialogue — minigame only.*
+*No terminal dialogue — minigame only. In-field DOC voice-call check-ins play during
+the run (`field_comms` in `QuestStageSeeder.php`) — text only, not yet voiced.*
 
 ---
 
@@ -426,8 +432,6 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 
 **PLAYER CHOICE**
 - `[UNSETTLED]` "Recognized what?"
-- `[FOCUSED]` "So what does that mean?"
-- `[TIRED]` "Am I dying or not?"
 
 **NARRATOR** `narrator/veil/v_s3_l5.mp3`
 > A layered model of your architecture unfolds between you again. Veil studies it in silence. One hand moves automatically, dismissing an amber alert before it can become a red one.
@@ -496,18 +500,20 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 
 ---
 
-## QUEST 3 — The Drift-Anchor Retrieval
+## QUEST 3 — The Drift-Anchor
 **Contractor:** Float  
 **District:** Spokane Valley  
 **Target Node:** SV-v9  
-**Minigame:** TOXIC_SOAK
+**Minigame:** CIPHER_LOCK
 
 ---
 
 ### STAGE 1 — Find Float
 
 **Objective (shown in quest log):**
-> Veil's lead points to Spokane Valley. Your deck is running at critical temperature — whatever is inside your system isn't just leaking anymore, it's vibrating. Every few seconds your HUD stutters, your avatar rubber-bands, and you lose a full second of movement.
+> Another fragment hit your system leaving Downtown. Same source. Same architecture. This time it resolved into something cleaner: Spokane Valley. Float.
+>
+> Your deck is running at critical temperature — whatever is inside your system isn't just leaking anymore, it's vibrating. Every few seconds your HUD stutters, your avatar rubber-bands, and you lose a full second of movement.
 >
 > Get to the SV-Hub before your rig gives out entirely.
 
@@ -516,81 +522,188 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 **Dialogue:**
 
 **NARRATOR**
-> Float's repair bay is a converted shipping container on the edge of the Valley grid, half-buried in a chain-link compound. She's under a raised panel unit when you arrive, one arm elbow-deep in the chassis. She doesn't come out.
+> Float's repair bay renders larger on the inside than it has any right to be — shipping containers stacked inside shipping containers, stitched together into architecture that stopped making sense years ago. Every surface is covered in handwritten labels and private shorthand that only means something to her. Hardware that hasn't been manufactured in over a decade hangs beside active systems she's somehow convinced to keep running. Nothing matches. Everything belongs. It doesn't feel like a workshop. It feels like a place where forgotten things come to survive. Her avatar is compact and practical, dressed in worn work gear without a single decorative component. Half a dozen AR overlays drift around her constantly, silently cataloguing the room. A panel she's halfway through dismantling rests on the bench beside her. She notices your signal before you've finished loading in. She notices the architecture. Then she notices you. Not necessarily in that order.
 
 **FLOAT**
-> I know why you're here. Veil sent a signal ahead. Said you were carrying something old.
->
-> Hand me the torque driver. The flat one. Don't touch anything else.
+> Don't touch anything. I mean it.
 
 **NARRATOR**
-> She emerges eventually, wiping her hands on a rag that's already past the point of usefulness. Her eyes go immediately to your rig. She studies it the way a salvager studies a wreck — not looking for damage, looking for value.
+> One of the overlays drifts toward you and stops. She glances at the readout. Then slowly sets down the tool in her hand. The kind of slow people reserve for discovering something they weren't expecting.
 
 **FLOAT**
-> Pre-collapse architecture running inside a live rig. On the Frequency. In this district.
->
-> I've seen fragments — bits of it pulled from dead nodes, compressed into storage media that won't interface with modern hardware. Never seen it active. Never seen it hosted.
->
-> You want to know what it is or you want to know what it's worth?
+> Pre-collapse architecture... And it's running... Inside a live rig.
+
+**NARRATOR**
+> One of the overlays shifts. Float stares at the readout for another second.
+
+**FLOAT**
+> No. No, that doesn't make any sense.
 
 **PLAYER CHOICE**
-- `[CAREFUL]` "What it is. Start there."
-- `[PRAGMATIC]` "Both. In that order."
-- `[BLUNT]` "I want it out of me."
+- `[CAREFUL]` "What doesn't make sense?"
+
+**NARRATOR**
+> She spreads the architecture apart with both hands. Layers unfold across the room. Her expression narrows with the focused quiet of someone reading a language nobody speaks anymore.
 
 **FLOAT**
-> Can't get it out. That's not how this architecture works — it doesn't sit on top of a system, it integrates. Give it long enough and you won't be able to tell where it ends and your rig begins.
->
-> But I can read it. Not here — I need data from a sink node first. There's a place in the Valley where the grid dumps its volatile processes. What pools there reacts to this kind of old code. You soak it, I can decode the signatures.
->
-> It'll cost you something. Not credits.
+> I don't know what I'm looking at. And I really don't like saying that. This should've crashed. Or fragmented. Or eaten your deck.
+
+**NARRATOR**
+> She rearranges three overlays, studies the results, then rearranges them again.
+
+**FLOAT**
+> Systems don't behave this well by accident.
+
+**PLAYER CHOICE**
+- `[DIRECT]` "Can you remove it?"
+
+**NARRATOR**
+> She doesn't answer immediately. One of the overlays expands and collapses again as she studies the architecture from another angle.
+
+**FLOAT**
+> No. Not because I can't. Because I don't know what "it" is.
+
+**NARRATOR**
+> She runs the analysis again. Then a third time.
+
+**FLOAT**
+> I can't tell where it's drawing power from. Which should be impossible. I can't tell where it's storing itself. Which should also be impossible. And I can't figure out why your rig isn't screaming louder.
+
+**NARRATOR**
+> She sighs quietly and folds one of the overlays shut.
+
+**FLOAT**
+> Which is annoying.
+
+**NARRATOR**
+> She returns to the panel she'd been dismantling and removes another piece while she thinks.
+
+**FLOAT**
+> There's a sink node out in the Valley. Grid dumps things there when it can't decide whether they're important. Old architecture tends to collect. Maybe it'll react. Maybe I'll learn something.
+
+**NARRATOR**
+> She shrugs.
+
+**FLOAT**
+> Or maybe reality embarrasses me again. Wouldn't be the first time. It'll cost you something. Not credits.
 
 ---
 
-### STAGE 2 — Soak the Drift-Anchor
+### STAGE 2 — Soak the Sink
 
 **Objective (shown in quest log):**
-> Float doesn't want to fix you. She wants to harvest what's rotting inside you. There's a data-sink at node SV-v9 — a submerged relay where the grid dumps its most volatile, discarded processes. Float needs what's pooled there.
+> Float isn't trying to fix you. She's trying to understand you.
 >
-> Get to SV-v9 and hold position. Let your system absorb the toxic data until the anchor is full.
+> There's a sink node in Spokane Valley where the grid dumps volatile processes it can't classify, contain, or delete. Strange things collect there. Old things.
 >
-> [WARNING] — The Drift is actively rewriting anything it touches. Your stability will drain continuously. You cannot fight it — you can only endure it.
+> Get to SV-v9 and expose your rig to the pool.
+>
+> [WARNING] — Your architecture will react unpredictably. Stability loss will be severe.
+>
+> Float thinks the signatures might tell her something.
+>
+> She also admitted she might be wrong.
 
-*No dialogue — minigame only.*
+*No terminal dialogue — minigame only. In-field DOC voice-call check-ins play during
+the run (`field_comms` in `QuestStageSeeder.php`) — text only, not yet voiced.*
 
 ---
 
 ### STAGE 3 — Report Back
 
 **Objective (shown in quest log):**
-> You're still standing. Barely. Get back to Float at the SV-Hub and let her drain what you're carrying.
+> The sink didn't kill you.
+>
+> Somehow.
+>
+> Return to Float and find out what she learned.
 
 ---
 
 **Dialogue:**
 
+**NARRATOR**
+> The overlays surrounding Float have changed when you return. Something has moved. Something has been rebuilt. Whatever she was working on before has become something else entirely. She notices your signal before you reach the bench.
+
 **FLOAT**
-> You held longer than I expected.
->
-> Sit down before you fall down.
+> You held longer than I expected. Sit down before you fall down.
 
 **NARRATOR**
-> She runs the readout twice. Doesn't explain what she's seeing. The silence isn't unfriendly — it's the kind of quiet that means something is actually interesting.
+> She clears the only available surface. Apparently you rank slightly above obsolete hardware. Slightly. She runs the data once. Then again. Rearranges three overlays. Runs it a third time.
 
 **FLOAT**
-> The data you soaked — it reacted to what's in you. Bonded to it. That's not a coincidence. Whatever is running inside your rig has a specific affinity for this era of architecture. Like it's looking for something.
->
-> There's someone at the University District who catalogues pre-collapse systems. Goes by Axiom. He'll want to see what you're carrying — and he'll have better answers than me.
+> Well.
+
+**NARRATOR**
+> She leans closer to the readout. Then farther away. As though changing the angle might somehow make it behave.
+
+**FLOAT**
+> That's worse.
 
 **PLAYER CHOICE**
-- `[GRATEFUL]` "Thank you. I mean it."
-- `[WORN OUT]` "How many more people do I have to see?"
-- `[RESOLUTE]` "I'll find Axiom."
+- `[UNEASY]` "Worse?"
 
 **FLOAT**
-> As many as it takes. You're carrying something that shouldn't exist anymore.
->
-> That either ends very badly or very interestingly. My money's on both.
+> I was hoping it was broken.
+
+**NARRATOR**
+> She runs the analysis again.
+
+**FLOAT**
+> Broken things make sense. The sink didn't corrupt it. Didn't slow it down either.
+
+**NARRATOR**
+> She reaches for a tool, thinks better of it, and instead opens another overlay.
+
+**FLOAT**
+> Whatever's inside you... It knew exactly what to do.
+
+**PLAYER CHOICE**
+- `[DIRECT]` "What did you find?"
+
+**FLOAT**
+> I don't know. And I hate saying that.
+
+**NARRATOR**
+> She studies the overlays in silence. Then dismisses half of them with visible irritation.
+
+**FLOAT**
+> It's not hiding. Which is strange. It's not fighting me. Which is stranger. And every assumption I make turns out wrong.
+
+**NARRATOR**
+> She squints at the readout.
+
+**FLOAT**
+> That's rude.
+
+**NARRATOR**
+> For the first time since you arrived, she stops looking at the architecture. She looks at you.
+
+**FLOAT**
+> Most things I find are dead. Broken. Incomplete. That's why people throw them away.
+
+**NARRATOR**
+> She runs the data one final time.
+
+**FLOAT**
+> Whatever's inside you... It knows exactly what it is.
+
+**NARRATOR**
+> The thought seems to bother her.
+
+**FLOAT**
+> And I don't think I've decided whether I find that exciting... Or terrifying.
+
+**NARRATOR**
+> One of the overlays flashes for attention. Float dismisses it without looking. Then another. And another. None of them are as interesting as the thing sitting across from her.
+
+**FLOAT**
+> Hm. Well. You're still alive. That's usually a good sign. Try to stay that way. I'd like to know how this ends.
+
+**NARRATOR**
+> She picks up the tool she'd set down when you first arrived. And just like that, she's back to convincing dead things to speak again.
+
+*Referral to Axiom is issued as a system log line on completion, not spoken in dialogue — see `referral_text` on this stage in `QuestStageSeeder.php`.*
 
 *→ Watcher Interrupt #3 fires when player leaves SV-hub.*
 
@@ -598,7 +711,7 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 
 ---
 
-## QUEST 4 — The Deep Archive Extraction
+## QUEST 4 — The Deep Archive
 **Contractor:** Axiom  
 **District:** University District  
 **Target Node:** UD-v17  
@@ -702,7 +815,8 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 >
 > Axiom said it dislikes things that make sense. Prove it right.
 
-*No dialogue — minigame only.*
+*No terminal dialogue — minigame only. In-field DOC voice-call check-ins play during
+the run (`field_comms` in `QuestStageSeeder.php`) — text only, not yet voiced.*
 
 ---
 
@@ -829,7 +943,7 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 
 ---
 
-## QUEST 5 — The Volatile Calibration
+## QUEST 5 — Ghost-Kernel Calibration
 **Contractor:** Patch  
 **District:** North Spokane  
 **Target Node:** NS-v13  
@@ -978,7 +1092,8 @@ These are the Watcher's intrusion signals. They appear as corrupted system broad
 >
 > Move quickly.
 
-*No dialogue — minigame only.*
+*No terminal dialogue — minigame only. In-field DOC voice-call check-ins play during
+the run (`field_comms` in `QuestStageSeeder.php`) — text only, not yet voiced.*
 
 ---
 

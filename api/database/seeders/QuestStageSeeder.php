@@ -40,6 +40,10 @@ use Illuminate\Database\Seeder;
  *                         (null = none). See CodexService — not required progress.
  *   node_canvas_id      — map node the player must be at to trigger (null = no requirement)
  *   minigame_type       — null | 'data_grab' | 'system_override'
+ *   field_comms         — optional array of in-field DOC voice-call lines, played via
+ *                         FieldCommsWindow.vue while the player works this stage's node.
+ *                         [{ speaker: 'doc'|'player', text, audio?, fx? }, ...]. Omit the
+ *                         key entirely for stages with no field call.
  */
 class QuestStageSeeder extends Seeder
 {
@@ -165,6 +169,16 @@ class QuestStageSeeder extends Seeder
                 'title'              => 'Flush the Buffer',
                 'objective_text'     => "Veil's interested in your corruption, but not enough to gamble on it. A recursive ghost-signal at node DT-v8 has been degrading local infrastructure for weeks. Clean rigs don't survive the feedback.\n\nYours isn't clean.\n\nGet to DT-v8 and deploy FLUSH_BUFFER.\n\n[WARNING] — Your stability will drop rapidly. Keep the signal contained.\n\nDon't inspect the data.\n\nJust flush it.",
                 'dialogue'           => null,
+                // NEEDS VOICING — text only, no 'audio' key yet. FieldCommsWindow.vue
+                // falls back to a reading-time hold until lines are recorded. Suggested
+                // path convention to match the rest of Veil's audio: veil/fc_dt2_0N.mp3
+                'field_comms'        => [
+                    ['speaker' => 'doc', 'text' => "Feed's live. Don't inspect what comes through — just flush it."],
+                    ['speaker' => 'doc', 'text' => "...huh. Buffer's not fighting you the way it fights everyone else."],
+                    ['speaker' => 'doc', 'text' => "Don't get comfortable. Keep the signal moving."],
+                    ['speaker' => 'doc', 'text' => "Last of it's coming through. Flush and get clear."],
+                    ['speaker' => 'player', 'text' => "Clear. Whatever that was, it's gone now."],
+                ],
                 'rep_reward'         => 0,
                 'is_branch'          => false,
                 'branch_options'     => null,
@@ -269,6 +283,16 @@ class QuestStageSeeder extends Seeder
                 'title'              => 'Soak the Sink',
                 'objective_text'     => "Float isn't trying to fix you. She's trying to understand you.\n\nThere's a sink node in Spokane Valley where the grid dumps volatile processes it can't classify, contain, or delete. Strange things collect there. Old things.\n\nGet to SV-v9 and expose your rig to the pool.\n\n[WARNING] — Your architecture will react unpredictably. Stability loss will be severe.\n\nFloat thinks the signatures might tell her something.\n\nShe also admitted she might be wrong.",
                 'dialogue'           => null,
+                // NEEDS VOICING — text only, no 'audio' key yet. FieldCommsWindow.vue
+                // falls back to a reading-time hold until lines are recorded. Suggested
+                // path convention to match the rest of Float's audio: float/fc_sv2_0N.mp3
+                'field_comms'        => [
+                    ['speaker' => 'doc', 'text' => "You're at the sink. Don't leave until it stabilizes — half-soaked data is worse than none."],
+                    ['speaker' => 'doc', 'text' => "Readouts are moving faster than I expected. Keep at it."],
+                    ['speaker' => 'doc', 'text' => "Whatever's in you is drinking that faster than it should."],
+                    ['speaker' => 'doc', 'text' => "Close it out. I want to see what you're carrying."],
+                    ['speaker' => 'player', 'text' => "Closing it out. Hope it was worth watching."],
+                ],
                 'rep_reward'         => 0,
                 'is_branch'          => false,
                 'branch_options'     => null,
@@ -387,6 +411,16 @@ class QuestStageSeeder extends Seeder
                 'title'              => 'Extract the Archive Packet',
                 'objective_text'     => "Axiom has spent eleven years trying to access an archive beneath the University District. Something in its architecture refuses to engage with clean systems — it reads them as hostile.\n\nYours doesn't read as clean.\n\nGet to node UD-v17 and extract the data packet Axiom needs.\n\n[WARNING] — The archive ICE will spike. Your rig will respond in kind. Keep working.\n\nAxiom said it dislikes things that make sense.\n\nProve it right.",
                 'dialogue'           => null,
+                // NEEDS VOICING — text only, no 'audio' key yet. FieldCommsWindow.vue
+                // falls back to a reading-time hold until lines are recorded. Suggested
+                // path convention to match the rest of Axiom's audio: axiom/fc_ud2_0N.mp3
+                'field_comms'        => [
+                    ['speaker' => 'doc', 'text' => "The archive knows you're in it. It always knows. Proceed regardless."],
+                    ['speaker' => 'doc', 'text' => "Ah — there. The ICE just noticed you don't read as hostile. How curious."],
+                    ['speaker' => 'doc', 'text' => "Take your time. Or don't. It rarely rewards patience, in my experience."],
+                    ['speaker' => 'doc', 'text' => "The packet is close. Extract it before the archive changes its mind."],
+                    ['speaker' => 'player', 'text' => "Got it. Whatever 'it' decided, I'm not sticking around to ask."],
+                ],
                 'rep_reward'         => 0,
                 'is_branch'          => false,
                 'branch_options'     => null,
@@ -509,6 +543,16 @@ class QuestStageSeeder extends Seeder
                 'title'              => 'Calibration Tether',
                 'objective_text'     => "Patch needs volatile calibration packages from node NS-v13.\n\nNobody wants them.\n\nWhich, according to Patch, makes them her problem.\n\nRetrieve the packages and bring them back to her node.\n\n[WARNING] — The sub-routines are unstable and actively resist containment. Every packet carried will drain your stability.\n\nYour own system is unstable.\n\nMove quickly.",
                 'dialogue'           => null,
+                // NEEDS VOICING — text only, no 'audio' key yet. FieldCommsWindow.vue
+                // falls back to a reading-time hold until lines are recorded. Suggested
+                // path convention to match the rest of Patch's audio: patch/fc_ns2_0N.mp3
+                'field_comms'        => [
+                    ['speaker' => 'doc', 'text' => "Nudge them gently. They don't like being handled, but they hate being ignored more."],
+                    ['speaker' => 'doc', 'text' => "That one's drifting. Route it before it destabilizes the rest."],
+                    ['speaker' => 'doc', 'text' => "Your rig's shaking almost as much as the sub-routines. Comforting, that."],
+                    ['speaker' => 'doc', 'text' => "Last one. Get it stable and get out of there."],
+                    ['speaker' => 'player', 'text' => "Stable. Barely. Bringing them in."],
+                ],
                 'rep_reward'         => 0,
                 'is_branch'          => false,
                 'branch_options'     => null,
@@ -637,6 +681,7 @@ class QuestStageSeeder extends Seeder
                         'title'               => $stageData['title'],
                         'objective_text'      => $stageData['objective_text'],
                         'dialogue'            => isset($stageData['dialogue']) ? json_encode($stageData['dialogue']) : null,
+                        'field_comms'         => isset($stageData['field_comms']) ? json_encode($stageData['field_comms']) : null,
                         'rep_reward'          => $stageData['rep_reward'],
                         'is_branch'           => $stageData['is_branch'],
                         'branch_options'      => $branchOptions,

@@ -82,6 +82,7 @@ const APPS = [
     { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'                              },
     { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'                             },
     { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'                              },
+    { url: SPLICE.MAPS,      icon: '⛯', label: 'MAPS'                              },
     { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true, tourId: 'nav-terminal' },
 ];
 

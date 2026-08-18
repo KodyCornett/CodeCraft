@@ -28,6 +28,7 @@
                     :pings="pings"
                     :traps="myTraps"
                     :quest-markers="questMarkers"
+                    :tracked-markers="trackedMarkers"
                     :current-node-id="currentNodeId"
                     :player-uplink="player.uplink"
                     :player-ss="player.currentSS"
@@ -372,6 +373,7 @@ import { useCodexFind }         from '@/composables/useCodexFind.js';
 import { usePvpFlow }           from '@/composables/usePvpFlow.js';
 import { useResourceReplenish } from '@/composables/useResourceReplenish.js';
 import { useBrowserNavigation } from '@/composables/useBrowserNavigation.js';
+import { useNodeTracking }      from '@/composables/useNodeTracking.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 import { docColorByName, docColor } from '@/constants/docColors.js';
 import { WATCHER_TRANSITIONS } from '@/constants/watcherTransitions.js';
@@ -437,7 +439,7 @@ const ph = usePacketHijack(playerId);
 const { activeMinigame, setCurrentNode, clear: clearMinigame } = useQuestMinigame();
 
 // Quest log (declared early — tutorial watchers reference fetchQuestLog)
-const { docs: questDocs, fetchQuestLog, completeStage: completeQuestStage } = useQuestLog();
+const { docs: questDocs, fetchQuestLog, completeStage: completeQuestStage, markWatcherSignalSent } = useQuestLog();
 const { objective: activeObjective } = useActiveObjective(questDocs);
 const { events: archiveEvents, fetchArchive } = useQuestArchive();
 const { queue: docNotifQueue, processEvents: processDocEvents, dismiss: dismissDocNotif } = useDocNotifications();
@@ -839,6 +841,10 @@ watch(() => activeObjective.value?.stageId, (next, prev) => {
     _missionToastTimer = setTimeout(() => { missionToast.value = null; }, 3500);
 });
 
+// Player-pinned map markers from the Splice Site map search — session-only,
+// module-level state shared with SpliceMapsPage.vue (see useNodeTracking.js)
+const { trackedMarkers } = useNodeTracking();
+
 // Derive active objective markers from quest state
 const questMarkers = computed(() => {
     const markers = [];
@@ -981,9 +987,7 @@ watch(frequencyHub, (hub) => {
 
 // ── Watcher signal system ─────────────────────────────────────────────────────
 const {
-    activeSignal, hasUnread: watcherHasUnread,
-    fetchUnread: fetchWatcherUnread,
-    markAllRead: watcherMarkAllRead,
+    activeSignal,
     triggerSignal,
     onSignalComplete: _onSignalComplete,
 } = useWatcher();
@@ -999,15 +1003,40 @@ function onSignalComplete() {
     }
 }
 
-provide('watcherMarkAllRead', watcherMarkAllRead);
 provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQuestLog });
 
 // Pool of nodes near BA-hub — random pick so players can't camp a fixed respawn point
 const _WATCHER_RESPAWN_POOL = ['B6', 'E7', 'C10', 'G11', 'H8', 'E5'];
 
-// Holds the pending transition config — set when a doc's dialogue completes,
-// cleared when the player leaves that doc's hub node.
+// Holds the pending transition config — armed once a doc's entry arc is
+// complete but the player hasn't yet left that doc's hub node, cleared when
+// the interrupt fires. Armed/re-armed from server quest state (see the
+// questDocs/currentNodeId watcher below) rather than from a one-shot client
+// callback, so a reload between arc completion and leaving the hub can't
+// drop the interrupt.
 const _pendingWatcherTransition = ref(null);
+
+// Arc IDs whose interrupt has already fired this session — guards against
+// re-arming while the markWatcherSignalSent() persist call is in flight and
+// questDocs hasn't caught up yet.
+const _watcherTransitionsFiredThisSession = new Set();
+
+function _fireWatcherTransition(t) {
+    _watcherTransitionsFiredThisSession.add(t.arcId);
+    _pendingWatcherTransition.value = null;
+    cutAudio();
+
+    _postSignalNav.value = () => {
+        resumeAudio();
+        if (_bootNotifTimer) clearTimeout(_bootNotifTimer);
+        bootNotification.value = true;
+        _bootNotifTimer = setTimeout(() => { bootNotification.value = false; }, 6000);
+        onLaunch(SPLICE.TERMINAL);
+    };
+
+    triggerSignal({ id: t.signalId, signal_text: t.signalText });
+    markWatcherSignalSent(t.arcId);
+}
 
 // Called by SystemUpdate.vue when the install sequence finishes
 provide('onInstallComplete', () => {
@@ -1033,29 +1062,35 @@ provide('onInstallComplete', () => {
     });
 });
 
-// Called by DocDialoguePage when a doc's dialogue stage closes
-provide('onDocDialogueComplete', (docHandle) => {
-    const transition = WATCHER_TRANSITIONS[docHandle];
-    if (transition) _pendingWatcherTransition.value = transition;
+// Arm or immediately fire a Watcher transition once its doc's entry arc
+// completes server-side. Re-evaluated whenever quest state or the player's
+// node changes — reload-safe by construction: a returning player who already
+// left the hub fires immediately below; one still standing at the hub gets
+// armed for the leave-watch that follows.
+watch([questDocs, currentNodeId], ([docs, nodeId]) => {
+    if (!nodeId) return; // currentNodeId reassigns a few times during boot
+
+    for (const transition of Object.values(WATCHER_TRANSITIONS)) {
+        const doc = (docs ?? []).find(d => d.district === transition.district);
+        const arc = doc?.arcs?.find(a => a.sequence_order === 1 && a.status === 'complete' && !a.watcher_signal_sent);
+        if (!arc) continue;
+        if (_watcherTransitionsFiredThisSession.has(arc.id)) continue;
+        if (_pendingWatcherTransition.value?.arcId === arc.id) continue;
+
+        const t = { ...transition, arcId: arc.id };
+        if (nodeId !== transition.leaveNode) {
+            _fireWatcherTransition(t);
+        } else {
+            _pendingWatcherTransition.value = t;
+        }
+    }
 });
 
 // Fire the Watcher intrusion when player leaves a hub node with a pending transition
 watch(currentNodeId, (newNode, oldNode) => {
     const t = _pendingWatcherTransition.value;
     if (!t || oldNode !== t.leaveNode || newNode === t.leaveNode) return;
-
-    _pendingWatcherTransition.value = null;
-    cutAudio();
-
-    _postSignalNav.value = () => {
-        resumeAudio();
-        if (_bootNotifTimer) clearTimeout(_bootNotifTimer);
-        bootNotification.value = true;
-        _bootNotifTimer = setTimeout(() => { bootNotification.value = false; }, 6000);
-        onLaunch(SPLICE.TERMINAL);
-    };
-
-    triggerSignal({ id: t.signalId, signal_text: t.signalText });
+    _fireWatcherTransition(t);
 });
 
 // ── WebSocket — live server events ────────────────────────────────────────────
@@ -1148,7 +1183,7 @@ onMounted(async () => {
 
         await Promise.all([
             fetchCommands(), fetchInventory(), fetchMyTraps(),
-            fetchWatcherUnread(), fetchQuestLog(), fetchArchive(),
+            fetchQuestLog(), fetchArchive(),
             fetchCodexState(),
             tutorial.hydrate(),
         ]);

@@ -84,11 +84,27 @@ export function useQuestLog() {
         }
     }
 
+    /**
+     * Mark that the client has displayed the Watcher interrupt cinematic
+     * tied to an arc's completion. Fire-and-forget — the caller has already
+     * shown the cinematic; this just persists that fact so a reload doesn't
+     * replay it. Does not re-fetch the quest log (the docs array will pick
+     * up watcher_signal_sent on its next natural fetch).
+     */
+    async function markWatcherSignalSent(arcId) {
+        try {
+            await axios.post(`/api/quests/arc/${arcId}/watcher-signal-sent`);
+        } catch (e) {
+            console.warn('[QUEST LOG] markWatcherSignalSent failed:', e?.message ?? e);
+        }
+    }
+
     return {
         docs:          readonly(docs),
         loading:       readonly(loading),
         error:         readonly(error),
         fetchQuestLog,
         completeStage,
+        markWatcherSignalSent,
     };
 }

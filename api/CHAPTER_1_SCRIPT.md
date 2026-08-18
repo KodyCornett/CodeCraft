@@ -42,7 +42,11 @@ their references are untouched by this system.
 
 Going forward, every chapter gets its own subfolder *inside* each existing Doc folder, so
 the top-level structure stays organized by character (one voice, one folder) while each
-chapter's lines stay self-contained for production:
+chapter's lines stay self-contained for production. The one exception is the narrator: all
+of the narrator's Chapter 1 lines live together in a single flat `narrator/chapter_1/`
+folder, not nested per-Doc — the narrator is one voice regardless of whose scene it's
+describing, and the `part_id` prefix on each filename already disambiguates which scene a
+line belongs to, so per-Doc nesting was redundant folder overhead:
 
 ```
 public/audio/Sound/
@@ -54,16 +58,18 @@ public/audio/Sound/
       c2_s#_p#_l#.mp3
   narrator/
     axiom/
-      a_s1_l1.mp3           ← Prologue, untouched
-      chapter_1/
-        c1_s2_p1_l1.mp3
+      a_s1_l1.mp3           ← Prologue, untouched (per-Doc nesting stays for Prologue)
+    chapter_1/               ← flat — every Doc's narrator lines land here together
+      c1_open_l1.mp3
+      c1_s2_p1_l1.mp3
+      c1_s4_p1_l1.mp3
   player/
     chapter_1/               ← new — Prologue has no voiced player lines
       c1_s1_p1_l6.mp3
 ```
 
 Full path pattern for Chapter 1: `{speaker}/chapter_1/{part_id}_l{n}.mp3` for a Doc's own
-lines, `narrator/{doc}/chapter_1/{part_id}_l{n}.mp3` for narrator lines,
+lines, `narrator/chapter_1/{part_id}_l{n}.mp3` for narrator lines (flat, no Doc nesting),
 `player/chapter_1/{part_id}_l{n}.mp3` for the player's fixed voiced lines. The line counter
 is one continuous sequence per Part, shared across all speakers in that Part, and resets to
 `l1` at the start of each new Part.
@@ -77,7 +83,7 @@ line, calling out a `GlitchEffect` cue to fire at that exact moment — see "VIS
 TOOLKIT" in `WORLD_PHILOSOPHY.md` for what's available and when to use it:
 
 ```
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l9.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l9.mp3`
 [FX: static(2) — 250ms]
 > He tries again, and this time you hear something inside click without engaging...
 ```
@@ -99,8 +105,8 @@ readability; convert to the JSON shape when it's actually seeded.
 
 Flavor/atmosphere piece, not narrative — sits before Scene 1, outside the Scene/Part
 numbering. See CHAPTER OPENERS in `WORLD_PHILOSOPHY.md`: strict parity with the player, no
-outside-POV hints, just mood. Audio lives directly under `narrator/chapter_1/`, not nested
-inside any Doc's folder.
+outside-POV hints, just mood. Audio lives under the flat `narrator/chapter_1/` folder, same
+as every other narrator line in this chapter.
 
 ---
 
@@ -127,7 +133,7 @@ inside any Doc's folder.
 
 ---
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l1.mp3`
 [FX: chromatic(2),flicker(1) — 700ms]
 > The diagnostic lead clicks into your collar before you're even conscious enough to feel
 > the cold alloy. You wake up suspended in Float's rig, suspended in static. Your temple
@@ -137,7 +143,7 @@ inside any Doc's folder.
 **FLOAT** `float/chapter_1/c1_s1_p1_l2.mp3`
 > "Hey. Eyes on me. Stay anchored."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l3.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l3.mp3`
 > Float isn't looking at your face; she's looking at the diagnostic rack behind you. She
 > steps in, wrenching a snarl of braided wire out of the way.
 
@@ -145,7 +151,7 @@ inside any Doc's folder.
 > "You blew through my lock, kicked my door off its track, and spewed three seconds of
 > garbled machine code before your legs gave out. You want to tell me what that was?"
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l5.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l5.mp3`
 > You reach for the memory of five minutes ago. There's no door, no walk, no panic. Just
 > an empty grey void where the timeline should be.
 >
@@ -156,14 +162,14 @@ inside any Doc's folder.
 **PLAYER** `player/chapter_1/c1_s1_p1_l6.mp3`
 > "I... can't— something's... missing. I don't know how I got here."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l7.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l7.mp3`
 > Float doesn't look surprised. She stops listening to your voice and starts listening to
 > the telemetry — the way an engineer ignores a panicked driver to read the oil pressure.
 
 **FLOAT** `float/chapter_1/c1_s1_p1_l8.mp3`
 > "Stop forcing the vocal track. Just breathe. You're dropping frames."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l9.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l9.mp3`
 > With a sharp gesture, she snaps a holographic telemetry window into the air between
 > you. Raw data cascades down in harsh amber text — far too fast for your glitched optics
 > to parse, but Float's eyes track every line.
@@ -175,7 +181,7 @@ inside any Doc's folder.
 > collapsed. Whatever spiked your system wasn't a spike at all. It was a background
 > process. It was running in your stack for ten minutes before you dropped."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l11.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l11.mp3`
 > She doesn't wait for your answer. She already knows you don't have one.
 >
 > Float swaths her hand across the air, dragging a second pane alongside the first — her
@@ -188,7 +194,7 @@ inside any Doc's folder.
 **FLOAT** `float/chapter_1/c1_s1_p1_l12.mp3`
 > "Zero."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l13.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l13.mp3`
 > She drops her hand, staring at the empty query result. Float's voice drops half an
 > octave — stripped of its usual defensive sarcasm, leaving only cold, mechanical
 > calculation.
@@ -198,7 +204,7 @@ inside any Doc's folder.
 > in this rig from before the grid fell, and your footprint doesn't share a single line
 > of logic with any of them."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l15.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l15.mp3`
 > She turns away from the floating glass, her gaze drifting toward the heavy steel door
 > you supposedly forced open. Her hand lingers near the lock manual override.
 
@@ -207,7 +213,7 @@ inside any Doc's folder.
 > and I know how to kill it. But whatever is sitting inside your head right now... it
 > isn't in anyone's system."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l17.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l17.mp3`
 > Float straightens away from the window, and just like that, something in her posture
 > resets — the crack sealing back over, replaced by the flat working calm of someone who
 > fixes problems for a living. She crosses to the rig and starts stripping the diagnostic
@@ -218,7 +224,7 @@ inside any Doc's folder.
 > things mean I'm going to keep pulling on this thread whether you pay me or not — but
 > pulling on it costs me rig time, and rig time isn't free."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l19.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l19.mp3`
 > The last lead comes free from your collar with a small, cold pop. She tosses it onto the
 > rack without looking.
 
@@ -235,7 +241,7 @@ inside any Doc's folder.
 > intact in the wreck — old enough nobody's bothered stripping it. I want it before some
 > scrapper beats you to it and sells it for parts instead of data."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p1_l23.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p1_l23.mp3`
 > Float pulls up a district map instead of saying anything else, one node glowing cold
 > blue against the sprawl of the Valley grid.
 
@@ -250,7 +256,7 @@ inside any Doc's folder.
 
 ---
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p2_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p2_l1.mp3`
 > Float doesn't look up when the heavy door groans open. It's still hanging half an inch
 > off its mounting track from when you kicked it in earlier. She's elbow-deep in an open
 > chassis on the main bench, live wire-harbors sparking against her gauntlets.
@@ -260,7 +266,7 @@ inside any Doc's folder.
 **FLOAT** `float/chapter_1/c1_s1_p2_l2.mp3`
 > "Core. Give."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p2_l3.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p2_l3.mp3`
 > You drop the warm alloy module into her hand. She doesn't inspect it. It disappears into
 > a heavy steel drawer with a hydraulic thud — filed away like the job was just a
 > distraction to keep your hands busy.
@@ -268,7 +274,7 @@ inside any Doc's folder.
 **PLAYER** `player/chapter_1/c1_s1_p2_l4.mp3`
 > "Did you pull anything off my read while I was in the field?"
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p2_l5.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p2_l5.mp3`
 > Her pneumatic driver goes silent. Float sets the tool down on the bench — slow, precise,
 > the calculated pause of someone trying to organize bad news into manageable pieces.
 
@@ -276,7 +282,7 @@ inside any Doc's folder.
 > "I stopped looking for a match in my archive. I ran your spike against itself. Evaluated
 > the signature's delta over time instead of static code."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p2_l7.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p2_l7.mp3`
 > She snaps her fingers, sweeping a multi-layered spectral waveform into the air between
 > you. It pulses with a frantic, jagged frequency — dense, tight, and unnervingly
 > rhythmic.
@@ -286,7 +292,7 @@ inside any Doc's folder.
 > cleaner, sharper, and more optimized than the one before it. Like a program running a
 > self-correction loop. Like something's practicing."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p2_l9.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p2_l9.mp3`
 > She cuts herself off mid-thought. For a fraction of a second, her jaw sets hard, like
 > she just glimpsed something through the code she'd rather unsee.
 
@@ -305,7 +311,7 @@ inside any Doc's folder.
 > parallels out of that archive of his that I wouldn't even know how to search for. I
 > already sent him the raw telemetry package. Get going."
 
-**NARRATOR** `narrator/float/chapter_1/c1_s1_p2_l13.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s1_p2_l13.mp3`
 > She's already reaching back into the open chassis on her bench, her fingers darting into
 > the mechanical guts before you've even taken a step toward the door. But just before the
 > sparks start flying again, her shoulder hitches.
@@ -322,7 +328,7 @@ inside any Doc's folder.
 
 ---
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l1.mp3`
 > Axiom's space is nothing like Float's — shelves stretching up into a darkness that
 > never quite resolves into a ceiling, folders drifting through the air in slow,
 > unhurried orbits, resettling themselves as though the whole room is quietly filing
@@ -336,7 +342,7 @@ inside any Doc's folder.
 > "Float sent the file ahead of you. I've read it twice. Sit — you look like the walk
 > here cost you more than it should have."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l3.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l3.mp3`
 > A chair drifts into place opposite the desk. You lower yourself into it before you're
 > entirely sure it's finished arriving.
 
@@ -354,7 +360,7 @@ inside any Doc's folder.
 > I'd rather you hear the honest word from someone than spend the next hour guessing at a
 > worse one."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l7.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l7.mp3`
 > He doesn't flinch saying it, and somehow that steadies you more than if he had. Axiom
 > rises and crosses to an oversized diagnostic reader built into the shelves — the kind of
 > instrument meant for legacy silicon, not modern rigs — already talking through the next
@@ -365,13 +371,13 @@ inside any Doc's folder.
 > glance. That'll tell us whether it's isolated or spreading, and roughly how fast. It's
 > not a pleasant comparison to run. It isn't a dangerous one either."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l9.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l9.mp3`
 [FX: static(2) — 250ms, on "click without engaging"]
 > He rests a hand on the housing's access panel. It doesn't open. He tries again, and this
 > time you hear something inside click without engaging — a small, wrong sound in an
 > otherwise silent room.
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l10.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l10.mp3`
 > Axiom's composure doesn't crack, exactly. It just goes still for a second, the way
 > someone goes still when a plan quietly stops being available.
 
@@ -389,7 +395,7 @@ inside any Doc's folder.
 > depot's changed hands and nobody's sure who's actually holding the access rights
 > anymore."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p1_l14.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p1_l14.mp3`
 > He turns back to you, and for a moment the warmth comes back into focus, deliberate,
 > like he's choosing to spend it on you specifically.
 
@@ -413,7 +419,7 @@ inside any Doc's folder.
 
 ---
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l1.mp3`
 > The part is smaller than expected—a matte-grey cylinder no bigger than a fingertip, its
 > edges worn smooth from three days of sitting unclaimed. Axiom takes it with both hands,
 > cradling it like something that used to belong to someone who mattered.
@@ -422,7 +428,7 @@ inside any Doc's folder.
 > "Good. No detours, no complications. I was almost disappointed—I'd already started
 > composing the apology I was going to owe you."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l3.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l3.mp3`
 > He steps back to the reader, working the panel open with the patient, exact precision of
 > a man who has done this a thousand times and will do it a thousand more. The replacement
 > seats with a small, clean click—the sound the original should have made.
@@ -430,18 +436,18 @@ inside any Doc's folder.
 **AXIOM** `axiom/chapter_1/c1_s2_p2_l4.mp3`
 > "There. Now we ask the question properly."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l5.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l5.mp3`
 > He presses a lead against your temple—cold, sterile metal, nothing like Float's tangled
 > nest of braided wire. The reader hums alive, low and resonant, shivering through your
 > cheekbone. For a second, nothing happens.
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l6.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l6.mp3`
 [FX: static(3),flicker(2) — 500ms, on "snap silent at once"]
 > Then the shelves shudder—then go still. Not the room. The sound: a hundred folders that
 > were always faintly turning, rustling, snap silent at once. You feel it before you
 > understand it—pressure behind your eyes, like the room just changed altitude.
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l7.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l7.mp3`
 > Pain shears through your skull, sharp and blinding—a line of white, electric heat drawn
 > directly from ear to ear, searing along the neural housing at the base of your brain. It
 > vanishes before you can gasp, but your hand flies to your temple. Your fingers come away
@@ -451,7 +457,7 @@ inside any Doc's folder.
 > "Steady. That was the archive, not you—it doesn't like being asked questions it can't
 > answer. And neither, apparently, do you."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l9.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l9.mp3`
 > His breathing doesn't change. If anything it slows—the sound of a man leaning into a
 > problem instead of flinching from it. As the reader finishes its pass, a dense column of
 > raw telemetry scrolls beside him. He goes quiet—a heavy, sudden silence that has nothing
@@ -472,7 +478,7 @@ inside any Doc's folder.
 > "Meaning it isn't passive. I laid it against the deepest layer in this archive expecting
 > alignment or silence. I got neither. For about four seconds, it reached."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l14.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l14.mp3`
 > He says the word deliberately, weighing it against three others he liked less.
 
 **AXIOM** `axiom/chapter_1/c1_s2_p2_l15.mp3`
@@ -490,7 +496,7 @@ inside any Doc's folder.
 > the public frequency. I study what things were. I don't study what they're actively doing
 > to city infrastructure while anchored in living tissue."
 
-**NARRATOR** `narrator/axiom/chapter_1/c1_s2_p2_l18.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s2_p2_l18.mp3`
 > He sets the lead down. Doesn't reach for the next tool. The quiet stretches long enough
 > that you start counting your own heartbeat before he breaks it.
 
@@ -516,7 +522,7 @@ inside any Doc's folder.
 
 ---
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l1.mp3`
 > Veil's node renders the way it always has — a sprawling workspace under warm hanging
 > lights, exposed conduits and maintenance terminals crowding every surface, status boards
 > and infrastructure maps floating overhead like constellations nobody's bothered to name.
@@ -525,7 +531,7 @@ inside any Doc's folder.
 > labeled. Every tool has a place. The whole room still carries that same feeling — a
 > station that was supposed to close years ago, and never did.
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l2.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l2.mp3`
 > She's watching six terminals at once when you arrive, dark hair loosely tied back, the
 > long coat she wears instead of armor hung with pockets and utility straps. One display
 > shifts to your signal. Her eyes hold on it half a second longer than the others got.
@@ -533,14 +539,14 @@ inside any Doc's folder.
 **VEIL** `veil/chapter_1/c1_s3_p1_l3.mp3`
 > "Axiom's package. Twenty minutes ago. Four reads. Still not enough."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l4.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l4.mp3`
 > She finally looks up. Not startled. Not concerned. Just tired, the way someone gets when
 > strange problems stopped surprising them a long time ago.
 
 **VEIL** `veil/chapter_1/c1_s3_p1_l5.mp3`
 > "Sit. I'd rather look at you than a report about you."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l6.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l6.mp3`
 > A chair rises from the floor, spare, unpadded — nothing like Axiom's or Float's. She runs
 > a slow pass with something that reads more like a level than a scanner, checking you
 > against a baseline only she can see.
@@ -548,7 +554,7 @@ inside any Doc's folder.
 **VEIL** `veil/chapter_1/c1_s3_p1_l7.mp3`
 > "He's right that it's reaching. Wrong that it's rare."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l8.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l8.mp3`
 > An alarm flashes amber somewhere behind her. She kills it with a flick of two fingers,
 > without looking.
 
@@ -562,19 +568,19 @@ inside any Doc's folder.
 **VEIL** `veil/chapter_1/c1_s3_p1_l11.mp3`
 > "Years ago. Before I did this for a living instead of against it."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l12.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l12.mp3`
 > Something in how she says it tells you not to ask further, so you don't.
 
 **VEIL** `veil/chapter_1/c1_s3_p1_l13.mp3`
 > "There's a name for it. On the boards where people build religions out of infrastructure
 > failures. They call it—"
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l14.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l14.mp3`
 [FX: static(4),flicker(3),bars(2) — 900ms, on the interrupted word]
 > She doesn't finish. The word gets halfway out — *the Persist—* — and something inside
 > your skull goes off like a struck bell.
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l15.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l15.mp3`
 > Pain doesn't describe it. Closer to feedback — a shriek pitched straight into the base of
 > your neural housing, gone as fast as it hit, a thin thread of smoke curling up behind
 > your left ear. Something back there just stopped working. Mid-sentence. Same as her.
@@ -582,7 +588,7 @@ inside any Doc's folder.
 **VEIL** `veil/chapter_1/c1_s3_p1_l16.mp3`
 > "—Theory."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l17.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l17.mp3`
 > She finishes it anyway. Quieter now. Like completing the sentence outranks whatever just
 > happened to you.
 
@@ -592,7 +598,7 @@ inside any Doc's folder.
 **VEIL** `veil/chapter_1/c1_s3_p1_l19.mp3`
 > "Resonance dampener. Failed. Hold still."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l20.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l20.mp3`
 > She's already moving — fast, precise, the reflex of someone who's handled hardware
 > failure a thousand times and refuses to let this be anything else. Pulse. Burn. Readout
 > again. By the time she's done, her voice is flat, controlled, all the way back inside its
@@ -601,7 +607,7 @@ inside any Doc's folder.
 **VEIL** `veil/chapter_1/c1_s3_p1_l21.mp3`
 > "Rig under stress. Threw an error. Bad timing. That's all this is."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l22.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l22.mp3`
 > She doesn't sound like she believes it. She sounds like someone choosing, on purpose, not
 > to say the rest of it twice.
 
@@ -615,7 +621,7 @@ inside any Doc's folder.
 > "A mistake. Fringe theory. Debunked years ago — fabricated, by people who wanted a better
 > story than the boring truth. Not relevant."
 
-**NARRATOR** `narrator/veil/chapter_1/c1_s3_p1_l26.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s3_p1_l26.mp3`
 > She's back at the readouts before you're fully standing, already pulling the next task
 > into the air — but her hand, for one second before it steadies, isn't as sure of itself
 > as the rest of her.
@@ -628,7 +634,7 @@ inside any Doc's folder.
 
 ---
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p1_l1.mp3`
 > Knuckle's wagon is the same cramped, low-ceiling space it's always been — walls patched
 > together from stolen network architecture, the seams still visible where different
 > systems were forced to talk to each other. Medical readouts float at chest height, most
@@ -636,7 +642,7 @@ inside any Doc's folder.
 > of his two diagnostic arms is already extended, pulling your signal before you've said a
 > word.
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l2.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p1_l2.mp3`
 > The readout it throws onto the wall comes back red, then narrows, then goes still on one
 > specific spot behind your ear.
 
@@ -644,7 +650,7 @@ inside any Doc's folder.
 > "Whoever told you to hold still was right. You're lucky it cauterized instead of
 > spreading."
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l4.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p1_l4.mp3`
 > He pulls a handheld scanner into the other arm and runs it slow along the burn, the way
 > he runs everything — no wasted motion, no urgency he hasn't decided to have. A burner
 > cigarette materializes between two fingers of the arm he isn't using. He doesn't light it
@@ -656,7 +662,7 @@ inside any Doc's folder.
 **KNUCKLE** `knuckle/chapter_1/c1_s4_p1_l6.mp3`
 > "Housing, yeah. Whatever burned out inside it, no."
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l7.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p1_l7.mp3`
 > He pulls the burned component free with a short mechanical click, turns it over once in
 > the scanner's light, and doesn't bother hiding his opinion of it.
 
@@ -671,7 +677,7 @@ inside any Doc's folder.
 > "Patch. North Spokane. Tell her Knuckle sent you for a standard dampener, not a consult —
 > she'll try to turn it into one anyway."
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p1_l11.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p1_l11.mp3`
 > He finally lights the cigarette, already turning back to the readouts, done with you in
 > the specific, efficient way of a man who never had more than two minutes to spend on
 > anyone.
@@ -696,7 +702,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 
 ---
 
-**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s5_p1_l1.mp3`
 > Patch's station is an old maintenance dig buried beneath North Spokane — exposed pipes,
 > concrete walls, bundles of cable disappearing into the dark like roots. Nothing here was
 > built to be lived in. Somebody clearly changed their mind anyway: plants grow under
@@ -704,7 +710,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 > working, and half a dozen terminals drift lazily through the air, opening and closing to
 > a logic only she seems to track.
 
-**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l2.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s5_p1_l2.mp3`
 > She's got both arms inside an open panel when you arrive, one sleeve rolled up, the other
 > forgotten, dark hair tied back with something that wasn't originally meant for hair.
 
@@ -718,7 +724,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 **PATCH** `patch/chapter_1/c1_s5_p1_l5.mp3`
 > "Sure. Course you are."
 
-**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l6.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s5_p1_l6.mp3`
 > The sale's barely finished processing — the case already in your hand — when she does
 > the thing every Doc apparently can't help doing: stops treating you like a transaction
 > and starts treating you like a patient.
@@ -733,7 +739,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 > "Nothing you need to hear standing up in my doorway. Take the part. Get it seated. Come
 > back when you've got twenty minutes I can actually use."
 
-**NARRATOR** `narrator/patch/chapter_1/c1_s5_p1_l10.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s5_p1_l10.mp3`
 > She's already back at the panel, not waiting for you to agree — but she says it again
 > anyway, quieter, like she wants to make sure it landed.
 
@@ -748,7 +754,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 
 ---
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p2_l1.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p2_l1.mp3`
 > Same wagon, same amber readouts drifting at chest height. Knuckle doesn't ask if you got
 > it — just holds one of his diagnostic arms out, palm up, waiting.
 
@@ -758,7 +764,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 **KNUCKLE** `knuckle/chapter_1/c1_s4_p2_l3.mp3`
 > "She never says hi. Sit."
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p2_l4.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p2_l4.mp3`
 > He has the panel open before you're fully seated, the burned housing already out and set
 > aside like he's been holding the shape of it in his head since you left. The new
 > component goes in without ceremony — one motion, a short mechanical click.
@@ -766,7 +772,7 @@ Knuckle's referral. Dialogue is locked; the purchase mechanic still needs real e
 **KNUCKLE** `knuckle/chapter_1/c1_s4_p2_l5.mp3`
 > "Give it a second."
 
-**NARRATOR** `narrator/knuckle/chapter_1/c1_s4_p2_l6.mp3`
+**NARRATOR** `narrator/chapter_1/c1_s4_p2_l6.mp3`
 > You feel it before the readout even changes — a cold, precise pressure behind your ear,
 > there and gone, like something exhaling on your behalf. The low, constant wrongness
 > that's been sitting in that spot since Veil's office goes with it. On the wall, the
@@ -861,7 +867,14 @@ no player acknowledgment, no resolution. The title card is the last thing on scr
 
 ---
 
-*Document version 2.8 — C1_S3_P2 ("We Need to Speak," Veil) written and locked: 5 spoken
+*Document version 2.9 — Flattened the narrator audio folder convention: all of Chapter 1's
+narrator lines now live together under a single `narrator/chapter_1/` folder instead of
+being nested per-Doc (`narrator/{doc}/chapter_1/`), matching how the files were actually
+organized during production. The `part_id` prefix on each filename already disambiguates
+which scene a line belongs to, so per-Doc nesting was redundant. Updated the documented
+convention and folder-tree example, and rewrote all 56 existing narrator audio tags across
+every locked scene (`C1_S1_P1` through `C1_S3_P2`) to drop the `{doc}` path segment.
+C1_OPEN's narrator tags were already flat and needed no change. Previously, version 2.8 — C1_S3_P2 ("We Need to Speak," Veil) written and locked: 5 spoken
 lines, closing Chapter 1. Delivered as a `FieldCommsWindow` call that gets forcibly taken
 over by `WatcherSignal` mid-word — the Watcher reacting to its own signal being named by two
 Docs cross-referencing data, the biggest examination of the pattern yet, which is why this

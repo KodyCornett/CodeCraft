@@ -15,6 +15,8 @@
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { getBusinessNetworkName } from './businessNodes.js';
+
 // ── Deterministic hash ────────────────────────────────────────────────────────
 function djb2(str) {
     let hash = 5381;
@@ -90,6 +92,12 @@ function getZoneCode(node) {
 
 // ── Network name ──────────────────────────────────────────────────────────────
 export function getNetworkName(node) {
+    // 15 hand-picked nodes (see businessNodes.js) show a Codex-thread
+    // company's network name instead of a generated one — cosmetic only,
+    // canvas_id/ICE/rewards/SPLICE address are all untouched.
+    const businessName = getBusinessNetworkName(node.canvasId);
+    if (businessName) return businessName;
+
     const h    = djb2(node.id);
     const pool = (node.district && DISTRICT_NAMES[node.district])
         ? DISTRICT_NAMES[node.district]
@@ -118,4 +126,45 @@ export function getNodeIdentity(node) {
         spliceAddress: getSpliceAddress(node),
         zoneCode:      getZoneCode(node),
     };
+}
+
+// ── Reverse lookup — Splice Site search ────────────────────────────────────────
+// Everything above only ever goes node → identity. This is the other
+// direction: given whatever a player typed, find the node(s) it matches.
+// Backs the Splice Site map page (see useNodeTracking.js) — nothing else
+// in the identity system needs this, so it stays isolated down here.
+
+/**
+ * Search a list of nodes by SPLICE address (exact, case-insensitive) or by
+ * network name (partial, case-insensitive substring — matches a business
+ * name from businessNodes.js same as it matches a generated name, since
+ * getNetworkName() already prefers the business name when one exists).
+ *
+ * Address matches are exact by design — the address is meant to feel like
+ * a real credential a player copies out of a document, not a fuzzy guess.
+ * Name matches are substring so a partial "AVISTA" still finds
+ * "AVISTA_CORP_NET". Address hits are returned first.
+ *
+ * Returns an array of { node, identity } pairs, not bare nodes, so callers
+ * don't have to recompute the identity a second time to display it.
+ */
+export function searchNodes(nodes, query) {
+    const q = (query ?? '').trim().toUpperCase();
+    if (!q) return [];
+
+    const addressHits = [];
+    const nameHits    = [];
+
+    for (const node of nodes) {
+        const identity = getNodeIdentity(node);
+        if (identity.spliceAddress.toUpperCase() === q) {
+            addressHits.push({ node, identity });
+            continue;
+        }
+        if (identity.networkName.toUpperCase().includes(q)) {
+            nameHits.push({ node, identity });
+        }
+    }
+
+    return [...addressHits, ...nameHits];
 }
