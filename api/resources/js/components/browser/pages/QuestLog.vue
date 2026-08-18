@@ -9,7 +9,7 @@
                 <span class="ql-sep">//</span>
                 <span class="ql-sub">QUEST TERMINAL</span>
             </div>
-            <button class="ql-refresh" @click="fetchQuestLog" :disabled="loading">
+            <button class="ql-refresh" @click="onSync" :disabled="loading">
                 {{ loading ? 'SYNCING...' : '↺ SYNC' }}
             </button>
         </div>
@@ -91,6 +91,15 @@
                                     {{ stage.objective_text }}
                                 </div>
 
+                                <!-- Trackable lead — appears once the stage goes active. Read-only by
+                                     design: the player has to actually go search this in Splice Maps
+                                     themselves, this terminal doesn't offer a shortcut to track it. -->
+                                <div v-if="stage.status === 'active' && leadFor(stage)" class="ql-stage-lead">
+                                    <span class="ql-lead-tag">LEAD</span>
+                                    <span class="ql-lead-name">{{ leadFor(stage).identity.networkName }}</span>
+                                    <span class="ql-lead-address">{{ leadFor(stage).identity.spliceAddress }}</span>
+                                </div>
+
                                 <div v-if="stage.status === 'locked'" class="ql-stage-obj ql-stage-obj--locked">
                                     [ CLASSIFIED — COMPLETE PREVIOUS OBJECTIVE ]
                                 </div>
@@ -138,9 +147,33 @@
 import { ref, onMounted } from 'vue';
 import { useQuestLog }      from '../../../composables/useQuestLog.js';
 import { useQuestMinigame } from '../../../composables/useQuestMinigame.js';
+import { useNodeTracking }  from '../../../composables/useNodeTracking.js';
 
 const { docs, loading, error, fetchQuestLog, completeStage } = useQuestLog();
 const { currentNodeCanvasId, launch } = useQuestMinigame();
+const { getIdentityByCanvasId } = useNodeTracking();
+
+// ── Trackable leads ──────────────────────────────────────────────────────────
+// canvasId -> { node, identity } | null, resolved lazily as active stages
+// come into view. Read-only display — see the "LEAD" markup above for why
+// this doesn't offer a one-click track.
+const leadCache = ref({});
+
+function leadFor(stage) {
+    return stage.node_canvas_id ? (leadCache.value[stage.node_canvas_id] ?? null) : null;
+}
+
+async function resolveLeads() {
+    for (const doc of docs.value) {
+        for (const arc of doc.arcs) {
+            for (const stage of arc.stages) {
+                const canvasId = stage.node_canvas_id;
+                if (stage.status !== 'active' || !canvasId || canvasId in leadCache.value) continue;
+                leadCache.value[canvasId] = await getIdentityByCanvasId(canvasId);
+            }
+        }
+    }
+}
 
 // Per-type skin defaults — labels, brief objective text, and mechanic flags
 const MINIGAME_SKIN = {
@@ -213,16 +246,24 @@ function stageIcon(status) {
     return '░';
 }
 
+// ── Manual sync ──────────────────────────────────────────────────────────────
+async function onSync() {
+    await fetchQuestLog();
+    resolveLeads();
+}
+
 // ── Branch selection ──────────────────────────────────────────────────────────
 async function onBranchSelect(stageId, docId) {
     await completeStage(stageId, docId);
     autoOpen();
+    resolveLeads();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 onMounted(async () => {
     await fetchQuestLog();
     autoOpen();
+    resolveLeads();
 });
 </script>
 
@@ -374,6 +415,26 @@ onMounted(async () => {
 }
 .ql-stage-obj--locked { color: #2a4a3a; font-style: italic; }
 .ql-stage--complete .ql-stage-obj { color: #2a5a3a; }
+
+/* ── Trackable lead — cyan to visually tie it to Splice Maps ─────────────── */
+.ql-stage-lead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 3px;
+    padding: 4px 8px 4px 16px;
+    font-size: 9.5px;
+}
+.ql-lead-tag {
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #00e5ff;
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+.ql-lead-name    { color: #b8e4f0; font-weight: 700; }
+.ql-lead-address { color: #00e5ff; }
 
 /* ── Branch options ──────────────────────────────────────────────────────── */
 .ql-branch {

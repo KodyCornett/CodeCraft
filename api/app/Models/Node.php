@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SpliceAddress;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,7 @@ class Node extends Model
 
     protected $fillable = [
         'canvas_id',
+        'splice_address',
         'x',
         'y',
         'type',
@@ -28,6 +30,24 @@ class Node extends Model
         'zone_type',
         'zone_group',
     ];
+
+    /**
+     * Auto-generate a node's SPLICE address on creation if one wasn't
+     * explicitly set. Registered in booted() (not boot()) so it runs after
+     * HasUuids's own creating listener — that trait's boot() call is what
+     * assigns $node->id, and it's registered first, so by the time this
+     * listener fires the UUID is already in place. A writer can still
+     * hand-set splice_address on a specific node (e.g. in a seeder) to
+     * override the generated value entirely.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Node $node) {
+            if (empty($node->splice_address)) {
+                $node->splice_address = SpliceAddress::generate($node->id, $node->district);
+            }
+        });
+    }
 
     protected $casts = [
         'x'                          => 'float',

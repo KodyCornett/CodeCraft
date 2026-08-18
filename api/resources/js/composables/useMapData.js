@@ -22,6 +22,7 @@ function toCanvasNode(apiNode) {
     return {
         id:        apiNode.id,          // UUID — used for all API calls (deplete, etc.)
         canvasId:  apiNode.canvas_id,   // 'DT-hub', 'NS-v3', 'wp_3_-7' — map lookup key
+        spliceAddress: apiNode.splice_address ?? null, // stored ZONE.HASH — see useNodeIdentity.js
         x:         apiNode.x  ?? 0,    // SVG canvas x coordinate (used for false ping targeting)
         y:         apiNode.y  ?? 0,    // SVG canvas y coordinate
         type:      apiNode.type,        // 'action' | 'cyberdoc'

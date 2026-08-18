@@ -111,7 +111,15 @@ export function getNetworkName(node) {
 }
 
 // ── SPLICE address ────────────────────────────────────────────────────────────
+// Prefers the stored value from the DB (Node::splice_address — see
+// api/app/Support/SpliceAddress.php) so a writer's hand-set override is
+// always respected. Falls back to computing it locally only when a node
+// hasn't got one yet (e.g. dev fixtures created outside the normal model
+// hook) — the fallback formula is kept in exact sync with the PHP port,
+// so the two never disagree for a node that ends up going through both.
 export function getSpliceAddress(node) {
+    if (node.spliceAddress) return node.spliceAddress;
+
     const h    = djb2(node.id + '_s');
     const zone = getZoneCode(node);
     const hash = (h & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');

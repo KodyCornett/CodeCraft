@@ -22,11 +22,16 @@
  * small rows, no adjacency/geometry needed here) and keeps this feature
  * fully self-contained — nothing else in the codebase has to change for it
  * to work.
+ *
+ * Also backs QuestLog.vue's "LEAD:" line — once a stage with a
+ * node_canvas_id goes active, the Mission Log shows that node's name and
+ * address (read-only, no auto-track button) so the player has to actually
+ * go to Splice Maps and search it themselves rather than one-clicking it.
  */
 
 import { ref, readonly } from 'vue';
 import axios from 'axios';
-import { searchNodes as searchNodeList } from './useNodeIdentity.js';
+import { getNodeIdentity, searchNodes as searchNodeList } from './useNodeIdentity.js';
 
 // Cap on simultaneously tracked pins — keeps the map legible. Oldest pin
 // drops off when a new one pushes past the cap. Easy to raise later if it
@@ -50,10 +55,11 @@ export function useNodeTracking() {
         try {
             const res = await axios.get('/api/nodes');
             nodeCache.value = (res.data.nodes ?? []).map(n => ({
-                id:       n.id,
-                canvasId: n.canvas_id,
-                type:     n.type,
-                district: n.district,
+                id:            n.id,
+                canvasId:      n.canvas_id,
+                type:          n.type,
+                district:      n.district,
+                spliceAddress: n.splice_address ?? null,
             }));
         } catch (e) {
             cacheError.value = e?.response?.data?.message ?? e.message ?? 'Node directory unavailable';
@@ -79,6 +85,21 @@ export function useNodeTracking() {
         return searchNodeList(nodeCache.value, query)
             .filter(({ node }) => node.type === 'action')
             .slice(0, 20);
+    }
+
+    /**
+     * Resolve a single node's identity by canvas ID — used by QuestLog.vue
+     * to show a stage's target node as a "LEAD: <name> — <address>" line.
+     * Loads the cache lazily on first call, same as search(). Returns null
+     * while loading, on fetch failure, or if the canvasId doesn't match
+     * anything (shouldn't happen for a real stage target, but a quest
+     * pointing at a since-removed/renamed node shouldn't crash the log).
+     */
+    async function getIdentityByCanvasId(canvasId) {
+        await ensureNodesLoaded();
+        if (cacheError.value || !canvasId) return null;
+        const node = nodeCache.value.find(n => n.canvasId === canvasId);
+        return node ? { node, identity: getNodeIdentity(node) } : null;
     }
 
     function isTracked(canvasId) {
@@ -114,6 +135,7 @@ export function useNodeTracking() {
         cacheError:     readonly(cacheError),
         maxTracked:     MAX_TRACKED,
         search,
+        getIdentityByCanvasId,
         trackNode,
         untrackNode,
         isTracked,

@@ -40,6 +40,7 @@ class NodeController extends Controller
             ->map(fn ($node) => [
                 'id'                         => $node->id,
                 'canvas_id'                  => $node->canvas_id,
+                'splice_address'             => $node->splice_address,
                 'x'                          => $node->x,
                 'y'                          => $node->y,
                 'type'                       => $node->type,
