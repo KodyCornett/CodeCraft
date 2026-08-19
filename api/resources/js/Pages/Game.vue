@@ -949,9 +949,12 @@ const activeUnpromptedStage = computed(() => {
             // Chapter 1 arc wraps ("both loose ends land within one scene of
             // each other" — CHAPTER_1_SCRIPT.md). The two arcs aren't linked
             // server-side (linear per-arc stage gating can't express a cross-doc
-            // dependency like this), so it's enforced here instead.
-            if (doc.name === 'Veil') {
-                const knuckle = questDocs.value.find(d => d.name === 'Knuckle');
+            // dependency like this), so it's enforced here instead. Matched by
+            // `district`, not `name` — doc.name is the shop name ("Veil's
+            // Parlour", "Knuckle's Med-Wagon"), same convention WATCHER_TRANSITIONS
+            // already uses for exactly this reason.
+            if (doc.district === 'Downtown') {
+                const knuckle = questDocs.value.find(d => d.district === "Browne's Addition");
                 const c1Arc   = knuckle?.arcs?.find(a => a.sequence_order === 2);
                 if (c1Arc?.status !== 'complete') continue;
             }
@@ -961,7 +964,7 @@ const activeUnpromptedStage = computed(() => {
                 docHandle:      doc.name?.match(/^([A-Za-z]+)/)?.[1]?.toUpperCase() ?? 'UNKNOWN',
                 accentColor:    docColorByName(doc.name),
                 lines:          stage.field_comms,
-                isChapterClose: doc.name === 'Veil',
+                isChapterClose: doc.district === 'Downtown',
             };
         }
     }

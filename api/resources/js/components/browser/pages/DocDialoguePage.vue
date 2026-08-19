@@ -31,54 +31,11 @@ import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue';
 import DialoguePage from './DialoguePage.vue';
 import { SPLICE } from '../SpliceRouter.js';
 import { useAudio } from '../../../composables/useAudio.js';
+import { DOC_CONFIG } from '../../../constants/docConfig.js';
 
 const props = defineProps({
     url: { type: String, default: '' },
 });
-
-// ── Doc config table ──────────────────────────────────────────────────────────
-const DOC_CONFIG = {
-    knuckle: {
-        npcHandle:     'KNUCKLE',
-        npcSubtitle:   'STREET DOC // BROWNE\'S ADDITION',
-        locationLabel: 'BA-HUB // KNUCKLE\'S MED-WAGON',
-        accentColor:   '#FF6B35',
-        district:      "Browne's Addition",
-        ambientSrc:    'k_node_BG.mp3',
-    },
-    patch: {
-        npcHandle:     'PATCH',
-        npcSubtitle:   'FIELD MEDIC // NORTH SPOKANE',
-        locationLabel: 'NS-HUB // PATCH\'S CLINIC',
-        accentColor:   '#00FFC8',
-        district:      'North Spokane',
-        ambientSrc:    'p_node_BG.mp3',
-    },
-    veil: {
-        npcHandle:     'VEIL',
-        npcSubtitle:   'IMPLANT ARTIST // DOWNTOWN',
-        locationLabel: 'DT-HUB // VEIL\'S PARLOUR',
-        accentColor:   '#B06FFF',
-        district:      'Downtown',
-        ambientSrc:    'v_node_BG.mp3',
-    },
-    axiom: {
-        npcHandle:     'AXIOM',
-        npcSubtitle:   'SYSTEMS TECH // UNIVERSITY DISTRICT',
-        locationLabel: 'UD-HUB // AXIOM SYSTEMS',
-        accentColor:   '#FFD700',
-        district:      'University District',
-        ambientSrc:    null,
-    },
-    float: {
-        npcHandle:     'FLOAT',
-        npcSubtitle:   'REPAIR SPECIALIST // SPOKANE VALLEY',
-        locationLabel: 'SV-HUB // FLOAT\'S REPAIR BAY',
-        accentColor:   '#00BFFF',
-        district:      'Spokane Valley',
-        ambientSrc:    'f_node_BG.mp3',
-    },
-};
 
 // ── Parse doc handle from URL (splice://dialogue/knuckle → 'knuckle') ─────────
 const docHandle = computed(() => {

@@ -210,6 +210,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/quests/stage/{stageId}/complete',     [QuestController::class, 'completeStage']);
     Route::post('/quests/arc/{arcId}/watcher-signal-sent', [QuestController::class, 'markWatcherSignalSent']);
 
+    // DEV ONLY — remove before release. Returns every stage's dialogue/field_comms
+    // content regardless of player progress; powers splice://dev/scenes.
+    Route::get('/dev/quest-scenes', [QuestController::class, 'devScenes']);
+
 // ---------------------------------------------------------------------------
 // Codex — optional investigative side system. While a codex thread is
 // active, winning Archive Extraction anywhere has a chance to drop a key;

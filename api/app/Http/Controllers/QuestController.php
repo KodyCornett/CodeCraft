@@ -102,4 +102,47 @@ class QuestController extends Controller
             'events' => $this->questLogService->getForPlayer($player),
         ]);
     }
+
+    /**
+     * GET /api/dev/quest-scenes — DEV ONLY, remove before release.
+     *
+     * Returns every quest stage that has dialogue and/or field_comms content,
+     * across ALL docs and stages, regardless of any player's progress. Powers
+     * the splice://dev/scenes scene splicer so audio/timing/effects can be
+     * previewed without fast-forwarding a real save via `player:skip-to`.
+     */
+    public function devScenes(): JsonResponse
+    {
+        $canvasToSlug = [
+            'BA-hub' => 'knuckle',
+            'NS-hub' => 'patch',
+            'DT-hub' => 'veil',
+            'UD-hub' => 'axiom',
+            'SV-hub' => 'float',
+        ];
+
+        $scenes = QuestStage::with('arc.cyberDoc.node')
+            ->where(function ($query) {
+                $query->whereNotNull('dialogue')->orWhereNotNull('field_comms');
+            })
+            ->get()
+            ->map(function (QuestStage $stage) use ($canvasToSlug) {
+                $canvasId = $stage->arc?->cyberDoc?->node?->canvas_id;
+
+                return [
+                    'id'           => $stage->id,
+                    'docSlug'      => $canvasToSlug[$canvasId] ?? 'unknown',
+                    'docName'      => $stage->arc?->cyberDoc?->name,
+                    'stageNumber'  => $stage->stage_number,
+                    'title'        => $stage->title,
+                    'dialogue'     => $stage->dialogue,
+                    'fieldComms'   => $stage->field_comms,
+                    'minigameType' => $stage->minigame_type,
+                ];
+            })
+            ->sortBy([['docSlug', 'asc'], ['stageNumber', 'asc']])
+            ->values();
+
+        return response()->json(['scenes' => $scenes]);
+    }
 }

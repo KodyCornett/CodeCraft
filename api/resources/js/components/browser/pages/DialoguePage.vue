@@ -90,6 +90,10 @@ const props = defineProps({
     locationLabel: { type: String, default: '' },
     accentColor:   { type: String, default: '#00FFC8' },
     ambientSrc:    { type: String, default: null },
+    // When true, PLAYER_CHOICE branches auto-pick their first option instead
+    // of waiting for a click — lets a scene run hands-off end to end.
+    // Off by default so normal play (DocDialoguePage.vue) is unaffected.
+    autoAdvanceChoices: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['complete', 'reached-end']);
@@ -307,6 +311,18 @@ function selectChoice(opt) {
     }, DELAY.PLAYER_SAID);
     _timers.push(t1);
 }
+
+// ── Auto-advance choices (dev scene splicer / preview mode) ───────────────────
+// Waits a beat so the choice is still readable, then picks the first option
+// exactly as if the player clicked it.
+watch(choicesReady, (ready) => {
+    if (!ready || !props.autoAdvanceChoices) return;
+    if (!currentChoices.value.length) return;
+    const t = setTimeout(() => {
+        if (!choiceMade.value) selectChoice(currentChoices.value[0]);
+    }, 1200);
+    _timers.push(t);
+});
 
 // ── Keep audio in sync with volume/mute changes made during playback ──────────
 // storyVolume change — update line audio only (ambient is fixed at AMBIENT_VOL)
