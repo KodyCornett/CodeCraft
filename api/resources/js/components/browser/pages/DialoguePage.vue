@@ -150,7 +150,11 @@ function _ambientIn() {
     } else {
         _ambient.play().catch(() => {});
     }
-    _ambientFadeTo(AMBIENT_VOL);
+    // Bug fix: this used to always fade to AMBIENT_VOL, ignoring the current
+    // mute state — so the ambient bed stayed audible under a muted session
+    // while line audio (which does check muted) played silently. Match the
+    // watch(muted, ...) behaviour below.
+    _ambientFadeTo(muted.value ? 0 : AMBIENT_VOL);
 }
 
 function _ambientOut() {
