@@ -6,6 +6,14 @@
         <!-- Watcher signal interrupt — renders above everything when active -->
         <WatcherSignal :signal="activeSignal" :player="player" @complete="onSignalComplete" />
 
+        <!-- Chapter title card — reveal cinematic, fires after WatcherSignal's reboot on a chapter close -->
+        <ChapterTitleCard
+            :chapter-number="chapterCard.chapterNumber"
+            :title="chapterCard.title"
+            :active="chapterCard.active"
+            @complete="chapterCard.active = false"
+        />
+
         <!-- Doc notifications — HUD alerts for arc unlocks and referrals -->
         <DocNotification :queue="docNotifQueue" @dismiss="dismissDocNotif" />
 
@@ -271,7 +279,7 @@
         <!-- DOC field comms — voice-call check-ins during field missions -->
         <FieldCommsWindow
             :call="fieldCommsActiveCall"
-            @complete="onFieldCommsComplete"
+            @complete="handleFieldCommsComplete"
         />
 
         <!-- First-login welcome modal -->
@@ -317,6 +325,7 @@ import TrapFiredNotification  from '@/components/shared/TrapFiredNotification.vu
 import UiTour                 from '@/components/shared/UiTour.vue';
 import DocChatWindow          from '@/components/shared/DocChatWindow.vue';
 import FieldCommsWindow       from '@/components/shared/FieldCommsWindow.vue';
+import ChapterTitleCard       from '@/components/shared/ChapterTitleCard.vue';
 // ── Extracted overlay components ──────────────────────────────────────────────
 import CriticalFailureOverlay from '@/components/shared/CriticalFailureOverlay.vue';
 import PvpChallengeOverlay    from '@/components/shared/PvpChallengeOverlay.vue';
@@ -919,6 +928,63 @@ watch(currentNodeId, (newNode, oldNode) => {
     });
 });
 
+// ── Unprompted field comms — DOC-initiated calls with no node requirement ────
+// Distinct from activeFieldStage above (which only fires on arrival at a
+// specific field node): these are stages that carry field_comms but no
+// node_canvas_id — the call fires wherever the player currently is, the
+// moment the stage goes active, and the stage completes itself when the call
+// ends, since there's no separate minigame/objective to finish first. Used
+// for Chapter 1's two DOC-initiated callback beats — Knuckle's "Still Live"
+// and Veil's chapter-close call — see CHAPTER_1_SCRIPT.md C1_S4_P3 / C1_S3_P2.
+const activeUnpromptedStage = computed(() => {
+    for (const doc of questDocs.value ?? []) {
+        for (const arc of doc.arcs ?? []) {
+            if (arc.status !== 'active') continue;
+            const stage = (arc.stages ?? []).find(s => s.status === 'active');
+            if (!stage) continue;
+            if (stage.node_canvas_id) continue; // node-arrival stages are activeFieldStage's job
+            if (!stage.field_comms || stage.field_comms.length === 0) continue;
+
+            // Veil's chapter close is written to land right after Knuckle's own
+            // Chapter 1 arc wraps ("both loose ends land within one scene of
+            // each other" — CHAPTER_1_SCRIPT.md). The two arcs aren't linked
+            // server-side (linear per-arc stage gating can't express a cross-doc
+            // dependency like this), so it's enforced here instead.
+            if (doc.name === 'Veil') {
+                const knuckle = questDocs.value.find(d => d.name === 'Knuckle');
+                const c1Arc   = knuckle?.arcs?.find(a => a.sequence_order === 2);
+                if (c1Arc?.status !== 'complete') continue;
+            }
+
+            return {
+                stageId:        stage.id,
+                docHandle:      doc.name?.match(/^([A-Za-z]+)/)?.[1]?.toUpperCase() ?? 'UNKNOWN',
+                accentColor:    docColorByName(doc.name),
+                lines:          stage.field_comms,
+                isChapterClose: doc.name === 'Veil',
+            };
+        }
+    }
+    return null;
+});
+
+// Fires as soon as an unprompted stage goes active — gated on `booted` so it
+// can't interrupt the boot sequence. triggerFieldComms/useFieldComms already
+// dedupes per stageId (see useFieldComms.js's _playedStageIds), same as the
+// node-arrival watcher above, so no extra bookkeeping is needed here.
+watch(activeUnpromptedStage, (stage) => {
+    if (!stage || !booted.value) return;
+
+    triggerFieldComms({
+        stageId:        stage.stageId,
+        docHandle:      stage.docHandle,
+        accentColor:    stage.accentColor,
+        lines:          stage.lines,
+        unprompted:     true,
+        isChapterClose: stage.isChapterClose,
+    });
+});
+
 // Dialogue SPLICE URL for the selected CyberDoc node
 const NPC_DIALOGUE_URL = {
     KNUCKLE: SPLICE.DIALOGUE_KNUCKLE,
@@ -1001,6 +1067,34 @@ function onSignalComplete() {
         _postSignalNav.value = null;
         nav();
     }
+}
+
+// Chapter title card — reveal cinematic. Fires once WatcherSignal's reboot
+// sequence finishes for the Chapter 1 close signal, via the same
+// _postSignalNav hook every other post-signal action already uses.
+const chapterCard = ref({ chapterNumber: 2, title: 'Persistence', active: false });
+
+// Wraps useFieldComms' onCallComplete: unprompted calls (see
+// activeUnpromptedStage above) have no separate objective for the player to
+// finish, so the call ending is what completes the stage — node-arrival field
+// jobs (activeFieldStage) still complete through their minigame, not here,
+// and are untouched since they were never tagged `unprompted`. Veil's
+// chapter-close call additionally hands off to the WatcherSignal cinematic
+// the instant it completes — Veil naming the Persistence Theory is what the
+// Watcher reacts to.
+function handleFieldCommsComplete() {
+    const finishedCall = fieldCommsActiveCall.value;
+    onFieldCommsComplete();
+    if (!finishedCall?.unprompted) return;
+
+    completeQuestStage(finishedCall.stageId).then(() => {
+        if (finishedCall.isChapterClose) {
+            _postSignalNav.value = () => {
+                chapterCard.value = { ...chapterCard.value, active: true };
+            };
+            triggerSignal({ id: 'watcher-chapter-1-close', signal_text: 'PERSISTENCE THEORY' });
+        }
+    });
 }
 
 provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQuestLog });

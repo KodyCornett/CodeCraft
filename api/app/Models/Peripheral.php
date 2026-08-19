@@ -18,6 +18,9 @@ class Peripheral extends Model
         'rarity',
         'port_cost',
         'price_creds',
+        'peripheral_type',
+        'slot_type',
+        'slot_tier',
     ];
 
     protected $casts = [

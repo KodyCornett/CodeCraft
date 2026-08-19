@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CyberDoc;
+use App\Models\Peripheral;
 use App\Models\Player;
 use App\Models\PlayerArcProgress;
 use App\Models\PlayerStageProgress;
@@ -13,8 +14,9 @@ use Illuminate\Support\Carbon;
 class QuestService
 {
     public function __construct(
-        private readonly QuestLogService $questLogService,
-        private readonly CodexService    $codexService,
+        private readonly QuestLogService          $questLogService,
+        private readonly CodexService              $codexService,
+        private readonly CyberDocInventoryService  $cyberDocInventoryService,
     ) {}
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -155,9 +157,21 @@ class QuestService
                 continue;
             }
 
+            // Chapter-aware: a referral into this doc only unlocks the arc it
+            // was actually meant for. Every doc now has a Chapter 1 arc sitting
+            // right behind its Prologue arc, and Chapter 1's referral chain
+            // reuses the same five docs — without this scope, the Prologue's
+            // own referral into a doc would unlock BOTH that doc's Prologue
+            // arc AND its Chapter 1 arc the first time the player ever visits,
+            // long before Chapter 1 has actually started. Requiring the
+            // referring stage's own arc to share this arc's sequence_order
+            // keeps each chapter's referral chain self-contained.
             $hasReferral = PlayerStageProgress::where('player_id', $player->id)
                 ->where('status', 'complete')
-                ->whereHas('stage', fn ($q) => $q->where('referral_doc_id', $doc->id))
+                ->whereHas('stage', function ($q) use ($doc, $arc) {
+                    $q->where('referral_doc_id', $doc->id)
+                      ->whereHas('arc', fn ($aq) => $aq->where('sequence_order', $arc->sequence_order));
+                })
                 ->exists();
 
             $shouldUnlock = $arc->is_entry_arc || $hasReferral;
@@ -261,8 +275,17 @@ class QuestService
                 ->where('quest_arc_id', $arc->id)
                 ->update(['status' => 'complete', 'completed_at' => Carbon::now()]);
 
-            // Unlock the next arc in sequence_order for this doc
-            $arcsUnlocked = $this->unlockNextArc($player, $doc, $arc->sequence_order);
+            // NOTE: this used to unconditionally call unlockNextArc() here,
+            // auto-advancing a doc straight into its own next sequence_order
+            // arc the instant the current one finished. That's wrong now that
+            // every doc has a Chapter 1 arc sitting right behind its Prologue
+            // arc — it would unlock a doc's Chapter 1 content the moment their
+            // Prologue arc wrapped, regardless of story state. Cross-chapter
+            // unlocking now happens exclusively through referrals (see
+            // initArcForDoc's sequence-scoped hasReferral check above) and the
+            // Chapter 1 kickoff special-case below. unlockNextArc() itself is
+            // unchanged and still in active use — just no longer called
+            // unconditionally from here.
         }
 
         // Write archive log entry
@@ -299,6 +322,44 @@ class QuestService
         // Activate a codex thread if this stage grants one — separate
         // optional side system, see CodexService.
         $codexActivation = $this->codexService->activateThreadForStage($player, $stage);
+
+        // ── Chapter 1 kickoff ────────────────────────────────────────────────
+        // Patch's final Prologue stage (reward_lore_key: 'prologue_complete')
+        // is the trigger the whole game has been building toward — finishing
+        // the Prologue unlocks Float's Chapter 1 arc, the chapter's entry
+        // point. Nothing "refers" a player to Float for Chapter 1 (she's the
+        // opener, not a referral target), so this can't ride the normal
+        // referral-unlock path above — it's a one-time, explicitly hardcoded
+        // special-case, same spirit as WATCHER_TRANSITIONS on the frontend.
+        if ($stage->reward_lore_key === 'prologue_complete') {
+            $floatDoc = CyberDoc::whereHas('node', fn ($q) => $q->where('canvas_id', 'SV-hub'))->first();
+            if ($floatDoc) {
+                $arcsUnlocked = array_merge($arcsUnlocked, $this->unlockNextArc($player, $floatDoc, 1));
+            }
+        }
+
+        // ── Knuckle's dampener referral (Chapter 1) ─────────────────────────
+        // Knuckle's "Interface, Not Chassis" stage (BA-hub, Chapter 1 arc,
+        // stage 1) refers the player to Patch for a resonance dampener —
+        // Knuckle doesn't stock interface hardware, so he can't hand it over
+        // himself. Grant the one-time catalog item to Patch's terminal the
+        // moment that referral fires, so it's waiting by the time the player
+        // arrives at NS-hub.
+        if ($doc->district === "Browne's Addition" && $arc->sequence_order === 2 && $stage->stage_number === 1) {
+            $dampener = Peripheral::where('name', 'Resonance Dampener')->first();
+            if ($dampener) {
+                $this->cyberDocInventoryService->grantCatalogItem(
+                    'NS-hub',
+                    'peripheral',
+                    $dampener->id,
+                    [
+                        'is_exclusive' => true,
+                        'stock_limit'  => 1,
+                        'source'       => 'mission:c1_s4_p1',
+                    ],
+                );
+            }
+        }
 
         return [
             'stage_id'           => $stage->id,

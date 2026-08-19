@@ -30,11 +30,25 @@ class QuestArcSeeder extends Seeder
                 'rep_required'   => 0,
                 'is_entry_arc'   => true,
             ],
+            [
+                // Chapter 1 — unlocked by the Chapter-1-kickoff special-case in
+                // QuestService (Patch's Prologue-completion stage), not by referral.
+                'sequence_order' => 2,
+                'title'          => 'The Dead End',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
         ],
         'DT-hub' => [   // Veil
             [
                 'sequence_order' => 1,
                 'title'          => 'The Smoothing Protocol',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
+            [
+                'sequence_order' => 2,
+                'title'          => 'The Persistence Theory',
                 'rep_required'   => 0,
                 'is_entry_arc'   => false,
             ],
@@ -46,6 +60,12 @@ class QuestArcSeeder extends Seeder
                 'rep_required'   => 0,
                 'is_entry_arc'   => false,
             ],
+            [
+                'sequence_order' => 2,
+                'title'          => 'The Cold Static',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
         ],
         'UD-hub' => [   // Axiom
             [
@@ -54,11 +74,23 @@ class QuestArcSeeder extends Seeder
                 'rep_required'   => 0,
                 'is_entry_arc'   => false,
             ],
+            [
+                'sequence_order' => 2,
+                'title'          => 'The Reaching Signal',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
         ],
         'NS-hub' => [   // Patch
             [
                 'sequence_order' => 1,
                 'title'          => 'Ghost-Kernel Calibration',
+                'rep_required'   => 0,
+                'is_entry_arc'   => false,
+            ],
+            [
+                'sequence_order' => 2,
+                'title'          => 'The Pickup',
                 'rep_required'   => 0,
                 'is_entry_arc'   => false,
             ],

@@ -168,6 +168,24 @@ class PeripheralSeeder extends Seeder
                 'price_creds'  => 7000,
             ],
 
+            // ── Interface hardware — story-gated, Chapter 1 ────────────────────
+            // Not a stat boost or a command slot. Granted to Patch's terminal
+            // as a one-time item (is_exclusive, stock_limit: 1) by QuestService
+            // when Knuckle's "Interface, Not Chassis" stage completes — see
+            // CyberDocInventoryService::grantCatalogItem() call there. Looked
+            // up by name, not by a hardcoded id, so re-seeding is safe.
+            [
+                'name'            => 'Resonance Dampener',
+                'stat_boosted'    => null,
+                'boost_amount'    => 0,
+                'rarity'          => 'rare',
+                'port_cost'       => 1,
+                'price_creds'     => 600,
+                'peripheral_type' => 'interface_hardware',
+                'slot_type'       => null,
+                'slot_tier'       => null,
+            ],
+
             // ── Command Modules — Nav Wraith series (map slots) ───────────────
             // Each Mk adds one map loadout slot. Tier = max command level allowed.
             [
