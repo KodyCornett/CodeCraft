@@ -20,7 +20,7 @@
                 v-for="(entry, i) in revealedEntries"
                 :key="i"
                 class="dp-entry"
-                :class="`dp-entry--${entry.speaker.toLowerCase().replace('_', '-')}`"
+                :class="`dp-entry--${(entry.speaker ?? 'unknown').toLowerCase().replace('_', '-')}`"
             >
                 <!-- NARRATOR -->
                 <template v-if="entry.speaker === 'NARRATOR'">
