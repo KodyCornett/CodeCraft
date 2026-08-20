@@ -119,13 +119,6 @@ const groupedDocs = computed(() => {
 
 function playScene(doc, scene) {
     if (!scene.dialogue) return;
-    // Temporary diagnostic — remove once voice playback is confirmed working.
-    console.log(
-        '[DEV SCENES] playScene()', scene.id,
-        '— isArray:', Array.isArray(scene.dialogue),
-        '— length:', scene.dialogue?.length,
-        '— entries:', JSON.parse(JSON.stringify(scene.dialogue)),
-    );
     fadeOutForDialogue();
     activeScene.value = {
         id:          scene.id,

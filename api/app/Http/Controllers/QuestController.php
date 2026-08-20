@@ -135,8 +135,8 @@ class QuestController extends Controller
                     'docName'      => $stage->arc?->cyberDoc?->name,
                     'stageNumber'  => $stage->stage_number,
                     'title'        => $stage->title,
-                    'dialogue'     => $stage->dialogue,
-                    'fieldComms'   => $stage->field_comms,
+                    'dialogue'     => $this->decodeJsonField($stage->dialogue),
+                    'fieldComms'   => $this->decodeJsonField($stage->field_comms),
                     'minigameType' => $stage->minigame_type,
                 ];
             })
@@ -144,5 +144,25 @@ class QuestController extends Controller
             ->values();
 
         return response()->json(['scenes' => $scenes]);
+    }
+
+    /**
+     * QuestStage::$dialogue / $field_comms are cast to 'array' on the model,
+     * but some rows come back from that cast as a JSON-encoded string instead
+     * of a decoded array (double-encoded data) — decode once more so the
+     * scene splicer always receives a real array, never raw JSON text.
+     */
+    private function decodeJsonField(mixed $value): ?array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : null;
+        }
+
+        return null;
     }
 }
