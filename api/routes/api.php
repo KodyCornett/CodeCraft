@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BankHeistController;
 use App\Http\Controllers\BountyController;
 use App\Http\Controllers\TutorialController;
 use App\Http\Controllers\CombatChallengeController;
@@ -114,6 +115,24 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:120,1');
     Route::post('/packet-hijack/{match}/transfer', [PacketHijackController::class, 'transfer']);
     Route::get('/packet-hijack/{match}/state',     [PacketHijackController::class, 'state']);
+
+// ---------------------------------------------------------------------------
+// Bank Heist — PvE mini-game gated to the 19 fixed bank/brokerage nodes in
+// BANK_TARGET_ROSTER.md (Node::is_bank_target). Client-trusted timers, same
+// as GridBreach — these endpoints only resolve discrete outcomes (a gate
+// failed, an account cracked, a lockdown hit). See BankHeistService's class
+// doc and BANK_HEIST_BUILD_PLAN.md for the full design.
+// ---------------------------------------------------------------------------
+
+    // gate1-failed: 20/min — one per failed attempt; a legitimate player can't
+    // fail faster than the timer floor (15s) allows
+    Route::post('/bank-heist/{canvasId}/gate1-failed', [BankHeistController::class, 'gate1Failed'])
+        ->middleware('throttle:20,1');
+    Route::post('/bank-heist/{canvasId}/brute-force-clean-exit', [BankHeistController::class, 'bruteForceCleanExit'])
+        ->middleware('throttle:20,1');
+    // account-result: 30/min — a greedy run can work through several accounts quickly
+    Route::post('/bank-heist/{canvasId}/account-result', [BankHeistController::class, 'accountResult'])
+        ->middleware('throttle:30,1');
 
 // ---------------------------------------------------------------------------
 // Leaderboards

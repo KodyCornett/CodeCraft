@@ -53,3 +53,55 @@ export const BUSINESS_NODES = {
 export function getBusinessNetworkName(canvasId) {
     return BUSINESS_NODES[canvasId] ?? null;
 }
+
+/**
+ * BANK_TARGET_NODES
+ *
+ * Same cosmetic-only mechanism as BUSINESS_NODES above, for the 19-target
+ * Bank Heist roster (see BANK_TARGET_ROSTER.md). canvas_id/ICE/rewards are
+ * untouched — only the human-readable network name changes. Kept as a
+ * separate map from BUSINESS_NODES since these are a different content
+ * system (Bank Heist, not the Codex thread), not because the mechanism
+ * differs.
+ *
+ * Placement: Tier 1 (retail/community) in low-ICE cells and Browne's
+ * Addition; Tier 2 (neo-tech/fast-yield) spread across North Spokane,
+ * Spokane Valley, University District, and a mid-ICE cell; Tier 3
+ * (institutional/high-net-worth) in Downtown, the map's highest-ICE named
+ * district; Tier 4 (apex/specialized) in Downtown's remaining slots plus
+ * scattered cells and one waypoint for Black-Tide Liquidity's underground
+ * flavor. None of the 19 collide with the 15 BUSINESS_NODES canvas_ids.
+ */
+export const BANK_TARGET_NODES = {
+    // Tier 1
+    'BA-v14': 'FIRSTMETRO_FCU_NET',
+    'G11-v2': 'SOLIS_LENDING_NET',
+    'F9-v2':  'VANTAGE_POINT_NET',
+    // Tier 2
+    'NS-v9':  'AETHER_NEOBANK_NET',
+    'SV-v9':  'BLUESKY_FUNDS_NET',
+    'UD-v7':  'HYPERION_VC_NET',
+    'I5-v2':  'PENSION_DIRECT_NET',
+    // Tier 3
+    'DT-v3':  'IRONCLAD_TRUST_NET',
+    'DT-v7':  'AEGIS_WEALTH_NET',
+    'DT-v11': 'KUROGANE_FLEET_NET',
+    'DT-v15': 'ZENJIN_ASSETS_NET',
+    'DT-v17': 'HORIZON_MUTUAL_NET',
+    // Tier 4
+    'DT-v19':   'APEX_CAPITAL_NET',
+    'DT-v21':   'CHRONOS_QUANT_NET',
+    'H7-v3':    'HORIZON_SOVEREIGN_NET',
+    'I3-v4':    'VERITAS_CUSTODY_NET',
+    'I5-v4':    'NOVA_EXCHANGE_NET',
+    'N10-v3':   'STARLIGHT_SOVEREIGN_NET',
+    'wp_-5_5':  'BLACKTIDE_RELAY_NET',
+};
+
+/**
+ * The Bank Heist target network name for this node's canvas_id, or null if
+ * it's not one of the 19 bank/brokerage nodes.
+ */
+export function getBankTargetNetworkName(canvasId) {
+    return BANK_TARGET_NODES[canvasId] ?? null;
+}

@@ -32,6 +32,7 @@
                 @open-dialogue="$emit('open-dialogue')"
                 @reset-cooldowns="$emit('reset-cooldowns')"
                 @hack-player="$emit('hack-player', $event)"
+                @bank-heist="$emit('bank-heist')"
             />
 
             <LoadoutBlock
@@ -83,7 +84,7 @@ defineProps({
     playerOpenSeason: { type: Boolean, default: false },
 });
 
-defineEmits(['hack', 'open-store', 'open-bank', 'open-dialogue', 'reset-cooldowns', 'use-command', 'hack-player']);
+defineEmits(['hack', 'open-store', 'open-bank', 'open-dialogue', 'reset-cooldowns', 'use-command', 'hack-player', 'bank-heist']);
 </script>
 
 <style scoped>

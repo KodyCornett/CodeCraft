@@ -150,6 +150,23 @@
                 <!-- Grid-Breach first-time orientation tour -->
                 <GridBreachTour v-if="activeHack" />
 
+                <!-- Bank Heist mini-game (PvE) — the 19 fixed bank/brokerage nodes only -->
+                <Transition name="breach-fade">
+                    <BankHeist
+                        v-if="activeBankHeist"
+                        :canvas-id="activeBankHeist.canvasId"
+                        :bank-name="activeBankHeist.bankName"
+                        :bank-ice="activeBankHeist.bankIce"
+                        :bank-tier="activeBankHeist.bankTier"
+                        :player-cpu="rig.cpu"
+                        :player-ram="rig.ram"
+                        :player-os="rig.os"
+                        :bounty-multiplier="player.bountyMultiplier"
+                        @complete="onBankHeistComplete"
+                        @abort="onBankHeistAbort"
+                    />
+                </Transition>
+
                 <!-- Packet Hijack terminal (PvP) — replaces GridBreach for PvP combat -->
                 <Transition name="breach-fade">
                     <PacketHijack
@@ -245,6 +262,7 @@
                 @reset-cooldowns="onResetCooldowns"
                 @use-command="onUseCommand"
                 @hack-player="onHackPlayer"
+                @bank-heist="onBankHeistSelected"
             />
 
         </div>
@@ -339,6 +357,7 @@ import GridBreachTour   from '@/components/minigame/GridBreachTour.vue';
 import PacketHijack     from '@/components/minigame/PacketHijack.vue';
 import PacketHijackTour from '@/components/minigame/PacketHijackTour.vue';
 import QuestMinigame    from '@/components/minigame/QuestMinigame.vue';
+import BankHeist        from '@/components/minigame/BankHeist.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
 import { useMapData }          from '@/composables/useMapData.js';
@@ -383,6 +402,7 @@ import { usePvpFlow }           from '@/composables/usePvpFlow.js';
 import { useResourceReplenish } from '@/composables/useResourceReplenish.js';
 import { useBrowserNavigation } from '@/composables/useBrowserNavigation.js';
 import { useNodeTracking }      from '@/composables/useNodeTracking.js';
+import { getBankTargetNetworkName } from '@/composables/businessNodes.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 import { docColorByName, docColor } from '@/constants/docColors.js';
 import { WATCHER_TRANSITIONS } from '@/constants/watcherTransitions.js';
@@ -570,6 +590,61 @@ const {
     tutorial, gbTour,
     applyCriticalFailure,
 });
+
+// ── Bank Heist flow ──────────────────────────────────────────────────────────
+// Separate from useHackFlow — a distinct minigame (BankHeist.vue, not
+// GridBreach) gated on the fixed 19-node Bank Heist roster rather than the
+// generic hack-any-action-node path. Kept inline (not its own composable)
+// since the state/handlers are small; BankHeist.vue owns all the game logic
+// round-trips itself via useBankHeist.js, this only opens/closes the overlay
+// and syncs the authoritative player/rig fields each server call already saved.
+const activeBankHeist = ref(null); // { canvasId, bankName, bankIce, bankTier }
+
+function onBankHeistSelected() {
+    const node = selectedNode.value;
+    if (!node || node.canvasId !== currentNodeId.value) return;
+    if (!node.isBankTarget) return;
+    if (node.bankCooldownUntil && new Date(node.bankCooldownUntil).getTime() > Date.now()) return;
+
+    activeBankHeist.value = {
+        canvasId: node.canvasId,
+        bankName: getBankTargetNetworkName(node.canvasId) ?? 'UNKNOWN TARGET',
+        bankIce:  node.bankIce ?? 3,
+        bankTier: node.bankTier ?? 1,
+    };
+}
+
+function onBankHeistComplete(payload) {
+    activeBankHeist.value = null;
+
+    const sync = payload?.playerSync;
+    if (sync) {
+        if (sync.pocketCreds !== undefined)      player.value.pocketCreds      = sync.pocketCreds;
+        if (sync.techPoints !== undefined)       player.value.techPoints       = sync.techPoints;
+        if (sync.bountyLevel !== undefined)      player.value.bountyLevel      = sync.bountyLevel;
+        if (sync.bountyMultiplier !== undefined) player.value.bountyMultiplier = sync.bountyMultiplier;
+        if (sync.currentSS !== undefined)        player.value.currentSS        = sync.currentSS;
+        if (sync.maxSS !== undefined)            player.value.maxSS            = sync.maxSS;
+        if (sync.event === 'critical_failure')   applyCriticalFailure(sync.criticalFailure ?? {});
+    }
+
+    // Gate 1 failure puts the node on a bank-wide cooldown — patch it into the
+    // local node record immediately so SidePanel's countdown doesn't wait for
+    // the next natural map refresh.
+    if (payload?.gate1Failed && payload?.canvasId) {
+        const node = getByCanvasId(payload.canvasId);
+        if (node) updateNodeResources(node.id, { bankCooldownUntil: payload.cooldownUntil ?? null });
+    }
+
+    console.log(
+        `[BANK HEIST] ${payload?.gate1Failed ? 'Gate 1 failed' : (payload?.lockdown ? 'LOCKDOWN' : 'Extracted clean')}` +
+        ` | +${payload?.totalCreds ?? 0} creds, +${(payload?.totalTech ?? 0).toFixed ? payload.totalTech.toFixed(2) : payload?.totalTech ?? 0} tech`
+    );
+}
+
+function onBankHeistAbort() {
+    activeBankHeist.value = null;
+}
 
 // ── Codex find prompt — rolled by useHackFlow on a successful routine hack ─────
 const { pendingFind: codexFindPending, accept: onCodexFindPlay, decline: onCodexFindPass } = useCodexFind();

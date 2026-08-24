@@ -56,6 +56,12 @@ class NodeController extends Controller
                 'is_safe_zone'               => $node->is_safe_zone,
                 'zone_type'                  => $node->zone_type ?? 'netlink',
                 'npc_handle'                 => $node->npc_handle,
+                // Bank Heist — only set for the 19 fixed targets in BANK_TARGET_ROSTER.md.
+                // bank_ice is independent of `ice` above (see the migration's class doc).
+                'is_bank_target'             => $node->is_bank_target,
+                'bank_tier'                  => $node->bank_tier,
+                'bank_ice'                   => $node->bank_ice,
+                'bank_cooldown_until'        => $node->bank_cooldown_until,
                 // Adjacent node IDs as UUIDs (for DB ops) and canvas_ids (for map matching)
                 'adjacent_node_ids'          => $node->adjacentNodes->pluck('id'),
                 'adjacent_canvas_ids'        => $node->adjacentNodes->pluck('canvas_id'),

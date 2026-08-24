@@ -15,7 +15,7 @@
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getBusinessNetworkName } from './businessNodes.js';
+import { getBusinessNetworkName, getBankTargetNetworkName } from './businessNodes.js';
 
 // ── Deterministic hash ────────────────────────────────────────────────────────
 function djb2(str) {
@@ -97,6 +97,12 @@ export function getNetworkName(node) {
     // canvas_id/ICE/rewards/SPLICE address are all untouched.
     const businessName = getBusinessNetworkName(node.canvasId);
     if (businessName) return businessName;
+
+    // 19 hand-picked nodes (see businessNodes.js) show a Bank Heist target's
+    // network name instead — same cosmetic-only mechanism as the Codex
+    // companies above, disjoint node set.
+    const bankName = getBankTargetNetworkName(node.canvasId);
+    if (bankName) return bankName;
 
     const h    = djb2(node.id);
     const pool = (node.district && DISTRICT_NAMES[node.district])

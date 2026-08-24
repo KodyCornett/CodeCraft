@@ -109,6 +109,21 @@
                 </div>
             </div>
 
+            <!-- Bank Heist — fixed 19-node trigger set, independent of normal hacking above -->
+            <div v-if="node.isBankTarget" class="ni-bankheist">
+                <div class="ni-divider" />
+                <div class="ni-res-label ni-bankheist-label">BANK HEIST TARGET — TIER {{ node.bankTier }}</div>
+                <button
+                    v-if="isOnNode"
+                    class="ni-bankheist-btn"
+                    :disabled="bankCooldownRemaining > 0"
+                    @click="$emit('bank-heist')"
+                >
+                    {{ bankCooldownRemaining > 0 ? `COOLDOWN — ${formatTimer(bankCooldownRemaining)}` : '[ INITIATE BANK HEIST ]' }}
+                </button>
+                <div v-else class="ni-bankheist-hint">Stand on this node to attempt entry.</div>
+            </div>
+
             <!-- Data fragments — recent hackers' traces, ticking down to zero -->
             <div v-if="traces.length > 0" class="ni-traces">
                 <div class="ni-divider" />
@@ -170,7 +185,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import PanelBlock from './PanelBlock.vue';
 import { getNodeIdentity } from '@/composables/useNodeIdentity.js';
 
@@ -191,7 +206,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['hack', 'open-store', 'open-bank', 'open-dialogue', 'reset-cooldowns', 'hack-player']);
+defineEmits(['hack', 'open-store', 'open-bank', 'open-dialogue', 'reset-cooldowns', 'hack-player', 'bank-heist']);
 
 // Render seconds_remaining as M:SS
 function formatTimer(seconds) {
@@ -200,6 +215,21 @@ function formatTimer(seconds) {
     const r = s % 60;
     return `${m}:${r.toString().padStart(2, '0')}`;
 }
+
+// Bank Heist cooldown countdown — node.bankCooldownUntil is a raw timestamp
+// (see useMapData.js), so this ticks its own clock rather than relying on
+// the resources prop's pre-computed replenishesIn (that system only covers
+// creds/tech/uplink).
+const nowTick = ref(Date.now());
+let cooldownTickInterval = null;
+onMounted(() => { cooldownTickInterval = setInterval(() => { nowTick.value = Date.now(); }, 1000); });
+onBeforeUnmount(() => { if (cooldownTickInterval) clearInterval(cooldownTickInterval); });
+
+const bankCooldownRemaining = computed(() => {
+    if (!props.node?.bankCooldownUntil) return 0;
+    const until = new Date(props.node.bankCooldownUntil).getTime();
+    return Math.max(0, Math.round((until - nowTick.value) / 1000));
+});
 
 const identity      = computed(() => props.node ? getNodeIdentity(props.node) : null);
 const typeLabel     = computed(() => props.node?.type === 'cyberdoc' ? 'CYBER DOC' : 'ACTION NODE');
@@ -278,6 +308,18 @@ const iceColorClass = computed(() => {
 .ni-hack-btn--uplink { border-color:rgba(125,249,255,.45); color:rgba(125,249,255,.85); }
 .ni-hack-btn--uplink:hover:not(:disabled) { color:#7DF9FF; border-color:rgba(125,249,255,.85); background:rgba(125,249,255,.07); }
 .ni-hack-btn:disabled { border-color:rgba(255,51,51,.25); color:rgba(255,51,51,.45); cursor:not-allowed; }
+
+/* ── Bank Heist trigger ────────────────────────────────────────────────────── */
+.ni-bankheist       { padding:8px 14px 10px; display:flex; flex-direction:column; gap:6px; }
+.ni-bankheist-label { color:#FFB300; text-shadow:0 0 6px rgba(255,179,0,.5); }
+.ni-bankheist-btn {
+    width:100%; padding:9px 0; background:rgba(255,179,0,.05); border:1px solid rgba(255,179,0,.5);
+    color:#FFB300; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.1em;
+    cursor:pointer; transition:all .15s; text-shadow:0 0 8px rgba(255,179,0,.4);
+}
+.ni-bankheist-btn:hover:not(:disabled) { background:rgba(255,179,0,.12); border-color:#FFB300; box-shadow:0 0 10px rgba(255,179,0,.2); }
+.ni-bankheist-btn:disabled { border-color:rgba(255,51,51,.3); color:rgba(255,51,51,.55); cursor:not-allowed; text-shadow:none; }
+.ni-bankheist-hint { font-size:8px; color:rgba(255,179,0,.55); letter-spacing:.06em; }
 
 .ni-store { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
 .ni-store-desc { font-size:9px; color:rgba(255,179,0,.72); letter-spacing:.06em; line-height:1.7; }

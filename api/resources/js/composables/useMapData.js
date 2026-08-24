@@ -32,6 +32,13 @@ function toCanvasNode(apiNode) {
         isSpawn:   apiNode.is_spawn   ?? false,
         isSafeZone: apiNode.is_safe_zone ?? false,
         npcHandle: apiNode.npc_handle ?? null,  // set on CyberDoc hubs — quest-giver handle
+        // Bank Heist — fixed 19-node trigger set (see BANK_HEIST_BUILD_PLAN.md).
+        // bankIce is independent of `ice` above; bankCooldownUntil is the Gate 1
+        // failure lockout timestamp (null = no active cooldown, any player may attempt).
+        isBankTarget:      apiNode.is_bank_target ?? false,
+        bankTier:          apiNode.bank_tier ?? null,
+        bankIce:           apiNode.bank_ice ?? null,
+        bankCooldownUntil: apiNode.bank_cooldown_until ?? null,
         state:     deriveState(apiNode),
         // Resource state for game logic
         credDepleted:       apiNode.cred_resource_depleted,
@@ -132,6 +139,9 @@ export function useMapData() {
         if (patch.movementDepleted     !== undefined) node.movementDepleted     = patch.movementDepleted;
         if (patch.credLastHackedAt     !== undefined) node.credLastHackedAt     = patch.credLastHackedAt;
         if (patch.movementLastHackedAt !== undefined) node.movementLastHackedAt = patch.movementLastHackedAt;
+        // Bank Heist — Gate 1 failure sets a bank-wide cooldown server-side;
+        // patched in immediately so SidePanel's countdown doesn't wait for fetchAll().
+        if (patch.bankCooldownUntil    !== undefined) node.bankCooldownUntil    = patch.bankCooldownUntil;
         // Re-derive visual state
         node.state = deriveState({
             type:                       node.type,

@@ -67,6 +67,13 @@ import StaVault04Terminal       from './pages/StaVault04Terminal.vue';
 import CopperheadFreightTerminal from './pages/CopperheadFreightTerminal.vue';
 import NullIrcRelayTerminal     from './pages/NullIrcRelayTerminal.vue';
 
+// ── Bank Heist target roster — one shared component, many routes ─────────────
+// See BANK_TARGET_ROSTER.md at the repo root and constants/bankTargetConfig.js
+// for the per-bank content this component renders. Cosmetic/flavor pages only
+// — the hackable-node backend (BankHeistService) lands separately once the
+// mechanic's numbers pass is locked (see BANK_HEIST_BUILD_PLAN.md).
+import BankTargetPage           from './pages/BankTargetPage.vue';
+
 // ── Route table ───────────────────────────────────────────────────────────────
 // To add a new page: import its component and add one entry here. That's it.
 const ROUTES = [
@@ -137,6 +144,31 @@ const ROUTES = [
     { url: 'splice://inland-biz.io',          title: 'I.B.J. // Inland Business Journal',  component: IbjFinancialPage     },
     { url: 'splice://valley-voice.org',       title: 'The Valley Voice',                   component: ValleyVoiceNewsPage  },
     { url: 'splice://wire-dead.net',          title: 'WIRE-DEAD // Leak Feed',             component: WireDeadLeakPage     },
+
+    // ── Bank Heist target roster — public flavor pages, one component ─────────
+    // Tier 1 — Retail & Community
+    { url: 'splice://firstmetro-fcu.org',        title: 'First Metro Federal Union',       component: BankTargetPage },
+    { url: 'splice://solis-lending.io',          title: 'Solis Micro-Lending',             component: BankTargetPage },
+    { url: 'splice://vantagepoint-trade.com',    title: 'Vantage Point Securities',        component: BankTargetPage },
+    // Tier 2 — Neo-Tech & Fast-Yield
+    { url: 'splice://aether-neobank.io',         title: 'Aether Neobank',                  component: BankTargetPage },
+    { url: 'splice://bluesky-funds.com',         title: 'BlueSky Index Funds',             component: BankTargetPage },
+    { url: 'splice://hyperion-vc.io',            title: 'Hyperion Venture Capital',        component: BankTargetPage },
+    { url: 'splice://pensiondirect.gov',         title: 'Pension Direct Assurance',        component: BankTargetPage },
+    // Tier 3 — Institutional & High-Net-Worth
+    { url: 'splice://ironclad-trust.com',        title: 'Ironclad Vault & Trust',          component: BankTargetPage },
+    { url: 'splice://aegis-wealth.com',          title: 'Aegis Wealth Management',         component: BankTargetPage },
+    { url: 'splice://kurogane-fleet.co',         title: 'Kurogane Fleet Bank',             component: BankTargetPage },
+    { url: 'splice://zenjin-assets.io',          title: 'Zenjin Asset Management',         component: BankTargetPage },
+    { url: 'splice://horizon-mutual.com',        title: 'Horizon Mutual Insurance',        component: BankTargetPage },
+    // Tier 4 — High-Risk Apex & Specialized
+    { url: 'splice://apex-capital.com',          title: 'Apex Capital Partners',           component: BankTargetPage },
+    { url: 'splice://chronos-quant.io',          title: 'Chronos Quantitative Management', component: BankTargetPage },
+    { url: 'splice://horizon-sovereign.offshore', title: 'Horizon Sovereign Holdings',     component: BankTargetPage },
+    { url: 'splice://veritas-custody.io',        title: 'Veritas Crypto-Custody',          component: BankTargetPage },
+    { url: 'splice://nova-exchange.com',         title: 'Nova Exchange',                   component: BankTargetPage },
+    { url: 'splice://starlight-sovereign.gov',   title: 'Starlight Sovereign Wealth',      component: BankTargetPage },
+    { url: 'splice://blacktide.onion',           title: 'Black-Tide Liquidity',            component: BankTargetPage },
 ];
 
 export function resolveRoute(url) {
@@ -217,4 +249,26 @@ export const SPLICE = {
     CODEX_STA_VAULT04:       'splice://sta-transit.net/vault04-terminal',
     CODEX_COPPERHEAD_FREIGHT: 'splice://copperhead-chassis.net/freight-terminal',
     CODEX_NULL_IRC:          'splice://null-front.board/irc-relay',
+
+    // Bank Heist target roster — see BANK_TARGET_ROSTER.md and
+    // constants/bankTargetConfig.js for content. All render via BankTargetPage.
+    BANK_FIRSTMETRO:        'splice://firstmetro-fcu.org',
+    BANK_SOLIS:             'splice://solis-lending.io',
+    BANK_VANTAGE_POINT:     'splice://vantagepoint-trade.com',
+    BANK_AETHER:            'splice://aether-neobank.io',
+    BANK_BLUESKY:           'splice://bluesky-funds.com',
+    BANK_HYPERION:          'splice://hyperion-vc.io',
+    BANK_PENSION_DIRECT:    'splice://pensiondirect.gov',
+    BANK_IRONCLAD:          'splice://ironclad-trust.com',
+    BANK_AEGIS:             'splice://aegis-wealth.com',
+    BANK_KUROGANE:          'splice://kurogane-fleet.co',
+    BANK_ZENJIN:            'splice://zenjin-assets.io',
+    BANK_HORIZON_MUTUAL:    'splice://horizon-mutual.com',
+    BANK_APEX_CAPITAL:      'splice://apex-capital.com',
+    BANK_CHRONOS:           'splice://chronos-quant.io',
+    BANK_HORIZON_SOVEREIGN: 'splice://horizon-sovereign.offshore',
+    BANK_VERITAS:           'splice://veritas-custody.io',
+    BANK_NOVA_EXCHANGE:     'splice://nova-exchange.com',
+    BANK_STARLIGHT:         'splice://starlight-sovereign.gov',
+    BANK_BLACKTIDE:         'splice://blacktide.onion',
 };
