@@ -282,7 +282,7 @@
                     :x="tooltipSvgPos.x - 4"
                     :y="tooltipSvgPos.y - 22"
                     width="200"
-                    height="106"
+                    :height="tooltipHeight"
                     class="tooltip-bg"
                 />
                 <!-- CyberDoc nodes: show store name, type, and safe harbor status -->
@@ -297,15 +297,18 @@
                         SAFE HARBOR
                     </text>
                 </template>
-                <!-- Action nodes: show ICE, zone type, and cred value -->
+                <!-- Action nodes: show network name, ICE, zone type, and cred value -->
                 <template v-else>
-                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y" class="tooltip-line">
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y" class="tooltip-line tooltip-line--name">
+                        {{ actionNodeName(hoveredDbNode) }}
+                    </text>
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 28" class="tooltip-line">
                         ICE {{ hoveredDbNode.ice ?? '?' }}  T{{ hoveredDbNode.tier ?? '?' }}
                     </text>
-                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 28" class="tooltip-line tooltip-line--dim">
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 56" class="tooltip-line tooltip-line--dim">
                         {{ hoveredDbNode.zoneType ?? 'netlink' }}
                     </text>
-                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 56" class="tooltip-line tooltip-line--creds">
+                    <text :x="tooltipSvgPos.x + 4" :y="tooltipSvgPos.y + 84" class="tooltip-line tooltip-line--creds">
                         ₡ {{ hoveredDbNode.credValueBase ?? '?' }}
                     </text>
                 </template>
@@ -318,6 +321,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { getNetworkName } from '@/composables/useNodeIdentity.js';
 
 // Template ref — bound to the <svg> element so getNodeScreenPos can convert
 // SVG coordinates to stage-relative screen pixels.
@@ -1339,6 +1343,21 @@ function cyberDocStoreName(node) {
     return 'CyberDoc';
 }
 
+// Action-node tooltip name line — prefers a Bank Heist target's network name,
+// then a Codex-thread business name (both via getNetworkName's own priority
+// order, see businessNodes.js), falling back to the same deterministic
+// generated name NodeInfoBlock's side panel shows for every other node.
+function actionNodeName(node) {
+    return getNetworkName(node);
+}
+
+// Tooltip box grows by one line for action nodes (name + ICE/tier + zone +
+// creds = 4 lines) vs. CyberDoc's 3 (store name + type + safe harbor).
+const tooltipHeight = computed(() => {
+    const node = hoveredDbNode.value;
+    return node?.type === 'cyberdoc' ? 106 : 134;
+});
+
 function onNodeHover(nodeId) {
     hoveredNodeId.value = nodeId;
     const node = ALL_NODES.get(nodeId);
@@ -1769,6 +1788,10 @@ defineExpose({
 }
 .tooltip-line--cyberdoc {
     fill: #FFB300;
+    font-size: 16px;
+}
+.tooltip-line--name {
+    fill: #E0FBFF;
     font-size: 16px;
 }
 .tooltip-line--safe {
