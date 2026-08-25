@@ -61,24 +61,23 @@ class BankHeistController extends Controller
     // =========================================================================
 
     /**
-     * "Denied at the door" — the Spoofed Handshake countertrace timer hit
-     * zero, Gate 2 Phase 1's MitM Handshake Spoof timed out on any of its
-     * three steps (SYN/SYN-ACK/ACK), or Gate 2 Phase 2's Global Trace Meter
-     * overran to 100%. All three use the same uniform cost stack (SS +
-     * bounty + node cooldown), per BANK_HEIST_BUILD_PLAN.md — the approach
-     * field is informational except for 'phase2_overrun', which also
-     * discards the player's staged Phase 2 harvest buffer (see
+     * "Denied at the door" — Gate 1's MitM Handshake Hijack timed out on any
+     * of its three steps (SYN/SYN-ACK/ACK), or Gate 2's Global Trace Meter
+     * overran to 100%. Both use the same uniform cost stack (SS + bounty +
+     * node cooldown), per BANK_HEIST_BUILD_PLAN.md — the approach field is
+     * informational except for 'phase2_overrun', which also discards the
+     * player's staged Phase 2 harvest buffer (see
      * BankHeistService::resolveGate1Failure). Named `gate1Failed` for
-     * historical reasons (it predates both Gate 2 redesigns) but is
-     * genuinely shared by every gate now.
+     * historical reasons (it predates the current two-gate shape) but is
+     * genuinely shared by both gates now.
      *
      * Body:
-     *   approach  string  'spoofed_handshake' | 'mitm_handshake' | 'phase2_overrun'
+     *   approach  string  'mitm_handshake' | 'phase2_overrun'
      */
     public function gate1Failed(Request $request, string $canvasId): JsonResponse
     {
         $data = $request->validate([
-            'approach' => ['required', 'string', 'in:spoofed_handshake,mitm_handshake,phase2_overrun'],
+            'approach' => ['required', 'string', 'in:mitm_handshake,phase2_overrun'],
         ]);
 
         [$player, $node, $error] = $this->resolvePlayerAndBank($request, $canvasId);

@@ -346,7 +346,7 @@ export function useBankHeist() {
         }
     }
 
-    /** @param {string} canvasId @param {'spoofed_handshake'|'mitm_handshake'|'phase2_overrun'} approach */
+    /** @param {string} canvasId @param {'mitm_handshake'|'phase2_overrun'} approach */
     function gate1Failed(canvasId, approach) {
         return post(`/api/bank-heist/${canvasId}/gate1-failed`, { approach });
     }

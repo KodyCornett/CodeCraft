@@ -117,8 +117,8 @@ const props = defineProps({
 
 // 'complete' fires only on a successful EXTRACT — the run banked something
 // (or nothing, if extracted with an empty buffer) and ends cleanly. 'failed'
-// fires only on a Global Trace overrun, forwarded up through
-// BankHeistGate2.vue exactly like BankHeistHandshake's 'failed' — the actual
+// fires only on a Global Trace overrun, forwarded straight up to
+// BankHeist.vue exactly like BankHeistHandshake's 'failed' — the actual
 // server call and cost stack live in BankHeist.vue's resolveEntryFailure so
 // there's exactly one place that ever calls gate1-failed.
 const emit = defineEmits(['complete', 'failed']);

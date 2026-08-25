@@ -32,11 +32,13 @@ use Illuminate\Support\Facades\Cache;
  * invent a parallel bounty/point system; "bounty spike" always means N
  * calls to the same hack-count mechanic every other hack already uses.
  *
- * Brute Force (the no-puzzle "survive the timer" Gate 1 approach) and the
+ * Brute Force (the no-puzzle "survive the timer" Gate 1 approach), the
+ * original probe/decrypt/slot "Spoofed Handshake" Gate 1 screen, and the
  * Ledger (the per-account crack list that used to follow Gate 2 Phase 1)
- * have both been removed. Spoofed Handshake is the only way through Gate 1;
- * Gate 2 Phase 2 is now the Token Reconstruction & Risk Harvest loop below,
- * which replaces the Ledger + old Payload Tampering screen entirely.
+ * have all been removed. Gate 1 is now the MitM Handshake Hijack (SYN
+ * intercept -> SEQ+1 cipher-chunk math -> ACK token bind) below; Gate 2 is
+ * the Token Reconstruction & Risk Harvest loop, which replaces the Ledger +
+ * old Payload Tampering screen entirely.
  */
 class BankHeistService
 {
@@ -149,9 +151,9 @@ class BankHeistService
      * place every failure funnels through) than to duplicate it at the
      * call site.
      *
-     * @param 'spoofed_handshake'|'mitm_handshake'|'phase2_overrun' $approach informational except for the phase2_overrun buffer wipe above
+     * @param 'mitm_handshake'|'phase2_overrun' $approach informational except for the phase2_overrun buffer wipe above
      */
-    public function resolveGate1Failure(Player $player, Node $node, string $approach = 'spoofed_handshake'): array
+    public function resolveGate1Failure(Player $player, Node $node, string $approach = 'mitm_handshake'): array
     {
         if ($approach === 'phase2_overrun') {
             Cache::forget($this->phase2BufferKey($player, $node));
