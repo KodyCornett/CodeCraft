@@ -31,8 +31,10 @@ const WRONG_ACTION_BASE   = 5;
 const WRONG_ACTION_OS_MULT = 0.4;
 
 // Gate 2 Phase 1 — MitM Handshake Spoof
-const HANDSHAKE_TIMER_BASE         = { syn: 5.0, syn_ack: 6.5, ack: 3.5 };
-const HANDSHAKE_TIMER_FLOOR        = { syn: 3.0, syn_ack: 4.0, ack: 2.0 };
+// Base/floor doubled from the original 5.0/6.5/3.5 and 3.0/4.0/2.0 after dev
+// testing found the original too fast to read the panel before it expired.
+const HANDSHAKE_TIMER_BASE         = { syn: 10.0, syn_ack: 13.0, ack: 7.0 };
+const HANDSHAKE_TIMER_FLOOR        = { syn: 6.0, syn_ack: 8.0, ack: 4.0 };
 const HANDSHAKE_TIMER_RAM_MULT     = 0.3;
 const HANDSHAKE_TIMER_BONUS_MULT   = 0.5;
 const HANDSHAKE_TIMER_PENALTY_MULT = 0.3;
