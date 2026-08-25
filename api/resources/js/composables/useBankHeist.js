@@ -36,12 +36,15 @@ const WRONG_ACTION_OS_MULT = 0.4;
 // Terminal Workspace / SYN Calculator step; a wrong -ack guess docks a flat
 // 15s off the *running* clock (never resets it) and rotates in a brand new
 // session (new SYN + new cipher pool) — "that session failed to auth so it
-// passes to another." Token Binding is a separate flat 3.5s window,
-// unrelated to the 90s clock. Either window hitting 0 is a full failure —
-// same cost stack as before (see BankHeistService::resolveGate1Failure).
+// passes to another." Session Token Binding does NOT get its own separate
+// clock — it inherits whatever's left on that same 90s window (floored at
+// HANDSHAKE_BIND_FLOOR, so solving the calculator right at the wire still
+// gets a fair minimum instead of an unwinnable sliver). The clock hitting 0
+// at either step is a full failure — same cost stack as before (see
+// BankHeistService::resolveGate1Failure).
 const HANDSHAKE_AUTH_TIMER         = 90.0;
 const HANDSHAKE_WRONG_GUESS_PENALTY = 15.0;
-const HANDSHAKE_BIND_TIMER         = 3.5;
+const HANDSHAKE_BIND_FLOOR         = 10.0;
 const HANDSHAKE_ICE_THRESHOLD        = 7;
 const HANDSHAKE_CHUNK_COUNT_LOW_ICE  = 4;
 const HANDSHAKE_CHUNK_COUNT_HIGH_ICE = 6;
@@ -361,7 +364,7 @@ export function useBankHeist() {
         phase2Extract,
         // Pure helpers re-exported for convenience so components only import one module
         baseTimer, wrongActionPenalty, decoyCount,
-        HANDSHAKE_AUTH_TIMER, HANDSHAKE_WRONG_GUESS_PENALTY, HANDSHAKE_BIND_TIMER,
+        HANDSHAKE_AUTH_TIMER, HANDSHAKE_WRONG_GUESS_PENALTY, HANDSHAKE_BIND_FLOOR,
         handshakeChunkCount, handshakeComboSize,
         generateHandshakePuzzle,
         phase2RequiredFragments, phase2DecoyCount, phase2TxTimer, phase2TraceRate,

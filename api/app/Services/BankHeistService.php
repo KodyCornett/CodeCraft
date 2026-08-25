@@ -81,9 +81,12 @@ class BankHeistService
     // session's SYN and waits for ENTER -> a Terminal Workspace/SYN
     // Calculator with a single flat 90s window, where each wrong -ack
     // guess docks a flat 15s off the *running* clock (never resets it) and
-    // rotates in a brand new session (new SYN + new cipher pool) -> a
-    // separate flat 3.5s Session Token Binding window. Either window
-    // reaching 0 is a full failure, resolved identically through
+    // rotates in a brand new session (new SYN + new cipher pool) -> Session
+    // Token Binding, which does NOT get its own separate clock — it
+    // inherits whatever time is left on the 90s window (floored at
+    // HANDSHAKE_BIND_FLOOR so a last-second calculator solve doesn't hand
+    // back an unwinnable bind window). The clock reaching 0, at either
+    // step, is a full failure, resolved identically through
     // resolveGate1Failure() below (mitigated SS damage + bounty + node
     // cooldown) — a wrong -ack guess alone costs time only, never stats.
 
@@ -93,8 +96,8 @@ class BankHeistService
     /** Seconds docked off the running HANDSHAKE_AUTH_TIMER clock for one wrong -ack guess. Also triggers a full session reroll (new SYN + new cipher pool). */
     private const HANDSHAKE_WRONG_GUESS_PENALTY = 15.0;
 
-    /** Flat Session Token Binding window, seconds — separate clock, unrelated to HANDSHAKE_AUTH_TIMER. */
-    private const HANDSHAKE_BIND_TIMER = 3.5;
+    /** Minimum seconds handed to Session Token Binding, even if the 90s clock is nearly spent when SYN-ACK is solved — binding reuses whatever's left on that same clock rather than a separate fixed window, floored here for fairness. */
+    private const HANDSHAKE_BIND_FLOOR = 10.0;
 
     /** Cipher chunk pool size / required combo size — both step up at BankICE 7+, same threshold-band shape as the rest of Bank Heist's tier-scaled difficulty. */
     private const HANDSHAKE_ICE_THRESHOLD        = 7;
@@ -210,9 +213,9 @@ class BankHeistService
     // =========================================================================
     // Gate 1 — Authentication Handshake (cipher-pool sizing only)
     // =========================================================================
-    // The 90s auth window, 15s wrong-guess penalty, and 3.5s bind window
-    // above are flat and client-computed (HANDSHAKE_AUTH_TIMER /
-    // HANDSHAKE_WRONG_GUESS_PENALTY / HANDSHAKE_BIND_TIMER, mirrored in
+    // The 90s auth window, 15s wrong-guess penalty, and the bind-window
+    // floor above are flat and client-computed (HANDSHAKE_AUTH_TIMER /
+    // HANDSHAKE_WRONG_GUESS_PENALTY / HANDSHAKE_BIND_FLOOR, mirrored in
     // useBankHeist.js) — no server-side timer math needed. Only the
     // ICE-scaled cipher pool sizing below has real logic worth mirroring
     // here for documentation parity with useBankHeist.js.

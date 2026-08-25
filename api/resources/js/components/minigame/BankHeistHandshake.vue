@@ -80,7 +80,7 @@
                         <div class="bhh-label">[ SESSION LOCK ]</div>
                         <div class="bhh-mono">STATUS     : FINAL ACK RECEIVED FROM CLIENT</div>
                         <div class="bhh-mono bhh-mono--target">TOKEN_HASH : 0x{{ tokenHash }}</div>
-                        <div class="bhh-bind-timer" :class="bindTimerClass">BIND WINDOW: {{ bindTimeLeft.toFixed(1) }}s</div>
+                        <div class="bhh-bind-timer" :class="timerClass">BIND WINDOW: {{ timeLeft.toFixed(1) }}s</div>
                         <p class="bhh-hint">Bind it before the session drops: <code>bind-session -token 0x{{ tokenHash }}</code>.</p>
                     </template>
                 </div>
@@ -134,7 +134,10 @@ const HANDSHAKE_WRONG_GUESS_PENALTY = bh.HANDSHAKE_WRONG_GUESS_PENALTY;
 // ── Step state ───────────────────────────────────────────────────────────────
 // 'GATEWAY_ENTRY' (static, no timer, ENTER to proceed) ->
 // 'AUTH_TERMINAL' (single flat 90s window, -15s + full session reroll per
-// wrong -ack guess) -> 'TOKEN_BIND' (separate flat 3.5s window).
+// wrong -ack guess) -> 'TOKEN_BIND' (no separate clock — inherits whatever
+// time is LEFT on the 90s window, floored at BIND_WINDOW_FLOOR, so solving
+// the calculator fast earns a roomy bind window and solving it late still
+// gets a fair minimum).
 const step             = ref('GATEWAY_ENTRY');
 const targetIp         = ref(genIp());
 const tokenHash        = ref(genHex(4));
@@ -214,19 +217,6 @@ const timerPct   = computed(() => timerTotal.value ? (timeLeft.value / timerTota
 const timerClass = computed(() => {
     if (timerTotal.value === 0) return '';
     const ratio = timeLeft.value / timerTotal.value;
-    if (ratio <= 0.3) return 'bhh-timer--crit';
-    if (ratio <= 0.6) return 'bhh-timer--warn';
-    return '';
-});
-
-// ── TOKEN_BIND timer — separate flat 3.5s window, unrelated to the 90s clock.
-const bindTimeLeft   = ref(0);
-const bindTimerTotal = ref(0);
-let bindInterval     = null;
-
-const bindTimerClass = computed(() => {
-    if (bindTimerTotal.value === 0) return '';
-    const ratio = bindTimeLeft.value / bindTimerTotal.value;
     if (ratio <= 0.3) return 'bhh-timer--crit';
     if (ratio <= 0.6) return 'bhh-timer--warn';
     return '';
@@ -356,21 +346,18 @@ function handleSynAck(raw) {
     generateNewSession(); // new SYN + new cipher pool — the running 90s clock keeps ticking from wherever it is
 }
 
-// ── Step 3: TOKEN_BIND — separate flat 3.5s window ──────────────────────────
+// ── Step 3: TOKEN_BIND — no separate clock, inherits leftover auth time ─────
 function advanceToTokenBind() {
-    if (authInterval) { clearInterval(authInterval); authInterval = null; }
     step.value = 'TOKEN_BIND';
-    bindTimerTotal.value = bh.HANDSHAKE_BIND_TIMER;
-    bindTimeLeft.value   = bh.HANDSHAKE_BIND_TIMER;
-    if (bindInterval) clearInterval(bindInterval);
-    bindInterval = setInterval(() => {
-        bindTimeLeft.value = Math.max(0, bindTimeLeft.value - 0.1);
-        if (bindTimeLeft.value <= 0) {
-            clearInterval(bindInterval);
-            bindInterval = null;
-            emit('failed');
-        }
-    }, 100);
+    // Same continuous clock as the calculator step — just floor it so a
+    // last-second solve doesn't hand back an unwinnable bind window, and
+    // rescale timerTotal so the progress bar reads against the new budget
+    // rather than looking nearly-empty relative to the original 90s.
+    timeLeft.value   = Math.max(bh.HANDSHAKE_BIND_FLOOR, timeLeft.value);
+    timerTotal.value = timeLeft.value;
+    // authInterval keeps running unchanged — it's the same interval that
+    // was already ticking down the calculator window; reaching 0 here
+    // still triggers the same full-failure emit('failed') as before.
     nextTick(() => cliInputEl.value?.focus());
 }
 
@@ -382,7 +369,7 @@ function handleAck(raw) {
     }
     if (m[2].toUpperCase() === tokenHash.value) {
         setStatus('[+] SESSION BOUND :: CONNECTION ESTABLISHED :: ACCESS GRANTED', 'good');
-        if (bindInterval) { clearInterval(bindInterval); bindInterval = null; }
+        if (authInterval) { clearInterval(authInterval); authInterval = null; }
         emit('success');
     } else {
         setStatus('[-] TOKEN MISMATCH', 'bad');
@@ -398,7 +385,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     if (authInterval) clearInterval(authInterval);
-    if (bindInterval) clearInterval(bindInterval);
     stopAmbientStream();
     window.removeEventListener('keydown', onGlobalKeydown);
 });
