@@ -27,18 +27,24 @@ use Illuminate\Support\Facades\Cache;
  * rather than an immediate credit, unlike the old Ledger's instant payout.
  *
  * All stat reads go through RigService::effectiveStats(). All SS damage
- * goes through RigService::applyDamage() with source 'pve'. All bounty
- * increments reuse BountyService::recordNodeHack() — Bank Heist does not
- * invent a parallel bounty/point system; "bounty spike" always means N
- * calls to the same hack-count mechanic every other hack already uses.
+ * goes through RigService::applyDamage() with source 'pve', mitigated by
+ * effective Firewall exactly like every other PvE hack failure (see
+ * RigController::damage()'s `max(1, ice - effectiveFirewall)` formula —
+ * Bank Heist does not get a special unmitigated or multiplied damage rule).
+ * All bounty increments reuse BountyService::recordNodeHack() — Bank Heist
+ * does not invent a parallel bounty/point system; "bounty spike" always
+ * means N calls to the same hack-count mechanic every other hack already
+ * uses.
  *
  * Brute Force (the no-puzzle "survive the timer" Gate 1 approach), the
  * original probe/decrypt/slot "Spoofed Handshake" Gate 1 screen, and the
  * Ledger (the per-account crack list that used to follow Gate 2 Phase 1)
- * have all been removed. Gate 1 is now the MitM Handshake Hijack (SYN
- * intercept -> SEQ+1 cipher-chunk math -> ACK token bind) below; Gate 2 is
- * the Token Reconstruction & Risk Harvest loop, which replaces the Ledger +
- * old Payload Tampering screen entirely.
+ * have all been removed. Gate 1 is now the Authentication Handshake — a
+ * static Gateway Entry screen, then a Terminal Workspace/SYN Calculator
+ * (SYN intercept -> SEQ+1 cipher-chunk math -> ACK), then a separate
+ * Session Token Binding step — below; Gate 2 is the Token Reconstruction &
+ * Risk Harvest loop, which replaces the Ledger + old Payload Tampering
+ * screen entirely.
  */
 class BankHeistService
 {
@@ -66,27 +72,29 @@ class BankHeistService
     /** Node cooldown (minutes) on Gate 1 failure, by bank tier 1-4. */
     private const TIER_COOLDOWN_MINUTES = [1 => 2, 2 => 4, 3 => 6, 4 => 8];
 
-    // ── Gate 2 Phase 1 — MitM Handshake Spoof ───────────────────────────────────
-    // Three-step CLI puzzle (SYN → SYN-ACK → ACK) replacing the earlier
-    // Traffic Interception concept. All timer/puzzle logic here is pure and
-    // client-mirrored (useBankHeist.js), same trust model as every other
-    // Bank Heist timer — only the eventual timeout failure hits the server,
-    // via the shared "denied at the door" path on resolveGate1Failure().
+    // ── Gate 1 — Authentication Handshake ───────────────────────────────────────
+    // Full Phase 1 replacement, superseding the three-step per-stage timer
+    // model above (kept client-mirrored purely for its cipher-pool sizing —
+    // see handshakeChunkCount()/handshakeComboSize() below). No more
+    // per-step CPU/RAM/ICE-scaled timers, "gold flash" lock-on, or a sniff
+    // command. Flow: a static Gateway Entry screen (no timer) shows the
+    // session's SYN and waits for ENTER -> a Terminal Workspace/SYN
+    // Calculator with a single flat 90s window, where each wrong -ack
+    // guess docks a flat 15s off the *running* clock (never resets it) and
+    // rotates in a brand new session (new SYN + new cipher pool) -> a
+    // separate flat 3.5s Session Token Binding window. Either window
+    // reaching 0 is a full failure, resolved identically through
+    // resolveGate1Failure() below (mitigated SS damage + bounty + node
+    // cooldown) — a wrong -ack guess alone costs time only, never stats.
 
-    /** Per-step base timer (seconds), before RAM/CPU-vs-ICE modifiers. Set flat to 90s (1.5 min) per step after two rounds of doubling (5.0/6.5/3.5 -> 10.0/13.0/7.0 -> 20.0/26.0/14.0) still read as too fast in dev testing — floor is equal to base now, so every player gets at least 90s per step regardless of CPU-vs-ICE, with a good rig's positive modifier adding on top rather than a bad rig's penalty being able to cut below it. */
-    private const HANDSHAKE_TIMER_BASE = ['syn' => 90.0, 'syn_ack' => 90.0, 'ack' => 90.0];
+    /** Flat Terminal Workspace / SYN Calculator window, seconds — not CPU/RAM/ICE-scaled. Starts once on entry and only ever counts down (or gets docked); never resets on a wrong guess. */
+    private const HANDSHAKE_AUTH_TIMER = 90.0;
 
-    /** Timer floor per step — never drops below this even against a very high-ICE bank. Equal to base now (see above), so a negative CPU-vs-ICE modifier can never shrink the guaranteed 90s. */
-    private const HANDSHAKE_TIMER_FLOOR = ['syn' => 90.0, 'syn_ack' => 90.0, 'ack' => 90.0];
+    /** Seconds docked off the running HANDSHAKE_AUTH_TIMER clock for one wrong -ack guess. Also triggers a full session reroll (new SYN + new cipher pool). */
+    private const HANDSHAKE_WRONG_GUESS_PENALTY = 15.0;
 
-    /** Lighter RAM/CPU-vs-ICE modifiers than the countertrace formula — proportionate to these steps' much shorter base timers. */
-    private const HANDSHAKE_TIMER_RAM_MULT     = 0.3;
-    private const HANDSHAKE_TIMER_BONUS_MULT   = 0.5;
-    private const HANDSHAKE_TIMER_PENALTY_MULT = 0.3;
-
-    /** Each wrong SYN-ACK cipher-chunk sum ratchets the *next* attempt's timer down by this fraction (a fresh handshake, less time) — floored so a retry is never mathematically impossible. */
-    private const HANDSHAKE_RETRY_RATCHET = 0.8;
-    private const HANDSHAKE_RETRY_FLOOR   = 2.0;
+    /** Flat Session Token Binding window, seconds — separate clock, unrelated to HANDSHAKE_AUTH_TIMER. */
+    private const HANDSHAKE_BIND_TIMER = 3.5;
 
     /** Cipher chunk pool size / required combo size — both step up at BankICE 7+, same threshold-band shape as the rest of Bank Heist's tier-scaled difficulty. */
     private const HANDSHAKE_ICE_THRESHOLD        = 7;
@@ -142,9 +150,13 @@ class BankHeistService
      * denied is being denied, regardless of which gate or step it happened
      * on.
      *
-     * Applies: SS damage = BankICE (unmitigated — Firewall has no role
-     * here), bounty spike = +tier to the existing hack-count, and puts the
-     * node on a tiered cooldown that blocks EVERY player, not just this one.
+     * Applies: SS damage = max(1, BankICE - effectiveFirewall) — the same
+     * Firewall-mitigated formula every other PvE hack failure uses (see
+     * RigController::damage()), not a Bank-Heist-special unmitigated or
+     * multiplied rule — bounty spike = +tier to the existing hack-count
+     * (a separate calculation from SS damage, on a full failure only, never
+     * on a wrong-guess session reroll), and puts the node on a tiered
+     * cooldown that blocks EVERY player, not just this one.
      * A 'phase2_overrun' approach additionally discards this player's
      * staged (unbanked) Phase 2 harvest buffer — that's the entire point of
      * the overrun consequence, and it's cheaper to do it here (the one
@@ -163,10 +175,21 @@ class BankHeistService
         $bankIce = (int) $node->bank_ice;
         $tier    = (int) $node->bank_tier;
 
+        // Same Firewall-mitigated formula as every other PvE hack failure —
+        // see RigController::damage()'s max(1, ice - effectiveFirewall).
+        // applyDamage() itself does not mitigate; that's on the caller.
+        $amount = $bankIce;
+        if ($rig) {
+            $effectiveFw = $this->rigService->effectiveStats($rig, $player)['firewall']['effective'] ?? 1;
+            $amount      = max(1, $bankIce - $effectiveFw);
+        }
+
         $damageResult = $rig
-            ? $this->rigService->applyDamage($rig, $bankIce, 'pve', $player)
+            ? $this->rigService->applyDamage($rig, $amount, 'pve', $player)
             : null;
 
+        // Bounty is a separate calculation from SS damage — a full failure
+        // spikes both, a wrong-guess session reroll spikes neither.
         for ($i = 0; $i < $tier; $i++) {
             $this->bountyService->recordNodeHack($player);
         }
@@ -175,7 +198,7 @@ class BankHeistService
         $node->save();
 
         return [
-            'ss_damage'           => $bankIce,
+            'ss_damage'           => $amount,
             'bounty_hacks_added'  => $tier,
             'cooldown_minutes'    => self::TIER_COOLDOWN_MINUTES[$tier] ?? 2,
             'cooldown_until'      => $node->bank_cooldown_until->toIso8601String(),
@@ -185,27 +208,14 @@ class BankHeistService
     }
 
     // =========================================================================
-    // Gate 2 Phase 1 — MitM Handshake Spoof
+    // Gate 1 — Authentication Handshake (cipher-pool sizing only)
     // =========================================================================
-
-    /** Base timer (seconds) for one handshake step, given effective CPU/RAM and Bank ICE. Same asymmetric CPU-vs-ICE shape as baseTimer(), different (much smaller) constants — this is three quick steps, not one long puzzle. */
-    public function handshakeStepTimer(string $step, int $cpu, int $ram, int $ice): float
-    {
-        $base = self::HANDSHAKE_TIMER_BASE[$step] + ($ram * self::HANDSHAKE_TIMER_RAM_MULT);
-        $diff = $cpu - $ice;
-        $mod  = $diff >= 0
-            ? $diff * self::HANDSHAKE_TIMER_BONUS_MULT
-            : -($diff ** 2) * self::HANDSHAKE_TIMER_PENALTY_MULT;
-
-        return max(self::HANDSHAKE_TIMER_FLOOR[$step], $base + $mod);
-    }
-
-    /** Timer for the Nth SYN-ACK attempt (1-indexed) — ratchets 0.8x per prior wrong-sum failure, floored at 2s. Attempt 1 always gets the full handshakeStepTimer('syn_ack', ...) value. */
-    public function handshakeRetryTimer(float $baseTimer, int $attemptNumber): float
-    {
-        $ratcheted = $baseTimer * (self::HANDSHAKE_RETRY_RATCHET ** max(0, $attemptNumber - 1));
-        return max(self::HANDSHAKE_RETRY_FLOOR, $ratcheted);
-    }
+    // The 90s auth window, 15s wrong-guess penalty, and 3.5s bind window
+    // above are flat and client-computed (HANDSHAKE_AUTH_TIMER /
+    // HANDSHAKE_WRONG_GUESS_PENALTY / HANDSHAKE_BIND_TIMER, mirrored in
+    // useBankHeist.js) — no server-side timer math needed. Only the
+    // ICE-scaled cipher pool sizing below has real logic worth mirroring
+    // here for documentation parity with useBankHeist.js.
 
     /** Cipher chunk pool size for the SYN-ACK puzzle — 6 chunks at BankICE 7+, 4 below that. */
     public function handshakeChunkCount(int $bankIce): int
@@ -224,16 +234,19 @@ class BankHeistService
     }
 
     // =========================================================================
-    // Gate 2 Phase 2 — Token Reconstruction & Risk Harvest
+    // Gate 2 Phase 2 — Ledger Spoof & Risk Harvest
     // =========================================================================
     // Replaces the Ledger + Payload Tampering screen entirely. A live
     // transaction queue: intercept a TX, reconstruct its forged token from
     // fragment candidates before its own timer expires, then EXTRACT to bank
     // the running total or CONTINUE to push your luck. A Global Trace Meter
-    // (0-100%) ticks continuously regardless of sub-step; hitting 100% wipes
-    // anything not yet extracted and costs the same "denied at the door"
-    // stack as every other Bank Heist failure — see resolveGate1Failure(),
-    // called with approach 'phase2_overrun'.
+    // (0-100%) ticks continuously while browsing the queue or working the
+    // Token Builder (at different flat rates — see PHASE2_TRACE_RATE_QUEUE /
+    // PHASE2_TRACE_RATE_BUILDER below), and pauses on the Harvest Summary
+    // decision screen. Hitting 100% wipes anything not yet extracted and
+    // costs the same "denied at the door" stack as every other Bank Heist
+    // failure — see resolveGate1Failure(), called with approach
+    // 'phase2_overrun'.
     //
     // Trust model: the queue itself (timers, fragment pool, which candidates
     // are decoys) is fully client-computed like every other Bank Heist
@@ -259,18 +272,16 @@ class BankHeistService
     /** Decoy fragments added on top of the required count, either difficulty. */
     private const PHASE2_DECOY_COUNT = 2;
 
-    /** TX expiration timer bands (seconds), before the ICE 7+ cut below. */
-    private const PHASE2_EASY_TIMER_RANGE = [3.0, 5.0];
-    private const PHASE2_HARD_TIMER_RANGE = [6.0, 9.0];
-    private const PHASE2_TIMER_ICE_CUT    = 0.75;
+    /** Flat TX expiration timers (seconds) — not ICE-scaled. Low yield/easy gets more time; high yield/hard gets less. */
+    private const PHASE2_EASY_TIMER = 8.0;
+    private const PHASE2_HARD_TIMER = 4.0;
 
-    /** Global Trace Meter tick rate, %/sec — always running regardless of sub-step. */
-    private const PHASE2_TRACE_RATE_LOW_ICE  = 0.5;
-    private const PHASE2_TRACE_RATE_HIGH_ICE = 0.8;
+    /** Global Trace Meter tick rate, %/sec — depends on which sub-step the player is in, not on Bank ICE. */
+    private const PHASE2_TRACE_RATE_QUEUE   = 0.5;
+    private const PHASE2_TRACE_RATE_BUILDER = 1.0;
 
-    /** Global Trace spike on a wrong sequence / TX timeout, % range. */
-    private const PHASE2_TRACE_SPIKE_LOW_ICE  = [20.0, 30.0];
-    private const PHASE2_TRACE_SPIKE_HIGH_ICE = [30.0, 40.0];
+    /** Flat, immediate Global Trace spike on a failed/expired token injection. */
+    private const PHASE2_TRACE_SPIKE_ON_FAIL = 25.0;
 
     /** Reward ranges rolled server-side per successful inject, by band/currency. */
     private const PHASE2_EASY_CRED_RANGE = [75, 150];
@@ -296,28 +307,24 @@ class BankHeistService
         return self::PHASE2_DECOY_COUNT;
     }
 
-    /** [min, max] seconds a transaction of this band lives before expiring, after the ICE 7+ cut. @param 'easy'|'hard' $band */
-    public function phase2TxTimerRange(string $band, int $bankIce): array
+    /** Flat seconds a transaction of this band lives before expiring — not ICE-scaled. @param 'easy'|'hard' $band */
+    public function phase2TxTimer(string $band): float
     {
-        $range = $band === 'easy' ? self::PHASE2_EASY_TIMER_RANGE : self::PHASE2_HARD_TIMER_RANGE;
-        $cut   = $bankIce >= self::PHASE2_ICE_THRESHOLD ? self::PHASE2_TIMER_ICE_CUT : 1.0;
-        return [$range[0] * $cut, $range[1] * $cut];
+        return $band === 'easy' ? self::PHASE2_EASY_TIMER : self::PHASE2_HARD_TIMER;
     }
 
-    /** Global Trace Meter tick rate, %/sec. */
-    public function phase2TraceRate(int $bankIce): float
+    /** Global Trace Meter tick rate, %/sec. @param 'queue'|'builder' $subStep */
+    public function phase2TraceRate(string $subStep): float
     {
-        return $bankIce >= self::PHASE2_ICE_THRESHOLD
-            ? self::PHASE2_TRACE_RATE_HIGH_ICE
-            : self::PHASE2_TRACE_RATE_LOW_ICE;
+        return $subStep === 'builder'
+            ? self::PHASE2_TRACE_RATE_BUILDER
+            : self::PHASE2_TRACE_RATE_QUEUE;
     }
 
-    /** [min, max] Global Trace spike percentage on a wrong sequence or TX timeout. */
-    public function phase2TraceSpikeRange(int $bankIce): array
+    /** Flat, immediate Global Trace spike percentage on a failed/expired token injection — always +25. */
+    public function phase2TraceSpike(): float
     {
-        return $bankIce >= self::PHASE2_ICE_THRESHOLD
-            ? self::PHASE2_TRACE_SPIKE_HIGH_ICE
-            : self::PHASE2_TRACE_SPIKE_LOW_ICE;
+        return self::PHASE2_TRACE_SPIKE_ON_FAIL;
     }
 
     /**

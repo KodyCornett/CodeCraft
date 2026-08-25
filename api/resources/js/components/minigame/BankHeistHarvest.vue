@@ -48,8 +48,9 @@
                     <template v-else-if="subStep === 'HARVEST_SCREEN'">
                         <div class="bhv-label">[ HARVEST SUMMARY ]</div>
                         <div class="bhv-harvest">
-                            <div>LAST HARVESTED : <span class="bhv-good">+{{ lastHarvest.creds || lastHarvest.tech }} {{ lastHarvest.currency }}</span></div>
-                            <div>TOTAL HARVEST  : <span class="bhv-good">{{ stagedCreds }} CRED{{ stagedTech > 0 ? ` / ${stagedTech.toFixed(2)} TECH` : '' }} (STAGED)</span></div>
+                            <div>LAST HARVESTED  : <span class="bhv-good">+{{ formatAmount(lastHarvest.creds || lastHarvest.tech) }} {{ currencyLabel(lastHarvest.currency) }}</span></div>
+                            <div>STAGED BUFFER   : <span class="bhv-good">{{ formatAmount(stagedCreds) }} CREDITS{{ stagedTech > 0 ? ` / ${formatAmount(stagedTech)} TECH PT` : '' }}</span></div>
+                            <div>GLOBAL TRACE    : <span :class="traceTierClass">{{ globalTrace.toFixed(0) }}% {{ traceTierLabel }}</span></div>
                         </div>
                     </template>
                 </div>
@@ -67,19 +68,19 @@
 
                     <template v-else-if="subStep === 'TOKEN_BUILD'">
                         <div class="bhv-label">[ PHASE 2 VIEW: TOKEN BUILDER ({{ puzzle.slots.length }} FRAGMENTS REQUIRED) ]</div>
-                        <div class="bhv-mono">TARGET LAYOUT: {{ puzzle.slots.map(s => `[${s}]`).join(' -> ') }}</div>
+                        <div class="bhv-mono">TARGET LAYOUT: {{ puzzle.slots.map(s => `[${s}]`).join(' - ') }}</div>
                         <div class="bhv-mono">SALT = {{ saltPreview }} | YOUR_ID = {{ playerTag }}</div>
 
-                        <div class="bhv-label bhv-label--sub">[ AVAILABLE FRAGMENTS ]</div>
+                        <div class="bhv-label bhv-label--sub">[ MEMORY FRAGMENT POOL ]</div>
                         <div class="bhv-fragments">
-                            <span v-for="f in puzzle.fragments" :key="f.id" class="bhv-fragment">[{{ f.id }}] {{ f.tag }}={{ f.value }}</span>
+                            <span v-for="f in puzzle.fragments" :key="f.id" class="bhv-fragment">[{{ f.id }}] {{ f.hexPreview }}.. (TAG: {{ f.tag }}={{ f.value }})</span>
                         </div>
                         <p class="bhv-hint">Order the fragments into the layout above, then <code>inject -token F6-F1-F2-...</code></p>
                     </template>
 
                     <template v-else-if="subStep === 'HARVEST_SCREEN'">
                         <div class="bhv-label">[ RISK & HARVEST DECISION ]</div>
-                        <p class="bhv-hint">Continuing increases trace risk. If Global Trace hits 100%, ALL STAGED FUNDS ARE WIPED.</p>
+                        <p class="bhv-hint bhv-hint--warn">Continuing increases trace risk! If Trace hits 100%, ALL STAGED FUNDS ARE WIPED.</p>
                         <p class="bhv-hint"><code>extract</code> — bank it safely and end the run · <code>continue</code> — back to the queue for more</p>
                     </template>
                 </div>
@@ -152,6 +153,25 @@ const txTimerClass = computed(() => {
     if (ratio <= 0.6) return 'bhv-warn';
     return '';
 });
+
+function formatAmount(n) {
+    return Number(n || 0).toLocaleString('en-US');
+}
+function currencyLabel(currency) {
+    return currency === 'TECH_PT' ? 'TECH PT' : 'CREDITS';
+}
+// Matches the design doc's own example (60% -> CRITICAL) exactly.
+const traceTierLabel = computed(() => {
+    if (globalTrace.value >= 60) return 'CRITICAL';
+    if (globalTrace.value >= 30) return 'ELEVATED';
+    return 'NOMINAL';
+});
+const traceTierClass = computed(() => {
+    if (globalTrace.value >= 60) return 'bhv-crit';
+    if (globalTrace.value >= 30) return 'bhv-warn';
+    return '';
+});
+
 const filterLabel = computed(() => {
     if (!filter.value) return '';
     return ` — filtered: ${filter.value.currency}${filter.value.min ? ` ≥ ${filter.value.min}` : ''}`;
@@ -169,12 +189,19 @@ function refillQueue() {
     }
 }
 
-// ── Global tick — trace meter + queue timers, always running regardless of sub-step ──
+// ── Global tick — trace meter (rate depends on sub-step) + queue/TX timers ──
+// Trace ticks at 0.5%/sec while browsing the queue, 1.0%/sec while inside
+// Token Builder, and pauses entirely on the Harvest Summary decision screen
+// (nothing in the design doc says it keeps climbing while you're just
+// reading the summary).
 let tickInterval = null;
 function startTick() {
     tickInterval = setInterval(() => {
-        globalTrace.value = Math.min(100, globalTrace.value + (bh.phase2TraceRate(props.bankIce) * 200) / 1000);
-        if (globalTrace.value >= 100) { triggerOverrun(); return; }
+        if (subStep.value !== 'HARVEST_SCREEN') {
+            const rate = bh.phase2TraceRate(subStep.value === 'TOKEN_BUILD' ? 'builder' : 'queue');
+            globalTrace.value = Math.min(100, globalTrace.value + (rate * 200) / 1000);
+            if (globalTrace.value >= 100) { triggerOverrun(); return; }
+        }
 
         if (subStep.value === 'QUEUE_SELECT') {
             queue.value.forEach(tx => { tx.timeLeft = Math.max(0, tx.timeLeft - 0.2); });
@@ -182,14 +209,20 @@ function startTick() {
             refillQueue();
         } else if (subStep.value === 'TOKEN_BUILD' && activeTx.value) {
             activeTx.value.timeLeft = Math.max(0, activeTx.value.timeLeft - 0.2);
-            if (activeTx.value.timeLeft <= 0) failInjection('TRANSACTION TIMER EXPIRED');
+            if (activeTx.value.timeLeft <= 0) failInjection();
         }
     }, 200);
 }
 
 function triggerOverrun() {
     if (tickInterval) clearInterval(tickInterval);
-    setStatus('[!!!] CRITICAL ALARM: GLOBAL SYSTEM TRACE 100% COMPLETE — STAGED BUFFER PURGED', 'bad');
+    setStatus('[!!!] SYSTEM TRACE COMPLETE :: ALL STAGED FUNDS PURGED', 'bad');
+    // The real staged buffer lives server-side (Cache) and is discarded by
+    // resolveGate1Failure()'s 'phase2_overrun' path; zero the local mirror
+    // too so the status bar/panels don't flash a stale non-zero total in
+    // the moment before BankHeist.vue closes the overlay.
+    stagedCreds.value = 0;
+    stagedTech.value  = 0;
     emit('failed', 'phase2_overrun');
 }
 
@@ -293,13 +326,13 @@ function handleTokenBuild(raw) {
     if (isMatch) {
         resolveInjection();
     } else {
-        failInjection('CHECKSUM INVALID (RECIPIENT MISMATCH)');
+        failInjection();
     }
 }
 
 async function resolveInjection() {
     const tx = activeTx.value;
-    setStatus('[+] CHECKSUM VERIFIED — TRANSACTION SPOOF SUCCESSFUL!', 'good');
+    setStatus('[+] CHECKSUM VERIFIED :: TRANSACTION SPOOFED', 'good');
     const res = await bh.phase2Inject(props.canvasId, tx.band, tx.currency);
     if (res) {
         stagedCreds.value = res.staged_creds ?? stagedCreds.value;
@@ -313,10 +346,12 @@ async function resolveInjection() {
     subStep.value = 'HARVEST_SCREEN';
 }
 
-function failInjection(reason) {
-    const spike = bh.phase2TraceSpike(props.bankIce);
+// Covers both an incorrect/malformed fragment chain and a timer expiry —
+// the design doc gives both the exact same output and consequence.
+function failInjection() {
+    const spike = bh.phase2TraceSpike();
     globalTrace.value = Math.min(100, globalTrace.value + spike);
-    setStatus(`[-] ${reason} — TX ${activeTx.value.id} DROPPED :: GLOBAL TRACE +${spike.toFixed(0)}%`, 'bad');
+    setStatus('[-] CHECKSUM INVALID :: TRANSACTION DROPPED', 'bad');
     activeTx.value = null;
     puzzle.value = null;
     if (globalTrace.value >= 100) { triggerOverrun(); return; }
@@ -382,6 +417,10 @@ onBeforeUnmount(() => {
 .bhv-mono { font-size: 11px; line-height: 1.7; }
 .bhv-hint { font-size: 10px; opacity: 0.7; line-height: 1.6; margin: 10px 0 0; }
 .bhv-hint code { color: #FFB000; }
+.bhv-hint--warn { color: #FF2244; opacity: 0.9; }
+
+.bhv-warn { color: #FFB000; }
+.bhv-crit { color: #FF2244; }
 
 .bhv-queue { display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
 .bhv-queue-head, .bhv-queue-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1.3fr 1.6fr; gap: 8px; align-items: center; }

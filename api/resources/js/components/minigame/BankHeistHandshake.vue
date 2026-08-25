@@ -12,21 +12,33 @@
 
             <div class="bhh-panels">
 
-                <!-- PANEL 1 — Live Packet Telemetry & Queue Stream -->
+                <!-- PANEL 1 — Live Packet Telemetry & Session Scan -->
                 <div class="bhh-panel bhh-panel1">
-                    <div class="bhh-panel-label">PANEL 1: LIVE PACKET TELEMETRY & QUEUE STREAM</div>
-                    <div class="bhh-stream">
-                        <div
-                            v-for="(line, i) in streamLines"
-                            :key="i"
-                            class="bhh-stream-line"
-                            :class="{ 'bhh-stream-line--target': line.isTarget }"
-                        >
-                            {{ line.text }}<span v-if="line.isTarget" class="bhh-lock-tag"> &lt;-- [GOLD LOCK]</span>
+                    <div class="bhh-panel-label">PANEL 1: LIVE PACKET TELEMETRY & SESSION SCAN</div>
+
+                    <template v-if="step !== 'TOKEN_BIND'">
+                        <div class="bhh-scan-label">[ SESSION SCAN — SYSTEM SELECTING SYN ]</div>
+                        <div class="bhh-scan">
+                            <div
+                                v-for="(c, i) in sessionCandidates"
+                                :key="i"
+                                class="bhh-scan-line"
+                                :class="{ 'bhh-scan-line--selected': c.selected }"
+                            >
+                                {{ c.text }}<span v-if="c.selected" class="bhh-lock-tag"> &lt;-- SELECTED</span>
+                            </div>
                         </div>
+                    </template>
+                    <template v-else>
+                        <div class="bhh-scan-label">[ SESSION LOCKED — AWAITING BIND ]</div>
+                    </template>
+
+                    <div class="bhh-stream">
+                        <div v-for="(line, i) in streamLines" :key="i" class="bhh-stream-line">{{ line.text }}</div>
                     </div>
-                    <div class="bhh-timer-row">
-                        <span class="bhh-timer-label">TIMEOUT</span>
+
+                    <div v-if="step === 'AUTH_TERMINAL'" class="bhh-timer-row">
+                        <span class="bhh-timer-label">AUTH TIMER</span>
                         [<div class="bhh-timer-bar"><div class="bhh-timer-fill" :class="timerClass" :style="{ width: timerPct + '%' }" /></div>]
                         <span class="bhh-timer-val" :class="timerClass">{{ timeLeft.toFixed(1) }}s</span>
                     </div>
@@ -36,18 +48,18 @@
                 <div class="bhh-panel bhh-panel2">
                     <div class="bhh-panel-label">PANEL 2: INSPECTOR & CIPHER MATRIX</div>
 
-                    <template v-if="step === 'TARGET_LOCK'">
-                        <div class="bhh-label">[ AWAITING TARGET LOCK ]</div>
-                        <div class="bhh-mono">SRC_IP : {{ targetIp }}</div>
-                        <div class="bhh-mono">PORT   : 443</div>
-                        <p class="bhh-hint">No command required — press <code>SPACEBAR</code> or <code>ENTER</code> the instant the target line lights up gold above.</p>
+                    <template v-if="step === 'GATEWAY_ENTRY'">
+                        <div class="bhh-label bhh-label--warn">[ AUTHENTICATION REQUIRED ]</div>
+                        <div class="bhh-mono bhh-mono--target">SESSION SYN : {{ puzzle?.seq }}</div>
+                        <div class="bhh-mono">TARGET IP   : {{ targetIp }}</div>
+                        <p class="bhh-hint bhh-hint--big">PRESS <code>[ENTER]</code> TO INITIALIZE TERMINAL WORKSPACE...</p>
                     </template>
 
-                    <template v-else-if="step === 'SYN_ACK_MATH'">
-                        <div class="bhh-label">[ PHASE 1 VIEW: SYN-ACK MATH ]{{ attemptLabel }}</div>
-                        <div class="bhh-mono">SRC_IP     : {{ targetIp }}</div>
-                        <div class="bhh-mono">SEQ NUMBER : {{ puzzle.seq }}</div>
-                        <div class="bhh-mono bhh-mono--target">TARGET ACK : {{ puzzle.targetAck }} (SEQ + 1)</div>
+                    <template v-else-if="step === 'AUTH_TERMINAL'">
+                        <div class="bhh-label">[ TERMINAL WORKSPACE :: SYN-ACK CALCULATOR ]</div>
+                        <div class="bhh-mono">SRC_IP       : {{ targetIp }}</div>
+                        <div class="bhh-mono">INCOMING SYN : {{ puzzle.seq }}</div>
+                        <div class="bhh-mono bhh-mono--target">TARGET ACK   : {{ puzzle.targetAck }} (SYN + 1)</div>
 
                         <div class="bhh-label bhh-label--sub">[ CIPHER POOL ]</div>
                         <div class="bhh-chunks">
@@ -59,12 +71,16 @@
                         </div>
 
                         <p class="bhh-hint">Find the {{ puzzle.comboSize }} chunks that sum to the target ACK, then <code>respond -syn -ack &lt;letters joined by +&gt;</code>.</p>
+                        <p v-if="sessionRerouteCount > 0" class="bhh-hint bhh-hint--warn">
+                            SESSION REROUTES: {{ sessionRerouteCount }} (-{{ (sessionRerouteCount * HANDSHAKE_WRONG_GUESS_PENALTY).toFixed(0) }}s off the clock)
+                        </p>
                     </template>
 
-                    <template v-else-if="step === 'ACK_BIND'">
+                    <template v-else-if="step === 'TOKEN_BIND'">
                         <div class="bhh-label">[ SESSION LOCK ]</div>
                         <div class="bhh-mono">STATUS     : FINAL ACK RECEIVED FROM CLIENT</div>
                         <div class="bhh-mono bhh-mono--target">TOKEN_HASH : 0x{{ tokenHash }}</div>
+                        <div class="bhh-bind-timer" :class="bindTimerClass">BIND WINDOW: {{ bindTimeLeft.toFixed(1) }}s</div>
                         <p class="bhh-hint">Bind it before the session drops: <code>bind-session -token 0x{{ tokenHash }}</code>.</p>
                     </template>
                 </div>
@@ -79,8 +95,8 @@
                             ref="cliInputEl"
                             v-model="cliText"
                             class="bhh-cli-input"
-                            :disabled="step === 'TARGET_LOCK'"
-                            :placeholder="step === 'TARGET_LOCK' ? 'no input required — SPACE / ENTER to lock' : 'type a command…'"
+                            :disabled="step === 'GATEWAY_ENTRY'"
+                            :placeholder="step === 'GATEWAY_ENTRY' ? 'no input required — ENTER to initialize' : 'type a command…'"
                             autocomplete="off"
                             spellcheck="false"
                             @keydown="onKeydown"
@@ -113,15 +129,17 @@ const props = defineProps({
 const emit = defineEmits(['success', 'failed', 'abort']);
 
 const bh = useBankHeist();
+const HANDSHAKE_WRONG_GUESS_PENALTY = bh.HANDSHAKE_WRONG_GUESS_PENALTY;
 
 // ── Step state ───────────────────────────────────────────────────────────────
-const step          = ref('TARGET_LOCK'); // 'TARGET_LOCK' | 'SYN_ACK_MATH' | 'ACK_BIND'
-const targetIp      = ref(genIp());
-const tokenHash     = ref(genHex(4));
-const puzzle        = ref(null);
-const synAckAttempt = ref(1);
-
-const attemptLabel = computed(() => synAckAttempt.value > 1 ? ` — RETRY ${synAckAttempt.value}` : '');
+// 'GATEWAY_ENTRY' (static, no timer, ENTER to proceed) ->
+// 'AUTH_TERMINAL' (single flat 90s window, -15s + full session reroll per
+// wrong -ack guess) -> 'TOKEN_BIND' (separate flat 3.5s window).
+const step             = ref('GATEWAY_ENTRY');
+const targetIp         = ref(genIp());
+const tokenHash        = ref(genHex(4));
+const puzzle           = ref(null);
+const sessionRerouteCount = ref(0);
 
 function genIp() {
     return `10.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
@@ -132,11 +150,14 @@ function genHex(len) {
     for (let i = 0; i < len; i++) out += h[Math.floor(Math.random() * 16)];
     return out;
 }
+function randInt(n) {
+    return Math.floor(Math.random() * n);
+}
 
 // ── Live "SELECTED MATCH" preview — recomputed on every keystroke while
 // solving SYN-ACK, mirroring the design doc's running-sum readout. ─────────
 const selectedMatchPreview = computed(() => {
-    if (step.value !== 'SYN_ACK_MATH' || !puzzle.value) return null;
+    if (step.value !== 'AUTH_TERMINAL' || !puzzle.value) return null;
     const m = cliText.value.match(/-ack\s+([a-zA-Z](?:\s*\+\s*[a-zA-Z])*\+?)/);
     if (!m) return null;
     const letters = m[1].toUpperCase().split('+').map(s => s.trim()).filter(Boolean);
@@ -146,19 +167,44 @@ const selectedMatchPreview = computed(() => {
     return { parts, sum: parts.reduce((a, c) => a + c.value, 0) };
 });
 
-// ── Timer ────────────────────────────────────────────────────────────────────
-const timeLeft    = ref(0);
-const timerTotal  = ref(0);
-let tickInterval  = null;
+// ── Session generation — a fresh SYN + cipher pool. Called once at mount
+// (so the Gateway Entry screen and the Terminal Workspace's initial render
+// share the SAME SYN — no disconnect between the lock-on step and the
+// calculator step) and again on every wrong -ack guess ("that session
+// failed to auth so it passes to another"). ─────────────────────────────────
+function generateNewSession() {
+    puzzle.value = bh.generateHandshakePuzzle(props.bankIce);
+    refreshSessionScan();
+}
 
-function startTimer(seconds) {
-    if (tickInterval) clearInterval(tickInterval);
-    timerTotal.value = seconds;
-    timeLeft.value   = seconds;
-    tickInterval = setInterval(() => {
+function refreshSessionScan() {
+    const decoyN = 4;
+    const lines = [];
+    for (let i = 0; i < decoyN; i++) {
+        lines.push({ text: `SEQ ${1000 + randInt(9000)} :: SRC_IP ${genIp()} :: SYN_RECEIVED`, selected: false });
+    }
+    const realIdx = randInt(decoyN + 1);
+    lines.splice(realIdx, 0, { text: `SEQ ${puzzle.value.seq} :: SRC_IP ${targetIp.value} :: SYN_RECEIVED`, selected: true });
+    sessionCandidates.value = lines;
+}
+
+const sessionCandidates = ref([]);
+
+// ── AUTH_TERMINAL timer — flat 90s, ticks continuously once started, never
+// resets on a wrong guess (only docked -15s). Reaching 0 is a full failure. ─
+const timeLeft   = ref(0);
+const timerTotal = ref(0);
+let authInterval = null;
+
+function startAuthTimer() {
+    timerTotal.value = bh.HANDSHAKE_AUTH_TIMER;
+    timeLeft.value   = bh.HANDSHAKE_AUTH_TIMER;
+    if (authInterval) clearInterval(authInterval);
+    authInterval = setInterval(() => {
         timeLeft.value = Math.max(0, timeLeft.value - 0.1);
         if (timeLeft.value <= 0) {
-            clearInterval(tickInterval);
+            clearInterval(authInterval);
+            authInterval = null;
             emit('failed');
         }
     }, 100);
@@ -173,11 +219,22 @@ const timerClass = computed(() => {
     return '';
 });
 
-// ── Traffic stream (Step 1 visual — also gates the spacebar/enter shortcut) ─
+// ── TOKEN_BIND timer — separate flat 3.5s window, unrelated to the 90s clock.
+const bindTimeLeft   = ref(0);
+const bindTimerTotal = ref(0);
+let bindInterval     = null;
+
+const bindTimerClass = computed(() => {
+    if (bindTimerTotal.value === 0) return '';
+    const ratio = bindTimeLeft.value / bindTimerTotal.value;
+    if (ratio <= 0.3) return 'bhh-timer--crit';
+    if (ratio <= 0.6) return 'bhh-timer--warn';
+    return '';
+});
+
+// ── Ambient telemetry (Panel 1 flavor scroll) ───────────────────────────────
 const streamLines = ref([]);
-const targetLineActive = ref(false);
 let streamInterval = null;
-let flashTimer = null;
 
 function stamp() {
     const d = new Date(2026, 0, 1, 12, 4, Math.floor(Math.random() * 60), Math.floor(Math.random() * 1000));
@@ -192,44 +249,28 @@ const FLAVOR_LINES = [
     () => `${stamp()} [STREAM] DNS QUERY :: bank-internal.local`,
 ];
 
-function pushStreamLine(text, isTarget = false) {
-    streamLines.value.push({ text, isTarget });
-    if (streamLines.value.length > 6) streamLines.value.shift();
+function pushStreamLine(text) {
+    streamLines.value.push({ text });
+    if (streamLines.value.length > 4) streamLines.value.shift();
 }
 
-function startStream() {
+function startAmbientStream() {
     streamInterval = setInterval(() => {
-        if (step.value !== 'TARGET_LOCK') { clearInterval(streamInterval); return; }
-        pushStreamLine(FLAVOR_LINES[Math.floor(Math.random() * FLAVOR_LINES.length)]());
+        pushStreamLine(FLAVOR_LINES[randInt(FLAVOR_LINES.length)]());
     }, 900);
-    scheduleTargetFlash();
 }
-
-function scheduleTargetFlash() {
-    flashTimer = setTimeout(() => {
-        if (step.value !== 'TARGET_LOCK') return;
-        targetLineActive.value = true;
-        pushStreamLine(`${stamp()} [STREAM] INCOMING SYN DETECTED :: SRC_IP: ${targetIp.value} :: PORT 443`, true);
-        flashTimer = setTimeout(() => {
-            targetLineActive.value = false;
-            if (step.value === 'TARGET_LOCK') scheduleTargetFlash();
-        }, 900);
-    }, 1600);
-}
-
-function stopStream() {
+function stopAmbientStream() {
     if (streamInterval) clearInterval(streamInterval);
-    if (flashTimer) clearTimeout(flashTimer);
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
-const cliText       = ref('');
-const cliInputEl    = ref(null);
-const lastStatus    = ref(null); // { text, kind } | null — single transient line, no scrolling log
-const history       = ref([]);
-const historyIndex  = ref(-1);
+const cliText      = ref('');
+const cliInputEl   = ref(null);
+const lastStatus   = ref(null); // { text, kind } | null — single transient line, no scrolling log
+const history      = ref([]);
+const historyIndex = ref(-1);
 
-const STEP_COMMANDS = { SYN_ACK_MATH: 'respond', ACK_BIND: 'bind-session' };
+const STEP_COMMANDS = { AUTH_TERMINAL: 'respond', TOKEN_BIND: 'bind-session' };
 
 function setStatus(text, kind = '') {
     lastStatus.value = { text, kind };
@@ -265,36 +306,27 @@ function submitCommand() {
     historyIndex.value = -1;
     cliText.value = '';
 
-    if (step.value === 'SYN_ACK_MATH') handleSynAck(raw);
-    else if (step.value === 'ACK_BIND') handleAck(raw);
+    if (step.value === 'AUTH_TERMINAL') handleSynAck(raw);
+    else if (step.value === 'TOKEN_BIND') handleAck(raw);
 }
 
-// ── Step 1: TARGET_LOCK — spacebar/enter only, no CLI command ───────────────
+// ── Step 1: GATEWAY_ENTRY — ENTER only, no CLI command ──────────────────────
 function onGlobalKeydown(e) {
-    if (e.key !== ' ' && e.key !== 'Enter') return;
-    if (document.activeElement === cliInputEl.value) return; // TARGET_LOCK disables the input, but guard anyway
-    if (step.value === 'TARGET_LOCK' && targetLineActive.value) {
-        e.preventDefault();
-        setStatus('[+] TARGET LOCKED — SYN INTERCEPTED', 'good');
-        advanceToSynAck();
-    }
+    if (e.key !== 'Enter') return;
+    if (step.value !== 'GATEWAY_ENTRY') return;
+    e.preventDefault();
+    enterTerminal();
 }
 
-// ── Step 2: SYN-ACK ──────────────────────────────────────────────────────────
-function advanceToSynAck() {
-    stopStream();
-    step.value = 'SYN_ACK_MATH';
-    synAckAttempt.value = 1;
-    newSynAckPuzzle();
+function enterTerminal() {
+    // Reuses the SAME puzzle (same SYN) already shown on the Gateway Entry
+    // screen — no regeneration here, that continuity is the whole point.
+    step.value = 'AUTH_TERMINAL';
+    startAuthTimer();
     nextTick(() => cliInputEl.value?.focus());
 }
 
-function newSynAckPuzzle() {
-    puzzle.value = bh.generateHandshakePuzzle(props.bankIce);
-    const base = bh.handshakeStepTimer('syn_ack', props.playerCpu, props.playerRam, props.bankIce);
-    startTimer(bh.handshakeRetryTimer(base, synAckAttempt.value));
-}
-
+// ── Step 2: AUTH_TERMINAL — SYN-ACK calculator ──────────────────────────────
 function handleSynAck(raw) {
     const m = raw.toLowerCase().match(/-ack\s+([a-f](?:\s*\+\s*[a-f])*)/i);
     if (!m) {
@@ -307,18 +339,39 @@ function handleSynAck(raw) {
 
     if (isMatch) {
         setStatus(`[+] SYN-ACK ACKNOWLEDGED (ACK=${puzzle.value.targetAck} VERIFIED)`, 'good');
-        advanceToAck();
-    } else {
-        setStatus('[-] ACK MISMATCH. CONNECTION RESET.', 'bad');
-        synAckAttempt.value += 1;
-        newSynAckPuzzle(); // fresh handshake, ratcheted-down timer — failures cost time
+        advanceToTokenBind();
+        return;
     }
+
+    setStatus('[-] ACK MISMATCH :: SESSION DROPPED — REROUTING TO NEXT CANDIDATE', 'bad');
+    sessionRerouteCount.value += 1;
+    timeLeft.value = Math.max(0, timeLeft.value - HANDSHAKE_WRONG_GUESS_PENALTY);
+
+    if (timeLeft.value <= 0) {
+        if (authInterval) { clearInterval(authInterval); authInterval = null; }
+        emit('failed');
+        return;
+    }
+
+    generateNewSession(); // new SYN + new cipher pool — the running 90s clock keeps ticking from wherever it is
 }
 
-// ── Step 3: ACK ──────────────────────────────────────────────────────────────
-function advanceToAck() {
-    step.value = 'ACK_BIND';
-    startTimer(bh.handshakeStepTimer('ack', props.playerCpu, props.playerRam, props.bankIce));
+// ── Step 3: TOKEN_BIND — separate flat 3.5s window ──────────────────────────
+function advanceToTokenBind() {
+    if (authInterval) { clearInterval(authInterval); authInterval = null; }
+    step.value = 'TOKEN_BIND';
+    bindTimerTotal.value = bh.HANDSHAKE_BIND_TIMER;
+    bindTimeLeft.value   = bh.HANDSHAKE_BIND_TIMER;
+    if (bindInterval) clearInterval(bindInterval);
+    bindInterval = setInterval(() => {
+        bindTimeLeft.value = Math.max(0, bindTimeLeft.value - 0.1);
+        if (bindTimeLeft.value <= 0) {
+            clearInterval(bindInterval);
+            bindInterval = null;
+            emit('failed');
+        }
+    }, 100);
+    nextTick(() => cliInputEl.value?.focus());
 }
 
 function handleAck(raw) {
@@ -329,7 +382,7 @@ function handleAck(raw) {
     }
     if (m[2].toUpperCase() === tokenHash.value) {
         setStatus('[+] SESSION BOUND :: CONNECTION ESTABLISHED :: ACCESS GRANTED', 'good');
-        if (tickInterval) clearInterval(tickInterval);
+        if (bindInterval) { clearInterval(bindInterval); bindInterval = null; }
         emit('success');
     } else {
         setStatus('[-] TOKEN MISMATCH', 'bad');
@@ -338,14 +391,15 @@ function handleAck(raw) {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(() => {
-    startTimer(bh.handshakeStepTimer('syn', props.playerCpu, props.playerRam, props.bankIce));
-    startStream();
+    generateNewSession(); // populates puzzle + session scan for the Gateway Entry screen
+    startAmbientStream();
     window.addEventListener('keydown', onGlobalKeydown);
 });
 
 onBeforeUnmount(() => {
-    if (tickInterval) clearInterval(tickInterval);
-    stopStream();
+    if (authInterval) clearInterval(authInterval);
+    if (bindInterval) clearInterval(bindInterval);
+    stopAmbientStream();
     window.removeEventListener('keydown', onGlobalKeydown);
 });
 </script>
@@ -366,12 +420,15 @@ onBeforeUnmount(() => {
 .bhh-panel3 { flex: 0 0 15%; display: flex; flex-direction: column; justify-content: flex-end; overflow: visible; }
 .bhh-panel-label { font-size: 9px; letter-spacing: 0.1em; color: #FFB000; margin-bottom: 8px; opacity: 0.85; }
 
-/* Panel 1 — stream + timer */
-.bhh-stream { min-height: 80px; display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
-.bhh-stream-line { font-size: 10px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bhh-stream-line--target { color: #FFB000; opacity: 1; font-weight: 600; animation: bhh-flash 0.5s ease-in-out infinite alternate; }
+/* Panel 1 — session scan + ambient stream + timer */
+.bhh-scan-label { font-size: 9px; color: #6a8aa0; letter-spacing: 0.06em; margin-bottom: 4px; }
+.bhh-scan { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.bhh-scan-line { font-size: 10px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bhh-scan-line--selected { color: #FFB000; opacity: 1; font-weight: 600; }
 .bhh-lock-tag { color: #FFB000; }
-@keyframes bhh-flash { from { opacity: 0.7; } to { opacity: 1; } }
+
+.bhh-stream { min-height: 40px; display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+.bhh-stream-line { font-size: 10px; opacity: 0.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .bhh-timer-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .bhh-timer-label { font-size: 9px; color: #6a8aa0; letter-spacing: 0.08em; }
@@ -386,13 +443,19 @@ onBeforeUnmount(() => {
 /* Panel 2 — inspector */
 .bhh-label { font-size: 10px; letter-spacing: 0.08em; color: #00F0FF; margin-bottom: 8px; }
 .bhh-label--sub { margin-top: 12px; }
+.bhh-label--warn { color: #FFB000; }
 .bhh-mono { font-size: 12px; line-height: 1.7; }
 .bhh-mono--target { color: #FFB000; }
 .bhh-chunks { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0; }
 .bhh-chunk { font-size: 12px; padding: 6px 10px; background: #0a0f16; border: 1px solid #00F0FF; }
 .bhh-match-preview { font-size: 11px; color: #FFB000; margin: 10px 0; }
 .bhh-hint { font-size: 10px; opacity: 0.7; line-height: 1.6; margin: 8px 0 0; }
+.bhh-hint--big { font-size: 12px; opacity: 0.9; margin-top: 16px; }
+.bhh-hint--warn { color: #FF2244; opacity: 0.9; }
 .bhh-hint code { color: #FFB000; }
+.bhh-bind-timer { font-size: 13px; margin: 10px 0; color: #00F0FF; }
+.bhh-bind-timer.bhh-timer--warn { color: #FFB000; }
+.bhh-bind-timer.bhh-timer--crit { color: #FF2244; }
 
 /* Panel 3 — CLI */
 .bhh-status-line { font-size: 10px; margin-bottom: 6px; opacity: 0.9; }

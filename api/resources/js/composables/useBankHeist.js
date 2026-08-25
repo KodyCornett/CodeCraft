@@ -30,18 +30,18 @@ const TIMER_FLOOR         = 15;
 const WRONG_ACTION_BASE   = 5;
 const WRONG_ACTION_OS_MULT = 0.4;
 
-// Gate 2 Phase 1 — MitM Handshake Spoof
-// Set flat to 90s (1.5 min) per step after two rounds of doubling
-// (5.0/6.5/3.5 -> 10.0/13.0/7.0 -> 20.0/26.0/14.0) still read as too fast in
-// dev testing. Floor == base so a bad CPU-vs-ICE roll can never cut below
-// the guaranteed 90s; a good roll's positive modifier still adds on top.
-const HANDSHAKE_TIMER_BASE         = { syn: 90.0, syn_ack: 90.0, ack: 90.0 };
-const HANDSHAKE_TIMER_FLOOR        = { syn: 90.0, syn_ack: 90.0, ack: 90.0 };
-const HANDSHAKE_TIMER_RAM_MULT     = 0.3;
-const HANDSHAKE_TIMER_BONUS_MULT   = 0.5;
-const HANDSHAKE_TIMER_PENALTY_MULT = 0.3;
-const HANDSHAKE_RETRY_RATCHET      = 0.8;
-const HANDSHAKE_RETRY_FLOOR        = 2.0;
+// Gate 1 — Authentication Handshake
+// Full Phase 1 replacement: no more per-step CPU/RAM/ICE-scaled timers or
+// "gold flash" lock-on gimmicks. A single flat 90s window covers the whole
+// Terminal Workspace / SYN Calculator step; a wrong -ack guess docks a flat
+// 15s off the *running* clock (never resets it) and rotates in a brand new
+// session (new SYN + new cipher pool) — "that session failed to auth so it
+// passes to another." Token Binding is a separate flat 3.5s window,
+// unrelated to the 90s clock. Either window hitting 0 is a full failure —
+// same cost stack as before (see BankHeistService::resolveGate1Failure).
+const HANDSHAKE_AUTH_TIMER         = 90.0;
+const HANDSHAKE_WRONG_GUESS_PENALTY = 15.0;
+const HANDSHAKE_BIND_TIMER         = 3.5;
 const HANDSHAKE_ICE_THRESHOLD        = 7;
 const HANDSHAKE_CHUNK_COUNT_LOW_ICE  = 4;
 const HANDSHAKE_CHUNK_COUNT_HIGH_ICE = 6;
@@ -65,26 +65,14 @@ export function decoyCount(bankIce) {
     return bankIce;
 }
 
-// ── Gate 2 Phase 1 — MitM Handshake Spoof ───────────────────────────────────
-// Three-step CLI puzzle (SYN → SYN-ACK → ACK). Timers/pool below mirror
-// BankHeistService.php's handshake* methods exactly. The final timeout
-// failure (any step) is reported via the same gate1Failed() call below,
-// with approach: 'mitm_handshake' — see that PHP method's docblock for why
-// it's shared across gates.
-
-/** Base timer (seconds) for one handshake step. Same asymmetric CPU-vs-ICE shape as baseTimer(), much smaller constants — these are snappy few-second steps. */
-export function handshakeStepTimer(step, cpu, ram, ice) {
-    const base = HANDSHAKE_TIMER_BASE[step] + ram * HANDSHAKE_TIMER_RAM_MULT;
-    const diff = cpu - ice;
-    const mod  = diff >= 0 ? diff * HANDSHAKE_TIMER_BONUS_MULT : -(diff ** 2) * HANDSHAKE_TIMER_PENALTY_MULT;
-    return Math.max(HANDSHAKE_TIMER_FLOOR[step], base + mod);
-}
-
-/** Timer for the Nth SYN-ACK attempt (1-indexed) — ratchets 0.8x per prior wrong-sum failure, floored at 2s. */
-export function handshakeRetryTimer(baseSeconds, attemptNumber) {
-    const ratcheted = baseSeconds * (HANDSHAKE_RETRY_RATCHET ** Math.max(0, attemptNumber - 1));
-    return Math.max(HANDSHAKE_RETRY_FLOOR, ratcheted);
-}
+// ── Gate 1 — Authentication Handshake ───────────────────────────────────────
+// Gateway Entry (no timer, ENTER to open the Terminal Workspace using the
+// SYN already shown at the door) -> Terminal Workspace & SYN Calculator
+// (flat 90s window, -15s + full session reroll per wrong -ack guess) ->
+// Session Token Binding (flat 3.5s window). Pool sizing below mirrors
+// BankHeistService.php's handshake* methods exactly. Any full failure
+// (either window hitting 0) is reported via the same gate1Failed() call
+// below, with approach: 'mitm_handshake'.
 
 export function handshakeChunkCount(bankIce) {
     return bankIce >= HANDSHAKE_ICE_THRESHOLD ? HANDSHAKE_CHUNK_COUNT_HIGH_ICE : HANDSHAKE_CHUNK_COUNT_LOW_ICE;
@@ -179,26 +167,29 @@ export function generateHandshakePuzzle(bankIce) {
     return { seq, targetAck, chunks, comboSize, correctLabels };
 }
 
-// ── Gate 2 Phase 2 — Token Reconstruction & Risk Harvest ────────────────────
+// ── Gate 2 Phase 2 — Ledger Spoof & Risk Harvest ────────────────────────────
 // Live transaction queue: intercept a TX, reconstruct its forged token from
 // fragment candidates before its own timer expires, then EXTRACT to bank the
 // running total or CONTINUE to push your luck. Mirrors
-// BankHeistService.php's phase2* methods exactly for timers/pool sizing;
-// the actual reward is rolled server-side per inject (see phase2Inject()
-// below) — the ranges here are a display preview only.
+// BankHeistService.php's phase2* methods exactly for pool sizing; the
+// actual reward is rolled server-side per inject (see phase2Inject() below)
+// — the ranges here are a display preview only. TX expiration timers and
+// the Global Trace Meter's tick rate/fail-spike are flat, spec-locked
+// numbers (not CPU/RAM/ICE-scaled) per the exact Phase 2 design doc.
 
 const PHASE2_ICE_THRESHOLD        = 7;
 const PHASE2_EASY_FRAGMENTS       = 4;
 const PHASE2_HARD_FRAGMENTS_LOW   = 6;
 const PHASE2_HARD_FRAGMENTS_HIGH  = 8;
 const PHASE2_DECOY_COUNT          = 2;
-const PHASE2_EASY_TIMER_RANGE     = [3.0, 5.0];
-const PHASE2_HARD_TIMER_RANGE     = [6.0, 9.0];
-const PHASE2_TIMER_ICE_CUT        = 0.75;
-const PHASE2_TRACE_RATE_LOW_ICE   = 0.5;
-const PHASE2_TRACE_RATE_HIGH_ICE  = 0.8;
-const PHASE2_TRACE_SPIKE_LOW_ICE  = [20, 30];
-const PHASE2_TRACE_SPIKE_HIGH_ICE = [30, 40];
+/** Flat TX expiration timers, seconds — low yield gets more time, high yield less. Not ICE-scaled. */
+const PHASE2_EASY_TIMER           = 8.0;
+const PHASE2_HARD_TIMER           = 4.0;
+/** Global Trace Meter tick rate, %/sec — depends on which sub-step the player is in, not on Bank ICE. */
+const PHASE2_TRACE_RATE_QUEUE     = 0.5;
+const PHASE2_TRACE_RATE_BUILDER   = 1.0;
+/** Flat, immediate trace spike on a failed/expired token injection. */
+const PHASE2_TRACE_SPIKE_ON_FAIL  = 25.0;
 const PHASE2_EASY_CRED_RANGE      = [75, 150];
 const PHASE2_EASY_TECH_RANGE      = [15, 40];
 const PHASE2_HARD_CRED_RANGE      = [350, 550];
@@ -228,20 +219,19 @@ export function phase2DecoyCount() {
     return PHASE2_DECOY_COUNT;
 }
 
-/** One randomized TX timer (seconds), already ICE-cut. */
-export function phase2TxTimer(band, bankIce) {
-    const rolled = randRange(band === 'easy' ? PHASE2_EASY_TIMER_RANGE : PHASE2_HARD_TIMER_RANGE);
-    return bankIce >= PHASE2_ICE_THRESHOLD ? rolled * PHASE2_TIMER_ICE_CUT : rolled;
+/** Flat TX expiration timer (seconds) — 8.0s for a low-yield/easy transaction, 4.0s for a high-yield/hard one. */
+export function phase2TxTimer(band) {
+    return band === 'easy' ? PHASE2_EASY_TIMER : PHASE2_HARD_TIMER;
 }
 
-/** Global Trace Meter tick rate, %/sec — always running regardless of sub-step. */
-export function phase2TraceRate(bankIce) {
-    return bankIce >= PHASE2_ICE_THRESHOLD ? PHASE2_TRACE_RATE_HIGH_ICE : PHASE2_TRACE_RATE_LOW_ICE;
+/** Global Trace Meter tick rate, %/sec — 0.5 while browsing the queue, 1.0 while inside Token Builder mode. @param {'queue'|'builder'} subStep */
+export function phase2TraceRate(subStep) {
+    return subStep === 'builder' ? PHASE2_TRACE_RATE_BUILDER : PHASE2_TRACE_RATE_QUEUE;
 }
 
-/** Global Trace spike on a wrong sequence / TX timeout. */
-export function phase2TraceSpike(bankIce) {
-    return randRange(bankIce >= PHASE2_ICE_THRESHOLD ? PHASE2_TRACE_SPIKE_HIGH_ICE : PHASE2_TRACE_SPIKE_LOW_ICE);
+/** Flat, immediate Global Trace spike on a failed/expired token injection — always +25%. */
+export function phase2TraceSpike() {
+    return PHASE2_TRACE_SPIKE_ON_FAIL;
 }
 
 /** UI-preview yield only — the server rolls the real reward on inject; this never gets credited directly. */
@@ -256,7 +246,7 @@ let txCounter = 8800;
 export function generateTransaction(bankIce) {
     const band = Math.random() < 0.5 ? 'easy' : 'hard';
     const currency = Math.random() < 0.8 ? 'CRED' : 'TECH_PT';
-    const timer = phase2TxTimer(band, bankIce);
+    const timer = phase2TxTimer(band);
     return {
         id: `TX-${++txCounter}`,
         band,
@@ -371,7 +361,8 @@ export function useBankHeist() {
         phase2Extract,
         // Pure helpers re-exported for convenience so components only import one module
         baseTimer, wrongActionPenalty, decoyCount,
-        handshakeStepTimer, handshakeRetryTimer, handshakeChunkCount, handshakeComboSize,
+        HANDSHAKE_AUTH_TIMER, HANDSHAKE_WRONG_GUESS_PENALTY, HANDSHAKE_BIND_TIMER,
+        handshakeChunkCount, handshakeComboSize,
         generateHandshakePuzzle,
         phase2RequiredFragments, phase2DecoyCount, phase2TxTimer, phase2TraceRate,
         phase2TraceSpike, previewPhase2Reward, generateTransaction, generateFragmentPuzzle,
