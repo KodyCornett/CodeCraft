@@ -520,7 +520,7 @@ as every other narrator line in this chapter.
 **Location:** Veil's node, Downtown Core
 **Contractor:** Veil
 
----
+---git 
 
 **NARRATOR** `narrator/chapter_1/c1_s3_p1_l1.mp3`
 > Veil's node renders the way it always has — a sprawling workspace under warm hanging

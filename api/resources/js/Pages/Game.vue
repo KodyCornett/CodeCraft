@@ -385,6 +385,7 @@ import { usePingSystem }       from '@/composables/usePingSystem.js';
 import { useWatcher }          from '@/composables/useWatcher.js';
 import { useQuestLog }         from '@/composables/useQuestLog.js';
 import { useQuestMinigame }    from '@/composables/useQuestMinigame.js';
+import { useDevBankHeist }     from '@/composables/useDevBankHeist.js';
 import { useDocNotifications } from '@/composables/useDocNotifications.js';
 import { useQuestArchive }     from '@/composables/useQuestArchive.js';
 import { useInactivityTimer }  from '@/composables/useInactivityTimer.js';
@@ -599,6 +600,18 @@ const {
 // round-trips itself via useBankHeist.js, this only opens/closes the overlay
 // and syncs the authoritative player/rig fields each server call already saved.
 const activeBankHeist = ref(null); // { canvasId, bankName, bankIce, bankTier }
+
+// DEV ONLY — remove alongside splice://dev/minigames before release. Lets the
+// dev launcher hand this ref a real roster-backed payload directly, bypassing
+// the current-node/cooldown gating onBankHeistSelected() applies below — see
+// useDevBankHeist.js's docblock for why this doesn't shortcut the real flow.
+const { activeDevBankHeist, clear: clearDevBankHeist } = useDevBankHeist();
+watch(activeDevBankHeist, (val) => {
+    if (!val) return;
+    activeBankHeist.value = val;
+    activeBrowserUrl.value = null;
+    clearDevBankHeist();
+});
 
 function onBankHeistSelected() {
     const node = selectedNode.value;

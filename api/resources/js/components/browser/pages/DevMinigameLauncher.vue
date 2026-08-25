@@ -51,14 +51,82 @@
             </div>
         </div>
 
+        <!-- Bank Heist — separate flow, not part of the quest-minigame skin system -->
+        <div class="dev-header" style="margin-top: 4px;">
+            <span class="dev-tag">[ DEV BUILD ]</span>
+            <span class="dev-title">BANK HEIST — REAL ROSTER TARGETS</span>
+            <span class="dev-sub">// Launches BankHeist.vue against a genuine bank Node — every server round-trip (gate1-failed / phase2-inject / phase2-extract) resolves for real, exactly like the live map trigger. Your actual rig stats (CPU/RAM/OS) and bounty multiplier apply, same as a real run.</span>
+        </div>
+
+        <div v-if="bankNodesLoading" class="dev-game-brief">Loading bank roster from /api/nodes…</div>
+        <div v-else-if="bankNodesError" class="dev-game-brief" style="color: rgba(255,100,100,0.6);">Failed to load roster: {{ bankNodesError }}</div>
+
+        <div v-else class="dev-games">
+            <div v-for="bank in bankTargets" :key="bank.canvasId" class="dev-game">
+                <div class="dev-game-header">
+                    <span class="dev-game-type">{{ bank.name }}</span>
+                    <span class="dev-game-status dev-status--built">TIER {{ bank.bankTier }} · ICE {{ bank.bankIce }}</span>
+                </div>
+                <div class="dev-game-quest">{{ bank.canvasId }}</div>
+                <div class="dev-game-brief">
+                    {{ bank.onCooldown ? `On cooldown until ${bank.cooldownLabel} — testable anyway, the server doesn't gate on this.` : 'No active cooldown.' }}
+                </div>
+                <button class="dev-launch-btn" @click="onLaunchBankHeist(bank)">[ TEST BANK HEIST ]</button>
+            </div>
+            <div v-if="!bankTargets.length" class="dev-game-brief">No bank-target nodes found — has the Bank Heist migration run?</div>
+        </div>
+
     </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useQuestMinigame } from '@/composables/useQuestMinigame.js';
+import { useDevBankHeist } from '@/composables/useDevBankHeist.js';
+import { useMapData } from '@/composables/useMapData.js';
+import { getBankTargetNetworkName } from '@/composables/businessNodes.js';
 
 const { launch } = useQuestMinigame();
+const { launch: launchDevBankHeist } = useDevBankHeist();
+
+// ── Bank Heist roster — DEV ONLY ─────────────────────────────────────────────
+// A fresh, independent useMapData() instance (not Game.vue's) — plain GET
+// /api/nodes, filtered to the 19 fixed is_bank_target rows. Only used to
+// populate this list; BankHeist.vue itself is driven entirely by Game.vue's
+// own activeBankHeist ref via useDevBankHeist's launch() below.
+const mapData          = useMapData();
+const bankNodesLoading = ref(true);
+const bankNodesError   = ref(null);
+
+const bankTargets = computed(() =>
+    mapData.nodes.value
+        .filter(n => n.isBankTarget)
+        .map(n => ({
+            canvasId:      n.canvasId,
+            name:          getBankTargetNetworkName(n.canvasId) ?? 'UNKNOWN TARGET',
+            bankTier:      n.bankTier ?? 1,
+            bankIce:       n.bankIce ?? 3,
+            onCooldown:    !!n.bankCooldownUntil && new Date(n.bankCooldownUntil).getTime() > Date.now(),
+            cooldownLabel: n.bankCooldownUntil ? new Date(n.bankCooldownUntil).toLocaleTimeString() : null,
+        }))
+        .sort((a, b) => a.bankTier - b.bankTier || a.name.localeCompare(b.name))
+);
+
+function onLaunchBankHeist(bank) {
+    launchDevBankHeist({
+        canvasId: bank.canvasId,
+        bankName: bank.name,
+        bankIce:  bank.bankIce,
+        bankTier: bank.bankTier,
+    });
+}
+
+onMounted(async () => {
+    bankNodesLoading.value = true;
+    await mapData.fetchAll();
+    bankNodesError.value   = mapData.error.value;
+    bankNodesLoading.value = false;
+});
 
 const selectedDiff  = ref(1);
 const selectedLocks = ref(5);

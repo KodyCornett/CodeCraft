@@ -61,25 +61,30 @@ class BankHeistController extends Controller
     // =========================================================================
 
     /**
-     * Gate 1 failure — either the Spoofed Handshake countertrace timer hit
-     * zero, or a Brute Force run got caught before its timer completed.
-     * Both use Gate 1's uniform cost stack (SS + bounty + node cooldown),
-     * per BANK_HEIST_BUILD_PLAN.md — the approach field is informational
-     * only, it doesn't change the consequence.
+     * "Denied at the door" — the Spoofed Handshake countertrace timer hit
+     * zero, Gate 2 Phase 1's MitM Handshake Spoof timed out on any of its
+     * three steps (SYN/SYN-ACK/ACK), or Gate 2 Phase 2's Global Trace Meter
+     * overran to 100%. All three use the same uniform cost stack (SS +
+     * bounty + node cooldown), per BANK_HEIST_BUILD_PLAN.md — the approach
+     * field is informational except for 'phase2_overrun', which also
+     * discards the player's staged Phase 2 harvest buffer (see
+     * BankHeistService::resolveGate1Failure). Named `gate1Failed` for
+     * historical reasons (it predates both Gate 2 redesigns) but is
+     * genuinely shared by every gate now.
      *
      * Body:
-     *   approach  string  'spoofed_handshake' | 'brute_force'
+     *   approach  string  'spoofed_handshake' | 'mitm_handshake' | 'phase2_overrun'
      */
     public function gate1Failed(Request $request, string $canvasId): JsonResponse
     {
-        $request->validate([
-            'approach' => ['required', 'string', 'in:spoofed_handshake,brute_force'],
+        $data = $request->validate([
+            'approach' => ['required', 'string', 'in:spoofed_handshake,mitm_handshake,phase2_overrun'],
         ]);
 
         [$player, $node, $error] = $this->resolvePlayerAndBank($request, $canvasId);
         if ($error) return $error;
 
-        $result = $this->bankHeistService->resolveGate1Failure($player, $node);
+        $result = $this->bankHeistService->resolveGate1Failure($player, $node, $data['approach']);
 
         return response()->json([
             'ss_damage'          => $result['ss_damage'],
@@ -93,75 +98,59 @@ class BankHeistController extends Controller
     }
 
     // =========================================================================
-    // POST /api/bank-heist/{canvasId}/brute-force-clean-exit
+    // POST /api/bank-heist/{canvasId}/phase2-inject
     // =========================================================================
 
     /**
-     * A Brute Force run that survived its timer and extracted clean.
-     * Unavoidable flat +1 bounty tax — going loud always leaves a mark,
-     * even on a perfect run. Distinct from an account crack's own outcome,
-     * which is reported separately via accountResult().
+     * Resolves one Gate 2 Phase 2 successful token injection. Rewards are
+     * always rolled server-side from the reported band/currency — never
+     * trusted from the client — and accumulated in a short-lived staged
+     * buffer that only phase2Extract() moves into the player's permanent
+     * balance. See BankHeistService's Gate 2 Phase 2 section for why.
+     *
+     * Body:
+     *   band      string  'easy' | 'hard'
+     *   currency  string  'CRED' | 'TECH_PT'
      */
-    public function bruteForceCleanExit(Request $request, string $canvasId): JsonResponse
+    public function phase2Inject(Request $request, string $canvasId): JsonResponse
     {
+        $data = $request->validate([
+            'band'     => ['required', 'string', 'in:easy,hard'],
+            'currency' => ['required', 'string', 'in:CRED,TECH_PT'],
+        ]);
+
         [$player, $node, $error] = $this->resolvePlayerAndBank($request, $canvasId);
         if ($error) return $error;
 
-        $result = $this->bankHeistService->resolveBruteForceCleanExit($player);
+        $result = $this->bankHeistService->resolvePhase2Inject($player, $node, $data['band'], $data['currency']);
 
         return response()->json([
-            'bounty_hacks_added' => $result['bounty_hacks_added'],
-            'bounty_level'       => $player->bounty_level,
-            'bounty_multiplier'  => $player->bounty_multiplier,
+            'reward'       => $result['reward'],
+            'staged_creds' => $result['staged_creds'],
+            'staged_tech'  => $result['staged_tech'],
         ]);
     }
 
     // =========================================================================
-    // POST /api/bank-heist/{canvasId}/account-result
+    // POST /api/bank-heist/{canvasId}/phase2-extract
     // =========================================================================
 
     /**
-     * Resolves one Gate 2 Phase 2 account-crack attempt. Rewards are always
-     * computed server-side from account ICE — never trusted from the
-     * client — mirroring NodeController::deplete()'s pattern exactly.
-     *
-     * Body:
-     *   account_type    string  'normal' | 'investment'
-     *   outcome         string  'success' | 'clean_failed' | 'abandoned'
-     *   detection_band  int     0-4, computed client-side from the running
-     *                           detection bar. A band of 4 always resolves
-     *                           as a forced Lockdown regardless of outcome.
+     * EXTRACT — banks this run's entire staged Phase 2 buffer to the
+     * player's permanent balance and clears it. Ends the mini-game cleanly.
      */
-    public function accountResult(Request $request, string $canvasId): JsonResponse
+    public function phase2Extract(Request $request, string $canvasId): JsonResponse
     {
-        $data = $request->validate([
-            'account_type'   => ['required', 'string', 'in:normal,investment'],
-            'outcome'        => ['required', 'string', 'in:success,clean_failed,abandoned'],
-            'detection_band' => ['required', 'integer', 'min:0', 'max:4'],
-        ]);
-
         [$player, $node, $error] = $this->resolvePlayerAndBank($request, $canvasId);
         if ($error) return $error;
 
-        $result = $this->bankHeistService->resolveAccountEvent(
-            $player,
-            $node,
-            $data['account_type'],
-            $data['outcome'],
-            $data['detection_band'],
-        );
+        $result = $this->bankHeistService->resolvePhase2Extract($player, $node);
 
         return response()->json([
-            'outcome'            => $result['outcome'],
-            'reward'             => $result['reward'],
-            'ss_damage'          => $result['ss_damage'],
-            'bounty_hacks_added' => $result['bounty_hacks_added'],
-            'failure_jump'       => $result['failure_jump'] ?? 0.0,
-            'pocket_creds'       => $player->pocket_creds,
-            'tech_points'        => $player->tech_points,
-            'bounty_level'       => $player->bounty_level,
-            'bounty_multiplier'  => $player->bounty_multiplier,
-            ...$this->rigStatePayload($result['rig'], $result['event']),
+            'creds_extracted' => $result['creds_extracted'],
+            'tech_extracted'  => $result['tech_extracted'],
+            'pocket_creds'    => $player->pocket_creds,
+            'tech_points'     => $player->tech_points,
         ]);
     }
 }

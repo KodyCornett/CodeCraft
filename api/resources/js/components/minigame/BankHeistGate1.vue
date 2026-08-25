@@ -12,44 +12,28 @@
             <div class="bh1-rule" />
 
             <!-- ── Spoofed Handshake ─────────────────────────────────────────── -->
-            <template v-if="approach === 'spoofed_handshake'">
-                <div class="bh1-label">[ INTERCEPTED HANDSHAKE READOUT ] — probe for the flaw, decrypt it, slot it</div>
+            <div class="bh1-label">[ INTERCEPTED HANDSHAKE READOUT ] — probe for the flaw, decrypt it, slot it</div>
 
-                <div class="bh1-slots">
-                    <div v-for="(v, i) in slots" :key="i" class="bh1-slot" :class="{ 'bh1-slot--filled': v }">
-                        {{ v ?? '[ EMPTY ]' }}
-                    </div>
+            <div class="bh1-slots">
+                <div v-for="(v, i) in slots" :key="i" class="bh1-slot" :class="{ 'bh1-slot--filled': v }">
+                    {{ v ?? '[ EMPTY ]' }}
                 </div>
+            </div>
 
-                <div class="bh1-readout">
-                    <button
-                        v-for="entry in readout"
-                        :key="entry.id"
-                        class="bh1-candidate"
-                        :class="{ 'bh1-candidate--used': entry.used }"
-                        :disabled="entry.used"
-                        @click="probe(entry)"
-                    >
-                        {{ entry.display }}
-                    </button>
-                </div>
+            <div class="bh1-readout">
+                <button
+                    v-for="entry in readout"
+                    :key="entry.id"
+                    class="bh1-candidate"
+                    :class="{ 'bh1-candidate--used': entry.used }"
+                    :disabled="entry.used"
+                    @click="probe(entry)"
+                >
+                    {{ entry.display }}
+                </button>
+            </div>
 
-                <div v-if="flash" class="bh1-flash" :class="flash.kind">{{ flash.text }}</div>
-            </template>
-
-            <!-- ── Brute Force ───────────────────────────────────────────────── -->
-            <template v-else>
-                <div class="bh1-label">[ BRUTE FORCE — HOLD THE LINE ]</div>
-                <p class="bh1-copy">No puzzle here — survive the countertrace clock. Loud and unmissable: detection climbs fast.</p>
-
-                <div class="bh1-bar-row">
-                    <span class="bh1-bar-label">DETECTION</span>
-                    <div class="bh1-bar-wrap">
-                        <div class="bh1-bar-fill" :class="detectionClass" :style="{ width: detection + '%' }" />
-                    </div>
-                    <span class="bh1-bar-val">{{ detection.toFixed(0) }}%</span>
-                </div>
-            </template>
+            <div v-if="flash" class="bh1-flash" :class="flash.kind">{{ flash.text }}</div>
 
             <div class="bh1-footer">
                 <button class="bh1-abort" @click="abort">[ ABORT — no cost, but no entry either ]</button>
@@ -59,14 +43,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useBankHeist } from '@/composables/useBankHeist.js';
 
 const props = defineProps({
     canvasId:  { type: String, required: true },
     bankName:  { type: String, default: 'UNKNOWN TARGET' },
     bankIce:   { type: Number, required: true },
-    approach:  { type: String, required: true }, // 'spoofed_handshake' | 'brute_force'
     playerCpu: { type: Number, default: 3 },
     playerRam: { type: Number, default: 2 },
     playerOs:  { type: Number, default: 2 },
@@ -77,7 +60,6 @@ const emit = defineEmits(['success', 'failed', 'abort']);
 const bh = useBankHeist();
 
 const timeLeft = ref(bh.baseTimer(props.playerCpu, props.playerRam, props.bankIce));
-const detection = ref(0);
 const flash = ref(null);
 
 // ── Spoofed Handshake state ─────────────────────────────────────────────────
@@ -128,7 +110,7 @@ function probe(entry) {
         showFlash('DECRYPTED — SLOTTED', 'good');
         if (slots.value.every((s) => s !== null)) {
             status.value = 'success';
-            emit('success', { restrictedToOneAccount: false });
+            emit('success');
         }
     } else {
         const penalty = bh.wrongActionPenalty(props.playerOs);
@@ -141,21 +123,13 @@ function probe(entry) {
 const status = ref('playing'); // 'playing' | 'success' | 'failed'
 let tickInterval = null;
 
-const detectionClass = computed(() => {
-    if (detection.value >= 100) return 'bh1-bar--lockdown';
-    if (detection.value >= 75) return 'bh1-bar--heavy';
-    if (detection.value >= 50) return 'bh1-bar--engaged';
-    if (detection.value >= 25) return 'bh1-bar--warn';
-    return 'bh1-bar--clean';
-});
-
 function abort() {
     if (tickInterval) clearInterval(tickInterval);
     emit('abort');
 }
 
 onMounted(() => {
-    if (props.approach === 'spoofed_handshake') buildReadout();
+    buildReadout();
 
     const tickMs = 200;
     tickInterval = setInterval(() => {
@@ -163,23 +137,7 @@ onMounted(() => {
 
         timeLeft.value = Math.max(0, timeLeft.value - tickMs / 1000);
 
-        if (props.approach === 'brute_force') {
-            const rate = bh.bruteForceTickRate(props.bankIce); // %/sec
-            detection.value = Math.min(100, detection.value + (rate * tickMs) / 1000);
-
-            if (detection.value >= 100) {
-                status.value = 'failed';
-                clearInterval(tickInterval);
-                emit('failed');
-                return;
-            }
-            if (timeLeft.value <= 0) {
-                status.value = 'success';
-                clearInterval(tickInterval);
-                emit('success', { restrictedToOneAccount: true });
-                return;
-            }
-        } else if (timeLeft.value <= 0) {
+        if (timeLeft.value <= 0) {
             status.value = 'failed';
             clearInterval(tickInterval);
             emit('failed');
@@ -202,7 +160,6 @@ onBeforeUnmount(() => {
 @keyframes bh1-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .bh1-rule { border-top: 1px solid #1e2a36; margin: 10px 0 16px; }
 .bh1-label { font-size: 10px; letter-spacing: 0.08em; color: #4a90d8; margin-bottom: 12px; }
-.bh1-copy { font-size: 11px; line-height: 1.6; opacity: 0.85; margin: 0 0 16px; }
 
 .bh1-slots { display: flex; gap: 10px; margin-bottom: 16px; }
 .bh1-slot { flex: 1; text-align: center; padding: 10px 6px; border: 1px solid #2a3a4a; font-size: 12px; opacity: 0.5; }
@@ -216,17 +173,6 @@ onBeforeUnmount(() => {
 .bh1-flash { font-size: 10px; letter-spacing: 0.05em; padding: 6px 0; }
 .bh1-flash.good { color: #2ed88a; }
 .bh1-flash.bad { color: #e04848; }
-
-.bh1-bar-row { display: flex; align-items: center; gap: 10px; margin: 20px 0; }
-.bh1-bar-label { font-size: 9px; color: #6a8aa0; }
-.bh1-bar-wrap { flex: 1; height: 10px; background: #101822; border: 1px solid #2a3a4a; }
-.bh1-bar-fill { height: 100%; transition: width 0.2s linear; }
-.bh1-bar--clean { background: #2ed88a; }
-.bh1-bar--warn { background: #d8c43c; }
-.bh1-bar--engaged { background: #d8a83c; }
-.bh1-bar--heavy { background: #e06b3c; }
-.bh1-bar--lockdown { background: #e04848; }
-.bh1-bar-val { font-size: 10px; width: 40px; text-align: right; }
 
 .bh1-footer { margin-top: 16px; text-align: right; }
 .bh1-abort { font-family: inherit; font-size: 9px; color: #6a8aa0; background: transparent; border: 1px solid #2a3a4a; padding: 6px 12px; cursor: pointer; }

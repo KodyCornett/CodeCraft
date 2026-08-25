@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Node;
 use App\Models\Player;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * BankHeistService — all game logic for the Bank Heist PvE mini-game.
@@ -18,21 +19,28 @@ use App\Models\Player;
  * against, so the countertrace/Anomaly Countdown timers and the puzzle
  * itself run client-side (computed once from server-provided stats, same
  * as GridBreach's `difficulty` computed()); this service only resolves
- * discrete OUTCOME events (a gate failed, an account cracked, a lockdown
- * hit) and applies their server-authoritative consequences — SS damage,
- * bounty, rewards, node cooldown. Rewards are always recomputed here from
- * account ICE, never trusted from the client, mirroring
- * NodeController::deplete()'s exact pattern.
+ * discrete OUTCOME events (a gate failed, a transaction injected, a run
+ * extracted) and applies their server-authoritative consequences — SS
+ * damage, bounty, rewards, node cooldown. Phase 2 rewards are always
+ * rolled here from a locked range, never trusted from the client — see
+ * the Gate 2 Phase 2 section below for why that's a cache-backed buffer
+ * rather than an immediate credit, unlike the old Ledger's instant payout.
  *
  * All stat reads go through RigService::effectiveStats(). All SS damage
  * goes through RigService::applyDamage() with source 'pve'. All bounty
  * increments reuse BountyService::recordNodeHack() — Bank Heist does not
  * invent a parallel bounty/point system; "bounty spike" always means N
  * calls to the same hack-count mechanic every other hack already uses.
+ *
+ * Brute Force (the no-puzzle "survive the timer" Gate 1 approach) and the
+ * Ledger (the per-account crack list that used to follow Gate 2 Phase 1)
+ * have both been removed. Spoofed Handshake is the only way through Gate 1;
+ * Gate 2 Phase 2 is now the Token Reconstruction & Risk Harvest loop below,
+ * which replaces the Ledger + old Payload Tampering screen entirely.
  */
 class BankHeistService
 {
-    // ── Gate 1 — Countertrace Timer (shared by Spoofed Handshake & Brute Force) ─
+    // ── Gate 1 — Countertrace Timer (Spoofed Handshake) ─────────────────────────
 
     /** Base timer flat component. Higher than GridBreach's 30s: Spoofed Handshake needs three full probe→decrypt→slot cycles, not one hexakey sequence. */
     private const TIMER_BASE = 45;
@@ -56,37 +64,34 @@ class BankHeistService
     /** Node cooldown (minutes) on Gate 1 failure, by bank tier 1-4. */
     private const TIER_COOLDOWN_MINUTES = [1 => 2, 2 => 4, 3 => 6, 4 => 8];
 
-    /** Brute Force's detection tick rate is this multiple of Gate 2's baseline passive tick. */
-    private const BRUTE_FORCE_TICK_MULT = 4;
+    // ── Gate 2 Phase 1 — MitM Handshake Spoof ───────────────────────────────────
+    // Three-step CLI puzzle (SYN → SYN-ACK → ACK) replacing the earlier
+    // Traffic Interception concept. All timer/puzzle logic here is pure and
+    // client-mirrored (useBankHeist.js), same trust model as every other
+    // Bank Heist timer — only the eventual timeout failure hits the server,
+    // via the shared "denied at the door" path on resolveGate1Failure().
 
-    /** Gate 2 passive detection tick, %/sec, scaled by BankICE. */
-    private const PASSIVE_TICK_PER_ICE = 0.15;
+    /** Per-step base timer (seconds), before RAM/CPU-vs-ICE modifiers. Deliberately snappy — single-digit seconds, not a multi-cycle puzzle timer like the countertrace/Anomaly Countdown. */
+    private const HANDSHAKE_TIMER_BASE = ['syn' => 5.0, 'syn_ack' => 6.5, 'ack' => 3.5];
 
-    // ── Gate 2 — Ledger & Accounts ──────────────────────────────────────────────
+    /** Timer floor per step — never drops below this even against a very high-ICE bank. */
+    private const HANDSHAKE_TIMER_FLOOR = ['syn' => 3.0, 'syn_ack' => 4.0, 'ack' => 2.0];
 
-    /** Ledger size (account count) by bank tier 1-4. */
-    private const LEDGER_SIZE = [1 => 4, 2 => 5, 3 => 6, 4 => 7];
+    /** Lighter RAM/CPU-vs-ICE modifiers than the countertrace formula — proportionate to these steps' much shorter base timers. */
+    private const HANDSHAKE_TIMER_RAM_MULT     = 0.3;
+    private const HANDSHAKE_TIMER_BONUS_MULT   = 0.5;
+    private const HANDSHAKE_TIMER_PENALTY_MULT = 0.3;
 
-    /** Investment accounts per ledger, regardless of tier (rest are Normal). */
-    private const INVESTMENT_ACCOUNTS_PER_LEDGER = 2;
+    /** Each wrong SYN-ACK cipher-chunk sum ratchets the *next* attempt's timer down by this fraction (a fresh handshake, less time) — floored so a retry is never mathematically impossible. */
+    private const HANDSHAKE_RETRY_RATCHET = 0.8;
+    private const HANDSHAKE_RETRY_FLOOR   = 2.0;
 
-    /** Investment account ICE bonus over the bank's own ICE, capped at 10. */
-    private const INVESTMENT_ICE_BONUS = 1;
-    private const MAX_ICE               = 10;
-
-    /** Salt-key length formula constants: 4 + floor(accountIce / 3). */
-    private const SALT_KEY_BASE_LENGTH = 4;
-    private const SALT_KEY_ICE_DIVISOR = 3;
-
-    /** Failure-jump (detection spike) formula constants. */
-    private const FAILURE_JUMP_FLOOR = 5;
-    private const FAILURE_JUMP_MULT  = 4;
-
-    /** Detection Bar threshold-band SS damage, keyed by band index (0-4). Bands 0-1 deal none. */
-    private const THRESHOLD_SS_FRACTION = [2 => 0.5, 3 => 1.0, 4 => 2.0];
-
-    /** Anomaly Countdown timer-cut fraction per detection band (0-3). Band 4 forces eject instead. */
-    private const TIMER_CUT_BY_BAND = [0 => 0.0, 1 => 0.10, 2 => 0.25, 3 => 0.40];
+    /** Cipher chunk pool size / required combo size — both step up at BankICE 7+, same threshold-band shape as the rest of Bank Heist's tier-scaled difficulty. */
+    private const HANDSHAKE_ICE_THRESHOLD        = 7;
+    private const HANDSHAKE_CHUNK_COUNT_LOW_ICE  = 4;
+    private const HANDSHAKE_CHUNK_COUNT_HIGH_ICE = 6;
+    private const HANDSHAKE_COMBO_SIZE_LOW_ICE   = 2;
+    private const HANDSHAKE_COMBO_SIZE_HIGH_ICE  = 3;
 
     public function __construct(
         private readonly RigService   $rigService,
@@ -94,7 +99,7 @@ class BankHeistService
     ) {}
 
     // =========================================================================
-    // Gate 1 — Countertrace Timer (shared by both approaches)
+    // Gate 1 — Countertrace Timer (Spoofed Handshake)
     // =========================================================================
 
     /**
@@ -125,31 +130,33 @@ class BankHeistService
         return $bankIce;
     }
 
-    /** Gate 2 passive detection tick, %/sec. */
-    public function passiveTickRate(int $bankIce): float
-    {
-        return $bankIce * self::PASSIVE_TICK_PER_ICE;
-    }
-
-    /** Brute Force's detection tick, %/sec — 4x Gate 2's baseline. */
-    public function bruteForceTickRate(int $bankIce): float
-    {
-        return $this->passiveTickRate($bankIce) * self::BRUTE_FORCE_TICK_MULT;
-    }
-
     /**
-     * Gate 1 failure — shared cost stack for both Spoofed Handshake and a
-     * Brute Force run caught before its timer completes (Brute Force
-     * borrows Gate 2's detection mechanics but NOT its capture consequences
-     * — a Gate 1 failure is a Gate 1 failure regardless of approach).
+     * "Denied at the door" cost stack — shared by every way a player can be
+     * turned away before ever banking their run: Gate 1's Spoofed Handshake
+     * timing out, Gate 2 Phase 1's MitM Handshake Spoof timing out on any of
+     * its three steps, and Gate 2 Phase 2's Global Trace Meter overrunning
+     * to 100%. The name is historical (this predates both redesigns) but
+     * the consequence is deliberately identical across all of them — being
+     * denied is being denied, regardless of which gate or step it happened
+     * on.
      *
-     * Applies: SS damage = BankICE (unmitigated — Firewall has no role in
-     * Gate 1), bounty spike = +tier to the existing hack-count, and puts
-     * the node on a tiered cooldown that blocks EVERY player, not just
-     * this one.
+     * Applies: SS damage = BankICE (unmitigated — Firewall has no role
+     * here), bounty spike = +tier to the existing hack-count, and puts the
+     * node on a tiered cooldown that blocks EVERY player, not just this one.
+     * A 'phase2_overrun' approach additionally discards this player's
+     * staged (unbanked) Phase 2 harvest buffer — that's the entire point of
+     * the overrun consequence, and it's cheaper to do it here (the one
+     * place every failure funnels through) than to duplicate it at the
+     * call site.
+     *
+     * @param 'spoofed_handshake'|'mitm_handshake'|'phase2_overrun' $approach informational except for the phase2_overrun buffer wipe above
      */
-    public function resolveGate1Failure(Player $player, Node $node): array
+    public function resolveGate1Failure(Player $player, Node $node, string $approach = 'spoofed_handshake'): array
     {
+        if ($approach === 'phase2_overrun') {
+            Cache::forget($this->phase2BufferKey($player, $node));
+        }
+
         $rig = $this->rigService->getRigForPlayer($player);
         $bankIce = (int) $node->bank_ice;
         $tier    = (int) $node->bank_tier;
@@ -175,201 +182,223 @@ class BankHeistService
         ];
     }
 
-    /**
-     * Brute Force's unavoidable tax on a fully clean exit — flat +1 to the
-     * hack-count regardless of tier. Deliberately flat (not tier-scaled
-     * like a failure bounty) since this fires even on a PERFECT run — it's
-     * the price of going loud at all, not a penalty.
-     */
-    public function resolveBruteForceCleanExit(Player $player): array
-    {
-        $this->bountyService->recordNodeHack($player);
+    // =========================================================================
+    // Gate 2 Phase 1 — MitM Handshake Spoof
+    // =========================================================================
 
-        return ['bounty_hacks_added' => 1];
+    /** Base timer (seconds) for one handshake step, given effective CPU/RAM and Bank ICE. Same asymmetric CPU-vs-ICE shape as baseTimer(), different (much smaller) constants — this is three quick steps, not one long puzzle. */
+    public function handshakeStepTimer(string $step, int $cpu, int $ram, int $ice): float
+    {
+        $base = self::HANDSHAKE_TIMER_BASE[$step] + ($ram * self::HANDSHAKE_TIMER_RAM_MULT);
+        $diff = $cpu - $ice;
+        $mod  = $diff >= 0
+            ? $diff * self::HANDSHAKE_TIMER_BONUS_MULT
+            : -($diff ** 2) * self::HANDSHAKE_TIMER_PENALTY_MULT;
+
+        return max(self::HANDSHAKE_TIMER_FLOOR[$step], $base + $mod);
+    }
+
+    /** Timer for the Nth SYN-ACK attempt (1-indexed) — ratchets 0.8x per prior wrong-sum failure, floored at 2s. Attempt 1 always gets the full handshakeStepTimer('syn_ack', ...) value. */
+    public function handshakeRetryTimer(float $baseTimer, int $attemptNumber): float
+    {
+        $ratcheted = $baseTimer * (self::HANDSHAKE_RETRY_RATCHET ** max(0, $attemptNumber - 1));
+        return max(self::HANDSHAKE_RETRY_FLOOR, $ratcheted);
+    }
+
+    /** Cipher chunk pool size for the SYN-ACK puzzle — 6 chunks at BankICE 7+, 4 below that. */
+    public function handshakeChunkCount(int $bankIce): int
+    {
+        return $bankIce >= self::HANDSHAKE_ICE_THRESHOLD
+            ? self::HANDSHAKE_CHUNK_COUNT_HIGH_ICE
+            : self::HANDSHAKE_CHUNK_COUNT_LOW_ICE;
+    }
+
+    /** Required combo size to hit the target ACK — 3 chunks at BankICE 7+, 2 below that. */
+    public function handshakeComboSize(int $bankIce): int
+    {
+        return $bankIce >= self::HANDSHAKE_ICE_THRESHOLD
+            ? self::HANDSHAKE_COMBO_SIZE_HIGH_ICE
+            : self::HANDSHAKE_COMBO_SIZE_LOW_ICE;
     }
 
     // =========================================================================
-    // Gate 2 — Ledger, Accounts, Detection
+    // Gate 2 Phase 2 — Token Reconstruction & Risk Harvest
     // =========================================================================
+    // Replaces the Ledger + Payload Tampering screen entirely. A live
+    // transaction queue: intercept a TX, reconstruct its forged token from
+    // fragment candidates before its own timer expires, then EXTRACT to bank
+    // the running total or CONTINUE to push your luck. A Global Trace Meter
+    // (0-100%) ticks continuously regardless of sub-step; hitting 100% wipes
+    // anything not yet extracted and costs the same "denied at the door"
+    // stack as every other Bank Heist failure — see resolveGate1Failure(),
+    // called with approach 'phase2_overrun'.
+    //
+    // Trust model: the queue itself (timers, fragment pool, which candidates
+    // are decoys) is fully client-computed like every other Bank Heist
+    // puzzle — there's no opponent to cheat against. But UNLIKE the old
+    // Ledger (whose reward came from a server-known account ICE), a queue
+    // transaction's yield is invented client-side, so it can't be
+    // recomputed from anything the server already knows. Instead, every
+    // successful INJECT reports only its difficulty band + currency
+    // (resolvePhase2Inject()) — the server rolls the real reward from its
+    // own range and accumulates it in a short-lived cache-backed buffer
+    // keyed to this player+bank; only EXTRACT (resolvePhase2Extract())
+    // moves that buffer into the player's permanent balance, and an
+    // overrun discards it unbanked. A modified client can misreport its
+    // band, but it can never inflate the amount a given band pays out.
 
-    /** Account ICE — Normal sits at the bank's own ICE, Investment is +1 (capped at 10). */
-    public function accountIce(int $bankIce, string $accountType): int
+    private const PHASE2_ICE_THRESHOLD = 7;
+
+    /** Required fragment count for a HARD transaction — steps up at ICE 7+. EASY is always 4. */
+    private const PHASE2_EASY_FRAGMENTS      = 4;
+    private const PHASE2_HARD_FRAGMENTS_LOW  = 6;
+    private const PHASE2_HARD_FRAGMENTS_HIGH = 8;
+
+    /** Decoy fragments added on top of the required count, either difficulty. */
+    private const PHASE2_DECOY_COUNT = 2;
+
+    /** TX expiration timer bands (seconds), before the ICE 7+ cut below. */
+    private const PHASE2_EASY_TIMER_RANGE = [3.0, 5.0];
+    private const PHASE2_HARD_TIMER_RANGE = [6.0, 9.0];
+    private const PHASE2_TIMER_ICE_CUT    = 0.75;
+
+    /** Global Trace Meter tick rate, %/sec — always running regardless of sub-step. */
+    private const PHASE2_TRACE_RATE_LOW_ICE  = 0.5;
+    private const PHASE2_TRACE_RATE_HIGH_ICE = 0.8;
+
+    /** Global Trace spike on a wrong sequence / TX timeout, % range. */
+    private const PHASE2_TRACE_SPIKE_LOW_ICE  = [20.0, 30.0];
+    private const PHASE2_TRACE_SPIKE_HIGH_ICE = [30.0, 40.0];
+
+    /** Reward ranges rolled server-side per successful inject, by band/currency. */
+    private const PHASE2_EASY_CRED_RANGE = [75, 150];
+    private const PHASE2_EASY_TECH_RANGE = [15, 40];
+    private const PHASE2_HARD_CRED_RANGE = [350, 550];
+    private const PHASE2_HARD_TECH_RANGE = [70, 130];
+
+    /** How long a run's staged (unbanked) buffer survives in cache before it's abandoned. */
+    private const PHASE2_BUFFER_TTL_MINUTES = 30;
+
+    /** Required fragment count for the token puzzle. @param 'easy'|'hard' $band */
+    public function phase2RequiredFragments(string $band, int $bankIce): int
     {
-        return $accountType === 'investment'
-            ? min(self::MAX_ICE, $bankIce + self::INVESTMENT_ICE_BONUS)
-            : $bankIce;
+        if ($band === 'easy') return self::PHASE2_EASY_FRAGMENTS;
+        return $bankIce >= self::PHASE2_ICE_THRESHOLD
+            ? self::PHASE2_HARD_FRAGMENTS_HIGH
+            : self::PHASE2_HARD_FRAGMENTS_LOW;
     }
 
-    /** Ledger account count for a bank tier. */
-    public function ledgerSize(int $tier): int
+    /** Decoy fragment count, both difficulties. */
+    public function phase2DecoyCount(): int
     {
-        return self::LEDGER_SIZE[$tier] ?? self::LEDGER_SIZE[1];
+        return self::PHASE2_DECOY_COUNT;
     }
 
-    /** How many of the ledger's accounts should be Investment type. */
-    public function investmentAccountCount(int $tier): int
+    /** [min, max] seconds a transaction of this band lives before expiring, after the ICE 7+ cut. @param 'easy'|'hard' $band */
+    public function phase2TxTimerRange(string $band, int $bankIce): array
     {
-        return min(self::INVESTMENT_ACCOUNTS_PER_LEDGER, $this->ledgerSize($tier));
+        $range = $band === 'easy' ? self::PHASE2_EASY_TIMER_RANGE : self::PHASE2_HARD_TIMER_RANGE;
+        $cut   = $bankIce >= self::PHASE2_ICE_THRESHOLD ? self::PHASE2_TIMER_ICE_CUT : 1.0;
+        return [$range[0] * $cut, $range[1] * $cut];
     }
 
-    /** Salt-key length (hex characters) for an account's CLI re-signing step. */
-    public function saltKeyLength(int $accountIce): int
+    /** Global Trace Meter tick rate, %/sec. */
+    public function phase2TraceRate(int $bankIce): float
     {
-        return self::SALT_KEY_BASE_LENGTH + intdiv($accountIce, self::SALT_KEY_ICE_DIVISOR);
+        return $bankIce >= self::PHASE2_ICE_THRESHOLD
+            ? self::PHASE2_TRACE_RATE_HIGH_ICE
+            : self::PHASE2_TRACE_RATE_LOW_ICE;
+    }
+
+    /** [min, max] Global Trace spike percentage on a wrong sequence or TX timeout. */
+    public function phase2TraceSpikeRange(int $bankIce): array
+    {
+        return $bankIce >= self::PHASE2_ICE_THRESHOLD
+            ? self::PHASE2_TRACE_SPIKE_HIGH_ICE
+            : self::PHASE2_TRACE_SPIKE_LOW_ICE;
     }
 
     /**
-     * Per-account reward — reuses NodeController::deplete()'s exact existing
-     * formulas verbatim, substituting accountIce for node.ice and always at
-     * full completion (a crack success is binary, not partial progress).
-     * Zero new economy math.
+     * Rolls the real reward for one successful inject, from this
+     * band/currency's locked range — never trusted from the client.
      *
+     * @param 'easy'|'hard' $band
+     * @param 'CRED'|'TECH_PT' $currency
      * @return array{creds: int, tech: float}
      */
-    public function accountReward(int $accountIce, string $accountType, float $bountyMultiplier): array
+    public function phase2Reward(string $band, string $currency, float $bountyMultiplier): array
     {
         $bountyMultiplier = max(1.0, $bountyMultiplier);
-
-        if ($accountType === 'normal') {
-            return [
-                'creds' => (int) round($accountIce * 25 * $bountyMultiplier),
-                'tech'  => 0.0,
-            ];
-        }
-
-        $techBase = $accountIce <= 1
-            ? 0.25
-            : ($accountIce === 2 ? 0.5 : max(1.0, $accountIce - 2));
-
-        $tech = max(0.25, round($techBase * $bountyMultiplier * 4) / 4);
-
-        return ['creds' => 0, 'tech' => $tech];
-    }
-
-    /** Discrete detection spike on a failed account crack. */
-    public function failureJump(int $accountIce, int $cpu): float
-    {
-        return max(self::FAILURE_JUMP_FLOOR, ($accountIce - $cpu) * self::FAILURE_JUMP_MULT);
-    }
-
-    /** Detection band index (0-4) for a 0-100 detection value. */
-    public function detectionBand(float $detection): int
-    {
-        return match (true) {
-            $detection >= 100 => 4,
-            $detection >= 75  => 3,
-            $detection >= 50  => 2,
-            $detection >= 25  => 1,
-            default            => 0,
+        $range = match (true) {
+            $band === 'easy' && $currency === 'CRED' => self::PHASE2_EASY_CRED_RANGE,
+            $band === 'easy'                          => self::PHASE2_EASY_TECH_RANGE,
+            $currency === 'CRED'                       => self::PHASE2_HARD_CRED_RANGE,
+            default                                     => self::PHASE2_HARD_TECH_RANGE,
         };
+        $rolled = mt_rand($range[0], $range[1]);
+
+        if ($currency === 'CRED') {
+            return ['creds' => (int) round($rolled * $bountyMultiplier), 'tech' => 0.0];
+        }
+        return ['creds' => 0, 'tech' => round($rolled * $bountyMultiplier, 2)];
     }
 
-    /** Anomaly Countdown timer-cut fraction for a detection band (0-3 only — band 4 forces eject). */
-    public function timerCutFraction(int $band): float
+    /** Cache key for a run's staged (unbanked) harvest buffer — one per player+bank, never persisted to a table. */
+    private function phase2BufferKey(Player $player, Node $node): string
     {
-        return self::TIMER_CUT_BY_BAND[$band] ?? 0.0;
-    }
-
-    /** Threshold-band SS damage — reuses the "SS = ICE, unmitigated" precedent locked for Gate 1. */
-    public function thresholdSsDamage(int $band, int $bankIce): int
-    {
-        $fraction = self::THRESHOLD_SS_FRACTION[$band] ?? 0.0;
-        return (int) round($bankIce * $fraction);
+        return "bank_heist_phase2_buffer:{$player->id}:{$node->id}";
     }
 
     /**
-     * Resolve one account-crack event: success, clean failure, or abandoned
-     * mid-attempt. A detection band of 4 always overrides the outcome to a
-     * forced Lockdown, regardless of what the client reports, per the
-     * Detection Bar's Threshold Consequences.
+     * Resolve one successful token injection: rolls the real reward from
+     * the reported band/currency and adds it to this run's staged buffer.
+     * Nothing is credited to the player yet — only resolvePhase2Extract()
+     * does that — so an overrun before extracting loses it cleanly.
      *
-     * @param 'normal'|'investment' $accountType
-     * @param 'success'|'clean_failed'|'abandoned' $outcome
-     * @param int $detectionBand 0-4, computed client-side from the running detection bar
+     * @param 'easy'|'hard' $band
+     * @param 'CRED'|'TECH_PT' $currency
      */
-    public function resolveAccountEvent(
-        Player $player,
-        Node $node,
-        string $accountType,
-        string $outcome,
-        int $detectionBand,
-    ): array {
-        $rig     = $this->rigService->getRigForPlayer($player);
-        $bankIce = (int) $node->bank_ice;
-        $tier    = (int) $node->bank_tier;
-        $accountIce = $this->accountIce($bankIce, $accountType);
+    public function resolvePhase2Inject(Player $player, Node $node, string $band, string $currency): array
+    {
+        $bountyMultiplier = (float) ($player->bounty_multiplier ?? 1.0);
+        $reward = $this->phase2Reward($band, $currency, $bountyMultiplier);
 
-        // Detection at 100% always wins — forced eject, unsecured progress lost,
-        // regardless of what outcome the client thought it was reporting.
-        if ($detectionBand >= 4) {
-            $amount = $bankIce * (int) self::THRESHOLD_SS_FRACTION[4];
-            $damageResult = $rig ? $this->rigService->applyDamage($rig, $amount, 'pve', $player) : null;
-            for ($i = 0; $i < $tier; $i++) {
-                $this->bountyService->recordNodeHack($player);
-            }
+        $key    = $this->phase2BufferKey($player, $node);
+        $buffer = Cache::get($key, ['creds' => 0, 'tech' => 0.0]);
+        $buffer['creds'] += $reward['creds'];
+        $buffer['tech']   = round($buffer['tech'] + $reward['tech'], 2);
+        Cache::put($key, $buffer, now()->addMinutes(self::PHASE2_BUFFER_TTL_MINUTES));
 
-            return [
-                'outcome'            => 'lockdown',
-                'reward'             => ['creds' => 0, 'tech' => 0.0],
-                'ss_damage'          => $amount,
-                'bounty_hacks_added' => $tier,
-                'rig'                => $damageResult['rig'] ?? $rig,
-                'event'              => $damageResult['event'] ?? null,
-            ];
-        }
-
-        $result = [
-            'outcome'            => $outcome,
-            'reward'             => ['creds' => 0, 'tech' => 0.0],
-            'ss_damage'          => 0,
-            'bounty_hacks_added' => 0,
-            'failure_jump'       => 0.0,
-            'rig'                => $rig,
-            'event'              => null,
+        return [
+            'reward'       => $reward,
+            'staged_creds' => $buffer['creds'],
+            'staged_tech'  => $buffer['tech'],
         ];
+    }
 
-        // Threshold-band SS damage applies on every event once ICE is actively
-        // engaged (band >= 2) — approximates "SS damage on each further
-        // tick/failure" without a continuously-ticking server-side clock.
-        $thresholdDamage = $this->thresholdSsDamage($detectionBand, $bankIce);
-        if ($thresholdDamage > 0 && $rig) {
-            $damageResult   = $this->rigService->applyDamage($rig, $thresholdDamage, 'pve', $player);
-            $result['rig']  = $damageResult['rig'];
-            $result['event'] = $damageResult['event'];
-            $result['ss_damage'] += $thresholdDamage;
+    /**
+     * EXTRACT — banks this run's entire staged buffer to the player's
+     * permanent balance and clears it. Safe to call with an empty buffer
+     * (extracting with nothing staged is a no-op, not an error).
+     */
+    public function resolvePhase2Extract(Player $player, Node $node): array
+    {
+        $key    = $this->phase2BufferKey($player, $node);
+        $buffer = Cache::pull($key, ['creds' => 0, 'tech' => 0.0]);
+
+        if ($buffer['creds'] > 0) {
+            $player->pocket_creds = (int) ($player->pocket_creds ?? 0) + $buffer['creds'];
         }
-
-        if ($outcome === 'success') {
-            $bountyMultiplier = (float) ($player->bounty_multiplier ?? 1.0);
-            $reward = $this->accountReward($accountIce, $accountType, $bountyMultiplier);
-            $result['reward'] = $reward;
-
-            if ($reward['creds'] > 0) {
-                $player->pocket_creds = (int) ($player->pocket_creds ?? 0) + $reward['creds'];
-            }
-            if ($reward['tech'] > 0) {
-                $player->tech_points = round((float) ($player->tech_points ?? 0) + $reward['tech'], 2);
-            }
+        if ($buffer['tech'] > 0) {
+            $player->tech_points = round((float) ($player->tech_points ?? 0) + $buffer['tech'], 2);
+        }
+        if ($buffer['creds'] > 0 || $buffer['tech'] > 0) {
             $player->save();
-
-        } elseif ($outcome === 'clean_failed') {
-            $stats = $rig ? $this->rigService->effectiveStats($rig, $player) : null;
-            $cpu   = $stats['cpu']['effective'] ?? 1;
-            $result['failure_jump'] = $this->failureJump($accountIce, $cpu);
-
-        } elseif ($outcome === 'abandoned') {
-            // Costlier abort case — extra SS damage + a flat bounty jump on top
-            // of the reward already being forfeited (no separate detection spike).
-            if ($rig) {
-                $damageResult = $this->rigService->applyDamage($rig, $accountIce, 'pve', $player);
-                $result['rig'] = $damageResult['rig'];
-                $result['event'] = $damageResult['event'] ?? $result['event'];
-                $result['ss_damage'] += $accountIce;
-            }
-            $this->bountyService->recordNodeHack($player);
-            $result['bounty_hacks_added'] += 1;
         }
 
-        return $result;
+        return [
+            'creds_extracted' => $buffer['creds'],
+            'tech_extracted'  => $buffer['tech'],
+        ];
     }
 }

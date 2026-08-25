@@ -1,44 +1,12 @@
 <template>
     <div class="bh-overlay">
 
-        <!-- ── Approach selection ──────────────────────────────────────────────── -->
-        <div v-if="stage === 'select'" class="bh-select-terminal">
-            <div class="bh-select-topbar">
-                <span>TARGET: {{ bankName }}</span>
-                <span>BANK ICE {{ bankIce }}</span>
-            </div>
-            <div class="bh-select-rule" />
-            <div class="bh-select-label">[ CHOOSE YOUR APPROACH — this cannot be changed once you commit ]</div>
-
-            <div class="bh-select-options">
-                <button class="bh-select-card" @click="commit('spoofed_handshake')">
-                    <div class="bh-select-card-title">SPOOFED HANDSHAKE</div>
-                    <div class="bh-select-card-copy">
-                        Puzzle-based entry. Probe the intercepted readout for the real fragments, slot them before the
-                        countertrace clock runs out. Wrong picks cost time, not the run. Clean success opens the full ledger.
-                    </div>
-                </button>
-                <button class="bh-select-card" @click="commit('brute_force')">
-                    <div class="bh-select-card-title">BRUTE FORCE</div>
-                    <div class="bh-select-card-copy">
-                        No puzzle — just survive the countertrace clock while detection climbs fast. Loud and unmissable.
-                        Success restricts you to a single ledger account, but skips the handshake entirely.
-                    </div>
-                </button>
-            </div>
-
-            <div class="bh-select-footer">
-                <button class="bh-select-cancel" @click="$emit('abort')">[ CANCEL ]</button>
-            </div>
-        </div>
-
-        <!-- ── Gate 1 ───────────────────────────────────────────────────────────── -->
+        <!-- ── Gate 1 — Spoofed Handshake ───────────────────────────────────────── -->
         <BankHeistGate1
-            v-else-if="stage === 'gate1'"
+            v-if="stage === 'gate1'"
             :canvas-id="canvasId"
             :bank-name="bankName"
             :bank-ice="bankIce"
-            :approach="approach"
             :player-cpu="playerCpu"
             :player-ram="playerRam"
             :player-os="playerOs"
@@ -54,13 +22,12 @@
             :bank-name="bankName"
             :bank-ice="bankIce"
             :bank-tier="bankTier"
-            :approach="approach"
-            :restricted-to-one-account="restrictedToOneAccount"
             :player-cpu="playerCpu"
             :player-ram="playerRam"
             :player-os="playerOs"
             :bounty-multiplier="bountyMultiplier"
             @complete="onGate2Complete"
+            @failed="onGate2Failed"
             @abort="$emit('abort')"
         />
 
@@ -92,25 +59,22 @@ const emit = defineEmits(['complete', 'abort']);
 
 const bh = useBankHeist();
 
-const stage = ref('select'); // 'select' | 'gate1' | 'gate2'
-const approach = ref('spoofed_handshake');
-const restrictedToOneAccount = ref(false);
+const stage = ref('gate1'); // 'gate1' | 'gate2' — no approach choice anymore, Spoofed Handshake is the only way in
 
-function commit(chosenApproach) {
-    approach.value = chosenApproach;
-    stage.value = 'gate1';
-}
-
-function onGate1Success({ restrictedToOneAccount: restricted }) {
-    restrictedToOneAccount.value = restricted;
+function onGate1Success() {
     stage.value = 'gate2';
 }
 
-async function onGate1Failed() {
-    const res = await bh.gate1Failed(props.canvasId, approach.value);
-    // Same field-merge shape as BankHeistGate2.vue's mergePlayerSync — Gate 1
-    // failure never touches creds/tech, only SS/bounty/cooldown, but keeping
-    // the shape consistent lets Game.vue apply both through one code path.
+// Shared "denied at the door" resolution — Gate 1's countertrace timeout,
+// Gate 2 Phase 1's MitM Handshake timeout, and Gate 2 Phase 2's Global
+// Trace overrun all cost the same thing (see
+// BankHeistService::resolveGate1Failure's docblock), so every failure path
+// below funnels through this one call.
+async function resolveEntryFailure(failureApproach) {
+    const res = await bh.gate1Failed(props.canvasId, failureApproach);
+    // Same field-merge shape as BankHeistGate2.vue's mergePlayerSync — an
+    // entry failure never touches creds/tech, only SS/bounty/cooldown, but
+    // keeping the shape consistent lets Game.vue apply both through one path.
     const playerSync = {};
     if (res?.bounty_level !== undefined)      playerSync.bountyLevel      = res.bounty_level;
     if (res?.bounty_multiplier !== undefined) playerSync.bountyMultiplier = res.bounty_multiplier;
@@ -125,6 +89,15 @@ async function onGate1Failed() {
     });
 }
 
+function onGate1Failed() {
+    return resolveEntryFailure('spoofed_handshake');
+}
+
+/** @param {'mitm_handshake'|'phase2_overrun'} failureApproach forwarded by BankHeistGate2's 'failed' emit */
+function onGate2Failed(failureApproach) {
+    return resolveEntryFailure(failureApproach);
+}
+
 function onGate2Complete(payload) {
     emit('complete', { ...payload, canvasId: props.canvasId });
 }
@@ -132,29 +105,4 @@ function onGate2Complete(payload) {
 
 <style scoped>
 .bh-overlay { position: fixed; inset: 0; z-index: 200; }
-
-.bh-select-terminal {
-    position: fixed; inset: 0; background: rgba(4, 6, 10, 0.92);
-    display: flex; align-items: center; justify-content: center; flex-direction: column;
-}
-.bh-select-terminal > * { width: min(680px, 92vw); }
-.bh-select-topbar { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 0.05em; color: #6a8aa0; font-family: 'JetBrains Mono', monospace; }
-.bh-select-rule { border-top: 1px solid #1e2a36; margin: 10px 0 16px; }
-.bh-select-label { font-size: 10px; letter-spacing: 0.08em; color: #4a90d8; margin-bottom: 16px; font-family: 'JetBrains Mono', monospace; }
-
-.bh-select-options { display: flex; gap: 14px; }
-.bh-select-card {
-    flex: 1; text-align: left; background: #0a0f16; border: 1px solid #2a3a4a; color: #a8c4d8;
-    padding: 16px; cursor: pointer; font-family: 'JetBrains Mono', monospace;
-}
-.bh-select-card:hover { border-color: #4a90d8; }
-.bh-select-card-title { font-size: 12px; letter-spacing: 0.06em; color: #4a90d8; margin-bottom: 8px; }
-.bh-select-card-copy { font-size: 10px; line-height: 1.6; opacity: 0.85; }
-
-.bh-select-footer { margin-top: 16px; text-align: right; }
-.bh-select-cancel {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #6a8aa0; background: transparent;
-    border: 1px solid #2a3a4a; padding: 6px 12px; cursor: pointer;
-}
-.bh-select-cancel:hover { border-color: #e04848; color: #e04848; }
 </style>

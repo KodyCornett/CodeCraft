@@ -120,19 +120,20 @@ Route::middleware('auth:sanctum')->group(function () {
 // Bank Heist — PvE mini-game gated to the 19 fixed bank/brokerage nodes in
 // BANK_TARGET_ROSTER.md (Node::is_bank_target). Client-trusted timers, same
 // as GridBreach — these endpoints only resolve discrete outcomes (a gate
-// failed, an account cracked, a lockdown hit). See BankHeistService's class
-// doc and BANK_HEIST_BUILD_PLAN.md for the full design.
+// failed, a Phase 2 transaction injected, a run extracted). See
+// BankHeistService's class doc and BANK_HEIST_BUILD_PLAN.md for the full design.
 // ---------------------------------------------------------------------------
 
     // gate1-failed: 20/min — one per failed attempt; a legitimate player can't
     // fail faster than the timer floor (15s) allows
     Route::post('/bank-heist/{canvasId}/gate1-failed', [BankHeistController::class, 'gate1Failed'])
         ->middleware('throttle:20,1');
-    Route::post('/bank-heist/{canvasId}/brute-force-clean-exit', [BankHeistController::class, 'bruteForceCleanExit'])
-        ->middleware('throttle:20,1');
-    // account-result: 30/min — a greedy run can work through several accounts quickly
-    Route::post('/bank-heist/{canvasId}/account-result', [BankHeistController::class, 'accountResult'])
+    // phase2-inject: 30/min — a greedy run can chain several transactions quickly
+    Route::post('/bank-heist/{canvasId}/phase2-inject', [BankHeistController::class, 'phase2Inject'])
         ->middleware('throttle:30,1');
+    // phase2-extract: 10/min — one per run's end, retries are free but not scriptable
+    Route::post('/bank-heist/{canvasId}/phase2-extract', [BankHeistController::class, 'phase2Extract'])
+        ->middleware('throttle:10,1');
 
 // ---------------------------------------------------------------------------
 // Leaderboards
