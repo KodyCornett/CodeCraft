@@ -31,10 +31,12 @@ const WRONG_ACTION_BASE   = 5;
 const WRONG_ACTION_OS_MULT = 0.4;
 
 // Gate 2 Phase 1 — MitM Handshake Spoof
-// Base/floor doubled from the original 5.0/6.5/3.5 and 3.0/4.0/2.0 after dev
-// testing found the original too fast to read the panel before it expired.
-const HANDSHAKE_TIMER_BASE         = { syn: 10.0, syn_ack: 13.0, ack: 7.0 };
-const HANDSHAKE_TIMER_FLOOR        = { syn: 6.0, syn_ack: 8.0, ack: 4.0 };
+// Set flat to 90s (1.5 min) per step after two rounds of doubling
+// (5.0/6.5/3.5 -> 10.0/13.0/7.0 -> 20.0/26.0/14.0) still read as too fast in
+// dev testing. Floor == base so a bad CPU-vs-ICE roll can never cut below
+// the guaranteed 90s; a good roll's positive modifier still adds on top.
+const HANDSHAKE_TIMER_BASE         = { syn: 90.0, syn_ack: 90.0, ack: 90.0 };
+const HANDSHAKE_TIMER_FLOOR        = { syn: 90.0, syn_ack: 90.0, ack: 90.0 };
 const HANDSHAKE_TIMER_RAM_MULT     = 0.3;
 const HANDSHAKE_TIMER_BONUS_MULT   = 0.5;
 const HANDSHAKE_TIMER_PENALTY_MULT = 0.3;

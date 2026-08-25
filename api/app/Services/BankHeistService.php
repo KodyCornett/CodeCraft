@@ -73,11 +73,11 @@ class BankHeistService
     // Bank Heist timer — only the eventual timeout failure hits the server,
     // via the shared "denied at the door" path on resolveGate1Failure().
 
-    /** Per-step base timer (seconds), before RAM/CPU-vs-ICE modifiers. Doubled from the original 5.0/6.5/3.5 pass after dev testing found the original too fast to even read the panel before it expired — still snappy relative to a multi-cycle puzzle timer like the countertrace/Anomaly Countdown, just no longer sub-readable. */
-    private const HANDSHAKE_TIMER_BASE = ['syn' => 10.0, 'syn_ack' => 13.0, 'ack' => 7.0];
+    /** Per-step base timer (seconds), before RAM/CPU-vs-ICE modifiers. Set flat to 90s (1.5 min) per step after two rounds of doubling (5.0/6.5/3.5 -> 10.0/13.0/7.0 -> 20.0/26.0/14.0) still read as too fast in dev testing — floor is equal to base now, so every player gets at least 90s per step regardless of CPU-vs-ICE, with a good rig's positive modifier adding on top rather than a bad rig's penalty being able to cut below it. */
+    private const HANDSHAKE_TIMER_BASE = ['syn' => 90.0, 'syn_ack' => 90.0, 'ack' => 90.0];
 
-    /** Timer floor per step — never drops below this even against a very high-ICE bank. Also doubled from the original 3.0/4.0/2.0 alongside the base timers above. */
-    private const HANDSHAKE_TIMER_FLOOR = ['syn' => 6.0, 'syn_ack' => 8.0, 'ack' => 4.0];
+    /** Timer floor per step — never drops below this even against a very high-ICE bank. Equal to base now (see above), so a negative CPU-vs-ICE modifier can never shrink the guaranteed 90s. */
+    private const HANDSHAKE_TIMER_FLOOR = ['syn' => 90.0, 'syn_ack' => 90.0, 'ack' => 90.0];
 
     /** Lighter RAM/CPU-vs-ICE modifiers than the countertrace formula — proportionate to these steps' much shorter base timers. */
     private const HANDSHAKE_TIMER_RAM_MULT     = 0.3;
