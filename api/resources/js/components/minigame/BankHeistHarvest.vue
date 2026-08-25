@@ -1,101 +1,107 @@
 <template>
     <div class="bhv-overlay">
-        <div class="bhv-terminal">
+        <div class="bhv-shell">
 
-            <!-- Top panel — status + Global Trace Meter -->
-            <div class="bhv-panel bhv-top">
-                <div class="bhv-status-row">
-                    <span>NODE: {{ bankName }}</span>
-                    <span>STAGED HARVEST: {{ stagedCreds }} CRED{{ stagedTech > 0 ? ` / ${stagedTech.toFixed(2)} TECH` : '' }}</span>
-                </div>
-                <div class="bhv-trace-row">
-                    <span class="bhv-trace-label">GLOBAL TRACE</span>
-                    <div class="bhv-trace-bar">
-                        <div class="bhv-trace-fill" :class="traceClass" :style="{ width: globalTrace.toFixed(1) + '%' }" />
-                    </div>
-                    <span class="bhv-trace-val" :class="traceClass">{{ globalTrace.toFixed(0) }}% {{ globalTrace >= 75 ? 'CRITICAL' : '(RUNNING)' }}</span>
-                </div>
-            </div>
+            <BankHeistStatusBar
+                :node-name="bankName"
+                :staged-creds="stagedCreds"
+                :staged-tech="stagedTech"
+                :trace-percent="globalTrace"
+                :active="true"
+            />
 
-            <!-- Middle panel — Queue / Token Builder / Harvest Screen -->
-            <div class="bhv-panel bhv-middle">
+            <div class="bhv-panels">
 
-                <!-- ── QUEUE_SELECT ─────────────────────────────────────────────── -->
-                <template v-if="subStep === 'QUEUE_SELECT'">
-                    <div class="bhv-label">[ LIVE TRANSACTION QUEUE ]{{ filterLabel }}</div>
-                    <div class="bhv-queue">
-                        <div class="bhv-queue-head">
-                            <span>TX_ID</span><span>YIELD</span><span>CURR</span><span>DIFFICULTY</span><span>EXPIRES</span>
+                <!-- PANEL 1 — Live Packet Telemetry & Queue Stream -->
+                <div class="bhv-panel bhv-panel1">
+                    <div class="bhv-panel-label">PANEL 1: LIVE PACKET TELEMETRY & QUEUE STREAM</div>
+
+                    <template v-if="subStep === 'QUEUE_SELECT'">
+                        <div class="bhv-label">[ LIVE TRANSACTION QUEUE ]{{ filterLabel }}</div>
+                        <div class="bhv-queue">
+                            <div class="bhv-queue-head">
+                                <span>TX_ID</span><span>YIELD</span><span>CURR</span><span>DIFFICULTY</span><span>EXPIRES</span>
+                            </div>
+                            <div v-for="tx in filteredQueue" :key="tx.id" class="bhv-queue-row">
+                                <span class="bhv-mono">{{ tx.id }}</span>
+                                <span class="bhv-mono">{{ tx.previewYield }}</span>
+                                <span class="bhv-mono">{{ tx.currency }}</span>
+                                <span class="bhv-mono">{{ tx.band === 'easy' ? 'EASY' : 'HARD' }} ({{ tx.requiredFragments }})</span>
+                                <span class="bhv-mono">
+                                    [<div class="bhv-tx-timer-bar"><div class="bhv-tx-timer-fill" :style="{ width: (tx.timeLeft / tx.timerTotal * 100) + '%' }" /></div>]
+                                    {{ tx.timeLeft.toFixed(1) }}s
+                                </span>
+                            </div>
+                            <div v-if="!filteredQueue.length" class="bhv-hint">No transactions match that filter right now.</div>
                         </div>
-                        <div v-for="tx in filteredQueue" :key="tx.id" class="bhv-queue-row">
-                            <span class="bhv-mono">{{ tx.id }}</span>
-                            <span class="bhv-mono">{{ tx.previewYield }}</span>
-                            <span class="bhv-mono">{{ tx.currency }}</span>
-                            <span class="bhv-mono">{{ tx.band === 'easy' ? 'EASY' : 'HARD' }} ({{ tx.requiredFragments }})</span>
-                            <span class="bhv-mono">
-                                <div class="bhv-tx-timer-bar"><div class="bhv-tx-timer-fill" :style="{ width: (tx.timeLeft / tx.timerTotal * 100) + '%' }" /></div>
-                                {{ tx.timeLeft.toFixed(1) }}s
-                            </span>
+                    </template>
+
+                    <template v-else-if="subStep === 'TOKEN_BUILD'">
+                        <div class="bhv-label">[ INTERCEPTED: {{ activeTx.id }} ] :: YIELD: {{ activeTx.previewYield }} {{ activeTx.currency }}</div>
+                        <div class="bhv-timer-row">
+                            <span class="bhv-timer-label">TX TIMER</span>
+                            [<div class="bhv-timer-bar"><div class="bhv-timer-fill" :class="txTimerClass" :style="{ width: (activeTx.timeLeft / activeTx.timerTotal * 100) + '%' }" /></div>]
+                            <span class="bhv-timer-val" :class="txTimerClass">{{ activeTx.timeLeft.toFixed(1) }}s</span>
                         </div>
-                        <div v-if="!filteredQueue.length" class="bhv-hint">No transactions match that filter right now.</div>
-                    </div>
-                    <p class="bhv-hint">
-                        <code>intercept -tx &lt;TX_ID&gt;</code> to hook one · <code>tx-filter -curr CRED|TECH_PT --min &lt;val&gt;</code> to narrow the feed
-                    </p>
-                </template>
+                    </template>
 
-                <!-- ── TOKEN_BUILD ──────────────────────────────────────────────── -->
-                <template v-else-if="subStep === 'TOKEN_BUILD'">
-                    <div class="bhv-label">[ INTERCEPTED: {{ activeTx.id }} ] :: YIELD: {{ activeTx.previewYield }} {{ activeTx.currency }}</div>
-                    <div class="bhv-timer-row">
-                        <span class="bhv-timer-label">TX TIMER</span>
-                        <div class="bhv-timer-bar"><div class="bhv-timer-fill" :class="txTimerClass" :style="{ width: (activeTx.timeLeft / activeTx.timerTotal * 100) + '%' }" /></div>
-                        <span class="bhv-timer-val" :class="txTimerClass">{{ activeTx.timeLeft.toFixed(1) }}s</span>
-                    </div>
-
-                    <div class="bhv-label bhv-label--sub">[ TARGET TOKEN LAYOUT ({{ puzzle.slots.length }} FRAGMENTS REQUIRED) ]</div>
-                    <div class="bhv-slots-row">
-                        <span v-for="slot in puzzle.slots" :key="slot" class="bhv-slot-tag">[{{ slot }}]</span>
-                    </div>
-                    <div class="bhv-mono">SALT = {{ saltPreview }} | YOUR_ID = {{ playerTag }}</div>
-
-                    <div class="bhv-label bhv-label--sub">[ CANDIDATE MEMORY FRAGMENTS ]</div>
-                    <div class="bhv-fragments">
-                        <span v-for="f in puzzle.fragments" :key="f.id" class="bhv-fragment">[{{ f.id }}] {{ f.hexPreview }}.. (TAG: {{ f.tag }}={{ f.value }})</span>
-                    </div>
-                    <p class="bhv-hint">Order the fragments into the layout above, then <code>inject -token F6-F1-F2-...</code></p>
-                </template>
-
-                <!-- ── HARVEST_SCREEN ───────────────────────────────────────────── -->
-                <template v-else-if="subStep === 'HARVEST_SCREEN'">
-                    <div class="bhv-label">[ HARVEST SUMMARY ]</div>
-                    <div class="bhv-harvest">
-                        <div>LAST HARVESTED : <span class="bhv-good">+{{ lastHarvest.creds || lastHarvest.tech }} {{ lastHarvest.currency }}</span></div>
-                        <div>TOTAL HARVEST  : <span class="bhv-good">{{ stagedCreds }} CRED{{ stagedTech > 0 ? ` / ${stagedTech.toFixed(2)} TECH` : '' }} (STAGED)</span></div>
-                    </div>
-                    <p class="bhv-hint">Continuing increases trace risk. If Global Trace hits 100%, ALL STAGED FUNDS ARE WIPED.</p>
-                    <p class="bhv-hint"><code>extract</code> — bank it safely and end the run · <code>continue</code> — back to the queue for more</p>
-                </template>
-
-            </div>
-
-            <!-- Bottom panel — CLI terminal -->
-            <div class="bhv-panel bhv-bottom">
-                <div ref="logEl" class="bhv-log">
-                    <div v-for="(entry, i) in log" :key="i" class="bhv-log-line" :class="entry.kind">{{ entry.text }}</div>
+                    <template v-else-if="subStep === 'HARVEST_SCREEN'">
+                        <div class="bhv-label">[ HARVEST SUMMARY ]</div>
+                        <div class="bhv-harvest">
+                            <div>LAST HARVESTED : <span class="bhv-good">+{{ lastHarvest.creds || lastHarvest.tech }} {{ lastHarvest.currency }}</span></div>
+                            <div>TOTAL HARVEST  : <span class="bhv-good">{{ stagedCreds }} CRED{{ stagedTech > 0 ? ` / ${stagedTech.toFixed(2)} TECH` : '' }} (STAGED)</span></div>
+                        </div>
+                    </template>
                 </div>
-                <div class="bhv-cli-row">
-                    <span class="bhv-prompt">&gt;</span>
-                    <input
-                        ref="cliInputEl"
-                        v-model="cliText"
-                        class="bhv-cli-input"
-                        placeholder="type a command…"
-                        autocomplete="off"
-                        spellcheck="false"
-                        @keydown="onKeydown"
-                    />
+
+                <!-- PANEL 2 — Inspector & Token Matrix -->
+                <div class="bhv-panel bhv-panel2">
+                    <div class="bhv-panel-label">PANEL 2: INSPECTOR & TOKEN MATRIX</div>
+
+                    <template v-if="subStep === 'QUEUE_SELECT'">
+                        <div class="bhv-label">[ QUEUE CONTROLS ]</div>
+                        <p class="bhv-hint">
+                            <code>intercept -tx &lt;TX_ID&gt;</code> to hook one · <code>tx-filter -curr CRED|TECH_PT --min &lt;val&gt;</code> to narrow the feed
+                        </p>
+                    </template>
+
+                    <template v-else-if="subStep === 'TOKEN_BUILD'">
+                        <div class="bhv-label">[ PHASE 2 VIEW: TOKEN BUILDER ({{ puzzle.slots.length }} FRAGMENTS REQUIRED) ]</div>
+                        <div class="bhv-mono">TARGET LAYOUT: {{ puzzle.slots.map(s => `[${s}]`).join(' -> ') }}</div>
+                        <div class="bhv-mono">SALT = {{ saltPreview }} | YOUR_ID = {{ playerTag }}</div>
+
+                        <div class="bhv-label bhv-label--sub">[ AVAILABLE FRAGMENTS ]</div>
+                        <div class="bhv-fragments">
+                            <span v-for="f in puzzle.fragments" :key="f.id" class="bhv-fragment">[{{ f.id }}] {{ f.tag }}={{ f.value }}</span>
+                        </div>
+                        <p class="bhv-hint">Order the fragments into the layout above, then <code>inject -token F6-F1-F2-...</code></p>
+                    </template>
+
+                    <template v-else-if="subStep === 'HARVEST_SCREEN'">
+                        <div class="bhv-label">[ RISK & HARVEST DECISION ]</div>
+                        <p class="bhv-hint">Continuing increases trace risk. If Global Trace hits 100%, ALL STAGED FUNDS ARE WIPED.</p>
+                        <p class="bhv-hint"><code>extract</code> — bank it safely and end the run · <code>continue</code> — back to the queue for more</p>
+                    </template>
                 </div>
+
+                <!-- PANEL 3 — Interactive CLI Command Console -->
+                <div class="bhv-panel bhv-panel3">
+                    <div class="bhv-panel-label">PANEL 3: INTERACTIVE CLI COMMAND CONSOLE</div>
+                    <div v-if="lastStatus" class="bhv-status-line" :class="lastStatus.kind">{{ lastStatus.text }}</div>
+                    <div class="bhv-cli-row">
+                        <span class="bhv-prompt">&gt;</span>
+                        <input
+                            ref="cliInputEl"
+                            v-model="cliText"
+                            class="bhv-cli-input"
+                            placeholder="type a command…"
+                            autocomplete="off"
+                            spellcheck="false"
+                            @keydown="onKeydown"
+                        />
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -105,6 +111,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useBankHeist } from '@/composables/useBankHeist.js';
+import BankHeistStatusBar from '@/components/minigame/BankHeistStatusBar.vue';
 
 const props = defineProps({
     canvasId:  { type: String, required: true },
@@ -138,11 +145,6 @@ const saltPreview   = ref('');
 const lastHarvest   = ref({});
 const filter        = ref(null); // { currency, min } | null
 
-const traceClass = computed(() => {
-    if (globalTrace.value >= 75) return 'bhv-crit';
-    if (globalTrace.value >= 50) return 'bhv-warn';
-    return '';
-});
 const txTimerClass = computed(() => {
     if (!activeTx.value) return '';
     const ratio = activeTx.value.timeLeft / activeTx.value.timerTotal;
@@ -187,16 +189,14 @@ function startTick() {
 
 function triggerOverrun() {
     if (tickInterval) clearInterval(tickInterval);
-    pushLog('[!!!] CRITICAL ALARM: GLOBAL SYSTEM TRACE 100% COMPLETE', 'bad');
-    pushLog(`[!!!] STAGED BUFFER PURGED: ${stagedCreds.value} CREDITS WIPED TO 0`, 'bad');
+    setStatus('[!!!] CRITICAL ALARM: GLOBAL SYSTEM TRACE 100% COMPLETE — STAGED BUFFER PURGED', 'bad');
     emit('failed', 'phase2_overrun');
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 const cliText      = ref('');
 const cliInputEl   = ref(null);
-const logEl        = ref(null);
-const log          = ref([]);
+const lastStatus   = ref(null); // { text, kind } | null — single transient line, no scrolling log
 const history      = ref([]);
 const historyIndex = ref(-1);
 
@@ -206,10 +206,8 @@ const STEP_COMMANDS = {
     HARVEST_SCREEN: ['extract', 'continue'],
 };
 
-function pushLog(text, kind = '') {
-    log.value.push({ text, kind });
-    if (log.value.length > 10) log.value.shift();
-    nextTick(() => { if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight; });
+function setStatus(text, kind = '') {
+    lastStatus.value = { text, kind };
 }
 
 function onKeydown(e) {
@@ -240,7 +238,6 @@ function submitCommand() {
     if (!raw) return;
     history.value.push(raw);
     historyIndex.value = -1;
-    pushLog('> ' + raw);
     cliText.value = '';
 
     if (subStep.value === 'QUEUE_SELECT') handleQueueSelect(raw);
@@ -256,12 +253,12 @@ function handleQueueSelect(raw) {
     if (interceptMatch) {
         const txId = interceptMatch[1].toUpperCase();
         const tx = queue.value.find(t => t.id === txId);
-        if (!tx) { pushLog(`[-] NO SUCH TRANSACTION IN FEED: ${txId}`, 'bad'); return; }
+        if (!tx) { setStatus(`[-] NO SUCH TRANSACTION IN FEED: ${txId}`, 'bad'); return; }
         queue.value = queue.value.filter(t => t.id !== txId);
         activeTx.value = tx;
         puzzle.value = bh.generateFragmentPuzzle(tx, playerTag);
         saltPreview.value = puzzle.value.fragments.find(f => f.tag === 'SALT')?.value ?? `0x${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
-        pushLog(`[+] HOOKED ${txId} — TOKEN BUILDER OPEN`, 'good');
+        setStatus(`[+] HOOKED ${txId} — TOKEN BUILDER OPEN`, 'good');
         subStep.value = 'TOKEN_BUILD';
         return;
     }
@@ -269,31 +266,29 @@ function handleQueueSelect(raw) {
     const filterMatch = lower.match(/^tx-filter\s+-curr\s+(cred|tech_pt)(?:\s+--min\s+(\d+))?/);
     if (filterMatch) {
         filter.value = { currency: filterMatch[1].toUpperCase(), min: filterMatch[2] ? Number(filterMatch[2]) : null };
-        pushLog(`[+] FEED FILTERED`, 'good');
+        setStatus(`[+] FEED FILTERED`, 'good');
         return;
     }
 
     if (lower === 'tx-filter' || lower === 'tx-filter clear' || lower === 'tx-filter -clear') {
         filter.value = null;
-        pushLog('[+] FILTER CLEARED', 'good');
+        setStatus('[+] FILTER CLEARED', 'good');
         return;
     }
 
-    pushLog('[-] UNKNOWN COMMAND — expected: intercept -tx <TX_ID> or tx-filter -curr <CRED|TECH_PT> --min <val>', 'bad');
+    setStatus('[-] UNKNOWN COMMAND — expected: intercept -tx <TX_ID> or tx-filter -curr <CRED|TECH_PT> --min <val>', 'bad');
 }
 
 // ── TOKEN_BUILD ──────────────────────────────────────────────────────────────
 function handleTokenBuild(raw) {
     const m = raw.toLowerCase().match(/^inject\s+-token\s+([a-z0-9]+(?:-[a-z0-9]+)*)/i);
     if (!m) {
-        pushLog('[-] MALFORMED COMMAND — expected: inject -token F1-F2-...', 'bad');
+        setStatus('[-] MALFORMED COMMAND — expected: inject -token F1-F2-...', 'bad');
         return;
     }
     const guess = m[1].toUpperCase().split('-');
     const correct = puzzle.value.correctSequence;
     const isMatch = guess.length === correct.length && guess.every((v, i) => v === correct[i]);
-
-    pushLog(`[*] PARSING TOKEN SEQUENCE: ${guess.join('-')}...`);
 
     if (isMatch) {
         resolveInjection();
@@ -304,7 +299,7 @@ function handleTokenBuild(raw) {
 
 async function resolveInjection() {
     const tx = activeTx.value;
-    pushLog('[+] CHECKSUM VERIFIED — TRANSACTION SPOOF SUCCESSFUL!', 'good');
+    setStatus('[+] CHECKSUM VERIFIED — TRANSACTION SPOOF SUCCESSFUL!', 'good');
     const res = await bh.phase2Inject(props.canvasId, tx.band, tx.currency);
     if (res) {
         stagedCreds.value = res.staged_creds ?? stagedCreds.value;
@@ -319,15 +314,12 @@ async function resolveInjection() {
 }
 
 function failInjection(reason) {
-    pushLog(`[-] ${reason}`, 'bad');
-    pushLog(`[-] TRANSACTION ${activeTx.value.id} DROPPED AND PURGED`, 'bad');
     const spike = bh.phase2TraceSpike(props.bankIce);
     globalTrace.value = Math.min(100, globalTrace.value + spike);
-    pushLog(`[!] SECURITY ALERT: GLOBAL TRACE +${spike.toFixed(0)}%`, 'bad');
+    setStatus(`[-] ${reason} — TX ${activeTx.value.id} DROPPED :: GLOBAL TRACE +${spike.toFixed(0)}%`, 'bad');
     activeTx.value = null;
     puzzle.value = null;
     if (globalTrace.value >= 100) { triggerOverrun(); return; }
-    pushLog('[!] RETURNING TO LIVE QUEUE...');
     subStep.value = 'QUEUE_SELECT';
 }
 
@@ -339,7 +331,7 @@ async function handleHarvestScreen(raw) {
     } else if (lower === 'continue') {
         subStep.value = 'QUEUE_SELECT';
     } else {
-        pushLog('[-] UNKNOWN COMMAND — expected: extract or continue', 'bad');
+        setStatus('[-] UNKNOWN COMMAND — expected: extract or continue', 'bad');
     }
 }
 
@@ -370,64 +362,55 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.bhv-overlay { position: fixed; inset: 0; background: rgba(4, 6, 10, 0.92); z-index: 200; display: flex; align-items: center; justify-content: center; }
-.bhv-terminal { width: min(820px, 96vw); max-height: 92vh; overflow-y: auto; background: #0a0f16; border: 1px solid #2a3a4a; font-family: 'JetBrains Mono', monospace; color: #a8c4d8; padding: 16px 18px; }
+.bhv-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(2, 4, 8, 0.55); display: flex; align-items: center; justify-content: center; }
+.bhv-shell {
+    width: 90vw; height: 90vh; max-width: 1400px;
+    background: rgba(5, 11, 20, 0.95); border: 1px solid #00F0FF; box-shadow: 0 0 24px rgba(0, 240, 255, 0.2);
+    font-family: 'JetBrains Mono', monospace; color: #00F0FF;
+    display: flex; flex-direction: column; padding: 14px 18px;
+}
 
-.bhv-panel + .bhv-panel { border-top: 1px solid #1e2a36; margin-top: 14px; padding-top: 14px; }
+.bhv-panels { flex: 1; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; min-height: 0; }
+.bhv-panel { border: 1px solid rgba(0, 240, 255, 0.35); padding: 10px 14px; overflow-y: auto; }
+.bhv-panel1 { flex: 0 0 40%; }
+.bhv-panel2 { flex: 0 0 45%; }
+.bhv-panel3 { flex: 0 0 15%; display: flex; flex-direction: column; justify-content: flex-end; overflow: visible; }
+.bhv-panel-label { font-size: 9px; letter-spacing: 0.1em; color: #FFB000; margin-bottom: 8px; opacity: 0.85; }
 
-/* Top — status + trace */
-.bhv-status-row { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 0.05em; color: #6a8aa0; margin-bottom: 10px; }
-.bhv-trace-row { display: flex; align-items: center; gap: 10px; }
-.bhv-trace-label { font-size: 9px; color: #6a8aa0; letter-spacing: 0.08em; }
-.bhv-trace-bar { flex: 1; height: 8px; background: #101822; border: 1px solid #2a3a4a; }
-.bhv-trace-fill { height: 100%; background: #2ed88a; transition: width 0.2s linear; }
-.bhv-trace-fill.bhv-warn { background: #d8a83c; }
-.bhv-trace-fill.bhv-crit { background: #e04848; }
-.bhv-trace-val { font-size: 10px; width: 110px; text-align: right; color: #2ed88a; }
-.bhv-trace-val.bhv-warn { color: #d8a83c; }
-.bhv-trace-val.bhv-crit { color: #e04848; animation: bhv-pulse 0.6s ease-in-out infinite; }
-@keyframes bhv-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-/* Middle — queue / builder / harvest */
-.bhv-label { font-size: 10px; letter-spacing: 0.08em; color: #4a90d8; margin-bottom: 8px; }
+.bhv-label { font-size: 10px; letter-spacing: 0.08em; color: #00F0FF; margin-bottom: 8px; }
 .bhv-label--sub { margin-top: 12px; }
 .bhv-mono { font-size: 11px; line-height: 1.7; }
 .bhv-hint { font-size: 10px; opacity: 0.7; line-height: 1.6; margin: 10px 0 0; }
-.bhv-hint code { color: #d8a83c; }
+.bhv-hint code { color: #FFB000; }
 
 .bhv-queue { display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
 .bhv-queue-head, .bhv-queue-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1.3fr 1.6fr; gap: 8px; align-items: center; }
-.bhv-queue-head { color: #6a8aa0; letter-spacing: 0.05em; padding-bottom: 4px; border-bottom: 1px solid #1e2a36; }
+.bhv-queue-head { color: #6a8aa0; letter-spacing: 0.05em; padding-bottom: 4px; border-bottom: 1px solid rgba(0, 240, 255, 0.2); }
 .bhv-queue-row { padding: 4px 0; }
-.bhv-tx-timer-bar { display: inline-block; width: 40px; height: 6px; background: #101822; border: 1px solid #2a3a4a; vertical-align: middle; margin-right: 4px; }
-.bhv-tx-timer-fill { height: 100%; background: #4a90d8; }
+.bhv-tx-timer-bar { display: inline-block; width: 40px; height: 6px; background: #0a0f16; vertical-align: middle; margin-right: 4px; }
+.bhv-tx-timer-fill { height: 100%; background: #00F0FF; }
 
-.bhv-timer-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bhv-timer-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .bhv-timer-label { font-size: 9px; color: #6a8aa0; letter-spacing: 0.08em; }
-.bhv-timer-bar { flex: 1; height: 8px; background: #101822; border: 1px solid #2a3a4a; }
-.bhv-timer-fill { height: 100%; background: #4a90d8; transition: width 0.1s linear; }
-.bhv-timer-fill.bhv-warn { background: #d8a83c; }
-.bhv-timer-fill.bhv-crit { background: #e04848; }
-.bhv-timer-val { font-size: 11px; width: 42px; text-align: right; color: #4a90d8; }
-.bhv-timer-val.bhv-warn { color: #d8a83c; }
-.bhv-timer-val.bhv-crit { color: #e04848; }
-
-.bhv-slots-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.bhv-slot-tag { font-size: 10px; padding: 3px 7px; background: #101822; border: 1px solid #2a3a4a; color: #d8a83c; }
+.bhv-timer-bar { display: inline-block; width: 160px; height: 8px; background: #0a0f16; vertical-align: middle; }
+.bhv-timer-fill { display: block; height: 100%; background: #00F0FF; transition: width 0.1s linear; }
+.bhv-timer-fill.bhv-warn { background: #FFB000; }
+.bhv-timer-fill.bhv-crit { background: #FF2244; }
+.bhv-timer-val { font-size: 11px; width: 42px; text-align: right; color: #00F0FF; }
+.bhv-timer-val.bhv-warn { color: #FFB000; }
+.bhv-timer-val.bhv-crit { color: #FF2244; }
 
 .bhv-fragments { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-.bhv-fragment { font-size: 10px; padding: 5px 9px; background: #101822; border: 1px solid #2a3a4a; }
+.bhv-fragment { font-size: 10px; padding: 6px 10px; background: #0a0f16; border: 1px solid #00F0FF; }
 
 .bhv-harvest { font-size: 11px; line-height: 2; margin-bottom: 8px; }
 .bhv-good { color: #2ed88a; }
 
-/* Bottom — CLI */
-.bhv-log { max-height: 100px; overflow-y: auto; margin-bottom: 8px; display: flex; flex-direction: column; gap: 2px; }
-.bhv-log-line { font-size: 10px; opacity: 0.85; }
-.bhv-log-line.good { color: #2ed88a; }
-.bhv-log-line.bad { color: #e04848; }
+.bhv-status-line { font-size: 10px; margin-bottom: 6px; opacity: 0.9; }
+.bhv-status-line.good { color: #2ed88a; }
+.bhv-status-line.bad { color: #FF2244; }
 .bhv-cli-row { display: flex; align-items: center; gap: 8px; }
-.bhv-prompt { color: #4a90d8; font-size: 13px; }
-.bhv-cli-input { flex: 1; font-family: inherit; font-size: 12px; background: #101822; border: 1px solid #2a3a4a; color: #a8c4d8; padding: 7px 9px; }
-.bhv-cli-input:focus { outline: none; border-color: #4a90d8; }
+.bhv-prompt { color: #00F0FF; font-size: 13px; }
+.bhv-cli-input { flex: 1; font-family: inherit; font-size: 12px; background: #0a0f16; border: 1px solid #00F0FF; color: #00F0FF; padding: 7px 9px; }
+.bhv-cli-input:focus { outline: none; box-shadow: 0 0 6px rgba(0, 240, 255, 0.4); }
 </style>

@@ -5,6 +5,7 @@
         <BankHeistHandshake
             v-if="stage === 'gate1'"
             :canvas-id="canvasId"
+            :bank-name="bankName"
             :bank-ice="bankIce"
             :player-cpu="playerCpu"
             :player-ram="playerRam"
