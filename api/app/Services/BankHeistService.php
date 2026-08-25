@@ -72,32 +72,29 @@ class BankHeistService
     /** Node cooldown (minutes) on Gate 1 failure, by bank tier 1-4. */
     private const TIER_COOLDOWN_MINUTES = [1 => 2, 2 => 4, 3 => 6, 4 => 8];
 
-    // ── Gate 1 — Authentication Handshake ───────────────────────────────────────
-    // Full Phase 1 replacement, superseding the three-step per-stage timer
-    // model above (kept client-mirrored purely for its cipher-pool sizing —
-    // see handshakeChunkCount()/handshakeComboSize() below). No more
-    // per-step CPU/RAM/ICE-scaled timers, "gold flash" lock-on, or a sniff
-    // command. Flow: a static Gateway Entry screen (no timer) shows the
-    // session's SYN and waits for ENTER -> a Terminal Workspace/SYN
-    // Calculator with a single flat 90s window, where each wrong -ack
-    // guess docks a flat 15s off the *running* clock (never resets it) and
-    // rotates in a brand new session (new SYN + new cipher pool) -> Session
-    // Token Binding, which does NOT get its own separate clock — it
-    // inherits whatever time is left on the 90s window (floored at
-    // HANDSHAKE_BIND_FLOOR so a last-second calculator solve doesn't hand
-    // back an unwinnable bind window). The clock reaching 0, at either
-    // step, is a full failure, resolved identically through
-    // resolveGate1Failure() below (mitigated SS damage + bounty + node
-    // cooldown) — a wrong -ack guess alone costs time only, never stats.
+    // ── Master Timer — one shared clock for the ENTIRE Bank Heist run ───────────
+    // Replaces every phase-local timer/risk system that came before it,
+    // including this class's old Gate 1 "Countertrace Timer" above (dead —
+    // kept only for Brute Force/legacy reference) and the Gate 2 Global
+    // Trace Meter that used to live in the Phase 2 section below. A single
+    // flat MASTER_TIMER_TOTAL clock starts the moment the player presses
+    // ENTER into the Terminal Workspace and runs continuously through BOTH
+    // phases — Terminal Workspace, Session Token Binding, the Gate 2 queue,
+    // and Token Builder all draw down the SAME clock; nothing resets it
+    // phase-locally. Every miss anywhere in the run (a wrong SYN-ACK guess,
+    // or a bad/expired token injection) docks a flat MISS_PENALTY off
+    // whatever's left. The clock reaching 0 at any point is a full failure,
+    // resolved identically through resolveGate1Failure() below (mitigated
+    // SS damage + bounty + node cooldown, plus discarding any staged Gate 2
+    // buffer via the 'phase2_overrun' approach) — a miss alone costs time
+    // only, never stats. A successful EXTRACT before the clock runs out
+    // banks whatever's staged.
 
-    /** Flat Terminal Workspace / SYN Calculator window, seconds — not CPU/RAM/ICE-scaled. Starts once on entry and only ever counts down (or gets docked); never resets on a wrong guess. */
-    private const HANDSHAKE_AUTH_TIMER = 90.0;
+    /** The whole-run clock, seconds (4 minutes) — not CPU/RAM/ICE-scaled, and not reset by moving between phases or sub-steps. */
+    private const MASTER_TIMER_TOTAL = 240.0;
 
-    /** Seconds docked off the running HANDSHAKE_AUTH_TIMER clock for one wrong -ack guess. Also triggers a full session reroll (new SYN + new cipher pool). */
-    private const HANDSHAKE_WRONG_GUESS_PENALTY = 15.0;
-
-    /** Minimum seconds handed to Session Token Binding, even if the 90s clock is nearly spent when SYN-ACK is solved — binding reuses whatever's left on that same clock rather than a separate fixed window, floored here for fairness. */
-    private const HANDSHAKE_BIND_FLOOR = 10.0;
+    /** Seconds docked off the running MASTER_TIMER_TOTAL clock for one miss, in either phase. A Gate 1 miss also rolls a full session reroll (new SYN + new cipher pool); a Gate 2 miss also drops the player back to the live queue. */
+    private const MISS_PENALTY = 10.0;
 
     /** Cipher chunk pool size / required combo size — both step up at BankICE 7+, same threshold-band shape as the rest of Bank Heist's tier-scaled difficulty. */
     private const HANDSHAKE_ICE_THRESHOLD        = 7;
@@ -145,13 +142,14 @@ class BankHeistService
 
     /**
      * "Denied at the door" cost stack — shared by every way a player can be
-     * turned away before ever banking their run: Gate 1's Spoofed Handshake
-     * timing out, Gate 2 Phase 1's MitM Handshake Spoof timing out on any of
-     * its three steps, and Gate 2 Phase 2's Global Trace Meter overrunning
-     * to 100%. The name is historical (this predates both redesigns) but
-     * the consequence is deliberately identical across all of them — being
-     * denied is being denied, regardless of which gate or step it happened
-     * on.
+     * turned away before ever banking their run: originally Gate 1's
+     * Spoofed Handshake timing out and Gate 2 Phase 1's MitM Handshake
+     * Spoof timing out; today, simply the shared Master Timer (see above)
+     * reaching 0 anywhere in the run, whether that's during Gate 1's
+     * Authentication Handshake or Gate 2's queue/Token Builder. The name is
+     * historical (this predates all of those redesigns) but the consequence
+     * is deliberately identical across all of them — being denied is being
+     * denied, regardless of where in the run it happened.
      *
      * Applies: SS damage = max(1, BankICE - effectiveFirewall) — the same
      * Firewall-mitigated formula every other PvE hack failure uses (see
@@ -213,12 +211,10 @@ class BankHeistService
     // =========================================================================
     // Gate 1 — Authentication Handshake (cipher-pool sizing only)
     // =========================================================================
-    // The 90s auth window, 15s wrong-guess penalty, and the bind-window
-    // floor above are flat and client-computed (HANDSHAKE_AUTH_TIMER /
-    // HANDSHAKE_WRONG_GUESS_PENALTY / HANDSHAKE_BIND_FLOOR, mirrored in
-    // useBankHeist.js) — no server-side timer math needed. Only the
-    // ICE-scaled cipher pool sizing below has real logic worth mirroring
-    // here for documentation parity with useBankHeist.js.
+    // Timing is entirely the shared Master Timer above (MASTER_TIMER_TOTAL /
+    // MISS_PENALTY, mirrored in useBankHeist.js) — no server-side timer math
+    // needed. Only the ICE-scaled cipher pool sizing below has real logic
+    // worth mirroring here for documentation parity with useBankHeist.js.
 
     /** Cipher chunk pool size for the SYN-ACK puzzle — 6 chunks at BankICE 7+, 4 below that. */
     public function handshakeChunkCount(int $bankIce): int
@@ -242,14 +238,14 @@ class BankHeistService
     // Replaces the Ledger + Payload Tampering screen entirely. A live
     // transaction queue: intercept a TX, reconstruct its forged token from
     // fragment candidates before its own timer expires, then EXTRACT to bank
-    // the running total or CONTINUE to push your luck. A Global Trace Meter
-    // (0-100%) ticks continuously while browsing the queue or working the
-    // Token Builder (at different flat rates — see PHASE2_TRACE_RATE_QUEUE /
-    // PHASE2_TRACE_RATE_BUILDER below), and pauses on the Harvest Summary
-    // decision screen. Hitting 100% wipes anything not yet extracted and
-    // costs the same "denied at the door" stack as every other Bank Heist
-    // failure — see resolveGate1Failure(), called with approach
-    // 'phase2_overrun'.
+    // the running total or CONTINUE to push your luck. There is no
+    // Phase-2-local risk meter anymore — the shared Master Timer (see above)
+    // is the only clock, running continuously from Gate 1 through here. A
+    // failed/expired injection is a miss (flat MISS_PENALTY off that shared
+    // clock, drop back to the queue); the clock reaching 0 wipes anything
+    // not yet extracted and costs the same "denied at the door" stack as
+    // every other Bank Heist failure — see resolveGate1Failure(), called
+    // with approach 'phase2_overrun'.
     //
     // Trust model: the queue itself (timers, fragment pool, which candidates
     // are decoys) is fully client-computed like every other Bank Heist
@@ -275,16 +271,9 @@ class BankHeistService
     /** Decoy fragments added on top of the required count, either difficulty. */
     private const PHASE2_DECOY_COUNT = 2;
 
-    /** Flat TX expiration timers (seconds) — not ICE-scaled. Low yield/easy gets more time; high yield/hard gets less. */
-    private const PHASE2_EASY_TIMER = 8.0;
-    private const PHASE2_HARD_TIMER = 4.0;
-
-    /** Global Trace Meter tick rate, %/sec — depends on which sub-step the player is in, not on Bank ICE. */
-    private const PHASE2_TRACE_RATE_QUEUE   = 0.5;
-    private const PHASE2_TRACE_RATE_BUILDER = 1.0;
-
-    /** Flat, immediate Global Trace spike on a failed/expired token injection. */
-    private const PHASE2_TRACE_SPIKE_ON_FAIL = 25.0;
+    /** Flat TX expiration timers (seconds) — not ICE-scaled. Low yield/easy gets more time; high yield/hard gets less. Doubled from the original 8.0/4.0 once the Master Timer replaced the Trace Meter as the primary pressure. */
+    private const PHASE2_EASY_TIMER = 16.0;
+    private const PHASE2_HARD_TIMER = 8.0;
 
     /** Reward ranges rolled server-side per successful inject, by band/currency. */
     private const PHASE2_EASY_CRED_RANGE = [75, 150];
@@ -314,20 +303,6 @@ class BankHeistService
     public function phase2TxTimer(string $band): float
     {
         return $band === 'easy' ? self::PHASE2_EASY_TIMER : self::PHASE2_HARD_TIMER;
-    }
-
-    /** Global Trace Meter tick rate, %/sec. @param 'queue'|'builder' $subStep */
-    public function phase2TraceRate(string $subStep): float
-    {
-        return $subStep === 'builder'
-            ? self::PHASE2_TRACE_RATE_BUILDER
-            : self::PHASE2_TRACE_RATE_QUEUE;
-    }
-
-    /** Flat, immediate Global Trace spike percentage on a failed/expired token injection — always +25. */
-    public function phase2TraceSpike(): float
-    {
-        return self::PHASE2_TRACE_SPIKE_ON_FAIL;
     }
 
     /**

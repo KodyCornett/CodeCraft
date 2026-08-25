@@ -1,7 +1,7 @@
 <template>
     <div class="bh-overlay">
 
-        <!-- ── Gate 1 — MitM Handshake Hijack ──────────────────────────────────── -->
+        <!-- ── Gate 1 — Authentication Handshake ───────────────────────────────── -->
         <BankHeistHandshake
             v-if="stage === 'gate1'"
             :canvas-id="canvasId"
@@ -9,8 +9,11 @@
             :bank-ice="bankIce"
             :player-cpu="playerCpu"
             :player-ram="playerRam"
+            :time-left="masterTimeLeft"
+            :time-total="masterTimerTotal"
             @success="onGate1Success"
-            @failed="onGate1Failed"
+            @terminal-entered="startMasterTimer"
+            @miss="applyMissPenalty"
             @abort="$emit('abort')"
         />
 
@@ -23,15 +26,17 @@
             :player-cpu="playerCpu"
             :player-ram="playerRam"
             :player-os="playerOs"
+            :time-left="masterTimeLeft"
+            :time-total="masterTimerTotal"
             @complete="onGate2Complete"
-            @failed="onGate2Failed"
+            @miss="applyMissPenalty"
         />
 
     </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onBeforeUnmount } from 'vue';
 import BankHeistHandshake from '@/components/minigame/BankHeistHandshake.vue';
 import BankHeistHarvest from '@/components/minigame/BankHeistHarvest.vue';
 import { useBankHeist } from '@/composables/useBankHeist.js';
@@ -55,16 +60,50 @@ const emit = defineEmits(['complete', 'abort']);
 
 const bh = useBankHeist();
 
-const stage = ref('gate1'); // 'gate1' | 'gate2' — Gate 1 IS the MitM Handshake Hijack itself; there is no separate screen in front of it
+const stage = ref('gate1'); // 'gate1' | 'gate2' — Gate 1 IS the Authentication Handshake itself; there is no separate screen in front of it
+
+// ── Master Timer — ONE shared clock for the whole run, lifted up here so it
+// survives the Gate 1 -> Gate 2 component swap below. Starts on Gate 1's
+// 'terminal-entered' (pressing ENTER at the Gateway Entry screen) and runs
+// continuously through both gates; a 'miss' from either child docks a flat
+// MISS_PENALTY off it; reaching 0 anywhere is a full failure, resolved the
+// same way regardless of which gate the player was in when it happened. ──
+const masterTimeLeft   = ref(bh.MASTER_TIMER_TOTAL);
+const masterTimerTotal = ref(bh.MASTER_TIMER_TOTAL);
+let masterInterval = null;
+let masterStarted  = false;
+
+function startMasterTimer() {
+    if (masterStarted) return; // guard — only Gate 1's Gateway Entry ever fires this, but never twice
+    masterStarted = true;
+    masterInterval = setInterval(() => {
+        masterTimeLeft.value = Math.max(0, masterTimeLeft.value - 0.1);
+        if (masterTimeLeft.value <= 0) {
+            clearInterval(masterInterval);
+            masterInterval = null;
+            resolveEntryFailure(stage.value === 'gate2' ? 'phase2_overrun' : 'mitm_handshake');
+        }
+    }, 100);
+}
+
+/** A miss (wrong SYN-ACK guess, or a bad/expired token injection) — costs time only, never stats. */
+function applyMissPenalty() {
+    masterTimeLeft.value = Math.max(0, masterTimeLeft.value - bh.MISS_PENALTY);
+    if (masterTimeLeft.value <= 0 && masterInterval) {
+        clearInterval(masterInterval);
+        masterInterval = null;
+        resolveEntryFailure(stage.value === 'gate2' ? 'phase2_overrun' : 'mitm_handshake');
+    }
+}
 
 function onGate1Success() {
     stage.value = 'gate2';
 }
 
-// Shared "denied at the door" resolution — Gate 1's (MitM Handshake) timeout
-// and Gate 2's (Harvest) Global Trace overrun both cost the same thing (see
-// BankHeistService::resolveGate1Failure's docblock), so every failure path
-// below funnels through this one call.
+// Shared "denied at the door" resolution — the Master Timer reaching 0
+// costs the same thing regardless of which gate the player was in (see
+// BankHeistService::resolveGate1Failure's docblock), so both the timer
+// callbacks above funnel through this one call.
 async function resolveEntryFailure(failureApproach) {
     const res = await bh.gate1Failed(props.canvasId, failureApproach);
     // Same field-merge shape as Gate 2's mergePlayerSync — an entry failure
@@ -84,18 +123,14 @@ async function resolveEntryFailure(failureApproach) {
     });
 }
 
-function onGate1Failed() {
-    return resolveEntryFailure('mitm_handshake');
-}
-
-/** @param {'phase2_overrun'} failureApproach forwarded by BankHeistHarvest's 'failed' emit */
-function onGate2Failed(failureApproach) {
-    return resolveEntryFailure(failureApproach);
-}
-
 function onGate2Complete(payload) {
+    if (masterInterval) { clearInterval(masterInterval); masterInterval = null; }
     emit('complete', { ...payload, canvasId: props.canvasId });
 }
+
+onBeforeUnmount(() => {
+    if (masterInterval) clearInterval(masterInterval);
+});
 </script>
 
 <style scoped>

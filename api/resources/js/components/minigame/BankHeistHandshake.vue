@@ -6,8 +6,9 @@
                 :node-name="bankName"
                 :staged-creds="0"
                 :staged-tech="0"
-                :trace-percent="0"
-                :active="false"
+                :time-left="timeLeft"
+                :time-total="timeTotal"
+                :active="step !== 'GATEWAY_ENTRY'"
             />
 
             <div class="bhh-panels">
@@ -37,8 +38,8 @@
                         <div v-for="(line, i) in streamLines" :key="i" class="bhh-stream-line">{{ line.text }}</div>
                     </div>
 
-                    <div v-if="step === 'AUTH_TERMINAL'" class="bhh-timer-row">
-                        <span class="bhh-timer-label">AUTH TIMER</span>
+                    <div v-if="step !== 'GATEWAY_ENTRY'" class="bhh-timer-row">
+                        <span class="bhh-timer-label">TIME REMAINING</span>
                         [<div class="bhh-timer-bar"><div class="bhh-timer-fill" :class="timerClass" :style="{ width: timerPct + '%' }" /></div>]
                         <span class="bhh-timer-val" :class="timerClass">{{ timeLeft.toFixed(1) }}s</span>
                     </div>
@@ -72,7 +73,7 @@
 
                         <p class="bhh-hint">Find the {{ puzzle.comboSize }} chunks that sum to the target ACK, then <code>respond -syn -ack &lt;letters joined by +&gt;</code>.</p>
                         <p v-if="sessionRerouteCount > 0" class="bhh-hint bhh-hint--warn">
-                            SESSION REROUTES: {{ sessionRerouteCount }} (-{{ (sessionRerouteCount * HANDSHAKE_WRONG_GUESS_PENALTY).toFixed(0) }}s off the clock)
+                            SESSION REROUTES: {{ sessionRerouteCount }} (-{{ (sessionRerouteCount * bh.MISS_PENALTY).toFixed(0) }}s off the clock)
                         </p>
                     </template>
 
@@ -124,20 +125,27 @@ const props = defineProps({
     bankIce:   { type: Number, required: true },
     playerCpu: { type: Number, default: 3 },
     playerRam: { type: Number, default: 2 },
+    // The shared Master Timer, owned by BankHeist.vue (the parent) so it
+    // survives the swap into Gate 2 — this component only reads it for
+    // display and reports misses upward, it never owns or ticks a clock.
+    timeLeft:  { type: Number, required: true },
+    timeTotal: { type: Number, required: true },
 });
 
-const emit = defineEmits(['success', 'failed', 'abort']);
+// 'terminal-entered' tells the parent to start the shared Master Timer —
+// fired exactly once, when ENTER is pressed at the Gateway Entry screen.
+// 'miss' tells the parent to dock a flat MISS_PENALTY off that timer — this
+// component no longer resolves full failures itself (the parent does, when
+// its timer hits 0); it only ever reports outcomes upward now.
+const emit = defineEmits(['success', 'terminal-entered', 'miss', 'abort']);
 
 const bh = useBankHeist();
-const HANDSHAKE_WRONG_GUESS_PENALTY = bh.HANDSHAKE_WRONG_GUESS_PENALTY;
 
 // ── Step state ───────────────────────────────────────────────────────────────
-// 'GATEWAY_ENTRY' (static, no timer, ENTER to proceed) ->
-// 'AUTH_TERMINAL' (single flat 90s window, -15s + full session reroll per
-// wrong -ack guess) -> 'TOKEN_BIND' (no separate clock — inherits whatever
-// time is LEFT on the 90s window, floored at BIND_WINDOW_FLOOR, so solving
-// the calculator fast earns a roomy bind window and solving it late still
-// gets a fair minimum).
+// 'GATEWAY_ENTRY' (static, no timer, ENTER starts the shared Master Timer) ->
+// 'AUTH_TERMINAL' (a wrong -ack guess docks a flat MISS_PENALTY off the
+// shared clock and rolls a full session reroll) -> 'TOKEN_BIND' (same
+// shared clock, no reset — binding just draws from whatever time is left).
 const step             = ref('GATEWAY_ENTRY');
 const targetIp         = ref(genIp());
 const tokenHash        = ref(genHex(4));
@@ -193,32 +201,15 @@ function refreshSessionScan() {
 
 const sessionCandidates = ref([]);
 
-// ── AUTH_TERMINAL timer — flat 90s, ticks continuously once started, never
-// resets on a wrong guess (only docked -15s). Reaching 0 is a full failure. ─
-const timeLeft   = ref(0);
-const timerTotal = ref(0);
-let authInterval = null;
-
-function startAuthTimer() {
-    timerTotal.value = bh.HANDSHAKE_AUTH_TIMER;
-    timeLeft.value   = bh.HANDSHAKE_AUTH_TIMER;
-    if (authInterval) clearInterval(authInterval);
-    authInterval = setInterval(() => {
-        timeLeft.value = Math.max(0, timeLeft.value - 0.1);
-        if (timeLeft.value <= 0) {
-            clearInterval(authInterval);
-            authInterval = null;
-            emit('failed');
-        }
-    }, 100);
-}
+// ── Shared clock display — the actual timer lives in BankHeist.vue (the
+// parent); this component only reads it via props for display/computation.
+const timeLeft   = computed(() => props.timeLeft);
+const timerTotal = computed(() => props.timeTotal);
 
 const timerPct   = computed(() => timerTotal.value ? (timeLeft.value / timerTotal.value) * 100 : 0);
 const timerClass = computed(() => {
-    if (timerTotal.value === 0) return '';
-    const ratio = timeLeft.value / timerTotal.value;
-    if (ratio <= 0.3) return 'bhh-timer--crit';
-    if (ratio <= 0.6) return 'bhh-timer--warn';
+    if (timeLeft.value <= 30) return 'bhh-timer--crit';
+    if (timeLeft.value <= 90) return 'bhh-timer--warn';
     return '';
 });
 
@@ -312,7 +303,7 @@ function enterTerminal() {
     // Reuses the SAME puzzle (same SYN) already shown on the Gateway Entry
     // screen — no regeneration here, that continuity is the whole point.
     step.value = 'AUTH_TERMINAL';
-    startAuthTimer();
+    emit('terminal-entered'); // parent starts the shared Master Timer
     nextTick(() => cliInputEl.value?.focus());
 }
 
@@ -335,29 +326,13 @@ function handleSynAck(raw) {
 
     setStatus('[-] ACK MISMATCH :: SESSION DROPPED — REROUTING TO NEXT CANDIDATE', 'bad');
     sessionRerouteCount.value += 1;
-    timeLeft.value = Math.max(0, timeLeft.value - HANDSHAKE_WRONG_GUESS_PENALTY);
-
-    if (timeLeft.value <= 0) {
-        if (authInterval) { clearInterval(authInterval); authInterval = null; }
-        emit('failed');
-        return;
-    }
-
-    generateNewSession(); // new SYN + new cipher pool — the running 90s clock keeps ticking from wherever it is
+    emit('miss'); // parent docks a flat MISS_PENALTY off the shared clock (and ends the run if that brings it to 0)
+    generateNewSession(); // new SYN + new cipher pool — the shared clock keeps ticking from wherever it is
 }
 
-// ── Step 3: TOKEN_BIND — no separate clock, inherits leftover auth time ─────
+// ── Step 3: TOKEN_BIND — same shared clock, no reset ────────────────────────
 function advanceToTokenBind() {
     step.value = 'TOKEN_BIND';
-    // Same continuous clock as the calculator step — just floor it so a
-    // last-second solve doesn't hand back an unwinnable bind window, and
-    // rescale timerTotal so the progress bar reads against the new budget
-    // rather than looking nearly-empty relative to the original 90s.
-    timeLeft.value   = Math.max(bh.HANDSHAKE_BIND_FLOOR, timeLeft.value);
-    timerTotal.value = timeLeft.value;
-    // authInterval keeps running unchanged — it's the same interval that
-    // was already ticking down the calculator window; reaching 0 here
-    // still triggers the same full-failure emit('failed') as before.
     nextTick(() => cliInputEl.value?.focus());
 }
 
@@ -369,7 +344,6 @@ function handleAck(raw) {
     }
     if (m[2].toUpperCase() === tokenHash.value) {
         setStatus('[+] SESSION BOUND :: CONNECTION ESTABLISHED :: ACCESS GRANTED', 'good');
-        if (authInterval) { clearInterval(authInterval); authInterval = null; }
         emit('success');
     } else {
         setStatus('[-] TOKEN MISMATCH', 'bad');
@@ -384,7 +358,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-    if (authInterval) clearInterval(authInterval);
     stopAmbientStream();
     window.removeEventListener('keydown', onGlobalKeydown);
 });

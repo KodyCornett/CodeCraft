@@ -6,7 +6,8 @@
                 :node-name="bankName"
                 :staged-creds="stagedCreds"
                 :staged-tech="stagedTech"
-                :trace-percent="globalTrace"
+                :time-left="timeLeft"
+                :time-total="timeTotal"
                 :active="true"
             />
 
@@ -50,7 +51,7 @@
                         <div class="bhv-harvest">
                             <div>LAST HARVESTED  : <span class="bhv-good">+{{ formatAmount(lastHarvest.creds || lastHarvest.tech) }} {{ currencyLabel(lastHarvest.currency) }}</span></div>
                             <div>STAGED BUFFER   : <span class="bhv-good">{{ formatAmount(stagedCreds) }} CREDITS{{ stagedTech > 0 ? ` / ${formatAmount(stagedTech)} TECH PT` : '' }}</span></div>
-                            <div>GLOBAL TRACE    : <span :class="traceTierClass">{{ globalTrace.toFixed(0) }}% {{ traceTierLabel }}</span></div>
+                            <div>TIME REMAINING  : <span :class="timerClass">{{ timeLeft.toFixed(1) }}s</span></div>
                         </div>
                     </template>
                 </div>
@@ -80,7 +81,7 @@
 
                     <template v-else-if="subStep === 'HARVEST_SCREEN'">
                         <div class="bhv-label">[ RISK & HARVEST DECISION ]</div>
-                        <p class="bhv-hint bhv-hint--warn">Continuing increases trace risk! If Trace hits 100%, ALL STAGED FUNDS ARE WIPED.</p>
+                        <p class="bhv-hint bhv-hint--warn">The clock never stops! If it hits 0, ALL STAGED FUNDS ARE WIPED.</p>
                         <p class="bhv-hint"><code>extract</code> — bank it safely and end the run · <code>continue</code> — back to the queue for more</p>
                     </template>
                 </div>
@@ -121,22 +122,35 @@ const props = defineProps({
     playerCpu: { type: Number, default: 3 },
     playerRam: { type: Number, default: 2 },
     playerOs:  { type: Number, default: 2 },
+    // The shared Master Timer, owned by BankHeist.vue (the parent) — this
+    // component only reads it for display and reports misses upward. There
+    // is no Phase-2-local risk meter or full-failure condition anymore; the
+    // parent alone decides when the run ends, when its timer hits 0.
+    timeLeft:  { type: Number, required: true },
+    timeTotal: { type: Number, required: true },
 });
 
 // 'complete' fires only on a successful EXTRACT — the run banked something
-// (or nothing, if extracted with an empty buffer) and ends cleanly. 'failed'
-// fires only on a Global Trace overrun, forwarded straight up to
-// BankHeist.vue exactly like BankHeistHandshake's 'failed' — the actual
-// server call and cost stack live in BankHeist.vue's resolveEntryFailure so
-// there's exactly one place that ever calls gate1-failed.
-const emit = defineEmits(['complete', 'failed']);
+// (or nothing, if extracted with an empty buffer) and ends cleanly. 'miss'
+// fires on a failed/expired token injection — a flat MISS_PENALTY off the
+// shared clock, nothing more; the parent decides whether that ends the run.
+const emit = defineEmits(['complete', 'miss']);
 
 const bh = useBankHeist();
 const playerTag = `PL_${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
 
-// ── Global state ─────────────────────────────────────────────────────────────
+// ── Shared clock display — the actual timer lives in BankHeist.vue (the
+// parent); this component only reads it via props for display/computation.
+const timeLeft   = computed(() => props.timeLeft);
+const timerTotal = computed(() => props.timeTotal);
+const timerClass = computed(() => {
+    if (timeLeft.value <= 30) return 'bhv-crit';
+    if (timeLeft.value <= 90) return 'bhv-warn';
+    return '';
+});
+
+// ── Local state ──────────────────────────────────────────────────────────────
 const subStep       = ref('QUEUE_SELECT'); // 'QUEUE_SELECT' | 'TOKEN_BUILD' | 'HARVEST_SCREEN'
-const globalTrace   = ref(0);
 const stagedCreds   = ref(0);
 const stagedTech    = ref(0);
 const queue         = ref([]);
@@ -160,17 +174,6 @@ function formatAmount(n) {
 function currencyLabel(currency) {
     return currency === 'TECH_PT' ? 'TECH PT' : 'CREDITS';
 }
-// Matches the design doc's own example (60% -> CRITICAL) exactly.
-const traceTierLabel = computed(() => {
-    if (globalTrace.value >= 60) return 'CRITICAL';
-    if (globalTrace.value >= 30) return 'ELEVATED';
-    return 'NOMINAL';
-});
-const traceTierClass = computed(() => {
-    if (globalTrace.value >= 60) return 'bhv-crit';
-    if (globalTrace.value >= 30) return 'bhv-warn';
-    return '';
-});
 
 const filterLabel = computed(() => {
     if (!filter.value) return '';
@@ -189,20 +192,12 @@ function refillQueue() {
     }
 }
 
-// ── Global tick — trace meter (rate depends on sub-step) + queue/TX timers ──
-// Trace ticks at 0.5%/sec while browsing the queue, 1.0%/sec while inside
-// Token Builder, and pauses entirely on the Harvest Summary decision screen
-// (nothing in the design doc says it keeps climbing while you're just
-// reading the summary).
+// ── Local tick — queue refill + per-TX countdown only. The Global Trace
+// Meter is gone; the only clock now is the shared Master Timer up in
+// BankHeist.vue (read here via the timeLeft/timeTotal props for display).
 let tickInterval = null;
 function startTick() {
     tickInterval = setInterval(() => {
-        if (subStep.value !== 'HARVEST_SCREEN') {
-            const rate = bh.phase2TraceRate(subStep.value === 'TOKEN_BUILD' ? 'builder' : 'queue');
-            globalTrace.value = Math.min(100, globalTrace.value + (rate * 200) / 1000);
-            if (globalTrace.value >= 100) { triggerOverrun(); return; }
-        }
-
         if (subStep.value === 'QUEUE_SELECT') {
             queue.value.forEach(tx => { tx.timeLeft = Math.max(0, tx.timeLeft - 0.2); });
             queue.value = queue.value.filter(tx => tx.timeLeft > 0);
@@ -212,18 +207,6 @@ function startTick() {
             if (activeTx.value.timeLeft <= 0) failInjection();
         }
     }, 200);
-}
-
-function triggerOverrun() {
-    if (tickInterval) clearInterval(tickInterval);
-    setStatus('[!!!] SYSTEM TRACE COMPLETE :: ALL STAGED FUNDS PURGED', 'bad');
-    // The real staged buffer lives server-side (Cache) and is discarded by
-    // resolveGate1Failure()'s 'phase2_overrun' path; zero the local mirror
-    // too so the status bar/panels don't flash a stale non-zero total in
-    // the moment before BankHeist.vue closes the overlay.
-    stagedCreds.value = 0;
-    stagedTech.value  = 0;
-    emit('failed', 'phase2_overrun');
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
@@ -347,14 +330,14 @@ async function resolveInjection() {
 }
 
 // Covers both an incorrect/malformed fragment chain and a timer expiry —
-// the design doc gives both the exact same output and consequence.
+// same output and consequence either way: a flat miss (parent docks
+// MISS_PENALTY off the shared clock, and ends the run if that hits 0),
+// drop back to the queue.
 function failInjection() {
-    const spike = bh.phase2TraceSpike();
-    globalTrace.value = Math.min(100, globalTrace.value + spike);
     setStatus('[-] CHECKSUM INVALID :: TRANSACTION DROPPED', 'bad');
+    emit('miss');
     activeTx.value = null;
     puzzle.value = null;
-    if (globalTrace.value >= 100) { triggerOverrun(); return; }
     subStep.value = 'QUEUE_SELECT';
 }
 
