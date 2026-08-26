@@ -191,9 +191,9 @@ const PHASE2_EASY_FRAGMENTS       = 4;
 const PHASE2_HARD_FRAGMENTS_LOW   = 6;
 const PHASE2_HARD_FRAGMENTS_HIGH  = 8;
 const PHASE2_DECOY_COUNT          = 2;
-/** Flat TX expiration timers, seconds — low yield gets more time, high yield less. Not ICE-scaled. Doubled from the original 8.0/4.0 once the Master Timer replaced the Trace Meter as the primary pressure. */
-const PHASE2_EASY_TIMER           = 16.0;
-const PHASE2_HARD_TIMER           = 8.0;
+/** Flat TX expiration timer, seconds — same for both bands now. Bumped to 30s (from 16.0/8.0) after 8.0s/4.0s, then 16.0s/8.0s, both still closed before the player could even read the intercepted transaction. Not ICE-scaled. */
+const PHASE2_EASY_TIMER           = 30.0;
+const PHASE2_HARD_TIMER           = 30.0;
 const PHASE2_EASY_CRED_RANGE      = [75, 150];
 const PHASE2_EASY_TECH_RANGE      = [15, 40];
 const PHASE2_HARD_CRED_RANGE      = [350, 550];
@@ -223,7 +223,7 @@ export function phase2DecoyCount() {
     return PHASE2_DECOY_COUNT;
 }
 
-/** Flat TX expiration timer (seconds) — 16.0s for a low-yield/easy transaction, 8.0s for a high-yield/hard one. */
+/** Flat TX expiration timer (seconds) — 30s, same for either band now. */
 export function phase2TxTimer(band) {
     return band === 'easy' ? PHASE2_EASY_TIMER : PHASE2_HARD_TIMER;
 }

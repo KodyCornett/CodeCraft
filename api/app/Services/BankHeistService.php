@@ -271,9 +271,9 @@ class BankHeistService
     /** Decoy fragments added on top of the required count, either difficulty. */
     private const PHASE2_DECOY_COUNT = 2;
 
-    /** Flat TX expiration timers (seconds) — not ICE-scaled. Low yield/easy gets more time; high yield/hard gets less. Doubled from the original 8.0/4.0 once the Master Timer replaced the Trace Meter as the primary pressure. */
-    private const PHASE2_EASY_TIMER = 16.0;
-    private const PHASE2_HARD_TIMER = 8.0;
+    /** Flat TX expiration timer (seconds) — not ICE-scaled, same for both bands now. Was 8.0/4.0, then 16.0/8.0; still closed before the player could even read the intercepted transaction, so both bands are now a flat 30s. */
+    private const PHASE2_EASY_TIMER = 30.0;
+    private const PHASE2_HARD_TIMER = 30.0;
 
     /** Reward ranges rolled server-side per successful inject, by band/currency. */
     private const PHASE2_EASY_CRED_RANGE = [75, 150];
