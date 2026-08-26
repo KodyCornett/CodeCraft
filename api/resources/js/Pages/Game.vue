@@ -128,12 +128,14 @@
                     />
                 </Transition>
 
-                <!-- Grid-Breach mini-game (PvE) -->
+                <!-- Node-hack mini-game (PvE) — generated per-hack by the minigame
+                     pool generator (components/minigame/generator/). activeHack is
+                     the generation spec {key, node, resource}; HackMinigame resolves
+                     `key` against the pool and mounts whichever template got picked. -->
                 <Transition name="breach-fade">
-                    <GridBreach
+                    <HackMinigame
                         v-if="activeHack"
-                        :node="activeHack.node"
-                        :resource="activeHack.resource"
+                        :spec="activeHack"
                         :player-cpu="rig.cpu"
                         :player-ram="rig.ram"
                         :player-os="rig.os"
@@ -147,8 +149,9 @@
                     />
                 </Transition>
 
-                <!-- Grid-Breach first-time orientation tour -->
-                <GridBreachTour v-if="activeHack" />
+                <!-- Grid-Breach first-time orientation tour — only while grid_breach
+                     is the template the generator actually picked this hack. -->
+                <GridBreachTour v-if="activeHack && activeHack.key === 'grid_breach'" />
 
                 <!-- Bank Heist mini-game (PvE) — the 19 fixed bank/brokerage nodes only -->
                 <Transition name="breach-fade">
@@ -352,7 +355,7 @@ import PvpResultToast         from '@/components/shared/PvpResultToast.vue';
 import WelcomeModal           from '@/components/shared/WelcomeModal.vue';
 
 import InGameBrowser    from '@/components/browser/InGameBrowser.vue';
-import GridBreach       from '@/components/minigame/GridBreach.vue';
+import HackMinigame     from '@/components/minigame/generator/HackMinigame.vue';
 import GridBreachTour   from '@/components/minigame/GridBreachTour.vue';
 import PacketHijack     from '@/components/minigame/PacketHijack.vue';
 import PacketHijackTour from '@/components/minigame/PacketHijackTour.vue';

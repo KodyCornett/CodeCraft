@@ -1,8 +1,16 @@
 /**
  * useHackFlow
  *
- * Owns the full GridBreach PvE hack lifecycle:
+ * Owns the full generic node-hack PvE lifecycle:
  *   onHackSelected → onHackComplete / onHackFailed / onHackAbort
+ *
+ * onHackSelected no longer hardcodes GridBreach — it calls generateMinigame()
+ * (components/minigame/generator/generateMinigame.js), which picks a template
+ * from the pool and hands back a generation spec. activeHack IS that spec;
+ * HackMinigame.vue resolves its `key` against the pool and mounts whatever
+ * got picked. Reward math (deplete()) never looks at which template ran —
+ * only `resource` and the completionPct it reports — so this stays a plain
+ * PvE minigame lifecycle regardless of which pool entry is in play.
  *
  * Also owns per-session ICE escalation tracking (nodeHackCounts, effectiveNodeIce).
  * Every successful breach on a node raises its effective ICE by 1 per ICE_ESCALATION
@@ -14,6 +22,7 @@
 
 import { ref } from 'vue';
 import { useCodexFind } from './useCodexFind.js';
+import { generateMinigame } from '@/components/minigame/generator/generateMinigame.js';
 
 const MIN_ICE        = 3;
 const ICE_ESCALATION = 2;  // successful hacks per +1 effective ICE on a node
@@ -35,7 +44,8 @@ export function useHackFlow({
     // Track successful hacks per node UUID this session — drives effective ICE escalation.
     const nodeHackCounts = ref(new Map());
 
-    // Currently active hack: { node: { ...selectedNode, ice }, resource }
+    // Currently active hack: a generation spec from generateMinigame(),
+    // { key, node: { ...selectedNode, ice }, resource }.
     const activeHack = ref(null);
 
     /** Returns the effective ICE for a node, escalating by 1 per ICE_ESCALATION hacks. */
@@ -55,12 +65,23 @@ export function useHackFlow({
         if (!selectedNode.value) return;
         if (selectedNode.value.canvasId !== currentNodeId.value) return;
 
-        const ice = effectiveNodeIce(selectedNode.value);
-        activeHack.value = { node: { ...selectedNode.value, ice }, resource };
+        const ice  = effectiveNodeIce(selectedNode.value);
+        const node = { ...selectedNode.value, ice };
 
-        // First-time breach during tutorial — start the GridBreach orientation tour.
-        // gbTour.start() is a no-op once the player has already seen it (localStorage flag).
-        if (tutorial.isTutorialActive.value) gbTour.start();
+        // The generator decides WHICH template plays this hack — see
+        // components/minigame/generator/generateMinigame.js. activeHack is
+        // now a generation spec ({ key, node, resource }), not just context;
+        // HackMinigame.vue resolves `key` against the pool and mounts it.
+        activeHack.value = generateMinigame({ node, resource });
+
+        // First-time breach during tutorial — start the GridBreach orientation
+        // tour, but only when GridBreach is actually the template that got
+        // picked. gbTour.start() is a no-op once the player has already seen
+        // it (localStorage flag). Once more templates exist this'll want its
+        // own per-template onboarding hook instead of a single hardcoded key.
+        if (tutorial.isTutorialActive.value && activeHack.value.key === 'grid_breach') {
+            gbTour.start();
+        }
     }
 
     function applyHackReward(resource, amount) {
