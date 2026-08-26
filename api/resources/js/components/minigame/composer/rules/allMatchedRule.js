@@ -37,7 +37,7 @@ export function evaluate(assignments, content) {
 export function describeTarget(content) {
     const noun       = content.theme?.noun ?? 'slot';
     const nounPlural = content.theme?.nounPlural ?? 'slots';
-    return `Assign the correct candidate to every ${noun} — ${content.slots.length} ${nounPlural} total, decoys included. All must match to complete the ${content.theme?.valueLabel ?? 'decryption'}.`;
+    return `Each ${noun}'s TARGET is a candidate's fingerprint reversed — reverse a candidate's digits and see if they match a target, then assign it. ${content.slots.length} ${nounPlural} total, decoys included.`;
 }
 
 export function describeOutcome(result, content) {

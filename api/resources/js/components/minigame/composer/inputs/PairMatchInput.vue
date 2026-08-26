@@ -19,6 +19,7 @@
                     @click="selectSlot(slot.id)"
                 >
                     <span class="pmi-slot-label">{{ slot.label }}</span>
+                    <span class="pmi-slot-target">TARGET: {{ slot.target }}</span>
                     <span class="pmi-slot-value">{{ assignments[slot.id] ? candidateLabel(assignments[slot.id]) : '— unassigned —' }}</span>
                 </button>
             </div>
@@ -224,6 +225,12 @@ function submit() {
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.08em;
+}
+
+.pmi-slot-target {
+    font-size: 13px;
+    color: #00d9ff;
+    letter-spacing: 0.04em;
 }
 
 .pmi-slot-value {

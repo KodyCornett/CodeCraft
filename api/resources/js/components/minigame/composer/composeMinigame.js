@@ -123,11 +123,27 @@ function composeSequentialPick(ice) {
 // (slots, candidates, hex-string labels) so it reads consistent with the
 // rest of the game rather than inventing new terms — but this function
 // never imports ArchiveExtraction.vue or shares any of its state.
+//
+// TUNING NOTE (v2): the first cut assigned each slot's correct candidate
+// with no signal the player could ever discover — ArchiveExtraction's real
+// version gives players something to deduce (plaintext found elsewhere in
+// the world), which the composer has no equivalent clue system for yet.
+// Without ANY deducible signal it was pure guessing dressed up as a
+// puzzle. Fix: each slot displays a TARGET that is the correct candidate's
+// label reversed — a small, honestly-solvable fingerprint puzzle (reverse
+// each candidate, see if it matches a slot's target) instead of a coin
+// flip. Reads consistent with the checksum/fingerprint framing already in
+// the theme, and decoys are checked to never accidentally reverse into a
+// real target.
 function hexLabel(len = 6) {
     const chars = '0123456789abcdef';
     let out = '';
     for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
     return out;
+}
+
+function reverseStr(s) {
+    return s.split('').reverse().join('');
 }
 
 function composePairMatch(ice) {
@@ -138,25 +154,29 @@ function composePairMatch(ice) {
     // tiers; carried a bit further here since composer ICE spans a wider
     // 3-10 band. Tier 1: 3 decoys .. Tier 4: 6 decoys.
     const decoyCount = 2 + tier;
+    const labelLen   = 6; // short enough to reverse-check by eye
 
-    const slots = Array.from({ length: slotCount }, (_, i) => ({
-        id:    `slot_${i}`,
-        label: `CIPHER SLOT ${i + 1}`,
-    }));
+    const slots = [];
+    const correctCandidates = [];
+    for (let i = 0; i < slotCount; i++) {
+        const slotId    = `slot_${i}`;
+        const candLabel = hexLabel(labelLen);
+        slots.push({ id: slotId, label: `CIPHER SLOT ${i + 1}`, target: reverseStr(candLabel) });
+        correctCandidates.push({ id: `cand_correct_${slotId}`, label: candLabel, forSlot: slotId });
+    }
 
-    // One correct candidate per slot, plus decoys — every candidate gets
-    // the same hex-string shape so decoys are indistinguishable at a
-    // glance, same as ArchiveExtraction's decoy files.
-    const correctCandidates = slots.map(slot => ({
-        id:      `cand_correct_${slot.id}`,
-        label:   hexLabel(),
-        forSlot: slot.id,
-    }));
-    const decoyCandidates = Array.from({ length: decoyCount }, (_, i) => ({
-        id:      `cand_decoy_${i}`,
-        label:   hexLabel(),
-        forSlot: null,
-    }));
+    // Decoys: random labels, regenerated on the rare collision where a
+    // decoy's own reversal happens to match a real target — otherwise the
+    // puzzle would have two "correct-looking" candidates for one slot.
+    const targets = new Set(slots.map(s => s.target));
+    const decoyCandidates = [];
+    for (let i = 0; i < decoyCount; i++) {
+        let label;
+        do {
+            label = hexLabel(labelLen);
+        } while (targets.has(reverseStr(label)));
+        decoyCandidates.push({ id: `cand_decoy_${i}`, label, forSlot: null });
+    }
 
     const candidates = shuffle([...correctCandidates, ...decoyCandidates])
         .map(({ id, label }) => ({ id, label }));
