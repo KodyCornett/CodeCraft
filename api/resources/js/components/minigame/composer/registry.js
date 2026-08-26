@@ -33,6 +33,12 @@ export const INPUT_MODELS = [
         valueType: 'pairs',
         component: () => import('./inputs/PairMatchInput.vue'),
     },
+    {
+        key:       'artifact_inspect',
+        label:     'Artifact Inspect',
+        valueType: 'artifacts',
+        component: () => import('./inputs/ArtifactInspectInput.vue'),
+    },
 ];
 
 export const WIN_RULES = [
@@ -53,6 +59,12 @@ export const WIN_RULES = [
         label:     'All Matched',
         valueType: 'pairs',
         module:    () => import('./rules/allMatchedRule.js'),
+    },
+    {
+        key:       'spot_anomaly',
+        label:     'Spot Anomaly',
+        valueType: 'artifacts',
+        module:    () => import('./rules/spotAnomalyRule.js'),
     },
 ];
 

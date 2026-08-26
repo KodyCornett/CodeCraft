@@ -16,6 +16,7 @@
  * the full pairing instead of by input model alone.
  */
 import { tierForIce } from './difficultyScaling.js';
+import { generateArtifactSet, randomHostname } from './dataFeed.js';
 
 function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -198,12 +199,38 @@ function composePairMatch(ice) {
     return { slots, candidates, correctMap, timeLimitSec, theme };
 }
 
+// artifact_inspect — feeds spot_anomaly (valueType: 'artifacts'). Uses
+// dataFeed.js's generator directly: a set of fake certs or log lines with
+// exactly one deliberately flawed, real fields underneath so the flaw is
+// something a player can actually reason about (CN mismatch, expired cert,
+// suspicious port) rather than an arbitrary transform.
+function composeArtifactInspect(ice) {
+    const tier = tierForIce(ice);
+    const kind = Math.random() < 0.5 ? 'cert' : 'log';
+
+    const count       = 3 + tier; // Tier 1: 4 .. Tier 4: 7 artifacts to inspect
+    const flawedCount = 1;        // exactly one compromised entry — keeps judgment binary
+
+    const hostname = kind === 'cert' ? randomHostname() : undefined;
+    const artifacts = generateArtifactSet({ kind, count, flawedCount, hostname });
+
+    // Tier 1: 85s .. Tier 4: 40s
+    const timeLimitSec = Math.max(30, 100 - tier * 15);
+
+    const theme = kind === 'cert'
+        ? { systemLabel: 'CERTIFICATE AUDIT', noun: 'certificate', nounPlural: 'certificates', valueLabel: 'TRUST CHAIN' }
+        : { systemLabel: 'ACCESS LOG AUDIT',  noun: 'log entry',   nounPlural: 'log entries',   valueLabel: 'INTEGRITY' };
+
+    return { kind, hostname, artifacts, timeLimitSec, theme };
+}
+
 const CONTENT_GENERATORS = {
     'grid_select:exact_sum':          composeGridSelect,
     'grid_select:closest_under':      composeGridSelect,
     'sequential_pick:exact_sum':      composeSequentialPick,
     'sequential_pick:closest_under':  composeSequentialPick,
     'pair_match:all_matched':         composePairMatch,
+    'artifact_inspect:spot_anomaly':  composeArtifactInspect,
 };
 
 export function composeMinigame({ inputKey, ruleKey, ice }) {
