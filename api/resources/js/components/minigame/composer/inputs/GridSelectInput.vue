@@ -1,7 +1,7 @@
 <template>
     <div class="gsi-wrap">
         <div class="gsi-status">
-            <span class="gsi-sum">SUM <strong>{{ selectedSum }}</strong></span>
+            <span class="gsi-sum">{{ valueLabel }} <strong>{{ selectedSum }}</strong></span>
             <span class="gsi-timer" :class="{ 'gsi-timer--low': timeLeft <= 10 }">{{ timeLeft }}s</span>
         </div>
 
@@ -51,6 +51,7 @@ const props = defineProps({
 
 const emit = defineEmits(['submit', 'timeout']);
 
+const valueLabel = computed(() => props.content.theme?.valueLabel ?? 'SUM');
 const rows   = computed(() => props.content.rows);
 const cols   = computed(() => props.content.cols);
 const values = computed(() => props.content.values);

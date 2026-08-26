@@ -70,7 +70,20 @@ function composeGridSelect(ice) {
     // cost meaningfully more time pressure: Tier 1: 90s .. Tier 4: 30s.
     const timeLimitSec = Math.max(30, 110 - tier * 20);
 
-    return { rows, cols, values, target, tolerance, timeLimitSec };
+    // theme — the flavor layer. Attached by the INPUT MODEL's content
+    // generator (not the win rule), same split as everything else here: a
+    // win rule's describeTarget()/describeOutcome() reads these generic
+    // fields to phrase itself, without ever needing to know it's looking
+    // at a grid specifically. Mirrors QuestMinigame's skin object, just
+    // generated instead of hand-authored per quest.
+    const theme = {
+        systemLabel: 'MEMORY SECTOR MAP',
+        noun:        'fragment',
+        nounPlural:  'fragments',
+        valueLabel:  'CHECKSUM',
+    };
+
+    return { rows, cols, values, target, tolerance, timeLimitSec, theme };
 }
 
 // sequential_pick — feeds both exact_sum and closest_under. Player steps
@@ -92,7 +105,15 @@ function composeSequentialPick(ice) {
     // does most of the scaling.
     const timeLimitSec = Math.max(30, 100 - tier * 14);
 
-    return { sequence, target, tolerance, timeLimitSec };
+    // See composeGridSelect's theme comment — same idea, different system.
+    const theme = {
+        systemLabel: 'PACKET STREAM',
+        noun:        'packet',
+        nounPlural:  'packets',
+        valueLabel:  'BUFFER TOTAL',
+    };
+
+    return { sequence, target, tolerance, timeLimitSec, theme };
 }
 
 const CONTENT_GENERATORS = {

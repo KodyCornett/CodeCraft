@@ -1,7 +1,7 @@
 <template>
     <div class="spi-wrap">
         <div class="spi-status">
-            <span class="spi-sum">SUM <strong>{{ selectedSum }}</strong></span>
+            <span class="spi-sum">{{ valueLabel }} <strong>{{ selectedSum }}</strong></span>
             <span class="spi-progress">{{ pointer }} / {{ sequence.length }}</span>
             <span class="spi-timer" :class="{ 'spi-timer--low': timeLeft <= 10 }">{{ timeLeft }}s</span>
         </div>
@@ -52,6 +52,7 @@ const props = defineProps({
 
 const emit = defineEmits(['submit', 'timeout']);
 
+const valueLabel = computed(() => props.content.theme?.valueLabel ?? 'SUM');
 const sequence = computed(() => props.content.sequence);
 const pointer  = ref(0);
 const takenValues = ref([]);

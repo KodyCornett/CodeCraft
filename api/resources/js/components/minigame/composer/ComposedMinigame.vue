@@ -2,7 +2,8 @@
     <div class="cm-overlay">
         <div class="cm-terminal">
             <div class="cm-topbar">
-                <span class="cm-label">{{ inputEntry?.label ?? spec.inputKey }} &times; {{ ruleEntry?.label ?? spec.ruleKey }}</span>
+                <span class="cm-label">{{ content.theme?.systemLabel ?? inputEntry?.label ?? spec.inputKey }}</span>
+                <span class="cm-verb">{{ verbLabel || ruleEntry?.label || spec.ruleKey }}</span>
                 <span class="cm-ice">ICE {{ spec.ice }}</span>
             </div>
 
@@ -23,8 +24,9 @@
 
             <div v-if="outcome" class="cm-outcome">
                 <div class="cm-outcome-title" :class="outcome.success ? 'cm-outcome-title--win' : 'cm-outcome-title--fail'">
-                    {{ outcome.success ? 'PAIRING SOLVED' : 'PAIRING FAILED' }}
+                    {{ outcome.title }}
                 </div>
+                <div class="cm-outcome-narrative">{{ outcome.narrative }}</div>
                 <pre class="cm-outcome-detail">{{ outcomeDetailText }}</pre>
                 <button type="button" class="cm-outcome-btn" @click="onClose">[ CLOSE ]</button>
             </div>
@@ -85,8 +87,9 @@ const activeInputComponent = computed(() => {
     return defineAsyncComponent({ loader: inputEntry.value.component });
 });
 
-const hint    = ref('');
-const outcome = ref(null);
+const hint      = ref('');
+const verbLabel = ref('');
+const outcome   = ref(null);
 let ruleModule = null;
 
 (async () => {
@@ -95,15 +98,30 @@ let ruleModule = null;
         return;
     }
     ruleModule = await ruleEntry.value.module();
-    hint.value = ruleModule.describeTarget ? ruleModule.describeTarget(content) : '';
+    hint.value      = ruleModule.describeTarget ? ruleModule.describeTarget(content) : '';
+    verbLabel.value = ruleModule.verbLabel ?? '';
 })();
 
-const outcomeDetailText = computed(() => outcome.value ? JSON.stringify(outcome.value.detail, null, 2) : '');
+// `outcome.raw` is the rule's own evaluate() detail object (sum/target/etc)
+// kept around as a small debug readout underneath the themed narrative —
+// useful in a dev lab, where seeing the actual numbers matters.
+const outcomeDetailText = computed(() => outcome.value ? JSON.stringify(outcome.value.raw, null, 2) : '');
 
 function onSubmit(pickedValues) {
     if (!ruleModule) return;
     const result = ruleModule.evaluate(pickedValues, content);
-    outcome.value = result;
+    // describeOutcome is only ever called with a real evaluate() result —
+    // timeout (below) has no sum/target to narrate, so it builds its own
+    // generic themed message instead of going through the rule module.
+    const described = ruleModule.describeOutcome
+        ? ruleModule.describeOutcome(result, content)
+        : { title: result.success ? 'PAIRING SOLVED' : 'PAIRING FAILED', detail: '' };
+    outcome.value = {
+        success:   result.success,
+        title:     described.title,
+        narrative: described.detail,
+        raw:       result.detail,
+    };
     if (result.success) {
         emit('complete', { completionPct: 1.0, detail: result.detail });
     } else {
@@ -112,9 +130,14 @@ function onSubmit(pickedValues) {
 }
 
 function onTimeout() {
-    const result = { success: false, detail: { reason: 'timeout' } };
-    outcome.value = result;
-    emit('failed', { detail: result.detail });
+    const raw = { reason: 'timeout' };
+    outcome.value = {
+        success:   false,
+        title:     'TRACE EXPIRED',
+        narrative: `${content.theme?.systemLabel ?? 'Connection'} timed out before ${content.theme?.valueLabel ?? 'the objective'} was met.`,
+        raw,
+    };
+    emit('failed', { detail: raw });
 }
 
 function onClose() {
@@ -161,6 +184,14 @@ function onClose() {
     font-weight: 700;
 }
 
+.cm-verb {
+    font-size: 11px;
+    color: rgba(0,255,100,0.5);
+    letter-spacing: 0.15em;
+    margin-left: 12px;
+    margin-right: auto;
+}
+
 .cm-ice {
     font-size: 12px;
     color: rgba(0,200,240,0.7);
@@ -189,6 +220,13 @@ function onClose() {
 
 .cm-outcome-title--win  { color: #00ff9d; }
 .cm-outcome-title--fail { color: rgba(255,80,80,0.85); }
+
+.cm-outcome-narrative {
+    font-size: 13px;
+    color: rgba(0,255,100,0.65);
+    text-align: center;
+    line-height: 1.5;
+}
 
 .cm-outcome-detail {
     font-size: 12px;
