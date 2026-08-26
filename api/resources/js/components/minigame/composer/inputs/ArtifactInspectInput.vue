@@ -5,17 +5,29 @@
             <span class="aii-timer" :class="{ 'aii-timer--low': timeLeft <= 10 }">{{ timeLeft }}s</span>
         </div>
 
-        <div class="aii-palette">
-            <span class="aii-palette-label">COMMANDS</span>
-            <button
-                v-for="cmd in commands"
-                :key="cmd.key"
-                type="button"
-                class="aii-cmd-btn"
-                :class="{ 'aii-cmd-btn--active': activeCommandKey === cmd.key }"
-                :disabled="paused"
-                @click="selectCommand(cmd.key)"
-            >{{ cmd.label }}</button>
+        <div class="aii-terminal">
+            <div class="aii-terminal-hint">
+                <span class="aii-palette-label">AVAILABLE</span>
+                <span v-for="cmd in commands" :key="cmd.key" class="aii-hint-cmd">{{ cmd.label }}</span>
+            </div>
+            <div class="aii-terminal-line">
+                <span class="aii-prompt">&gt;</span>
+                <input
+                    ref="commandInputEl"
+                    v-model="commandInput"
+                    type="text"
+                    class="aii-terminal-input"
+                    placeholder="type a command..."
+                    :disabled="paused"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    @keydown.enter="runTypedCommand"
+                />
+            </div>
+            <div v-if="activeCommandKey" class="aii-active-cmd">
+                ACTIVE: {{ activeCommandLabel }} — select a locked target to run it against.
+            </div>
         </div>
 
         <div class="aii-log" v-if="log.length">
@@ -63,18 +75,25 @@
 /**
  * ArtifactInspectInput — fourth input model, first for valueType: 'artifacts'.
  *
- * V2: artifacts now start LOCKED. The player selects a command from the
- * palette, then runs it against a locked target — the right command for
- * that target's kind reveals it, the wrong one (or a decoy command like
- * whois/ping) burns a small time penalty and reveals nothing. Only once
- * revealed can a card be flagged. This turns "click to see the data" into
- * an actual investigation step: figuring out which command applies to
- * which target is now part of the challenge, not just flavor before the
- * real mechanic starts.
+ * V2: artifacts start LOCKED. The player runs a command against a locked
+ * target — the right command for that target's kind reveals it, the wrong
+ * one (or a decoy command like whois/ping) burns a small time penalty and
+ * reveals nothing. Only once revealed can a card be flagged.
+ *
+ * V3: command entry is now a typed terminal line instead of a row of
+ * clickable buttons — a player types the command's name (matched loosely
+ * against `content.commands`, case-insensitive, either the short key like
+ * "openssl" or the full displayed syntax) and hits Enter to arm it, then
+ * clicks a locked card to run the armed command against that target. The
+ * available syntax is still listed above the input as reference text (not
+ * buttons) so the player knows what to type without having to guess or
+ * memorize real tool syntax. This is what actually makes the "commands,
+ * not rings" feel land — the mechanic underneath (arm a command, run it
+ * against a target, right command for the right kind reveals it) is
+ * unchanged from V2.
  *
  * Still has no idea which flags are correct, and still emits the same
- * flagged-id-array contract on submit as before — none of that changed,
- * only how a card gets from locked to inspectable. Never imports
+ * flagged-id-array contract on submit as before. Never imports
  * dataFeed.js directly; commandPalette.js is the only new dependency, and
  * it only knows about the generic `kind` string dataFeed.js stamps on
  * every artifact.
@@ -84,7 +103,7 @@
  * the full fixed vocabulary. Falls back to the full palette only if a
  * caller forgets to attach one, so this component never renders empty.
  */
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { getCommandPalette, findCommand, commandReveals } from '../commandPalette.js';
 
 const props = defineProps({
@@ -101,6 +120,13 @@ const revealed         = ref(new Set());
 const flagged          = ref(new Set());
 const activeCommandKey = ref(null);
 const log              = ref([]);
+const commandInput     = ref('');
+const commandInputEl   = ref(null);
+
+const activeCommandLabel = computed(() => {
+    const cmd = activeCommandKey.value ? findCommand(activeCommandKey.value) : null;
+    return cmd ? cmd.label : '';
+});
 
 const PENALTY_SECONDS = 5;
 
@@ -116,15 +142,41 @@ onMounted(() => {
             emit('timeout');
         }
     }, 1000);
+    nextTick(() => commandInputEl.value?.focus());
 });
 
 onBeforeUnmount(() => {
     if (timerId) clearInterval(timerId);
 });
 
-function selectCommand(key) {
+// Loose match so a player can type either the short key ("openssl") or the
+// full displayed syntax ("openssl s_client -connect <target>:443") and
+// land on the same command — real terminal muscle memory shouldn't be
+// punished for typing more or less of the line.
+function matchCommand(text) {
+    const normalized = text.trim().toLowerCase();
+    if (!normalized) return null;
+    return commands.value.find(cmd => {
+        if (cmd.key.toLowerCase() === normalized) return true;
+        const firstWord = cmd.label.toLowerCase().split(' ')[0];
+        return firstWord === normalized || cmd.label.toLowerCase() === normalized;
+    }) ?? null;
+}
+
+function runTypedCommand() {
     if (props.paused) return;
-    activeCommandKey.value = activeCommandKey.value === key ? null : key;
+    const raw = commandInput.value;
+    if (!raw.trim()) return;
+
+    log.value.push(`> ${raw.trim()}`);
+    const match = matchCommand(raw);
+    if (match) {
+        activeCommandKey.value = match.key;
+        log.value.push(`  [${match.label}] armed — select a target.`);
+    } else {
+        log.value.push(`  command not recognized: "${raw.trim()}"`);
+    }
+    commandInput.value = '';
 }
 
 function attemptReveal(artifactId) {
@@ -189,11 +241,20 @@ function submit() {
     color: rgba(255,80,80,0.85);
 }
 
-.aii-palette {
+.aii-terminal {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border: 1px solid rgba(0,200,240,0.25);
+    background: rgba(0,200,240,0.03);
+    padding: 10px 12px;
+}
+
+.aii-terminal-hint {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .aii-palette-label {
@@ -203,31 +264,45 @@ function submit() {
     margin-right: 4px;
 }
 
-.aii-cmd-btn {
-    font-family: 'JetBrains Mono', monospace;
+.aii-hint-cmd {
     font-size: 11px;
+    color: rgba(0,200,240,0.55);
+}
+
+.aii-terminal-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.aii-prompt {
+    color: rgba(0,255,100,0.6);
+    font-size: 14px;
+}
+
+.aii-terminal-input {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
     background: transparent;
-    border: 1px solid rgba(0,200,240,0.3);
-    color: rgba(0,200,240,0.7);
-    padding: 6px 12px;
-    cursor: pointer;
-    transition: all 0.1s;
+    border: none;
+    outline: none;
+    color: #00ff9d;
+    caret-color: #00ff9d;
 }
 
-.aii-cmd-btn:hover:not(:disabled) {
-    border-color: rgba(0,200,240,0.7);
-    background: rgba(0,200,240,0.08);
+.aii-terminal-input::placeholder {
+    color: rgba(0,255,100,0.25);
 }
 
-.aii-cmd-btn--active {
-    border-color: #00d9ff;
-    background: rgba(0,217,255,0.12);
-    color: #00d9ff;
-}
-
-.aii-cmd-btn:disabled {
-    cursor: not-allowed;
+.aii-terminal-input:disabled {
     opacity: 0.4;
+}
+
+.aii-active-cmd {
+    font-size: 11px;
+    color: #00d9ff;
+    letter-spacing: 0.05em;
 }
 
 .aii-log {
