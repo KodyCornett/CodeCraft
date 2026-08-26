@@ -39,7 +39,13 @@ export function evaluate(flaggedIds, content) {
 export function describeTarget(content) {
     const noun       = content.theme?.noun ?? 'entry';
     const nounPlural = content.theme?.nounPlural ?? 'entries';
-    return `Inspect each ${noun} and flag the one that's compromised. ${content.artifacts.length} ${nounPlural} total — exactly one is wrong.`;
+    // Generic on purpose — a mixed set can hold certs and log lines
+    // together, which don't share fields like "issuer" or "hostname", so
+    // this can't name specific attributes anymore. Every legitimate
+    // artifact of a given kind still shares one baseline profile; the
+    // player has to run the right command to see each one before they can
+    // compare it.
+    return `Run the right command against each locked ${noun} to pull its data, then compare it against the others of its kind. Every legitimate ${noun} shares the same baseline profile — find the one whose data deviates and flag it. ${content.artifacts.length} ${nounPlural} total, exactly one is compromised.`;
 }
 
 export function describeOutcome(result, content) {

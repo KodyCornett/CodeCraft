@@ -17,6 +17,7 @@
  */
 import { tierForIce } from './difficultyScaling.js';
 import { generateArtifactSet, randomHostname } from './dataFeed.js';
+import { selectCommands } from './commandPalette.js';
 
 function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -200,28 +201,46 @@ function composePairMatch(ice) {
 }
 
 // artifact_inspect — feeds spot_anomaly (valueType: 'artifacts'). Uses
-// dataFeed.js's generator directly: a set of fake certs or log lines with
-// exactly one deliberately flawed, real fields underneath so the flaw is
-// something a player can actually reason about (CN mismatch, expired cert,
-// suspicious port) rather than an arbitrary transform.
+// dataFeed.js's generator directly: a MIXED set of fake certs and log
+// lines (kind: 'mixed') with exactly one deliberately flawed, real fields
+// underneath so the flaw is something a player can actually reason about
+// (CN mismatch, expired cert, suspicious port) rather than an arbitrary
+// transform. Mixed kinds is what makes command selection matter at all —
+// a single-kind set only ever needed one real command, so there was
+// nothing to choose between.
+//
+// Command palette is chosen per instance too, not the fixed global list:
+// selectCommands() guarantees the real command for every kind actually
+// present is on the palette (the puzzle always stays solvable), then adds
+// a handful of decoys so picking the right tool per target is itself part
+// of the challenge.
 function composeArtifactInspect(ice) {
     const tier = tierForIce(ice);
-    const kind = Math.random() < 0.5 ? 'cert' : 'log';
 
     const count       = 3 + tier; // Tier 1: 4 .. Tier 4: 7 artifacts to inspect
     const flawedCount = 1;        // exactly one compromised entry — keeps judgment binary
 
-    const hostname = kind === 'cert' ? randomHostname() : undefined;
-    const artifacts = generateArtifactSet({ kind, count, flawedCount, hostname });
+    const hostname  = randomHostname(); // shared target host across every cert in the set
+    const artifacts = generateArtifactSet({ kind: 'mixed', count, flawedCount, hostname });
+
+    const kindsPresent = [...new Set(artifacts.map(a => a.kind))];
+    // Decoy count grows a little with tier — more noise to sift through
+    // at higher difficulty. Tier 1: 1 decoy .. Tier 4: 3 decoys.
+    const commands = selectCommands(kindsPresent, 1 + Math.floor(tier / 2));
 
     // Tier 1: 85s .. Tier 4: 40s
     const timeLimitSec = Math.max(30, 100 - tier * 15);
 
-    const theme = kind === 'cert'
-        ? { systemLabel: 'CERTIFICATE AUDIT', noun: 'certificate', nounPlural: 'certificates', valueLabel: 'TRUST CHAIN' }
-        : { systemLabel: 'ACCESS LOG AUDIT',  noun: 'log entry',   nounPlural: 'log entries',   valueLabel: 'INTEGRITY' };
+    // Generic theme — a mixed set can't claim to be just a "certificate
+    // audit" anymore, so this reads as a general intel sweep instead.
+    const theme = {
+        systemLabel: 'MIXED INTEL SWEEP',
+        noun:        'target',
+        nounPlural:  'targets',
+        valueLabel:  'INTEGRITY',
+    };
 
-    return { kind, hostname, artifacts, timeLimitSec, theme };
+    return { hostname, artifacts, commands, timeLimitSec, theme };
 }
 
 const CONTENT_GENERATORS = {

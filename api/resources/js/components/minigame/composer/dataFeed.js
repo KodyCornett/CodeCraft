@@ -91,13 +91,22 @@ export function randomProcessName() {
 
 const CERT_FLAW_TYPES = ['cn_mismatch', 'expired', 'self_signed'];
 
-export function generateCertArtifact({ hostname, flawed = false } = {}) {
+export function generateCertArtifact({ hostname, issuer, validFromYear, validToYear, flawed = false } = {}) {
     const host = hostname || randomHostname();
-    const validFromYear = 2024 + Math.floor(Math.random() * 2);
-    const validToYear   = validFromYear + 1 + Math.floor(Math.random() * 2);
+
+    // Every legitimate cert in a set is expected to share the same issuer
+    // and validity window — generateArtifactSet() pins these once and
+    // passes them to every artifact it generates below. Falling back to
+    // random here only matters when this function is called standalone
+    // (e.g. a smoke test) outside that shared-baseline flow.
+    const canonicalIssuer   = issuer ?? pick(CERT_ISSUERS);
+    const canonicalFromYear = validFromYear ?? (2024 + Math.floor(Math.random() * 2));
+    const canonicalToYear   = validToYear   ?? (canonicalFromYear + 1 + Math.floor(Math.random() * 2));
 
     let cn         = host;
-    let issuer     = pick(CERT_ISSUERS);
+    let thisIssuer = canonicalIssuer;
+    let fromYear   = canonicalFromYear;
+    let toYear     = canonicalToYear;
     let selfSigned = false;
     let expired    = false;
     let flawType   = null;
@@ -108,24 +117,28 @@ export function generateCertArtifact({ hostname, flawed = false } = {}) {
             cn = randomHostname();
         } else if (flawType === 'expired') {
             expired = true;
+            // Shift the whole window into the past — a visible deviation
+            // from every other cert's shared window, not just a tag on an
+            // otherwise-identical-looking date range.
+            fromYear = canonicalFromYear - 2;
+            toYear   = canonicalFromYear - 1;
         } else if (flawType === 'self_signed') {
             selfSigned = true;
-            issuer = cn;
+            thisIssuer = cn;
         }
     }
 
-    const validTo = `${validToYear}-06-15`;
     const text = [
         `Certificate for ${host}:443`,
         `  Subject CN: ${cn}`,
-        `  Issuer:     ${issuer}${selfSigned ? ' (self-signed)' : ''}`,
-        `  Valid:      ${validFromYear}-01-01 to ${validTo}${expired ? '  [EXPIRED]' : ''}`,
+        `  Issuer:     ${thisIssuer}${selfSigned ? ' (self-signed)' : ''}`,
+        `  Valid:      ${fromYear}-01-01 to ${toYear}-06-15${expired ? '  [EXPIRED]' : ''}`,
     ].join('\n');
 
     return {
         kind:   'cert',
         text,
-        fields: { host, cn, issuer, selfSigned, expired },
+        fields: { host, cn, issuer: thisIssuer, selfSigned, expired, fromYear, toYear },
         flawed,
         flawType,
     };
@@ -168,15 +181,34 @@ const GENERATORS = {
 };
 
 /**
- * Generate a shuffled set of artifacts of one kind, with exactly
- * `flawedCount` of them flawed — the shape a "spot the anomaly" win rule
- * needs: N items, a known subset actually wrong, everything else clean.
+ * Generate a shuffled set of artifacts, with exactly `flawedCount` of them
+ * flawed — the shape a "spot the anomaly" win rule needs: N items, a known
+ * subset actually wrong, everything else clean.
+ *
+ * `kind: 'mixed'` shuffles certs and log lines together into one
+ * investigation instead of a uniform batch of one type — the point being a
+ * command-gated reveal flow (ArtifactInspectInput.vue) where the player
+ * has to figure out which command actually applies to a given locked
+ * target, not just spam one command for the whole set.
  */
 export function generateArtifactSet({ kind = 'cert', count = 4, flawedCount = 1, hostname } = {}) {
-    const generator = GENERATORS[kind];
-    if (!generator) {
+    const mixed = kind === 'mixed';
+    if (!mixed && !GENERATORS[kind]) {
         throw new Error(`[dataFeed] Unknown artifact kind "${kind}".`);
     }
+
+    // Shared cert baseline (issuer + validity window) — applies to every
+    // cert-kind artifact in this set, mixed batch or not, so any cert
+    // among a mixed pile is still comparable against the same profile.
+    // Without this, every clean cert had a different random issuer/date
+    // range too, leaving nothing stable to compare the flawed one against.
+    const validFromYear = 2024 + Math.floor(Math.random() * 2);
+    const certSharedParams = {
+        hostname,
+        issuer:       pick(CERT_ISSUERS),
+        validFromYear,
+        validToYear:  validFromYear + 1 + Math.floor(Math.random() * 2),
+    };
 
     const flawedIdx = new Set();
     while (flawedIdx.size < Math.min(flawedCount, count)) {
@@ -185,9 +217,12 @@ export function generateArtifactSet({ kind = 'cert', count = 4, flawedCount = 1,
 
     const items = [];
     for (let i = 0; i < count; i++) {
+        const itemKind  = mixed ? pick(['cert', 'log']) : kind;
+        const generator = GENERATORS[itemKind];
+        const params    = itemKind === 'cert' ? certSharedParams : {};
         items.push({
             id: `artifact_${i}`,
-            ...generator({ hostname, flawed: flawedIdx.has(i) }),
+            ...generator({ ...params, flawed: flawedIdx.has(i) }),
         });
     }
 
