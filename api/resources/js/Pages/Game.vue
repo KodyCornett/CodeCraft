@@ -170,6 +170,20 @@
                     />
                 </Transition>
 
+                <!-- Composer dev-lab overlay — input model x win rule pairing test.
+                     DEV ONLY, reached only via splice://dev/generator-lab. Never part
+                     of the live hack flow; no reward endpoint is called from here. -->
+                <Transition name="breach-fade">
+                    <ComposedMinigame
+                        v-if="activeComposedMinigame"
+                        :key="JSON.stringify(activeComposedMinigame)"
+                        :spec="activeComposedMinigame"
+                        @complete="onComposedMinigameComplete"
+                        @failed="onComposedMinigameFailed"
+                        @abort="onComposedMinigameAbort"
+                    />
+                </Transition>
+
                 <!-- Packet Hijack terminal (PvP) — replaces GridBreach for PvP combat -->
                 <Transition name="breach-fade">
                     <PacketHijack
@@ -361,6 +375,7 @@ import PacketHijack     from '@/components/minigame/PacketHijack.vue';
 import PacketHijackTour from '@/components/minigame/PacketHijackTour.vue';
 import QuestMinigame    from '@/components/minigame/QuestMinigame.vue';
 import BankHeist        from '@/components/minigame/BankHeist.vue';
+import ComposedMinigame from '@/components/minigame/composer/ComposedMinigame.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
 import { useMapData }          from '@/composables/useMapData.js';
@@ -389,6 +404,7 @@ import { useWatcher }          from '@/composables/useWatcher.js';
 import { useQuestLog }         from '@/composables/useQuestLog.js';
 import { useQuestMinigame }    from '@/composables/useQuestMinigame.js';
 import { useDevBankHeist }     from '@/composables/useDevBankHeist.js';
+import { useDevComposer }      from '@/composables/useDevComposer.js';
 import { useDocNotifications } from '@/composables/useDocNotifications.js';
 import { useQuestArchive }     from '@/composables/useQuestArchive.js';
 import { useInactivityTimer }  from '@/composables/useInactivityTimer.js';
@@ -660,6 +676,35 @@ function onBankHeistComplete(payload) {
 
 function onBankHeistAbort() {
     activeBankHeist.value = null;
+}
+
+// ── Composer dev-lab flow ────────────────────────────────────────────────────
+// DEV ONLY — remove alongside splice://dev/generator-lab before release.
+// Mirrors the Bank Heist dev-launch bridge above, but for the composer
+// (input model x win rule) experiment — see useDevComposer.js's docblock.
+// Fully separate from useHackFlow / the real node-hack generator: no reward
+// endpoint is ever called from this path.
+const activeComposedMinigame = ref(null); // { inputKey, ruleKey, ice } | null
+const { activeComposedSpec, clear: clearDevComposer } = useDevComposer();
+watch(activeComposedSpec, (val) => {
+    if (!val) return;
+    activeComposedMinigame.value = val;
+    activeBrowserUrl.value = null;
+    clearDevComposer();
+});
+
+function onComposedMinigameComplete(payload) {
+    console.log('[COMPOSER] Pairing solved', payload);
+    activeComposedMinigame.value = null;
+}
+
+function onComposedMinigameFailed(payload) {
+    console.log('[COMPOSER] Pairing failed', payload);
+    activeComposedMinigame.value = null;
+}
+
+function onComposedMinigameAbort() {
+    activeComposedMinigame.value = null;
 }
 
 // ── Codex find prompt — rolled by useHackFlow on a successful routine hack ─────

@@ -369,11 +369,11 @@ onUnmounted(() => {
 }
 
 .cb-terminal {
-    width: min(920px, 94vw);
+    width: min(1000px, 92vw);
     max-height: 92vh;
     display: flex;
     flex-direction: column;
-    padding: 18px 24px 22px;
+    padding: 24px 32px 28px;
     box-sizing: border-box;
     background: #040c07;
     border: 1px solid rgba(0,255,100,0.25);
@@ -388,7 +388,7 @@ onUnmounted(() => {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    font-size: 10px;
+    font-size: 13px;
     letter-spacing: 0.12em;
     color: rgba(0,255,100,0.55);
     flex-shrink: 0;
@@ -400,12 +400,12 @@ onUnmounted(() => {
 
 .cb-abort-btn {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.15em;
     background: transparent;
     border: 1px solid rgba(255,51,51,0.35);
     color: rgba(255,51,51,0.75);
-    padding: 5px 14px;
+    padding: 7px 18px;
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -423,22 +423,22 @@ onUnmounted(() => {
 .cb-infobar {
     display: flex;
     align-items: center;
-    gap: 28px;
-    padding-bottom: 8px;
+    gap: 36px;
+    padding-bottom: 10px;
     border-bottom: 1px solid rgba(0,255,100,0.07);
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     flex-shrink: 0;
 }
 
-.cb-info-block { display: flex; flex-direction: column; gap: 2px; }
+.cb-info-block { display: flex; flex-direction: column; gap: 3px; }
 
 .cb-info-label {
-    font-size: 8px;
-    color: rgba(0,255,100,0.28);
+    font-size: 10px;
+    color: rgba(0,255,100,0.4);
     letter-spacing: 0.15em;
 }
 
-.cb-info-val { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; }
+.cb-info-val { font-size: 19px; font-weight: 700; letter-spacing: 0.06em; }
 
 .cb-info-val--target { color: #ff6600; }
 .cb-sum--neutral      { color: rgba(0,255,100,0.35); }
@@ -446,20 +446,20 @@ onUnmounted(() => {
 .cb-sum--over         { color: #ff3333; }
 .cb-sum--under        { color: #FFB300; }
 
-.cb-att-pips { display: flex; gap: 7px; margin-top: 2px; }
-.cb-att-pip  { font-size: 13px; transition: color 0.25s; }
+.cb-att-pips { display: flex; gap: 9px; margin-top: 3px; }
+.cb-att-pip  { font-size: 16px; transition: color 0.25s; }
 .cb-att-pip--free { color: rgba(0,255,100,0.25); }
 .cb-att-pip--used { color: #ff3333; text-shadow: 0 0 6px rgba(255,51,51,0.5); }
 
 .cb-decrypt-btn {
     margin-left: auto;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 13px;
     letter-spacing: 0.2em;
     background: transparent;
     border: 1px solid rgba(0,255,100,0.12);
     color: rgba(0,255,100,0.2);
-    padding: 8px 22px;
+    padding: 10px 28px;
     cursor: not-allowed;
     transition: all 0.15s;
     flex-shrink: 0;
@@ -501,9 +501,9 @@ onUnmounted(() => {
 .cb-node-g:hover text   { fill: rgba(0,255,100,0.9); }
 
 .cb-node-text {
-    fill: rgba(0,255,100,0.55);
+    fill: rgba(0,255,100,0.7);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
+    font-size: 9px;
     text-anchor: middle;
     pointer-events: none;
     letter-spacing: 0.03em;
@@ -511,7 +511,7 @@ onUnmounted(() => {
 
 .cb-side-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 7px;
+    font-size: 8px;
     text-anchor: middle;
     letter-spacing: 0.12em;
     pointer-events: none;
@@ -554,25 +554,25 @@ onUnmounted(() => {
     padding: 0 24px;
 }
 
-.cb-outcome-title { font-size: 20px; letter-spacing: 0.15em; }
+.cb-outcome-title { font-size: 28px; letter-spacing: 0.15em; }
 .outcome--success .cb-outcome-title { color: #00FF88; text-shadow: 0 0 24px rgba(0,255,136,0.55); }
 .outcome--failed  .cb-outcome-title { color: #FF3333; text-shadow: 0 0 24px rgba(255,51,51,0.55); }
 
 .cb-outcome-sub {
-    font-size: 11px;
+    font-size: 14px;
     letter-spacing: 0.08em;
-    color: rgba(0,255,100,0.6);
+    color: rgba(0,255,100,0.7);
 }
 
 .cb-outcome-btn {
-    margin-top: 10px;
+    margin-top: 12px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 13px;
     letter-spacing: 0.2em;
     background: transparent;
     border: 1px solid rgba(0,255,255,0.4);
     color: rgba(0,255,255,0.85);
-    padding: 8px 26px;
+    padding: 10px 32px;
     cursor: pointer;
     transition: all 0.15s;
 }

@@ -39,6 +39,7 @@ import SystemUpdate    from './pages/SystemUpdate.vue';
 import DocDialoguePage from './pages/DocDialoguePage.vue';
 import Decrypter        from './pages/Decrypter.vue';
 import DevMinigameLauncher from './pages/DevMinigameLauncher.vue';
+import DevGeneratorLab from './pages/DevGeneratorLab.vue';
 import DevSceneLauncher    from './pages/DevSceneLauncher.vue';
 import SpliceMapsPage   from './pages/SpliceMapsPage.vue';
 import NotFound        from './pages/NotFound.vue';
@@ -111,6 +112,7 @@ const ROUTES = [
 
     // ── Dev tools — remove before release ────────────────────────────────────
     { url: 'splice://dev/minigames', title: 'DEV // Minigame Launcher', component: DevMinigameLauncher },
+    { url: 'splice://dev/generator-lab', title: 'DEV // Generator Lab', component: DevGeneratorLab },
     { url: 'splice://dev/scenes',    title: 'DEV // Scene Splicer',     component: DevSceneLauncher    },
 
     // ── Doc dialogue pages ────────────────────────────────────────────────────
@@ -208,6 +210,7 @@ export const SPLICE = {
     TUTORIAL:          'splice://sys.local/tutorial',
     TERMINAL:          'splice://sys.local/terminal',   // NavBar TERMINAL app
     DEV_MINIGAMES:     'splice://dev/minigames',        // DEV ONLY — remove before release— Mission Log / Quest Log
+    DEV_GENERATOR_LAB: 'splice://dev/generator-lab',    // DEV ONLY — remove before release — composer input/rule test lab
     DEV_SCENES:        'splice://dev/scenes',           // DEV ONLY — remove before release
     ARCHIVE:           'splice://sys.local/archive',   // Chronological story archive
     CODEX:             'splice://sys.local/codex',     // Codex Archive — key resolution & history
