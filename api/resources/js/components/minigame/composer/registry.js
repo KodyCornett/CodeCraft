@@ -27,6 +27,12 @@ export const INPUT_MODELS = [
         valueType: 'numeric',
         component: () => import('./inputs/SequentialPickInput.vue'),
     },
+    {
+        key:       'pair_match',
+        label:     'Pair Match',
+        valueType: 'pairs',
+        component: () => import('./inputs/PairMatchInput.vue'),
+    },
 ];
 
 export const WIN_RULES = [
@@ -41,6 +47,12 @@ export const WIN_RULES = [
         label:     'Closest Under',
         valueType: 'numeric',
         module:    () => import('./rules/closestUnderRule.js'),
+    },
+    {
+        key:       'all_matched',
+        label:     'All Matched',
+        valueType: 'pairs',
+        module:    () => import('./rules/allMatchedRule.js'),
     },
 ];
 

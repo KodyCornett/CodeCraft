@@ -116,11 +116,74 @@ function composeSequentialPick(ice) {
     return { sequence, target, tolerance, timeLimitSec, theme };
 }
 
+// pair_match — feeds all_matched (valueType: 'pairs'). Concept ported from
+// ArchiveExtraction.vue: a small fixed number of target "cipher slots",
+// each with exactly one correct candidate, buried among more decoy
+// candidates than there are slots. Reuses that system's own vocabulary
+// (slots, candidates, hex-string labels) so it reads consistent with the
+// rest of the game rather than inventing new terms — but this function
+// never imports ArchiveExtraction.vue or shares any of its state.
+function hexLabel(len = 6) {
+    const chars = '0123456789abcdef';
+    let out = '';
+    for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+}
+
+function composePairMatch(ice) {
+    const tier = tierForIce(ice);
+
+    const slotCount  = 3; // mirrors ArchiveExtraction's fixed 3 target cipher slots
+    // ArchiveExtraction scales decoyPairCount 2->4 across its 3 quest
+    // tiers; carried a bit further here since composer ICE spans a wider
+    // 3-10 band. Tier 1: 3 decoys .. Tier 4: 6 decoys.
+    const decoyCount = 2 + tier;
+
+    const slots = Array.from({ length: slotCount }, (_, i) => ({
+        id:    `slot_${i}`,
+        label: `CIPHER SLOT ${i + 1}`,
+    }));
+
+    // One correct candidate per slot, plus decoys — every candidate gets
+    // the same hex-string shape so decoys are indistinguishable at a
+    // glance, same as ArchiveExtraction's decoy files.
+    const correctCandidates = slots.map(slot => ({
+        id:      `cand_correct_${slot.id}`,
+        label:   hexLabel(),
+        forSlot: slot.id,
+    }));
+    const decoyCandidates = Array.from({ length: decoyCount }, (_, i) => ({
+        id:      `cand_decoy_${i}`,
+        label:   hexLabel(),
+        forSlot: null,
+    }));
+
+    const candidates = shuffle([...correctCandidates, ...decoyCandidates])
+        .map(({ id, label }) => ({ id, label }));
+
+    const correctMap = {};
+    correctCandidates.forEach(c => { correctMap[c.forSlot] = c.id; });
+
+    // Tier 1: 125s .. Tier 4: 50s — same order of magnitude as
+    // ArchiveExtraction's own 95-150s trace budget.
+    const timeLimitSec = Math.max(45, 150 - tier * 25);
+
+    const theme = {
+        systemLabel: 'CIPHER SLOT MATRIX',
+        noun:        'slot',
+        nounPlural:  'slots',
+        valueLabel:  'DECRYPTION',
+    };
+
+    return { slots, candidates, correctMap, timeLimitSec, theme };
+}
+
 const CONTENT_GENERATORS = {
     'grid_select:exact_sum':          composeGridSelect,
     'grid_select:closest_under':      composeGridSelect,
     'sequential_pick:exact_sum':      composeSequentialPick,
     'sequential_pick:closest_under':  composeSequentialPick,
+    'pair_match:all_matched':         composePairMatch,
 };
 
 export function composeMinigame({ inputKey, ruleKey, ice }) {
