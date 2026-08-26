@@ -33,26 +33,33 @@
  * Renders a grid of numeric cells the player can toggle on/off, and on
  * submit emits the plain array of currently-selected values. It has no
  * concept of "target", "win", or "correct" — that judgment belongs entirely
- * to whichever win rule the composer paired it with. This is what lets the
- * same component serve any future numeric win rule without changes here.
+ * to whichever win rule the composer paired it with.
+ *
+ * Takes the whole `content` object rather than named grid props — content
+ * shape is an input-model concern, not something ComposedMinigame.vue
+ * should have to know the field names for. This model happens to want
+ * { rows, cols, values, timeLimitSec }; a different input model (e.g.
+ * SequentialPickInput) reads a completely different shape from its own
+ * `content` prop without either component knowing about the other.
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 
 const props = defineProps({
-    rows:         { type: Number,  required: true },
-    cols:         { type: Number,  required: true },
-    values:       { type: Array,   required: true }, // rows x cols, numeric
-    timeLimitSec: { type: Number,  default: 60 },
-    paused:       { type: Boolean, default: false },
+    content: { type: Object,  required: true }, // { rows, cols, values, timeLimitSec }
+    paused:  { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['submit', 'timeout']);
 
+const rows   = computed(() => props.content.rows);
+const cols   = computed(() => props.content.cols);
+const values = computed(() => props.content.values);
+
 const flatCells = computed(() => {
     const out = [];
-    for (let r = 0; r < props.rows; r++) {
-        for (let c = 0; c < props.cols; c++) {
-            out.push({ value: props.values[r][c] });
+    for (let r = 0; r < rows.value; r++) {
+        for (let c = 0; c < cols.value; c++) {
+            out.push({ value: values.value[r][c] });
         }
     }
     return out;
@@ -70,7 +77,7 @@ const pickedValues = computed(() =>
 );
 const selectedSum = computed(() => pickedValues.value.reduce((s, v) => s + v, 0));
 
-const timeLeft = ref(props.timeLimitSec);
+const timeLeft = ref(props.content.timeLimitSec);
 let timerId = null;
 
 onMounted(() => {

@@ -21,6 +21,12 @@ export const INPUT_MODELS = [
         valueType: 'numeric',
         component: () => import('./inputs/GridSelectInput.vue'),
     },
+    {
+        key:       'sequential_pick',
+        label:     'Sequential Pick',
+        valueType: 'numeric',
+        component: () => import('./inputs/SequentialPickInput.vue'),
+    },
 ];
 
 export const WIN_RULES = [
@@ -29,6 +35,12 @@ export const WIN_RULES = [
         label:     'Exact Sum',
         valueType: 'numeric',
         module:    () => import('./rules/exactSumRule.js'),
+    },
+    {
+        key:       'closest_under',
+        label:     'Closest Under',
+        valueType: 'numeric',
+        module:    () => import('./rules/closestUnderRule.js'),
     },
 ];
 

@@ -8,13 +8,14 @@
 
             <div class="cm-hint">{{ hint || 'Loading win condition...' }}</div>
 
+            <!-- Pass the whole content object, not named grid fields — content
+                 shape is an input-model concern (a grid needs rows/cols/values,
+                 a sequential feed needs a flat list); this renderer shouldn't
+                 need to know either shape to stay generic across both. -->
             <component
                 v-if="!outcome && activeInputComponent"
                 :is="activeInputComponent"
-                :rows="content.rows"
-                :cols="content.cols"
-                :values="content.values"
-                :time-limit-sec="content.timeLimitSec"
+                :content="content"
                 :paused="paused"
                 @submit="onSubmit"
                 @timeout="onTimeout"
