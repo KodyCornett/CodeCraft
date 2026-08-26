@@ -66,11 +66,15 @@ const ruleEntry  = computed(() => findWinRule(props.spec.ruleKey));
 // Generated once per mount — a new spec (different pairing/ICE) means a
 // fresh ComposedMinigame instance via Vue's :key in the caller, not a
 // re-generate-in-place here.
+//
+// composeMinigame() returns { inputKey, ruleKey, ice, content }, not the
+// content itself — unwrap it here so the rest of this file (and the
+// win-rule module) only ever deals with the flat content object.
 const content = composeMinigame({
     inputKey: props.spec.inputKey,
     ruleKey:  props.spec.ruleKey,
     ice:      props.spec.ice,
-});
+}).content;
 
 const activeInputComponent = computed(() => {
     if (!inputEntry.value) {
