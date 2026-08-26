@@ -695,12 +695,16 @@ watch(activeComposedSpec, (val) => {
 
 function onComposedMinigameComplete(payload) {
     console.log('[COMPOSER] Pairing solved', payload);
-    activeComposedMinigame.value = null;
+    // Don't clear here — ComposedMinigame.vue shows its own PAIRING SOLVED /
+    // PAIRING FAILED outcome pane and waits for [ CLOSE ], which fires
+    // @abort below. Clearing immediately on @complete/@failed was unmounting
+    // the overlay via v-if before that outcome pane ever got a chance to
+    // render, which is why it looked like the game just silently closed.
 }
 
 function onComposedMinigameFailed(payload) {
     console.log('[COMPOSER] Pairing failed', payload);
-    activeComposedMinigame.value = null;
+    // See onComposedMinigameComplete's comment — same reasoning applies.
 }
 
 function onComposedMinigameAbort() {
