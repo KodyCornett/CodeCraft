@@ -76,6 +76,8 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 
 <style scoped>
 .tsh-wrap {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -83,7 +85,8 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 }
 
 .tsh-scrollback {
-    height: 320px;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 4px 2px;
     display: flex;

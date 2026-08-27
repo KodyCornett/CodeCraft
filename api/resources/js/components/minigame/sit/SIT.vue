@@ -8,13 +8,14 @@
 
             <div class="sit-objective">{{ scenario.objective }}</div>
 
-            <TerminalShell
-                v-if="!outcome"
-                :lines="lines"
-                prompt-label="~"
-                :paused="paused"
-                @submit="onSubmit"
-            />
+            <div v-if="!outcome" class="sit-terminal-area">
+                <TerminalShell
+                    :lines="lines"
+                    prompt-label="~"
+                    :paused="paused"
+                    @submit="onSubmit"
+                />
+            </div>
 
             <div v-if="outcome" class="sit-outcome">
                 <div class="sit-outcome-title" :class="outcome.success ? 'sit-outcome-title--win' : 'sit-outcome-title--fail'">
@@ -129,8 +130,11 @@ function onClose() {
 }
 
 .sit-window {
-    width: 720px;
+    width: 1080px;
     max-width: 94vw;
+    height: 80vh;
+    max-height: 860px;
+    box-sizing: border-box;
     background: #050807;
     border: 1px solid rgba(0,255,100,0.3);
     box-shadow: 0 0 40px rgba(0,255,100,0.08);
@@ -139,6 +143,13 @@ function onClose() {
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+.sit-terminal-area {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .sit-topbar {

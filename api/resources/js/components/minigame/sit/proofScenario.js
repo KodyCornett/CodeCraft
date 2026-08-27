@@ -31,15 +31,20 @@ export function buildProofScenario() {
             'IRONVALE CORP — INTERNAL WORKSTATION',
             'Unauthorized access is a violation of network policy.',
             '',
-            'OBJECTIVE: locate valid VPN credentials and authenticate as an employee.',
+            'OBJECTIVE: locate valid VPN credentials for S.WALKER and authenticate.',
             'Use: login <username> <password>',
+            '',
+            'Credentials are rarely written down in one place — check personal',
+            'files, mail, and system logs.',
         ]),
         'home': dir('home', {
             's.walker': dir('s.walker', {
                 'notes.txt': file('notes.txt', [
                     'reminder to self: renew badge before it expires next month.',
                     'also stop leaving stickies with wifi codes on the monitor,',
-                    'karen will kill me',
+                    'karen will kill me.',
+                    'still waiting on k.ramos to send over the final project',
+                    'sign-off, need to ping her again',
                 ]),
                 'mail': dir('mail', {
                     'inbox.eml': file('inbox.eml', [
@@ -55,7 +60,8 @@ export function buildProofScenario() {
                         'Subject: re: re: vpn access',
                         '',
                         'yep, still project codename + shipped year. same as always,',
-                        "dont write it down anywhere obvious lol",
+                        "dont write it down anywhere obvious lol. if you blank on the",
+                        'year again its on the deploy logs, ops keeps those forever',
                     ]),
                 }),
             }),
