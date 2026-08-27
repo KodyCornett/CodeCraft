@@ -66,6 +66,12 @@ export const WIN_RULES = [
         valueType: 'artifacts',
         module:    () => import('./rules/spotAnomalyRule.js'),
     },
+    {
+        key:       'correlate_trace',
+        label:     'Correlate Trace',
+        valueType: 'artifacts',
+        module:    () => import('./rules/correlateTraceRule.js'),
+    },
 ];
 
 export function findInputModel(key) {

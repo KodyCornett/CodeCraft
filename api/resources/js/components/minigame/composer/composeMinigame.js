@@ -16,7 +16,7 @@
  * the full pairing instead of by input model alone.
  */
 import { tierForIce } from './difficultyScaling.js';
-import { generateArtifactSet, randomHostname } from './dataFeed.js';
+import { generateArtifactSet, randomHostname, generateCorrelatedSet } from './dataFeed.js';
 import { selectCommands } from './commandPalette.js';
 
 function shuffle(arr) {
@@ -243,6 +243,41 @@ function composeArtifactInspect(ice) {
     return { hostname, artifacts, commands, timeLimitSec, theme };
 }
 
+// artifact_inspect + correlate_trace — sessions of (cert, log) pairs for
+// valueType: 'artifacts'. Where spot_anomaly judges a single artifact in
+// isolation, this pairing requires revealing BOTH halves of a session and
+// comparing them: the compromise here isn't a broken field on one
+// artifact, it's a log entry naming a DIFFERENT host than its own
+// session's certificate — a real correlation problem, not a lone typo.
+// This is the "prove it multiplies" pairing for the artifacts family, the
+// same move that added closest_under alongside exact_sum for numeric.
+function composeCorrelateTrace(ice) {
+    const tier = tierForIce(ice);
+
+    const pairCount = 2 + tier; // Tier 1: 3 sessions (6 artifacts) .. Tier 4: 6 sessions (12 artifacts)
+    const artifacts = generateCorrelatedSet({ pairCount });
+
+    // Both kinds are always present here (every session is one cert + one
+    // log), so both real commands are always required on the palette —
+    // decoys still keep picking the right tool per target meaningful.
+    const commands = selectCommands(['cert', 'log'], 1 + Math.floor(tier / 2));
+
+    // A bit more generous than spot_anomaly's budget at the same tier —
+    // this pairing requires revealing TWO artifacts per session instead of
+    // judging one in isolation, so there's simply more reading to do.
+    // Tier 1: 110s .. Tier 4: 55s
+    const timeLimitSec = Math.max(40, 130 - tier * 20);
+
+    const theme = {
+        systemLabel: 'SESSION CORRELATION',
+        noun:        'record',
+        nounPlural:  'records',
+        valueLabel:  'CHAIN INTEGRITY',
+    };
+
+    return { artifacts, commands, timeLimitSec, theme };
+}
+
 const CONTENT_GENERATORS = {
     'grid_select:exact_sum':          composeGridSelect,
     'grid_select:closest_under':      composeGridSelect,
@@ -250,6 +285,7 @@ const CONTENT_GENERATORS = {
     'sequential_pick:closest_under':  composeSequentialPick,
     'pair_match:all_matched':         composePairMatch,
     'artifact_inspect:spot_anomaly':  composeArtifactInspect,
+    'artifact_inspect:correlate_trace': composeCorrelateTrace,
 };
 
 export function composeMinigame({ inputKey, ruleKey, ice }) {

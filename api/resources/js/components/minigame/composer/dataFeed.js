@@ -146,13 +146,20 @@ export function generateCertArtifact({ hostname, issuer, validFromYear, validToY
 
 const LOG_FLAW_TYPES = ['unexpected_parent', 'suspicious_port', 'auth_failure'];
 
-export function generateLogLine({ flawed = false } = {}) {
+// `host`, when passed, is the target hostname this connection claims to be
+// for — stamped into the CONNECT line and into `fields.host`. Optional and
+// omitted by default so every existing caller (spot_anomaly's single-kind
+// and mixed sets) renders identical text to before this was added; only
+// correlate_trace's paired sessions pass it, since that's the whole signal
+// that rule needs a player to read and compare across two artifacts.
+export function generateLogLine({ flawed = false, host } = {}) {
     const ts   = randomTimestamp();
     const proc = randomProcessName();
     const ip   = randomIp();
     const port = randomPort();
+    const hostSuffix = host ? ` -> ${host}` : '';
 
-    let event    = `CONNECT ${ip}:${port} — OK`;
+    let event    = `CONNECT ${ip}:${port}${hostSuffix} — OK`;
     let flawType = null;
 
     if (flawed) {
@@ -160,7 +167,7 @@ export function generateLogLine({ flawed = false } = {}) {
         if (flawType === 'unexpected_parent') {
             event = `SPAWN ${proc} <- parent:unknown (PID mismatch)`;
         } else if (flawType === 'suspicious_port') {
-            event = `CONNECT ${ip}:${randomPort({ suspect: true })} — unrecognized service`;
+            event = `CONNECT ${ip}:${randomPort({ suspect: true })}${hostSuffix} — unrecognized service`;
         } else if (flawType === 'auth_failure') {
             event = `AUTH_FAIL user=admin src=${ip} attempts=${3 + Math.floor(Math.random() * 5)}`;
         }
@@ -169,7 +176,7 @@ export function generateLogLine({ flawed = false } = {}) {
     return {
         kind:   'log',
         text:   `[${ts}] ${proc}: ${event}`,
-        fields: { ts, proc, ip, port, event },
+        fields: { ts, proc, ip, port, host: host ?? null, event },
         flawed,
         flawType,
     };
@@ -225,6 +232,61 @@ export function generateArtifactSet({ kind = 'cert', count = 4, flawedCount = 1,
             ...generator({ ...params, flawed: flawedIdx.has(i) }),
         });
     }
+
+    return shuffle(items);
+}
+
+// ── Correlated sessions ──────────────────────────────────────────────────
+// The content shape correlate_trace needs: N "sessions", each one clean
+// cert paired with one clean connection log for the same host. In every
+// session but one, the log's claimed target host matches its own
+// session's cert; in exactly one it claims a DIFFERENT (still real,
+// still valid-looking) host from elsewhere in the same set instead. This
+// is a cross-artifact inconsistency rather than a flaw on any single
+// artifact — spotting it means revealing both halves of a session and
+// comparing the hostname each one names, not just judging one artifact in
+// isolation the way spot_anomaly's sets do.
+
+function distinctHostnames(n) {
+    const set = new Set();
+    let guard = 0;
+    while (set.size < n && guard < n * 50) {
+        set.add(randomHostname());
+        guard++;
+    }
+    return [...set];
+}
+
+export function generateCorrelatedSet({ pairCount = 3 } = {}) {
+    const hosts = distinctHostnames(pairCount);
+
+    const validFromYear = 2024 + Math.floor(Math.random() * 2);
+    const certSharedParams = {
+        issuer:       pick(CERT_ISSUERS),
+        validFromYear,
+        validToYear:  validFromYear + 1 + Math.floor(Math.random() * 2),
+    };
+
+    const mismatchIdx = Math.floor(Math.random() * hosts.length);
+
+    const items = [];
+    hosts.forEach((host, i) => {
+        const sessionId = `session_${i}`;
+        const cert = generateCertArtifact({ ...certSharedParams, hostname: host, flawed: false });
+
+        // The log's claimed target host matches its own session's cert
+        // except for the one mismatched session, where it names a
+        // DIFFERENT session's (still-real) host instead — the only tell
+        // is that it points at the wrong cert, not that anything about it
+        // looks broken on its own.
+        const claimedHost = i === mismatchIdx
+            ? hosts[(i + 1) % hosts.length]
+            : host;
+        const log = generateLogLine({ flawed: false, host: claimedHost });
+
+        items.push({ id: `artifact_cert_${i}`, sessionId, role: 'cert', ...cert });
+        items.push({ id: `artifact_log_${i}`,  sessionId, role: 'log',  ...log, correlationMismatch: i === mismatchIdx });
+    });
 
     return shuffle(items);
 }
