@@ -184,6 +184,19 @@
                     />
                 </Transition>
 
+                <!-- SIT (Splice Interface Terminal) dev-lab overlay — typed ls/cd/cat
+                     proof-of-concept. DEV ONLY, reached only via splice://dev/sit-lab.
+                     Never part of the live hack flow; no reward endpoint is called
+                     from here. -->
+                <Transition name="breach-fade">
+                    <SIT
+                        v-if="activeSIT"
+                        @complete="onSITComplete"
+                        @failed="onSITFailed"
+                        @abort="onSITAbort"
+                    />
+                </Transition>
+
                 <!-- Packet Hijack terminal (PvP) — replaces GridBreach for PvP combat -->
                 <Transition name="breach-fade">
                     <PacketHijack
@@ -376,6 +389,7 @@ import PacketHijackTour from '@/components/minigame/PacketHijackTour.vue';
 import QuestMinigame    from '@/components/minigame/QuestMinigame.vue';
 import BankHeist        from '@/components/minigame/BankHeist.vue';
 import ComposedMinigame from '@/components/minigame/composer/ComposedMinigame.vue';
+import SIT from '@/components/minigame/sit/SIT.vue';
 
 // ── Composables ───────────────────────────────────────────────────────────────
 import { useMapData }          from '@/composables/useMapData.js';
@@ -405,6 +419,7 @@ import { useQuestLog }         from '@/composables/useQuestLog.js';
 import { useQuestMinigame }    from '@/composables/useQuestMinigame.js';
 import { useDevBankHeist }     from '@/composables/useDevBankHeist.js';
 import { useDevComposer }      from '@/composables/useDevComposer.js';
+import { useDevSIT }           from '@/composables/useDevSIT.js';
 import { useDocNotifications } from '@/composables/useDocNotifications.js';
 import { useQuestArchive }     from '@/composables/useQuestArchive.js';
 import { useInactivityTimer }  from '@/composables/useInactivityTimer.js';
@@ -709,6 +724,36 @@ function onComposedMinigameFailed(payload) {
 
 function onComposedMinigameAbort() {
     activeComposedMinigame.value = null;
+}
+
+// ── SIT dev-lab flow ──────────────────────────────────────────────────────────
+// DEV ONLY — remove alongside splice://dev/sit-lab before release. Mirrors
+// the composer dev-launch bridge above, but for SIT (Splice Interface
+// Terminal, components/minigame/sit/) — see useDevSIT.js's docblock.
+// Fully separate from useHackFlow / the real node-hack generator and from
+// the composer: no reward endpoint is ever called from this path.
+const activeSIT = ref(false);
+const { active: devSITActive, clear: clearDevSIT } = useDevSIT();
+watch(devSITActive, (val) => {
+    if (!val) return;
+    activeSIT.value = true;
+    activeBrowserUrl.value = null;
+    clearDevSIT();
+});
+
+function onSITComplete(payload) {
+    console.log('[SIT] Solved', payload);
+    // Don't clear here — SIT.vue shows its own outcome pane and waits for
+    // [ CLOSE ], which fires @abort below. Same reasoning as
+    // onComposedMinigameComplete above.
+}
+
+function onSITFailed(payload) {
+    console.log('[SIT] Failed', payload);
+}
+
+function onSITAbort() {
+    activeSIT.value = false;
 }
 
 // ── Codex find prompt — rolled by useHackFlow on a successful routine hack ─────

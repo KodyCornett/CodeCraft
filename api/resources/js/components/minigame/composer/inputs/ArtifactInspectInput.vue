@@ -259,14 +259,14 @@ function submit() {
 
 .aii-palette-label {
     font-size: 9px;
-    color: rgba(0,255,100,0.3);
+    color: rgba(0,255,100,0.5);
     letter-spacing: 0.18em;
     margin-right: 4px;
 }
 
 .aii-hint-cmd {
     font-size: 11px;
-    color: rgba(0,200,240,0.55);
+    color: rgba(0,200,240,0.7);
 }
 
 .aii-terminal-line {
@@ -292,7 +292,7 @@ function submit() {
 }
 
 .aii-terminal-input::placeholder {
-    color: rgba(0,255,100,0.25);
+    color: rgba(0,255,100,0.4);
 }
 
 .aii-terminal-input:disabled {
@@ -309,7 +309,7 @@ function submit() {
     max-height: 70px;
     overflow-y: auto;
     font-size: 11px;
-    color: rgba(0,255,100,0.4);
+    color: rgba(0,255,100,0.6);
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -346,7 +346,7 @@ function submit() {
 
 .aii-locked-label {
     font-size: 12px;
-    color: rgba(0,255,100,0.4);
+    color: rgba(0,255,100,0.65);
     letter-spacing: 0.1em;
 }
 
@@ -366,16 +366,16 @@ function submit() {
     font-size: 11px;
     letter-spacing: 0.1em;
     background: transparent;
-    border: 1px solid rgba(255,140,60,0.35);
-    color: rgba(255,140,60,0.75);
+    border: 1px solid rgba(255,140,60,0.5);
+    color: rgba(255,140,60,0.8);
     padding: 6px 14px;
     cursor: pointer;
     transition: all 0.1s;
 }
 
 .aii-run-btn {
-    border-color: rgba(0,200,240,0.35);
-    color: rgba(0,200,240,0.8);
+    border-color: rgba(0,200,240,0.5);
+    color: rgba(0,200,240,0.85);
 }
 
 .aii-flag-btn:hover:not(:disabled) {
@@ -407,7 +407,7 @@ function submit() {
     font-size: 13px;
     letter-spacing: 0.15em;
     background: transparent;
-    border: 1px solid rgba(0,255,100,0.3);
+    border: 1px solid rgba(0,255,100,0.45);
     color: rgba(0,255,100,0.7);
     padding: 10px 0;
     cursor: pointer;
