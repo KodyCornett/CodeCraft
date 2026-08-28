@@ -11,20 +11,26 @@
  * This composable exists only to hand Game.vue a signal to mount SIT.vue
  * with, purely for in-game feel testing. No reward endpoint is ever
  * called from this path.
+ *
+ * `active` holds either null (no session requested) or a scenario key
+ * string (see components/minigame/sit/scenarios/index.js) — now that SIT
+ * has more than one hand-written scenario, DevSITLab.vue needs to say
+ * which one to launch.
  */
 
 import { ref } from 'vue';
+import { DEFAULT_SCENARIO_KEY } from '@/components/minigame/sit/scenarios/index.js';
 
-const active = ref(false); // true | false — only one proof scenario exists so far, no spec needed yet
+const active = ref(null); // null | scenario key string
 
 export function useDevSIT() {
 
-    function launch() {
-        active.value = true;
+    function launch(scenarioKey) {
+        active.value = scenarioKey ?? DEFAULT_SCENARIO_KEY;
     }
 
     function clear() {
-        active.value = false;
+        active.value = null;
     }
 
     return { active, launch, clear };

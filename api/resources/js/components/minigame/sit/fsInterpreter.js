@@ -11,11 +11,25 @@
  *   { type: 'dir',  name, children: { [name]: node, ... } }
  *   { type: 'file', name, content: string }
  *
- * Supported verbs are intentionally the small, real set a person actually
- * types at a shell: ls, cd, cat, login, help. No made-up game-only verbs —
- * that's the whole point of this being a terminal instead of another
- * button-per-mechanic widget.
+ * The universal verbs (ls, cd, cat, help) are hardcoded here because every
+ * scenario needs them. A scenario's actual OBJECTIVE verb (login,
+ * connect, whatever fits its puzzle) is NOT hardcoded — it's supplied by
+ * the scenario itself via `scenario.verbs = { name: { usage, run(args,
+ * state) => ({ output, solved }) } }`. This is what lets a second scenario
+ * ship a completely different final command (connect <ip> instead of
+ * login <user> <pass>) without editing this shared file at all.
+ *
+ * getSuggestions() is the one addition purely in service of accessibility:
+ * a player who has never used a real terminal shouldn't have to already
+ * know this vocabulary to use it. It only ever suggests command/verb
+ * NAMES and ls/cd/cat path arguments — never a scenario verb's arguments
+ * (login's user/pass, connect's ip, etc.) — so it helps with syntax
+ * without ever leaking a puzzle answer. That guarantee falls out of the
+ * same code path regardless of which verbs a scenario defines: only cd/
+ * cat/ls get argument suggestions at all.
  */
+
+export const COMMAND_NAMES = ['ls', 'cd', 'cat', 'help'];
 
 function splitPath(path) {
     return path.split('/').filter(Boolean);
@@ -52,7 +66,7 @@ export function pathString(segments) {
  * @param {Object} root      Root directory node.
  * @param {Object} state     { cwd: string[], solved: boolean }
  * @param {string} rawLine   Whatever the player typed.
- * @param {Object} scenario  { checkWin(user, password) => boolean }
+ * @param {Object} scenario  { verbs?: { [name]: { usage, run(args, state) => ({ output, solved }) } } }
  * @returns {{ output: string[], state: Object }}
  */
 export function runCommand(root, state, rawLine, scenario) {
@@ -62,19 +76,21 @@ export function runCommand(root, state, rawLine, scenario) {
     const [cmdRaw, ...args] = line.split(/\s+/);
     const cmd = cmdRaw.toLowerCase();
     const cwd = state.cwd;
+    const verbs = scenario?.verbs ?? {};
 
     switch (cmd) {
-        case 'help':
-            return {
-                output: [
-                    'available commands:',
-                    '  ls [path]              list a directory',
-                    '  cd <path>               change directory (.. goes up, no arg goes home)',
-                    '  cat <file>              print a file\'s contents',
-                    '  login <user> <pass>     attempt to authenticate',
-                ],
-                state,
-            };
+        case 'help': {
+            const output = [
+                'available commands:',
+                '  ls [path]              list a directory',
+                '  cd <path>               change directory (.. goes up, no arg goes home)',
+                '  cat <file>              print a file\'s contents',
+            ];
+            for (const verb of Object.values(verbs)) {
+                output.push(`  ${verb.usage}`);
+            }
+            return { output, state };
+        }
 
         case 'ls': {
             const targetSegs = args[0] ? resolveSegments(cwd, args[0]) : cwd;
@@ -104,17 +120,72 @@ export function runCommand(root, state, rawLine, scenario) {
             return { output: node.content.split('\n'), state };
         }
 
-        case 'login': {
-            if (args.length < 2) return { output: ['login: usage — login <user> <password>'], state };
-            const [user, password] = args;
-            const ok = scenario.checkWin(user, password);
-            if (ok) {
-                return { output: ['ACCESS GRANTED.'], state: { ...state, solved: true } };
+        default: {
+            const verb = verbs[cmd];
+            if (!verb) {
+                return { output: [`command not recognized: ${cmd}`], state };
             }
-            return { output: ['ACCESS DENIED — invalid credentials.'], state };
+            const result = verb.run(args, state);
+            const nextState = result.solved ? { ...state, solved: true } : state;
+            return { output: result.output, state: nextState };
         }
-
-        default:
-            return { output: [`command not recognized: ${cmd}`], state };
     }
+}
+
+/**
+ * Candidate completions for whatever the player is currently typing —
+ * always full replacement values for the LAST token (the caller just
+ * swaps the last token wholesale, it never has to know why).
+ *
+ * - No text yet, or still typing the first word → matching command/verb
+ *   names (universal commands plus whatever verbs this scenario defines).
+ * - Typing an argument to ls/cd/cat → matching file/directory names from
+ *   whatever directory the partial path resolves against.
+ * - Anything else (a scenario verb's arguments, help's no-args) → nothing.
+ *   Deliberately never suggests a scenario verb's arguments — that's the
+ *   one place a suggestion could hand over part of the actual puzzle
+ *   answer, and it holds for every scenario automatically since only
+ *   cd/cat/ls get argument-level suggestions at all.
+ *
+ * @param {Object} root      Root directory node.
+ * @param {Object} state     { cwd: string[], solved: boolean }
+ * @param {string} typedText Whatever's currently in the input.
+ * @param {Object} [scenario] { verbs?: { [name]: {...} } } — used only to list verb names.
+ * @returns {string[]}
+ */
+export function getSuggestions(root, state, typedText, scenario) {
+    const verbNames = Object.keys(scenario?.verbs ?? {});
+    const allNames = [...COMMAND_NAMES, ...verbNames];
+
+    const endsWithSpace = /\s$/.test(typedText);
+    const parts = typedText.split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) {
+        return allNames;
+    }
+
+    if (parts.length === 1 && !endsWithSpace) {
+        const prefix = parts[0].toLowerCase();
+        return allNames.filter(c => c.startsWith(prefix));
+    }
+
+    const cmd = parts[0].toLowerCase();
+    if (cmd !== 'cd' && cmd !== 'cat' && cmd !== 'ls') {
+        return [];
+    }
+
+    const rawArg = endsWithSpace ? '' : parts[parts.length - 1];
+    const lastSlash = rawArg.lastIndexOf('/');
+    const dirPart = lastSlash >= 0 ? rawArg.slice(0, lastSlash) : '';
+    const partial = lastSlash >= 0 ? rawArg.slice(lastSlash + 1) : rawArg;
+
+    const baseSegs = dirPart ? resolveSegments(state.cwd, dirPart) : state.cwd;
+    const node = getNode(root, baseSegs);
+    if (!node || node.type !== 'dir') return [];
+
+    return Object.values(node.children)
+        .map(c => (c.type === 'dir' ? c.name + '/' : c.name))
+        .filter(name => name.toLowerCase().startsWith(partial.toLowerCase()))
+        .sort()
+        .map(name => (dirPart ? dirPart + '/' + name : name));
 }

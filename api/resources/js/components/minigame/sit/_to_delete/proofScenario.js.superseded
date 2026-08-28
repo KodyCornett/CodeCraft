@@ -97,6 +97,13 @@ export function buildProofScenario() {
         root,
         checkWin,
         objective:    'Locate valid VPN credentials and authenticate as an employee.',
-        timeLimitSec: 240, // generous on purpose — this proof slice is about reading, not racing a clock
+        // Deliberately very generous right now — the point of this proof slice is
+        // to find out whether exploring + reading + combining facts feels good on
+        // its own. A 240s budget cut a real first playthrough off mid-investigation,
+        // which just confuses "is this fun" with "did I read fast enough." Whatever
+        // real time pressure eventually looks like here (earlier discussion leaned
+        // toward a trace/suspicion mechanic rather than a countdown anyway) is a
+        // separate tuning pass for after the core loop itself is proven.
+        timeLimitSec: 900,
     };
 }
