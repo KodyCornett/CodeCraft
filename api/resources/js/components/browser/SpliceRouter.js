@@ -41,7 +41,6 @@ import Decrypter        from './pages/Decrypter.vue';
 import DevMinigameLauncher from './pages/DevMinigameLauncher.vue';
 import DevGeneratorLab from './pages/DevGeneratorLab.vue';
 import DevSITLab       from './pages/DevSITLab.vue';
-import DevSignalLockLab from './pages/DevSignalLockLab.vue';
 import DevSceneLauncher    from './pages/DevSceneLauncher.vue';
 import SpliceMapsPage   from './pages/SpliceMapsPage.vue';
 import NotFound        from './pages/NotFound.vue';
@@ -116,7 +115,6 @@ const ROUTES = [
     { url: 'splice://dev/minigames', title: 'DEV // Minigame Launcher', component: DevMinigameLauncher },
     { url: 'splice://dev/generator-lab', title: 'DEV // Generator Lab', component: DevGeneratorLab },
     { url: 'splice://dev/sit-lab', title: 'DEV // SIT Lab', component: DevSITLab },
-    { url: 'splice://dev/signal-lock-lab', title: 'DEV // Signal Lock Lab', component: DevSignalLockLab },
     { url: 'splice://dev/scenes',    title: 'DEV // Scene Splicer',     component: DevSceneLauncher    },
 
     // ── Doc dialogue pages ────────────────────────────────────────────────────
@@ -216,7 +214,6 @@ export const SPLICE = {
     DEV_MINIGAMES:     'splice://dev/minigames',        // DEV ONLY — remove before release— Mission Log / Quest Log
     DEV_GENERATOR_LAB: 'splice://dev/generator-lab',    // DEV ONLY — remove before release — composer input/rule test lab
     DEV_SIT_LAB:       'splice://dev/sit-lab',          // DEV ONLY — remove before release — SIT (Splice Interface Terminal) test lab
-    DEV_SIGNAL_LOCK_LAB: 'splice://dev/signal-lock-lab', // DEV ONLY — remove before release — Signal Lock pool-template candidate test lab
     DEV_SCENES:        'splice://dev/scenes',           // DEV ONLY — remove before release
     ARCHIVE:           'splice://sys.local/archive',   // Chronological story archive
     CODEX:             'splice://sys.local/codex',     // Codex Archive — key resolution & history

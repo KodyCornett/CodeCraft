@@ -76,6 +76,52 @@
             <div v-if="!bankTargets.length" class="dev-game-brief">No bank-target nodes found — has the Bank Heist migration run?</div>
         </div>
 
+        <!-- Signal Lock — candidate 4th node-hack pool template. NOT registered
+             in generator/pool.js yet — same props/emits/reward-formula contract
+             as GridBreach/ChecksumBreach/CipherBreach, so promoting it later is a
+             one-line addition. Separate flow, not part of the quest-minigame skin
+             system — mirrors the Bank Heist section above. -->
+        <div class="dev-header" style="margin-top: 4px;">
+            <span class="dev-tag">[ DEV BUILD ]</span>
+            <span class="dev-title">SIGNAL LOCK — POOL-TEMPLATE CANDIDATE</span>
+            <span class="dev-sub">// Reads a rule line, pick the candidate row that satisfies it. Parity rule unlocks at ICE 5+; a flagged decoy joins it at ICE 7+.</span>
+        </div>
+
+        <div class="dev-games">
+            <div class="dev-game">
+                <div class="dev-game-header">
+                    <span class="dev-game-type">SIGNAL_LOCK</span>
+                    <span class="dev-game-status dev-status--built">[ BUILT ]</span>
+                </div>
+                <div class="dev-game-quest">CANDIDATE — ICE {{ sglIce }} / RIG: {{ sglRig.label }}</div>
+                <div class="dev-game-brief">
+                    Read the objective rule at the top, then pick (click or press 1&ndash;N) the one
+                    candidate row that actually satisfies it &mdash; the rest fail on at least one field.
+                </div>
+                <div class="dev-diff-row" style="margin: 4px 0;">
+                    <span class="dev-diff-label">ICE</span>
+                    <button
+                        v-for="ice in [3, 4, 5, 6, 7, 8, 9, 10]"
+                        :key="ice"
+                        class="dev-diff-btn"
+                        :class="{ 'dev-diff-btn--active': sglIce === ice }"
+                        @click="sglIce = ice"
+                    >{{ ice }}</button>
+                </div>
+                <div class="dev-diff-row" style="margin: 4px 0 8px;">
+                    <span class="dev-diff-label">RIG</span>
+                    <button
+                        v-for="preset in SGL_RIG_PRESETS"
+                        :key="preset.label"
+                        class="dev-diff-btn"
+                        :class="{ 'dev-diff-btn--active': sglRig.label === preset.label }"
+                        @click="sglRig = preset"
+                    >{{ preset.label }}</button>
+                </div>
+                <button class="dev-launch-btn" @click="onLaunchSignalLock">[ LAUNCH SIGNAL LOCK ]</button>
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -83,11 +129,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useQuestMinigame } from '@/composables/useQuestMinigame.js';
 import { useDevBankHeist } from '@/composables/useDevBankHeist.js';
+import { useDevSignalLock } from '@/composables/useDevSignalLock.js';
 import { useMapData } from '@/composables/useMapData.js';
 import { getBankTargetNetworkName } from '@/composables/businessNodes.js';
 
 const { launch } = useQuestMinigame();
 const { launch: launchDevBankHeist } = useDevBankHeist();
+const { launch: launchSignalLock } = useDevSignalLock();
 
 // ── Bank Heist roster — DEV ONLY ─────────────────────────────────────────────
 // A fresh, independent useMapData() instance (not Game.vue's) — plain GET
@@ -226,6 +274,19 @@ function onLaunch(game) {
         iceLevel:          game.skin.iceLevel ?? selectedDiff.value,
     };
     launch('dev', game.type, skin);
+}
+
+// ── Signal Lock — DEV ONLY, candidate pool-template testing ─────────────────
+const SGL_RIG_PRESETS = [
+    { label: 'STARTER',  cpu: 3, ram: 2, os: 2 },
+    { label: 'MID-TIER', cpu: 5, ram: 4, os: 4 },
+    { label: 'HIGH-SEC', cpu: 8, ram: 6, os: 6 },
+];
+const sglIce = ref(3);
+const sglRig = ref(SGL_RIG_PRESETS[0]);
+
+function onLaunchSignalLock() {
+    launchSignalLock({ ice: sglIce.value, cpu: sglRig.value.cpu, ram: sglRig.value.ram, os: sglRig.value.os });
 }
 </script>
 
