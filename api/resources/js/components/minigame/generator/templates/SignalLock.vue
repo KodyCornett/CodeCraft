@@ -5,80 +5,90 @@
             <!-- ── Top bar ───────────────────────────────────────────────────── -->
             <div class="sgl-topbar">
                 <span>NODE: {{ nodeLabel }}</span>
-                <span class="sgl-timer" :class="timerClass">TIME REMAINING: {{ timeDisplay }}</span>
+                <span class="sgl-tally">
+                    ROUND {{ Math.min(roundsPlayed + 1, matchConfig.rounds) }}/{{ matchConfig.rounds }}
+                    &nbsp;·&nbsp;
+                    <span class="tally--correct">{{ correctCount }} RIGHT</span>
+                    /
+                    <span class="tally--wrong">{{ wrongCount }} WRONG</span>
+                </span>
                 <button class="sgl-abort-btn" @click="onAbort">[ ABORT ]</button>
             </div>
             <div class="sgl-rule" />
 
-            <!-- ── Objective banner — the rule the player has to apply this round ── -->
+            <!-- ── Standing directive + target signature — persists all match ── -->
             <div class="sgl-objective">
-                <span class="sgl-objective-label">OBJECTIVE</span>
-                <span class="sgl-objective-text">{{ currentRound?.ruleText }}</span>
+                <span class="sgl-objective-label">STANDING DIRECTIVE</span>
+                <span class="sgl-objective-text">
+                    STABLE SIGNAL &rarr; {{ standingDirective?.STABLE?.toUpperCase() }}.
+                    UNSTABLE SIGNAL &rarr; {{ standingDirective?.UNSTABLE?.toUpperCase() }}.
+                </span>
+                <span class="sgl-objective-label" style="margin-top: 4px;">SIGNATURE MATCH</span>
+                <span class="sgl-objective-text sgl-objective-text--sig">{{ currentRound?.targetPrefixLabel }}</span>
             </div>
 
-            <!-- ── Trace progress dots ──────────────────────────────────────── -->
+            <!-- ── Round outcome dots ───────────────────────────────────────── -->
             <div class="sgl-progress-row">
-                <span class="sgl-progress-caption">TRACE {{ Math.min(roundIndex + 1, difficulty.roundCount) }} / {{ difficulty.roundCount }}</span>
+                <span class="sgl-progress-caption">
+                    NEED {{ matchConfig.need }} TO CLEAR &middot; FAILS AT {{ matchConfig.loseAt }} WRONG
+                </span>
                 <div class="sgl-progress-dots">
                     <span
-                        v-for="i in difficulty.roundCount"
+                        v-for="i in matchConfig.rounds"
                         :key="i"
                         class="sgl-dot"
-                        :class="{ 'dot--done': i - 1 < roundIndex, 'dot--current': i - 1 === roundIndex && status === 'playing' }"
+                        :class="dotClass(i - 1)"
                     />
                 </div>
             </div>
 
             <div class="sgl-rule sgl-rule--light" />
 
-            <!-- ── Body: candidate table + side reference panel ────────────── -->
+            <!-- ── Body: active signals table + side reference panel ───────── -->
             <div class="sgl-body">
 
                 <div class="sgl-candidates">
                     <div class="sgl-cand-head">
-                        <span class="sgl-col sgl-col--num">#</span>
-                        <span class="sgl-col sgl-col--addr">ADDRESS</span>
-                        <span v-for="f in currentRound?.fields" :key="f" class="sgl-col">{{ fieldLabel(f) }}</span>
+                        <span class="sgl-col sgl-col--num">ID</span>
+                        <span class="sgl-col sgl-col--addr">MAC</span>
+                        <span class="sgl-col">SIG HISTORY</span>
+                        <span class="sgl-col sgl-col--ping">PING</span>
                     </div>
                     <div
-                        v-for="(c, idx) in currentRound?.candidates"
-                        :key="c.id"
+                        v-for="row in currentRound?.rows"
+                        :key="row.label"
                         class="sgl-cand-row"
-                        :class="rowClass(idx)"
-                        @click="submitGuess(idx)"
+                        :class="rowFlashClass(row.label)"
                     >
-                        <span class="sgl-col sgl-col--num">{{ idx + 1 }}</span>
-                        <span class="sgl-col sgl-col--addr">{{ c.addr }}</span>
-                        <span
-                            v-for="f in currentRound?.fields"
-                            :key="f"
-                            class="sgl-col"
-                            :class="fieldClass(c, f)"
-                        >{{ fieldValue(c, f) }}</span>
+                        <span class="sgl-col sgl-col--num">{{ row.label }}</span>
+                        <span class="sgl-col sgl-col--addr" :class="{ 'val--unscanned': !row.macRevealed }">
+                            {{ row.macRevealed ? row.mac : '░░:░░:░░:░░:░░:░░' }}
+                        </span>
+                        <span class="sgl-col" :class="{ 'val--unscanned': !row.sigHistory.length }">
+                            {{ row.sigHistory.length ? row.sigHistory.join(' → ') : '--' }}
+                        </span>
+                        <span class="sgl-col sgl-col--ping" :class="{ 'val--unscanned': row.pingValue === null }">
+                            {{ row.pingValue !== null ? `${row.pingValue}ms` : '--' }}
+                        </span>
                     </div>
                 </div>
 
                 <div class="sgl-side">
-                    <div class="sgl-side-title">CMD REF</div>
-                    <div class="sgl-side-hint">
-                        PRESS <span class="sgl-side-key">[1&ndash;{{ currentRound?.candidates.length ?? '' }}]</span>
-                        OR CLICK A ROW TO LOCK A TARGET.
-                    </div>
-
-                    <div class="sgl-panel-rule" />
-
+                    <div class="sgl-side-title">COLUMN LEGEND</div>
                     <div class="sgl-legend">
-                        <div class="sgl-legend-title">FIELD LEGEND</div>
-                        <div v-for="f in currentRound?.fields" :key="f" class="sgl-legend-line">{{ fieldLegend(f) }}</div>
+                        <div class="sgl-legend-line">MAC — hardware address. <b>scan mac</b> reveals it for every row.</div>
+                        <div class="sgl-legend-line">SIG HISTORY — recent signal samples. <b>scan sig</b> takes a reading; run it again to watch the trend continue.</div>
+                        <div class="sgl-legend-line">PING — round-trip latency. <b>scan ping</b> reveals it.</div>
                     </div>
 
                     <div class="sgl-panel-rule" />
 
-                    <div class="sgl-heat-block">
-                        <span class="sgl-heat-label">TRACE HEAT</span>
-                        <div class="sgl-heat-bar">
-                            <div class="sgl-heat-fill" :class="heatClass" :style="{ width: traceHeat + '%' }" />
-                        </div>
+                    <div class="sgl-side-title">COMMANDS</div>
+                    <div class="sgl-legend">
+                        <div class="sgl-legend-line"><b>scan</b> mac / sig / ping</div>
+                        <div class="sgl-legend-line"><b>log</b> &lt;id&gt; — benign, record and move on</div>
+                        <div class="sgl-legend-line"><b>jam</b> &lt;id&gt; — disrupt an active threat</div>
+                        <div class="sgl-legend-line" style="opacity: 0.6;">Committing is final — no changing a call once made.</div>
                     </div>
                 </div>
 
@@ -91,9 +101,36 @@
                 </Transition>
             </div>
 
+            <!-- ── Command input — typed, with arrow-navigable autocomplete ─── -->
+            <div class="sgl-cmdbar">
+                <span class="sgl-cmd-prompt">&gt;</span>
+                <div class="sgl-cmd-input-wrap">
+                    <input
+                        ref="cmdInputEl"
+                        v-model="inputText"
+                        class="sgl-cmd-input"
+                        type="text"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="scan mac / scan sig / scan ping / log &lt;id&gt; / jam &lt;id&gt;"
+                        :disabled="status !== 'playing'"
+                        @keydown="onInputKeydown"
+                    />
+                    <div v-if="suggestions.length" class="sgl-suggest-list">
+                        <div
+                            v-for="(s, i) in suggestions"
+                            :key="s"
+                            class="sgl-suggest-item"
+                            :class="{ 'suggest--active': i === highlightedIndex }"
+                            @mousedown.prevent="acceptSuggestion(s)"
+                        >{{ s }}</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── Outcome overlay ──────────────────────────────────────────── -->
             <div v-if="status !== 'playing'" class="sgl-outcome-overlay" :class="`outcome--${status}`">
-                <div class="sgl-outcome-title">{{ status === 'success' ? 'TRACE COMPLETE' : 'CONNECTION LOST' }}</div>
+                <div class="sgl-outcome-title">{{ status === 'success' ? 'SIGNAL RESOLVED' : 'MISCALL — LOST THE THREAD' }}</div>
                 <div class="sgl-outcome-sub">{{ status === 'success' ? outcomeSuccessMsg : outcomeFailMsg }}</div>
                 <button class="sgl-outcome-btn" @click="onDismiss">[ CONTINUE ]</button>
             </div>
@@ -105,51 +142,68 @@
 <script setup>
 /**
  * SIGNAL LOCK — candidate node-hack pool template (would-be generator key:
- * 'signal_lock'). NOT YET REGISTERED in generator/pool.js — this file is
- * built against the pool's exact contract (props/emits/reward formula
- * identical to ChecksumBreach.vue and CipherBreach.vue) so it's a one-line
- * addition to MINIGAME_POOL whenever it's actually approved for live
- * rotation, but for now it's reachable only through the dev-only
- * splice://dev/signal-lock-lab route via useDevSignalLock.js — same
- * isolation pattern already used for the composer/ and sit/ experiments.
+ * 'signal_lock'). NOT YET REGISTERED in generator/pool.js — reachable only
+ * through splice://dev/minigames (DevMinigameLauncher.vue) via
+ * useDevSignalLock.js, same isolation pattern as the composer/ and sit/
+ * experiments.
  *
- * WHY THIS EXISTS: GridBreach, ChecksumBreach, and CipherBreach are all
- * "solve a puzzle that's entirely visible on screen" — scan-and-type,
- * arithmetic path-sum, and substitution guessing respectively. None of them
- * ask the player to read a few partial, real-feeling signals and reason
- * about which one is genuine versus a decoy the way PacketHijack's Phase 1
- * suspect grid does. SIGNAL LOCK brings that same investigative DNA into
- * the pool, compressed down to something resolvable in a few seconds per
- * round — because unlike PacketHijack this has to survive being played on
- * every node in the game, not just as an occasional set piece.
+ * ── REBUILD NOTE (v2) ──────────────────────────────────────────────────────
+ * v1 was a rule-matching table: read one rule line, scan a fully-visible
+ * candidate table, click the row that satisfies it. Every field was handed
+ * to the player up front — mechanically that's a multiple-choice quiz with
+ * a hacking skin, not an investigation. This rebuild replaces that shape
+ * entirely, keeping only the pool-template contract (props/emits/reward
+ * math) and the terminal aesthetic.
  *
- * THE LOOP: each round shows a short list of 4-7 candidate entries with 2-3
- * visible fields, plus one rule line describing what makes the real target
- * real. The player reads the rule, scans the rows, and picks the ONE
- * candidate that actually satisfies it — everything else fails on at least
- * one field. At higher ICE the rule becomes compound instead of the list
- * just getting longer, and one candidate becomes a genuine decoy that
- * satisfies the rule's surface but fails a flagged detail — the same
- * "looks right if you don't read carefully" trick ArchiveExtraction's fake
- * token/cipher pairs use. All data is shown up front; there's no typed
- * probe command to run and wait on, unlike PacketHijack — the friction
- * budget here has to be near zero.
+ * THE NEW LOOP — "isolate a WiFi device and call its intent":
+ *   1. Each round shows a table of devices (rows), IDs only. Every column
+ *      (MAC / SIG HISTORY / PING) starts blank — nothing is free. The
+ *      player types scan commands (`scan mac`, `scan sig`, `scan ping`) to
+ *      reveal one column at a time, for every row at once. Commands are
+ *      unlimited/free to re-run — the friction is procedural (you must
+ *      type to see anything), not resource-metered.
+ *   2. The round's target is identified by two independent, partial clues
+ *      shown in the top panel: a partial MAC prefix ("SIGNATURE MATCH")
+ *      and — at higher ICE — a shared-prefix decoy that forces reading
+ *      PING as a tiebreaker, since one clue alone stops being enough.
+ *      SIG HISTORY isn't for finding the target — it's read on whichever
+ *      row you believe is real, to decide the response.
+ *   3. A "STANDING DIRECTIVE" (fixed for the whole match, randomized each
+ *      time this component mounts) maps STABLE/UNSTABLE signal behavior to
+ *      LOG or JAM. The player commits with `log <id>` or `jam <id>` —
+ *      irreversible, and wrong either on the device or the verb both count
+ *      as a miss the same way (picking the wrong row is exactly as wrong
+ *      as picking the right row and calling it backwards).
+ *   4. Best-of-N per match instead of one shot: ICE sets the round count
+ *      and win/lose thresholds (see MATCH_CONFIG below), capped at 5 rounds
+ *      — past that, ICE 6-8 scale difficulty through decoy density and how
+ *      close the tiebreak PING ranges sit, not more rounds. There is no
+ *      timer anywhere in this template; a round only ends when the player
+ *      commits a call.
  *
- * COST/EFFECT: reuses GridBreach's own timer formula verbatim (RAM widens
- * the total clock, OS widens the per-round grace baked into that base, CPU
- * vs ICE is asymmetric — a modest bonus for being over-geared, a compounding
- * penalty for being under). The one deliberate departure from GridBreach's
- * shape is round count: GridBreach maps sequence length 1:1 to ICE because
- * each of its steps is a fast visual scan; SIGNAL LOCK's rounds carry more
- * to read and reason about per round, so round count scales gentler
- * (roughly half of ICE, plus one) to land in a similar total playtime.
- * That's the one tuning knob this design pitch flagged as needing real
- * playtesting to calibrate — see ROUND_COUNT below. Reward math is the
- * shared computeRewardAmount()/outcomeSuccessMessage() every other pool
- * template already uses, completely unmodified.
+ * COST/EFFECT — deliberately NOT wired to playerCpu/playerRam/playerOs in
+ * this version. Every other pool template uses those stats to modulate a
+ * timer that no longer exists here. They're still accepted as props (contract
+ * parity with the rest of the pool) but currently unused — flagged as an
+ * open question for whoever approves this for the live pool: should a
+ * stronger rig shrink decoy count / shared-prefix count instead? Left out
+ * for now rather than inventing an un-discussed mechanic.
+ *
+ * Reward math is the same shared computeRewardAmount()/outcomeSuccessMessage()
+ * every other pool template uses, unmodified — full reward on a match win,
+ * nothing on a loss, no partial credit for a 3-2 win vs a 3-0 win.
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { computeRewardAmount, outcomeSuccessMessage } from '../rewardFormula.js';
+import {
+    clampIce,
+    matchConfigForIce,
+    generateSignalRound,
+    genSigSeed,
+    genSigNext,
+    randInt,
+    parseCommandState,
+} from './signalLockLogic.js';
 
 // ─── Props & emits — identical contract to every other pool entry ────────────
 const props = defineProps({
@@ -161,247 +215,45 @@ const props = defineProps({
     playerFirewall:   { type: Number,  default: 1       },
     playerMaxUplink:  { type: Number,  default: 3       },
     bountyMultiplier: { type: Number,  default: 1.0     },
-    paused:           { type: Boolean, default: false   },
+    paused:           { type: Boolean, default: false   }, // no timer in this template — accepted for contract parity, currently unused
 });
 
 const emit = defineEmits(['complete', 'failed', 'abort']);
 
 const nodeLabel = computed(() => props.node?.canvasId ?? props.node?.id ?? 'UNKNOWN');
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
-function randInt(min, max) { return Math.floor(min + Math.random() * (max - min + 1)); }
-function pick(arr)         { return arr[randInt(0, arr.length - 1)]; }
-function parityOf(n)       { return n % 2 === 0 ? 'EVEN' : 'ODD'; }
-
-function genAddr(lastOctet) {
-    const octet = lastOctet ?? randInt(2, 253);
-    return `10.${randInt(10, 99)}.${randInt(10, 99)}.${octet}`;
-}
-
-// ─── ICE tiering — same convention as every other pool template ──────────────
-//   ICE 3-4  -> Tier 1     ICE 7-8  -> Tier 3
-//   ICE 5-6  -> Tier 2     ICE 9-10 -> Tier 4
-const MIN_ICE = 3;
-const MAX_ICE = 10;
-const iceLevel = computed(() => Math.min(MAX_ICE, Math.max(MIN_ICE, props.node?.ice ?? MIN_ICE)));
-
-function tierForIce(ice) {
-    if (ice <= 4) return 1;
-    if (ice <= 6) return 2;
-    if (ice <= 8) return 3;
-    return 4;
-}
-const tier = computed(() => tierForIce(iceLevel.value));
-
-const CANDIDATE_COUNT = { 1: 4, 2: 5, 3: 6, 4: 7 };
-const WRONG_PENALTY_S = 4;
-
-// ─── Difficulty — GridBreach's exact timer formula; round count scaled
-// gentler than 1:1 with ICE (see docblock above). Threshold is implicitly
-// "complete every round" — there's no partial-credit mid-run, matching how
-// every other pool template behaves.
-const difficulty = computed(() => {
-    const ice = iceLevel.value;
-    const roundCount = Math.max(2, Math.ceil(ice / 2) + 1);
-
-    const baseTimer = 30 + (props.playerRam * 5) + Math.round(props.playerOs * 0.3);
-    const diff      = props.playerCpu - ice;
-    const timerMod  = diff >= 0 ? diff * 3 : -(diff * diff) * 2;
-
-    return { roundCount, timer: Math.max(8, baseTimer + timerMod) };
-});
-
-// ─── Round generation ─────────────────────────────────────────────────────────
-//
-// Two rule templates, rotated randomly per round (parity only unlocks at
-// Tier 2+, and only grows a flagged decoy at Tier 3+ — same escalation
-// shape GridBreach uses for its locked/glitch row modifiers).
-
-function buildExtremalRound(count) {
-    const useSignal = Math.random() < 0.5;
-    const candidates = Array.from({ length: count }, (_, i) => ({
-        id: i,
-        addr: genAddr(),
-        session: Math.random() < 0.55 ? 'ACTIVE' : 'IDLE',
-        latency: randInt(6, 58),
-        signal: randInt(35, 98),
-        flag: null,
-    }));
-
-    // Guarantee at least 2 ACTIVE candidates so the condition is meaningful.
-    let activeCount = candidates.filter(c => c.session === 'ACTIVE').length;
-    for (const c of candidates) {
-        if (activeCount >= 2) break;
-        if (c.session === 'IDLE') { c.session = 'ACTIVE'; activeCount++; }
-    }
-
-    const activeOnes = candidates.filter(c => c.session === 'ACTIVE');
-    let correct;
-    if (useSignal) {
-        correct = activeOnes.reduce((a, b) => (b.signal > a.signal ? b : a));
-        activeOnes.forEach(c => { if (c !== correct && c.signal === correct.signal) c.signal -= randInt(1, 4); });
-    } else {
-        correct = activeOnes.reduce((a, b) => (b.latency < a.latency ? b : a));
-        activeOnes.forEach(c => { if (c !== correct && c.latency === correct.latency) c.latency += randInt(1, 4); });
-    }
-
-    return {
-        ruleText: useSignal
-            ? 'TARGET = HIGHEST SIGNAL STRENGTH, ACTIVE SESSION'
-            : 'TARGET = LOWEST LATENCY, ACTIVE SESSION',
-        fields: useSignal ? ['signal', 'session'] : ['latency', 'session'],
-        candidates,
-        correctIndex: candidates.indexOf(correct),
-        explainFail(c) {
-            if (c.session !== 'ACTIVE') return `SESSION: ${c.session}`;
-            return useSignal ? `SIGNAL ${c.signal}% NOT HIGHEST` : `LATENCY ${c.latency}ms NOT LOWEST`;
-        },
-    };
-}
-
-function buildParityRound(count, withSpoof) {
-    const candidates = Array.from({ length: count }, (_, i) => {
-        const octet = randInt(2, 253);
-        return {
-            id: i,
-            addr: genAddr(octet),
-            octet,
-            octetParity: parityOf(octet),
-            checksumVal: randInt(0, 255),
-            flag: null,
-        };
-    });
-
-    // Force exactly one true parity match by construction, not by chance.
-    const correctIndex = randInt(0, count - 1);
-    candidates.forEach((c, i) => {
-        const shouldMatch = i === correctIndex;
-        let val = c.checksumVal;
-        let guard = 0;
-        while ((parityOf(val) === c.octetParity) !== shouldMatch && guard < 50) {
-            val = randInt(0, 255);
-            guard++;
-        }
-        c.checksumVal = val;
-    });
-
-    let ruleText = 'TARGET = CHECKSUM PARITY MATCHES OCTET PARITY';
-
-    if (withSpoof) {
-        // Pick a different, currently-mismatching candidate and force its
-        // checksum to ALSO match parity, then flag it — a candidate that
-        // looks right if you only check the numbers and skip the flag.
-        const spoofPool = candidates
-            .map((c, i) => i)
-            .filter(i => i !== correctIndex && parityOf(candidates[i].checksumVal) !== candidates[i].octetParity);
-        if (spoofPool.length) {
-            const spoofIdx = pick(spoofPool);
-            const target = candidates[spoofIdx];
-            let val = target.checksumVal;
-            let guard = 0;
-            while (parityOf(val) !== target.octetParity && guard < 50) { val = randInt(0, 255); guard++; }
-            target.checksumVal = val;
-            target.flag = 'SPOOFED';
-        }
-        ruleText += ', AND NOT FLAGGED';
-    }
-
-    return {
-        ruleText,
-        fields: ['octet', 'checksum', 'flag'],
-        candidates,
-        correctIndex,
-        explainFail(c) {
-            if (c.flag) return `FLAGGED: ${c.flag}`;
-            return `PARITY MISMATCH (CHK ${parityOf(c.checksumVal)} vs OCTET ${c.octetParity})`;
-        },
-    };
-}
-
-function generateRound() {
-    const t = tier.value;
-    const count = CANDIDATE_COUNT[t];
-    const pool = t >= 2 ? ['extremal', 'extremal', 'parity'] : ['extremal'];
-    const template = pick(pool);
-    if (template === 'parity') return buildParityRound(count, t >= 3);
-    return buildExtremalRound(count);
-}
-
-// ─── Field display helpers ────────────────────────────────────────────────────
-function fieldLabel(f) {
-    return { latency: 'LATENCY', signal: 'SIGNAL', session: 'SESSION', octet: 'OCTET', checksum: 'CHECKSUM', flag: 'FLAG' }[f] ?? f.toUpperCase();
-}
-function fieldValue(c, f) {
-    if (f === 'latency')  return `${c.latency}ms`;
-    if (f === 'signal')   return `${c.signal}%`;
-    if (f === 'session')  return c.session;
-    if (f === 'octet')    return `${c.octet} (${c.octetParity})`;
-    if (f === 'checksum') return `0x${c.checksumVal.toString(16).toUpperCase().padStart(2, '0')} (${parityOf(c.checksumVal)})`;
-    if (f === 'flag')     return c.flag ?? '—';
-    return '';
-}
-function fieldClass(c, f) {
-    if (f === 'session') return c.session === 'ACTIVE' ? 'val--active' : 'val--idle';
-    if (f === 'flag' && c.flag) return 'val--flagged';
-    return '';
-}
-function fieldLegend(f) {
-    return {
-        latency:  'LATENCY — response time in ms, lower is fresher',
-        signal:   'SIGNAL — link strength, 0–98%',
-        session:  'SESSION — ACTIVE or IDLE',
-        octet:    'OCTET — last address segment + its parity',
-        checksum: 'CHECKSUM — packet hash + its parity',
-        flag:     'FLAG — integrity marker; SPOOFED disqualifies',
-    }[f] ?? '';
-}
+// ─── ICE — this game's actual ceiling is 8, not 10 (see signalLockLogic.js) ──
+const iceLevel   = computed(() => clampIce(props.node?.ice));
+const matchConfig = computed(() => matchConfigForIce(iceLevel.value));
 
 // ─── Game state ───────────────────────────────────────────────────────────────
-const status       = ref('playing'); // 'playing' | 'success' | 'failed'
-const roundIndex    = ref(0);
-const currentRound  = ref(null);
-const timeLeft      = ref(0);
-const traceHeat     = ref(15); // 0-100, cosmetic tension dressing only — never gates success/failure
-const rowFlash      = ref(null); // { idx, type } | null
-const flashMsg      = ref('');
-const flashType     = ref('');
-let flashTimer      = null;
+const status            = ref('playing'); // 'playing' | 'success' | 'failed'
+const currentRound      = ref(null);
+const roundsPlayed      = ref(0);
+const correctCount      = ref(0);
+const wrongCount        = ref(0);
+const roundOutcomes     = ref([]); // 'correct' | 'wrong', one per resolved round
+const standingDirective = ref(null); // { STABLE: 'log'|'jam', UNSTABLE: the other }
+const flashMsg          = ref('');
+const flashType         = ref('');
+const flashRow          = ref(null); // row label most recently flashed, or null
+let flashTimer          = null;
 
-const timeDisplay = computed(() => {
-    const t = Math.max(0, Math.ceil(timeLeft.value));
-    const m = Math.floor(t / 60).toString().padStart(2, '0');
-    const s = (t % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-});
-
-const timerClass = computed(() => {
-    const pct = timeLeft.value / difficulty.value.timer;
-    if (pct <= 0.15) return 'timer--critical';
-    if (pct <= 0.35) return 'timer--warn';
+function dotClass(i) {
+    if (roundOutcomes.value[i] === 'correct') return 'dot--correct';
+    if (roundOutcomes.value[i] === 'wrong')    return 'dot--wrong';
+    if (i === roundsPlayed.value && status.value === 'playing') return 'dot--current';
     return '';
-});
-
-const heatClass = computed(() => {
-    if (traceHeat.value >= 75) return 'heat--critical';
-    if (traceHeat.value >= 45) return 'heat--warn';
-    return '';
-});
-
-function bumpHeat(amount) { traceHeat.value = Math.min(97, traceHeat.value + amount); }
-function coolHeat(amount) { traceHeat.value = Math.max(5, traceHeat.value - amount); }
-
-function setRowFlash(idx, type) {
-    rowFlash.value = { idx, type };
-    setTimeout(() => { rowFlash.value = null; }, 450);
 }
-function rowClass(idx) {
-    return rowFlash.value?.idx === idx ? [`row--flash-${rowFlash.value.type}`] : [];
+function rowFlashClass(label) {
+    return flashRow.value === label ? [`row--flash-${flashType.value}`] : [];
 }
-function showFlash(msg, type) {
+function showFlash(msg, type, rowLabel = null) {
     clearTimeout(flashTimer);
     flashMsg.value  = msg;
     flashType.value = type;
-    flashTimer = setTimeout(() => { flashMsg.value = ''; }, 1800);
+    flashRow.value  = rowLabel;
+    flashTimer = setTimeout(() => { flashMsg.value = ''; flashRow.value = null; }, 2200);
 }
 
 // ─── Reward — shared with every other binary-outcome pool template ───────────
@@ -412,39 +264,135 @@ const rewardAmount = computed(() => computeRewardAmount({
     playerMaxUplink:  props.playerMaxUplink,
 }));
 const outcomeSuccessMsg = computed(() => outcomeSuccessMessage(props.resource, rewardAmount.value));
-const outcomeFailMsg    = 'TRACE NOT COMPLETED — ICE HELD — NO YIELD';
+const outcomeFailMsg    = 'IDENTIFICATION FAILED — TOO MANY BAD CALLS — NO YIELD';
 
-// ─── Submit ───────────────────────────────────────────────────────────────────
-function submitGuess(idx) {
-    if (status.value !== 'playing' || !currentRound.value) return;
-    const round     = currentRound.value;
-    const candidate = round.candidates[idx];
-    if (!candidate) return;
+// ─── Command input + autocomplete ────────────────────────────────────────────
+// Token/suggestion rules live in parseCommandState() (signalLockLogic.js) so
+// they're unit-tested directly — this just feeds it the live input text and
+// this round's row labels.
+const inputText        = ref('');
+const highlightedIndex = ref(0);
+const cmdInputEl       = ref(null);
 
-    if (idx === round.correctIndex) {
-        setRowFlash(idx, 'correct');
-        coolHeat(4);
-        roundIndex.value++;
-        if (roundIndex.value >= difficulty.value.roundCount) {
-            showFlash(`TARGET CONFIRMED — TRACE COMPLETE`, 'correct');
-            triggerSuccess();
-        } else {
-            showFlash(`TARGET CONFIRMED — TRACE ${roundIndex.value}/${difficulty.value.roundCount} LOCKED`, 'correct');
-            currentRound.value = generateRound();
-        }
+const commandState = computed(() => parseCommandState(
+    inputText.value,
+    currentRound.value?.rows.map(r => r.label) ?? [],
+));
+const phase       = computed(() => commandState.value.phase);
+const verbToken   = computed(() => commandState.value.verbToken);
+const argToken    = computed(() => commandState.value.argToken);
+const suggestions = computed(() => commandState.value.suggestions);
+
+watch(suggestions, () => { highlightedIndex.value = 0; });
+watch(status, async (s) => {
+    if (s === 'playing') { await nextTick(); cmdInputEl.value?.focus(); }
+});
+
+function acceptSuggestion(sug) {
+    if (phase.value === 'verb') {
+        inputText.value = `${sug} `;
     } else {
-        setRowFlash(idx, 'wrong');
-        bumpHeat(8);
-        showFlash(`REJECTED — ${round.explainFail(candidate)}`, 'wrong');
-        timeLeft.value = Math.max(0, timeLeft.value - WRONG_PENALTY_S);
-        if (timeLeft.value <= 0) triggerFail();
+        executeCommand(verbToken.value, sug);
+        inputText.value = '';
+    }
+    cmdInputEl.value?.focus();
+}
+
+function onInputKeydown(e) {
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (suggestions.value.length) highlightedIndex.value = (highlightedIndex.value + 1) % suggestions.value.length;
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (suggestions.value.length) highlightedIndex.value = (highlightedIndex.value - 1 + suggestions.value.length) % suggestions.value.length;
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (suggestions.value.length) {
+            acceptSuggestion(suggestions.value[highlightedIndex.value]);
+        } else if (phase.value === 'arg' && verbToken.value && argToken.value) {
+            executeCommand(verbToken.value, argToken.value);
+            inputText.value = '';
+        } else if (commandState.value.tokens.length) {
+            showFlash('UNKNOWN COMMAND', 'wrong');
+        }
+    } else if (e.key === 'Escape') {
+        inputText.value = '';
+    }
+}
+
+function executeCommand(verb, argRaw) {
+    if (status.value !== 'playing' || !currentRound.value) return;
+    if (verb === 'scan') {
+        const sub = (argRaw || '').toLowerCase();
+        if (sub === 'mac') revealMac();
+        else if (sub === 'sig') revealSig();
+        else if (sub === 'ping') revealPing();
+        else showFlash('UNKNOWN SCAN TARGET', 'wrong');
+        return;
+    }
+    if (verb === 'log' || verb === 'jam') {
+        const target = (argRaw || '').toUpperCase();
+        const row = currentRound.value.rows.find(r => r.label === target);
+        if (!row) { showFlash(`NO SUCH TARGET: ${target}`, 'wrong'); return; }
+        commit(verb, row);
+        return;
+    }
+    showFlash('UNKNOWN COMMAND', 'wrong');
+}
+
+// ─── Scans — free/unlimited; reveal one column across every row at once ─────
+function revealMac() {
+    currentRound.value.rows.forEach(r => { r.macRevealed = true; });
+}
+function revealSig() {
+    currentRound.value.rows.forEach(r => {
+        if (r.sigHistory.length === 0) {
+            r.sigHistory = genSigSeed(r.sigCategory);
+        } else {
+            r.sigHistory.push(genSigNext(r.sigCategory, r.sigHistory[r.sigHistory.length - 1]));
+            if (r.sigHistory.length > 4) r.sigHistory.shift();
+        }
+    });
+}
+function revealPing() {
+    currentRound.value.rows.forEach(r => {
+        r.pingValue = r.pingBase + randInt(-r.pingJitter, r.pingJitter);
+    });
+}
+
+// ─── Commit — irreversible; wrong device and wrong verb are equally a miss ──
+function commit(verb, row) {
+    const correctDevice = row.isTarget;
+    const expectedVerb  = correctDevice ? standingDirective.value[row.sigCategory] : null;
+    const correctVerb   = correctDevice && verb === expectedVerb;
+    const roundCorrect  = correctDevice && correctVerb;
+
+    if (roundCorrect) {
+        correctCount.value++;
+        roundOutcomes.value.push('correct');
+        showFlash(`${verb.toUpperCase()} CONFIRMED — CORRECT CALL ON ${row.label}`, 'correct', row.label);
+    } else if (!correctDevice) {
+        wrongCount.value++;
+        roundOutcomes.value.push('wrong');
+        showFlash(`WRONG TARGET — ${row.label} DID NOT MATCH THE SIGNATURE`, 'wrong', row.label);
+    } else {
+        wrongCount.value++;
+        roundOutcomes.value.push('wrong');
+        showFlash(`WRONG CALL — ${row.label} WAS ${row.sigCategory}, SHOULD HAVE BEEN ${expectedVerb.toUpperCase()}`, 'wrong', row.label);
+    }
+
+    roundsPlayed.value++;
+
+    if (correctCount.value >= matchConfig.value.need) {
+        status.value = 'success';
+    } else if (wrongCount.value >= matchConfig.value.loseAt) {
+        status.value = 'failed';
+    } else {
+        currentRound.value = generateSignalRound(iceLevel.value);
     }
 }
 
 // ─── Outcome ──────────────────────────────────────────────────────────────────
-function triggerSuccess() { status.value = 'success'; }
-function triggerFail()    { status.value = 'failed'; }
-
 function onDismiss() {
     if (status.value === 'success') {
         emit('complete', { resource: props.resource, amount: rewardAmount.value, completionPct: 1.0 });
@@ -454,35 +402,15 @@ function onDismiss() {
 }
 function onAbort() { emit('abort'); }
 
-// ─── Keyboard — digit keys 1..N select a row; no typing required anywhere
-// in this template, deliberately lower-friction than GridBreach's typed
-// coordinates since this has to be comfortable to run dozens of times. ────
-function onKeydown(e) {
-    if (status.value !== 'playing' || !currentRound.value) return;
-    const n = parseInt(e.key, 10);
-    if (!Number.isNaN(n) && n >= 1 && n <= currentRound.value.candidates.length) {
-        submitGuess(n - 1);
-    }
-}
-
-// ─── Timer tick ───────────────────────────────────────────────────────────────
-let tickHandle = null;
-
 onMounted(() => {
-    timeLeft.value     = difficulty.value.timer;
-    currentRound.value = generateRound();
-    tickHandle = setInterval(() => {
-        if (status.value !== 'playing' || props.paused) return;
-        timeLeft.value--;
-        if (timeLeft.value <= 0) triggerFail();
-    }, 1000);
-    window.addEventListener('keydown', onKeydown);
+    const stableVerb = Math.random() < 0.5 ? 'log' : 'jam';
+    standingDirective.value = { STABLE: stableVerb, UNSTABLE: stableVerb === 'log' ? 'jam' : 'log' };
+    currentRound.value = generateSignalRound(iceLevel.value);
+    nextTick(() => cmdInputEl.value?.focus());
 });
 
 onUnmounted(() => {
-    clearInterval(tickHandle);
     clearTimeout(flashTimer);
-    window.removeEventListener('keydown', onKeydown);
 });
 </script>
 
@@ -525,9 +453,9 @@ onUnmounted(() => {
     color: rgba(196,166,255,0.6);
     flex-shrink: 0;
 }
-.sgl-timer { color: #b794f6; }
-.sgl-timer.timer--warn     { color: #FFB300; }
-.sgl-timer.timer--critical { color: #ff3333; animation: sgl-blink 0.6s ease infinite alternate; }
+.sgl-tally { font-size: 11px; }
+.tally--correct { color: #00ff9d; }
+.tally--wrong   { color: #ff3333; }
 
 .sgl-abort-btn {
     font-family: 'JetBrains Mono', monospace;
@@ -545,7 +473,7 @@ onUnmounted(() => {
 .sgl-rule       { height: 1px; background: rgba(183,148,246,0.18); flex-shrink: 0; }
 .sgl-rule--light{ height: 1px; background: rgba(183,148,246,0.08); flex-shrink: 0; }
 
-/* ── Objective banner ─────────────────────────────────────────────────────── */
+/* ── Standing directive / signature banner ────────────────────────────────── */
 .sgl-objective {
     display: flex;
     flex-direction: column;
@@ -556,9 +484,10 @@ onUnmounted(() => {
     flex-shrink: 0;
 }
 .sgl-objective-label { font-size: 9px; letter-spacing: 0.18em; color: rgba(196,166,255,0.5); }
-.sgl-objective-text  { font-size: 15px; letter-spacing: 0.04em; color: #e4d6ff; font-weight: 600; }
+.sgl-objective-text  { font-size: 13px; letter-spacing: 0.03em; color: #e4d6ff; font-weight: 600; }
+.sgl-objective-text--sig { font-size: 15px; letter-spacing: 0.06em; }
 
-/* ── Progress dots ─────────────────────────────────────────────────────────── */
+/* ── Round outcome dots ────────────────────────────────────────────────────── */
 .sgl-progress-row {
     display: flex;
     align-items: center;
@@ -573,7 +502,8 @@ onUnmounted(() => {
     background: rgba(183,148,246,0.15);
     border: 1px solid rgba(183,148,246,0.3);
 }
-.dot--done    { background: #00ff9d; border-color: #00ff9d; }
+.dot--correct { background: #00ff9d; border-color: #00ff9d; }
+.dot--wrong   { background: #ff3333; border-color: #ff3333; }
 .dot--current { background: #b794f6; border-color: #e4d6ff; box-shadow: 0 0 8px rgba(183,148,246,0.7); animation: sgl-dot-pulse 1s ease-in-out infinite; }
 
 /* ── Body ──────────────────────────────────────────────────────────────────── */
@@ -607,27 +537,24 @@ onUnmounted(() => {
 }
 .sgl-cand-row {
     font-size: 12px;
-    cursor: pointer;
     border-bottom: 1px solid rgba(183,148,246,0.07);
     transition: background 0.1s;
 }
 .sgl-cand-row:last-child { border-bottom: none; }
-.sgl-cand-row:hover { background: rgba(183,148,246,0.08); }
 
 .sgl-col { flex: 1; min-width: 0; }
-.sgl-col--num  { flex: 0 0 26px; color: rgba(196,166,255,0.35); }
+.sgl-col--num  { flex: 0 0 30px; color: rgba(196,166,255,0.35); }
 .sgl-col--addr { flex: 0 0 150px; color: #e4d6ff; letter-spacing: 0.03em; }
+.sgl-col--ping { flex: 0 0 70px; }
 
-.val--active  { color: #00ff9d; }
-.val--idle    { color: rgba(196,166,255,0.35); }
-.val--flagged { color: #ff3333; font-weight: 700; }
+.val--unscanned { color: rgba(196,166,255,0.25); }
 
 .row--flash-correct { background: rgba(0,255,157,0.15) !important; }
 .row--flash-wrong    { background: rgba(255,51,51,0.15) !important; }
 
 /* ── Side panel ────────────────────────────────────────────────────────────── */
 .sgl-side {
-    width: 230px;
+    width: 250px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -638,20 +565,12 @@ onUnmounted(() => {
     overflow-y: auto;
 }
 .sgl-side-title { font-size: 10px; letter-spacing: 0.14em; color: rgba(196,166,255,0.5); }
-.sgl-side-hint  { font-size: 10px; line-height: 1.6; color: rgba(196,166,255,0.55); }
-.sgl-side-key   { color: #e4d6ff; }
 
 .sgl-panel-rule { height: 1px; background: rgba(183,148,246,0.12); }
 
-.sgl-legend-title { font-size: 9px; letter-spacing: 0.12em; color: rgba(196,166,255,0.4); margin-bottom: 5px; }
-.sgl-legend-line  { font-size: 9px; line-height: 1.6; color: rgba(196,166,255,0.45); }
-
-.sgl-heat-block { display: flex; flex-direction: column; gap: 5px; }
-.sgl-heat-label { font-size: 9px; letter-spacing: 0.12em; color: rgba(196,166,255,0.4); }
-.sgl-heat-bar { height: 6px; background: rgba(183,148,246,0.08); overflow: hidden; }
-.sgl-heat-fill { height: 100%; background: #b794f6; transition: width 0.25s ease, background 0.25s; }
-.sgl-heat-fill.heat--warn     { background: #FFB300; }
-.sgl-heat-fill.heat--critical { background: #ff3333; }
+.sgl-legend { display: flex; flex-direction: column; gap: 6px; }
+.sgl-legend-line { font-size: 9.5px; line-height: 1.6; color: rgba(196,166,255,0.55); }
+.sgl-legend-line b { color: #e4d6ff; }
 
 /* ── Feedback flash ────────────────────────────────────────────────────────── */
 .sgl-flash-row { min-height: 18px; flex-shrink: 0; }
@@ -661,6 +580,49 @@ onUnmounted(() => {
 
 .sgl-flash-fade-enter-active, .sgl-flash-fade-leave-active { transition: opacity 0.25s; }
 .sgl-flash-fade-enter-from,   .sgl-flash-fade-leave-to     { opacity: 0; }
+
+/* ── Command input + autocomplete ─────────────────────────────────────────── */
+.sgl-cmdbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    border: 1px solid rgba(183,148,246,0.3);
+    background: rgba(183,148,246,0.04);
+    padding: 8px 12px;
+}
+.sgl-cmd-prompt { color: #00ff9d; font-size: 13px; }
+.sgl-cmd-input-wrap { flex: 1; position: relative; }
+.sgl-cmd-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e4d6ff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+}
+.sgl-cmd-input::placeholder { color: rgba(196,166,255,0.3); }
+.sgl-cmd-input:disabled { opacity: 0.4; }
+
+.sgl-suggest-list {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 160px;
+    background: #150f24;
+    border: 1px solid rgba(183,148,246,0.35);
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+    z-index: 10;
+}
+.sgl-suggest-item {
+    padding: 6px 12px;
+    font-size: 12px;
+    color: rgba(196,166,255,0.7);
+    cursor: pointer;
+}
+.suggest--active { background: rgba(183,148,246,0.18); color: #e4d6ff; }
 
 /* ── Outcome overlay ───────────────────────────────────────────────────────── */
 .sgl-outcome-overlay {
@@ -694,6 +656,5 @@ onUnmounted(() => {
 }
 .sgl-outcome-btn:hover { background: rgba(183,148,246,0.08); border-color: #e4d6ff; color: #e4d6ff; }
 
-@keyframes sgl-blink { from { opacity: 1; } to { opacity: 0.4; } }
 @keyframes sgl-dot-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 </style>

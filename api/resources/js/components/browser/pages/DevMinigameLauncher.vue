@@ -84,7 +84,7 @@
         <div class="dev-header" style="margin-top: 4px;">
             <span class="dev-tag">[ DEV BUILD ]</span>
             <span class="dev-title">SIGNAL LOCK — POOL-TEMPLATE CANDIDATE</span>
-            <span class="dev-sub">// Reads a rule line, pick the candidate row that satisfies it. Parity rule unlocks at ICE 5+; a flagged decoy joins it at ICE 7+.</span>
+            <span class="dev-sub">// Type scan commands to isolate a device from decoys, then commit log/jam per its signal behavior. Shared-prefix decoys (need PING to break the tie) join at ICE 5+; density rises again at ICE 7+.</span>
         </div>
 
         <div class="dev-games">
@@ -95,13 +95,15 @@
                 </div>
                 <div class="dev-game-quest">CANDIDATE — ICE {{ sglIce }} / RIG: {{ sglRig.label }}</div>
                 <div class="dev-game-brief">
-                    Read the objective rule at the top, then pick (click or press 1&ndash;N) the one
-                    candidate row that actually satisfies it &mdash; the rest fail on at least one field.
+                    Type <b>scan mac</b> / <b>scan sig</b> / <b>scan ping</b> (arrow keys + Enter to
+                    autocomplete) to reveal the device table, isolate the one matching the signature,
+                    then commit with <b>log &lt;id&gt;</b> or <b>jam &lt;id&gt;</b> per the standing
+                    directive. Best-of-N per match &mdash; wrong device or wrong call are equally a miss.
                 </div>
                 <div class="dev-diff-row" style="margin: 4px 0;">
                     <span class="dev-diff-label">ICE</span>
                     <button
-                        v-for="ice in [3, 4, 5, 6, 7, 8, 9, 10]"
+                        v-for="ice in [3, 4, 5, 6, 7, 8]"
                         :key="ice"
                         class="dev-diff-btn"
                         :class="{ 'dev-diff-btn--active': sglIce === ice }"
