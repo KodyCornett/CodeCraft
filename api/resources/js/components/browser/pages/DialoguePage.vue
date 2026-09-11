@@ -1,6 +1,7 @@
 <template>
     <div class="dp-root" :style="{ '--dp-accent': accentColor }">
         <div class="dp-scanline" />
+        <GlitchFx :fx="activeFx" />
 
         <!-- ── Header ────────────────────────────────────────────────────── -->
         <div class="dp-header">
@@ -82,6 +83,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useAudio } from '../../../composables/useAudio.js';
+import GlitchFx from '../../shared/GlitchFx.vue';
 
 const props = defineProps({
     entries:       { type: Array,  required: true },
@@ -109,6 +111,7 @@ const complete        = ref(false);
 const isTyping        = ref(false);
 const selectedChoice  = ref(null);
 const scrollEl        = ref(null);
+const activeFx        = ref(null);   // current entry's FX cue — { preset } or { type, duration } — see GlitchFx.vue
 
 let _entryIdx   = 0;
 let _timers     = [];
@@ -279,6 +282,7 @@ function _revealNext() {
     const t = setTimeout(() => {
         revealedEntries.value.push(entry);
         isTyping.value = false;
+        if (entry.fx) activeFx.value = entry.fx;
         _scrollBottom();
 
         if (entry.audio) {
@@ -351,6 +355,7 @@ watch(() => props.entries, (val) => {
         choiceMade.value      = false;
         complete.value        = false;
         selectedChoice.value  = null;
+        activeFx.value        = null;
 
         const t = setTimeout(_revealNext, 300);
         _timers.push(t);

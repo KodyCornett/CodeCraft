@@ -66,6 +66,7 @@
 import { ref, inject, onMounted, onUnmounted } from 'vue';
 import { SPLICE } from '@/components/browser/SpliceRouter.js';
 import { findCompanyByQuery } from '@/composables/codexPageRoutes.js';
+import { findBankByQuery } from '@/composables/bankPageRoutes.js';
 
 defineProps({ url: { type: String, default: '' } });
 
@@ -95,7 +96,7 @@ function onGo() {
         // Not a literal address — try resolving it as a company name first
         // (e.g. "avista", "the valley voice") before falling back to
         // treating it as a bare domain.
-        url = findCompanyByQuery(raw) ?? ('splice://' + raw);
+        url = findCompanyByQuery(raw) ?? findBankByQuery(raw) ?? ('splice://' + raw);
     }
     spliceNavigate(url);
     query.value = '';

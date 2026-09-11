@@ -231,7 +231,7 @@ class BountyServiceTest extends TestCase
     }
 
     // =========================================================================
-    // extractToStreetDoc — resets all run counters
+    // extractToCyberDoc — resets all run counters
     // =========================================================================
 
     public function test_extract_resets_all_run_counters(): void
@@ -246,7 +246,7 @@ class BountyServiceTest extends TestCase
             'bounty_district_snapshot' => 'Downtown',
         ]);
 
-        $this->service->extractToStreetDoc($player);
+        $this->service->extractToCyberDoc($player);
 
         $fresh = $player->fresh();
         $this->assertSame(0, $fresh->nodes_hacked_this_run);
@@ -265,7 +265,7 @@ class BountyServiceTest extends TestCase
             'open_season_best_wins'    => 5,
         ]);
 
-        $this->service->extractToStreetDoc($player);
+        $this->service->extractToCyberDoc($player);
 
         $this->assertSame(5, $player->fresh()->open_season_best_wins);
     }

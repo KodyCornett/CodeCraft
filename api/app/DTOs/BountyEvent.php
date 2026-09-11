@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\DTOs;
 
 /**
  * Value object returned from BountyService state-change methods.

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\DTOs\BountyEvent;
 use App\Models\Player;
 use Illuminate\Support\Collection;
 
@@ -290,14 +291,6 @@ class BountyService
         $player->save();
 
         return $pocket; // caller adds this to safe wallet
-    }
-
-    /**
-     * Alias for extractToCyberDoc() — keeps older test references working.
-     */
-    public function extractToStreetDoc(Player $player): int
-    {
-        return $this->extractToCyberDoc($player);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

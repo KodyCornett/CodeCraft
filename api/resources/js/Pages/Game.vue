@@ -465,7 +465,7 @@ import { WATCHER_TRANSITIONS } from '@/constants/watcherTransitions.js';
 import { SPLICE }              from '@/components/browser/SpliceRouter.js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-const { playerId, player: authPlayer, rig: authRig, login } = useAuth();
+const { playerId, player: authPlayer, rig: authRig, login, logout } = useAuth();
 
 // ── Game state — all reactive refs, seeded from API after login ───────────────
 const {
@@ -511,9 +511,6 @@ const { applyDamage } = useRigDamage();
 // ── CyberDoc — banking and NPC interactions ───────────────────────────────────
 const cyberDoc = useCyberDoc();
 
-// ── Trap system — mine/decoy placement + server-persisted trap list ───────────
-const { myTraps, placeTrap, placeDecoy, fetchMyTraps } = useTrapSystem();
-
 // PvP combat state
 const activePacketHijack = ref(false); // true while the PH terminal overlay is shown
 
@@ -541,10 +538,12 @@ const criticalFailure = ref(null);
 const hudFlash    = ref('');
 let   _flashTimer = null;
 
-// Trap UI state
-const trapTargetMode        = ref(null);
-const trapHitNotification   = ref(null);
-const trapFiredNotification = ref(null);
+// ── Trap system — mine/decoy placement + targeting mode + notifications ──────
+const {
+    myTraps, trapTargetMode, trapHitNotification, trapFiredNotification,
+    placeDecoy, fetchMyTraps,
+    attemptPlaceTrap, cancelTrapTarget, handleTrapHit, handleTrapFired,
+} = useTrapSystem({ hudFlash });
 
 // Boot notification — shown after Watcher reboot sequence completes
 const bootNotification = ref(false);
@@ -703,11 +702,6 @@ function onBankHeistComplete(payload) {
         const node = getByCanvasId(payload.canvasId);
         if (node) updateNodeResources(node.id, { bankCooldownUntil: payload.cooldownUntil ?? null });
     }
-
-    console.log(
-        `[BANK HEIST] ${payload?.gate1Failed ? 'Gate 1 failed' : (payload?.lockdown ? 'LOCKDOWN' : 'Extracted clean')}` +
-        ` | +${payload?.totalCreds ?? 0} creds, +${(payload?.totalTech ?? 0).toFixed ? payload.totalTech.toFixed(2) : payload?.totalTech ?? 0} tech`
-    );
 }
 
 function onBankHeistAbort() {
@@ -730,7 +724,6 @@ watch(activeComposedSpec, (val) => {
 });
 
 function onComposedMinigameComplete(payload) {
-    console.log('[COMPOSER] Pairing solved', payload);
     // Don't clear here — ComposedMinigame.vue shows its own PAIRING SOLVED /
     // PAIRING FAILED outcome pane and waits for [ CLOSE ], which fires
     // @abort below. Clearing immediately on @complete/@failed was unmounting
@@ -739,7 +732,6 @@ function onComposedMinigameComplete(payload) {
 }
 
 function onComposedMinigameFailed(payload) {
-    console.log('[COMPOSER] Pairing failed', payload);
     // See onComposedMinigameComplete's comment — same reasoning applies.
 }
 
@@ -763,14 +755,12 @@ watch(devSITActive, (val) => {
 });
 
 function onSITComplete(payload) {
-    console.log('[SIT] Solved', payload);
     // Don't clear here — SIT.vue shows its own outcome pane and waits for
     // [ CLOSE ], which fires @abort below. Same reasoning as
     // onComposedMinigameComplete above.
 }
 
 function onSITFailed(payload) {
-    console.log('[SIT] Failed', payload);
 }
 
 function onSITAbort() {
@@ -793,12 +783,10 @@ watch(devSignalLockActive, (val) => {
 });
 
 function onSignalLockComplete(payload) {
-    console.log('[SignalLock] Solved', payload);
     activeSignalLock.value = null;
 }
 
 function onSignalLockFailed(payload) {
-    console.log('[SignalLock] Failed', payload);
     activeSignalLock.value = null;
 }
 
@@ -865,34 +853,8 @@ async function onQuestMinigameFail() {
 
 // ── Node click — intercepts trap targeting mode before normal selection ────────
 function handleNodeClicked(event) {
-    if (trapTargetMode.value) {
-        if (!event.isAdjacent) {
-            clearTimeout(_flashTimer);
-            hudFlash.value = `OUT OF RANGE — select an adjacent node to plant ${trapTargetMode.value.cmd.name}`;
-            _flashTimer = setTimeout(() => { hudFlash.value = ''; }, 3_000);
-            return;
-        }
-        const { cmd, match } = trapTargetMode.value;
-        const ttl = cmd.duration?.moves ?? 5;
-
-        placeTrap(event.node.id, cmd.id).then(res => {
-            if (res) fetchMyTraps();
-            else { match.cooldown = false; match.movesLeft = 0; }
-        });
-
-        match.cooldown  = true;
-        match.movesLeft = ttl;
-        trapTargetMode.value = null;
-        return;
-    }
+    if (attemptPlaceTrap(event)) return;
     onNodeClicked(event);
-}
-
-function cancelTrapTarget() {
-    if (!trapTargetMode.value) return;
-    // Revert the premature cooldown — command stays ready if the player cancels
-    trapTargetMode.value.match.cooldown = false;
-    trapTargetMode.value = null;
 }
 
 // ── Player movement ───────────────────────────────────────────────────────────
@@ -905,10 +867,7 @@ function handlePlayerMoved(event) {
 
         if (data.trap_triggered) {
             applyTrapEffects(data.trap_triggered, data.active_effects, data.current_ss);
-            trapHitNotification.value = {
-                commandName: data.trap_triggered.command_name,
-                effect:      data.trap_triggered.effect,
-            };
+            handleTrapHit(data.trap_triggered);
         }
         fetchMyTraps();
     });
@@ -969,7 +928,7 @@ async function onLogout() {
     try { await tutorial.flush(); } catch (e) {
         console.warn('[LOGOUT] tutorial flush failed:', e?.message);
     }
-    try { await axios.post('/logout'); } catch { /* session may already be expired */ }
+    await logout();
     window.location.href = '/login';
 }
 
@@ -1007,30 +966,24 @@ provide('tutorial', tutorial);
 // Clear badge + fire URL-based tutorial step triggers when SPLICE navigates
 watch(activeBrowserUrl, (url) => {
     if (!url) return;
-    console.log('%c[TUTORIAL:nav] activeBrowserUrl →', 'color:#00FFC8;font-weight:bold', url);
 
     if (url.startsWith(SPLICE.TERMINAL) || url.startsWith(SPLICE.TUTORIAL)) {
         tutorial.clearBadge();
     }
     if (url.startsWith(SPLICE.RIG)) {
-        console.log('%c[TUTORIAL:nav] matched RIG — calling markStepDone(open_rig)', 'color:#00FFC8');
         tutorial.markStepDone('open_rig');
     }
     if (url.startsWith(SPLICE.STAT_GUIDE)) {
-        console.log('%c[TUTORIAL:nav] matched STAT_GUIDE — calling markStepDone(read_stat_guide)', 'color:#00FFC8');
         tutorial.markStepDone('read_stat_guide');
     }
     if (url.startsWith('splice://cyberdoc')) {
-        console.log('%c[TUTORIAL:nav] matched cyberdoc — calling markStepDone(open_cyberdoc_store)', 'color:#00FFC8');
         tutorial.markStepDone('open_cyberdoc_store');
     }
 });
 
 // Launch CORTEX_PATCH install sequence once tutorial is complete and cortex hasn't been seen
 watch([booted, tutorial.needsCortexInstall], ([isBooted, needsInstall]) => {
-    console.log('%c[TUTORIAL] cortex-install watcher — booted:', 'color:#00FFC8;font-weight:bold', isBooted, 'needsInstall:', needsInstall);
     if (isBooted && needsInstall) {
-        console.log('%c[TUTORIAL] Launching CORTEX_PATCH SPLICE page', 'color:#00FFC8;font-weight:bold');
         fetchQuestLog();
         onLaunch(SPLICE.CORTEX_PATCH);
     }
@@ -1240,13 +1193,11 @@ const currentNodeDialogueUrl = computed(() => {
 
     const doc = questDocs.value.find(d => d.district === node.district);
     if (!doc) {
-        console.log(`%c[DIALOGUE] ${node.npcHandle} — no quest doc found for district "${node.district}"`, 'color:#FF6B35');
         return null;
     }
     const hasDialogue = doc.arcs?.some(arc =>
         arc.stages?.some(s => s.status === 'active' && s.dialogue?.length > 0)
     );
-    console.log(`%c[DIALOGUE] ${node.npcHandle} — met=${doc.met} hasActiveDialogue=${hasDialogue}`, 'color:#00FFC8');
     return hasDialogue ? url : null;
 });
 
@@ -1372,13 +1323,11 @@ function _fireWatcherTransition(t) {
 
 // Called by SystemUpdate.vue when the install sequence finishes
 provide('onInstallComplete', () => {
-    console.log('%c[TUTORIAL] onInstallComplete fired — cutting audio, queueing Watcher intrusion', 'color:#FF6B35;font-weight:bold');
     cutAudio();
 
     _postSignalNav.value = () => {
         const pool      = _WATCHER_RESPAWN_POOL;
         const respawnId = pool[Math.floor(Math.random() * pool.length)];
-        console.log('%c[TUTORIAL] Watcher reboot complete — respawning to', 'color:#FF6B35;font-weight:bold', respawnId);
         currentNodeId.value = respawnId;
         resumeAudio();
         tutorial.markCortexInstall();
@@ -1526,8 +1475,6 @@ onMounted(async () => {
         startHeartbeat();
         startAudio();
         initDialogue(NPC_DIALOGUE_URL);
-
-        console.log(`[BOOT] Auth OK — playing as ${player.value.handle} (${playerId.value})`);
     }
 
     // Step 2 — start polling
@@ -1544,10 +1491,7 @@ onMounted(async () => {
                 incomingChallenge.value   = null;
             })
             .listen('.trap.triggered', (data) => {
-                trapFiredNotification.value = {
-                    commandName:  data.command_name,
-                    victimHandle: data.victim_handle,
-                };
+                handleTrapFired(data);
                 fetchMyTraps();
             });
     }
@@ -1564,9 +1508,7 @@ onMounted(async () => {
         currentNodeId.value = startCanvasId;
         onNodeClicked({ node: { id: startCanvasId, x: 0, y: 0 }, isAdjacent: false });
         if (savedCanvasId) {
-            console.log('[BOOT] Position restored at', savedCanvasId);
         } else {
-            console.log('[SPAWN] Player placed at', spawnCanvasId);
             updatePosition(spawnCanvasId, player.value.district);
         }
     } else {

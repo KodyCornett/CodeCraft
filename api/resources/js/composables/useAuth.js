@@ -10,7 +10,8 @@
  *      session cookie authenticate /api/* requests — no Bearer token needed.
  *   3. GET /api/player/me → player UUID + rig snapshot.
  *
- * To log out: POST /logout (wired in NavBar or a future settings page).
+ * logout() POSTs /logout to invalidate the session; the caller (Game.vue's
+ * onLogout) handles the redirect to /login afterward.
  */
 
 import { ref, readonly } from 'vue';
@@ -45,6 +46,19 @@ export function useAuth() {
         }
     }
 
+    /**
+     * Invalidate the session server-side, then let the caller redirect.
+     * Best-effort — if the session is already expired the POST 404s/419s and
+     * we swallow it, since the caller is navigating to /login regardless.
+     */
+    async function logout() {
+        try {
+            await axios.post('/logout');
+        } catch {
+            /* session may already be expired */
+        }
+    }
+
     return {
         ready:    readonly(ready),
         playerId: readonly(playerId),
@@ -52,5 +66,6 @@ export function useAuth() {
         rig:      readonly(rig),
         error:    readonly(error),
         login,
+        logout,
     };
 }
