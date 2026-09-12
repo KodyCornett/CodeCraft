@@ -1,77 +1,69 @@
 <template>
-    <!-- Dim backdrop — click outside window to close -->
-    <div class="splice-overlay" @click.self="handleClose">
+    <!-- Chrome (backdrop, titlebar, traffic lights) is the shared OsWindow shell —
+         Browser only supplies its own tab bar / nav bar / page content below. -->
+    <OsWindow title="SPLICE BROWSER" :minimizable="false" @close="handleClose">
+      <!-- OsWindow's content slot is a plain block box — Browser supplies its
+           own flex-column stacking (tabbar/navbar/content) here, same layout
+           `.splice-window` used to provide before this chrome moved out. -->
+      <div class="browser-body">
 
-        <div class="splice-window">
-
-            <!-- ── Title bar ───────────────────────────────────────────────── -->
-            <div class="splice-titlebar">
-                <div class="traffic-lights">
-                    <button class="tl tl-close" title="Close"    @click="handleClose" />
-                    <button class="tl tl-min"   title="Minimize" />
-                    <button class="tl tl-max"   title="Maximize" />
-                </div>
-                <span class="splice-appname">SPLICE BROWSER</span>
-                <button class="titlebar-close" @click="handleClose">✕ CLOSE</button>
-            </div>
-
-            <!-- ── Tab bar ─────────────────────────────────────────────────── -->
-            <div class="splice-tabbar">
-                <button
-                    v-for="tab in tabs"
-                    :key="tab.id"
-                    class="splice-tab"
-                    :class="{ 'splice-tab--active': tab.id === activeTabId }"
-                    @click="setActiveTab(tab.id)"
-                >
-                    <span class="tab-label">{{ getPageTitle(tab.url) }}</span>
-                    <span
-                        v-if="tabs.length > 1"
-                        class="tab-x"
-                        @click.stop="closeTab(tab.id)"
-                    >✕</span>
-                </button>
-                <button class="splice-new-tab" title="New tab" @click="openTab()">＋</button>
-            </div>
-
-            <!-- ── Nav bar ─────────────────────────────────────────────────── -->
-            <div class="splice-navbar">
-                <button class="nav-btn" :disabled="!canGoBack" @click="back()"         title="Back">&#8592;</button>
-                <button class="nav-btn" disabled                                        title="Forward">&#8594;</button>
-                <button class="nav-btn" @click="navigate(currentUrl)"                  title="Reload">&#8635;</button>
-                <button class="nav-btn" @click="navigate(SPLICE.HOME)"                 title="Home">&#8962;</button>
-
-                <div class="address-bar" @click="focusInput">
-                    <span class="addr-secure">&#9679;</span>
-                    <span class="addr-scheme">splice://</span>
-                    <input
-                        ref="addrInputEl"
-                        class="addr-input"
-                        v-model="addressInput"
-                        @keydown.enter="onNavigate"
-                        @focus="onAddrFocus"
-                        @blur="onAddrBlur"
-                        spellcheck="false"
-                        autocomplete="off"
-                    />
-                </div>
-
-                <button class="go-btn" @click="onNavigate">GO</button>
-            </div>
-
-            <!-- ── Page content ────────────────────────────────────────────── -->
-            <div class="splice-content">
-                <Transition name="page-fade" mode="out-in">
-                    <component
-                        :is="currentPage"
-                        :key="currentUrl"
-                        :url="currentUrl"
-                    />
-                </Transition>
-            </div>
-
+        <!-- ── Tab bar ─────────────────────────────────────────────────────── -->
+        <div class="splice-tabbar">
+            <button
+                v-for="tab in tabs"
+                :key="tab.id"
+                class="splice-tab"
+                :class="{ 'splice-tab--active': tab.id === activeTabId }"
+                @click="setActiveTab(tab.id)"
+            >
+                <span class="tab-label">{{ getPageTitle(tab.url) }}</span>
+                <span
+                    v-if="tabs.length > 1"
+                    class="tab-x"
+                    @click.stop="closeTab(tab.id)"
+                >✕</span>
+            </button>
+            <button class="splice-new-tab" title="New tab" @click="openTab()">＋</button>
         </div>
-    </div>
+
+        <!-- ── Nav bar ─────────────────────────────────────────────────────── -->
+        <div class="splice-navbar">
+            <button class="nav-btn" :disabled="!canGoBack" @click="back()"         title="Back">&#8592;</button>
+            <button class="nav-btn" disabled                                        title="Forward">&#8594;</button>
+            <button class="nav-btn" @click="navigate(currentUrl)"                  title="Reload">&#8635;</button>
+            <button class="nav-btn" @click="navigate(SPLICE.HOME)"                 title="Home">&#8962;</button>
+
+            <div class="address-bar" @click="focusInput">
+                <span class="addr-secure">&#9679;</span>
+                <span class="addr-scheme">splice://</span>
+                <input
+                    ref="addrInputEl"
+                    class="addr-input"
+                    v-model="addressInput"
+                    @keydown.enter="onNavigate"
+                    @focus="onAddrFocus"
+                    @blur="onAddrBlur"
+                    spellcheck="false"
+                    autocomplete="off"
+                />
+            </div>
+
+            <button class="go-btn" @click="onNavigate">GO</button>
+        </div>
+
+        <!-- ── Page content ────────────────────────────────────────────────── -->
+        <div class="splice-content">
+            <Transition name="page-fade" mode="out-in">
+                <component
+                    :is="currentPage"
+                    :key="currentUrl"
+                    :url="currentUrl"
+                />
+            </Transition>
+        </div>
+
+      </div>
+    </OsWindow>
 </template>
 
 <script setup>
@@ -80,6 +72,7 @@ import { useBrowser }                   from '@/composables/useBrowser.js';
 import { resolveRoute, getPageTitle, SPLICE } from './SpliceRouter.js';
 import { findCompanyByQuery } from '@/composables/codexPageRoutes.js';
 import { findBankByQuery } from '@/composables/bankPageRoutes.js';
+import OsWindow from '@/components/shared/OsWindow.vue';
 
 const props = defineProps({
     initialUrl: { type: String, default: 'splice://home' },
@@ -158,89 +151,16 @@ function handleClose() {
 </script>
 
 <style scoped>
-/* ── Overlay ──────────────────────────────────────────────────────────────── */
-.splice-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 50;
-    background: rgba(0, 0, 0, 0.65);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-}
+/* Overlay/window/titlebar/traffic-lights chrome now lives in OsWindow.vue —
+   this file only styles what it still owns: tabs, nav bar, page content. */
 
-/* ── Browser window ───────────────────────────────────────────────────────── */
-.splice-window {
-    width: 100%;
-    height: 100%;
-    max-width: 960px;
+/* Replaces the flex-column stacking `.splice-window` used to provide —
+   OsWindow's content slot is a plain block box, so Browser owns its own
+   internal layout here instead of leaning on shared-shell CSS for it. */
+.browser-body {
     display: flex;
     flex-direction: column;
-    background: #0a0a12;
-    border: 1px solid rgba(0, 255, 255, 0.2);
-    box-shadow:
-        0 0 0 1px rgba(0, 255, 255, 0.05),
-        0 24px 60px rgba(0, 0, 0, 0.7);
-    overflow: hidden;
-}
-
-/* ── Title bar ────────────────────────────────────────────────────────────── */
-.splice-titlebar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 9px 14px;
-    background: #080810;
-    border-bottom: 1px solid rgba(0, 255, 255, 0.07);
-    flex-shrink: 0;
-    user-select: none;
-}
-
-.traffic-lights {
-    display: flex;
-    gap: 7px;
-    flex-shrink: 0;
-}
-
-.tl {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-}
-.tl-close { background: #FF3B30; }
-.tl-min   { background: #FFB300; cursor: default; }
-.tl-max   { background: #00FF88; cursor: default; }
-.tl-close:hover { background: #FF6060; }
-
-.splice-appname {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: rgba(0, 255, 255, 0.3);
-    letter-spacing: 0.18em;
-    flex: 1;
-    text-align: center;
-}
-
-.titlebar-close {
-    background: transparent;
-    border: 1px solid rgba(255, 51, 51, 0.3);
-    color: rgba(255, 51, 51, 0.6);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    padding: 4px 12px;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.titlebar-close:hover {
-    background: rgba(255, 51, 51, 0.12);
-    color: #FF3333;
-    border-color: rgba(255, 51, 51, 0.7);
+    height: 100%;
 }
 
 /* ── Tab bar ──────────────────────────────────────────────────────────────── */

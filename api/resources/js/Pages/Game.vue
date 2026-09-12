@@ -29,29 +29,46 @@
         <div class="map-row" :class="{ 'map-hidden': !booted }">
 
             <div class="map-stage">
-                <!-- Hex node map -->
-                <HexMapCanvas
-                    ref="mapCanvasRef"
-                    :nodes="nodes"
-                    :pings="pings"
-                    :traps="myTraps"
-                    :quest-markers="questMarkers"
-                    :tracked-markers="trackedMarkers"
-                    :current-node-id="currentNodeId"
-                    :player-uplink="player.uplink"
-                    :player-ss="player.currentSS"
-                    :is-dev="player.isDev"
-                    :target-mode="!!trapTargetMode"
-                    @node-clicked="handleNodeClicked"
-                    @player-moved="handlePlayerMoved"
-                    @move-blocked="onMoveBlocked"
-                />
+                <!-- Map program window — opens/closes/minimizes like any other
+                     SPLICE program (see useWindowManager). Open by default for
+                     now (see the windowManager.open('map', ...) call above);
+                     becomes purely icon/taskbar-launched once desktop icons
+                     (Phase 1 step 8) exist. -->
+                <OsWindow
+                    v-if="windowManager.isOpen('map') && !windowManager.isMinimized('map')"
+                    title="NETWORK MAP"
+                    icon="⬢"
+                    accent="#00FF88"
+                    max-width="none"
+                    app-class="map-window"
+                    @close="windowManager.close('map')"
+                    @minimize="windowManager.minimize('map')"
+                    @focus="windowManager.focus('map')"
+                >
+                    <!-- Hex node map -->
+                    <HexMapCanvas
+                        ref="mapCanvasRef"
+                        :nodes="nodes"
+                        :pings="pings"
+                        :traps="myTraps"
+                        :quest-markers="questMarkers"
+                        :tracked-markers="trackedMarkers"
+                        :current-node-id="currentNodeId"
+                        :player-uplink="player.uplink"
+                        :player-ss="player.currentSS"
+                        :is-dev="player.isDev"
+                        :target-mode="!!trapTargetMode"
+                        @node-clicked="handleNodeClicked"
+                        @player-moved="handlePlayerMoved"
+                        @move-blocked="onMoveBlocked"
+                    />
 
-                <!-- HUD overlay -->
-                <HUD :player="player" :rig="rig" :current-node="currentNode" :bounty-ticker="bountyTicker" :flash="hudFlash" />
+                    <!-- HUD overlay -->
+                    <HUD :player="player" :rig="rig" :current-node="currentNode" :bounty-ticker="bountyTicker" :flash="hudFlash" />
 
-                <!-- Active objective tracker — top-left, collapses to header bar -->
-                <ObjectiveTracker v-if="tutorial.allComplete.value" :objective="activeObjective" />
+                    <!-- Active objective tracker — top-left, collapses to header bar -->
+                    <ObjectiveTracker v-if="tutorial.allComplete.value" :objective="activeObjective" />
+                </OsWindow>
 
                 <!-- Boot notification — shown after Watcher reboot sequence -->
                 <Transition name="ice-alert-fade">
@@ -329,6 +346,15 @@
             @toggle-frequency="toggleFrequency"
         />
 
+        <!-- TEMP — stands in for a desktop "Network Map" icon until Phase 1
+             step 8 (real desktop icons) lands. Reopens the Map program if
+             it's been closed or minimized. Remove once icons exist. -->
+        <button
+            v-if="!windowManager.isOpen('map') || windowManager.isMinimized('map')"
+            class="temp-map-launcher"
+            @click="windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' })"
+        >⬢ MAP</button>
+
         <!-- DOC hub live chat — opened via the FREQUENCY hotkey in NavBar -->
         <DocChatWindow
             :visible="frequencyOpen"
@@ -376,6 +402,10 @@ import SidePanel  from '@/components/layout/SidePanel.vue';
 
 // ── Map ───────────────────────────────────────────────────────────────────────
 import HexMapCanvas from '@/components/map/HexMapCanvas.vue';
+
+// ── OS shell ──────────────────────────────────────────────────────────────────
+import OsWindow from '@/components/shared/OsWindow.vue';
+import { useWindowManager } from '@/composables/useWindowManager.js';
 
 // ── Overlays ──────────────────────────────────────────────────────────────────
 import BootSequence           from '@/components/shared/BootSequence.vue';
@@ -556,6 +586,19 @@ const {
     selectedNode, selectedNodeIsAdjacent, pings, booted,
     onPlayerMoved, onNodeClicked,
 } = useMapInteraction(player, getByCanvasId);
+
+// ── OS shell — window manager for the map + future program windows ───────────
+const windowManager = useWindowManager();
+
+// Temporary: open the Map program immediately (not gated on `booted`) since
+// desktop icons (Phase 1 step 8) don't exist yet as the real way to launch
+// it. This also matches the pre-refactor behavior the mounted hook below
+// depends on — HexMapCanvas (and mapCanvasRef) must exist synchronously by
+// the time onMounted runs to seed starting position; the `.map-hidden` CSS
+// class (unchanged) is what actually keeps it visually hidden during boot.
+// Remove this open() call once there's a real desktop to click "Network Map"
+// from — at that point the window should start closed.
+windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' });
 
 // ── Ping system ───────────────────────────────────────────────────────────────
 const {
@@ -1552,6 +1595,27 @@ onUnmounted(() => {
 .map-hidden {
     opacity: 0;
     pointer-events: none;
+}
+
+/* TEMP — remove once real desktop icons (Phase 1 step 8) exist. */
+.temp-map-launcher {
+    position: absolute;
+    right: 16px;
+    bottom: 56px;
+    z-index: 40;
+    background: #080810;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    color: #00FF88;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+.temp-map-launcher:hover {
+    background: rgba(0, 255, 136, 0.1);
+    border-color: rgba(0, 255, 136, 0.8);
 }
 
 .map-loading {
