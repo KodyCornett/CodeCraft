@@ -14,8 +14,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * via the File Explorer OS program. Self-referencing tree via parent_id;
  * null parent_id is the player's root folder.
  *
- * Phase 1 is read-only (see CONTRACTS_AND_OS_REWORK_PLAN.md) — content is
- * seeded once per player by FileService and never mutated from the client.
+ * `protected` marks the system-seeded structure (Documents/Downloads
+ * folders and the starter reference docs — see FileService::ensureSeeded())
+ * that the player can't move or delete. Anything else — added by the player
+ * from inside a folder, or dropped in by a game system via
+ * FileService::depositDownload() — is unprotected and deletable.
+ *
  * Kept generic (plain text content, no schema coupling to any other system)
  * so a later mission can insert a file into a specific player's tree.
  */
@@ -31,10 +35,12 @@ class PlayerFile extends Model
         'extension',
         'content',
         'sort_order',
+        'protected',
     ];
 
     protected $casts = [
         'sort_order' => 'integer',
+        'protected'  => 'boolean',
     ];
 
     public function player(): BelongsTo

@@ -31,16 +31,45 @@
 
         <!-- Folder contents -->
         <div v-else class="exp-grid">
-            <button
-                v-for="item in currentChildren"
-                :key="item.id"
-                class="exp-item"
-                @click="openItem(item)"
-            >
-                <span class="exp-item-icon">{{ item.type === 'folder' ? '▢' : '▤' }}</span>
-                <span class="exp-item-label">{{ item.name }}<span v-if="item.extension">.{{ item.extension }}</span></span>
-            </button>
-            <div v-if="currentChildren.length === 0" class="exp-empty">EMPTY FOLDER</div>
+            <div v-for="item in currentChildren" :key="item.id" class="exp-item-wrap">
+                <button class="exp-item" @click="openItem(item)">
+                    <span class="exp-item-icon">{{ item.type === 'folder' ? '▢' : '▤' }}</span>
+                    <span class="exp-item-label">{{ item.name }}<span v-if="item.extension">.{{ item.extension }}</span></span>
+                </button>
+                <!-- Delete affordance — never shown for protected (seeded) items,
+                     and there's no move/drag feature at all to restrict separately. -->
+                <button
+                    v-if="!item.protected"
+                    class="exp-item-delete"
+                    title="Delete"
+                    @click.stop="handleDelete(item)"
+                >✕</button>
+            </div>
+
+            <!-- Add-file tile — only inside a folder (not at the "THIS PC" root),
+                 per the "add files from inside the folders" rule. Minimal by
+                 design: name only, empty content, defaults to .txt. -->
+            <div v-if="currentFolderId !== null" class="exp-item-wrap">
+                <div v-if="creating" class="exp-item exp-item--creating">
+                    <span class="exp-item-icon">▤</span>
+                    <input
+                        ref="newFileInput"
+                        v-model="newFileName"
+                        class="exp-new-input"
+                        type="text"
+                        placeholder="filename.txt"
+                        @keydown.enter="confirmCreate"
+                        @keydown.esc="cancelCreate"
+                        @blur="cancelCreate"
+                    />
+                </div>
+                <button v-else class="exp-item exp-item--add" @click="startCreate">
+                    <span class="exp-item-icon">+</span>
+                    <span class="exp-item-label">NEW FILE</span>
+                </button>
+            </div>
+
+            <div v-if="currentChildren.length === 0 && currentFolderId === null" class="exp-empty">EMPTY FOLDER</div>
         </div>
     </div>
 </template>
@@ -52,15 +81,20 @@
 // touching this component. Single click opens (folder navigates in, file
 // shows its content) — matches the single-click convention the rest of the
 // OS shell already uses (Desktop icons, Start Menu items).
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useFileSystem } from '@/composables/useFileSystem.js';
 
-const { loading, fetchTree, fetchFileContent, childrenOf } = useFileSystem();
+const { loading, fetchTree, fetchFileContent, childrenOf, createFile, deleteFile } = useFileSystem();
 
 const currentFolderId = ref(null);   // null = top level ("THIS PC")
 const breadcrumb      = ref([]);     // [{ id, name }, ...] folders navigated into, root excluded
 const viewingFile     = ref(null);   // { id, name, extension, content } | null
 const fileLoading     = ref(false);
+
+// ── Add file — minimal by design: name only, empty content, .txt default ────
+const creating     = ref(false);
+const newFileName  = ref('');
+const newFileInput = ref(null);
 
 onMounted(fetchTree);
 
@@ -105,6 +139,33 @@ function jumpTo(i) {
     }
     breadcrumb.value = breadcrumb.value.slice(0, i);
     currentFolderId.value = breadcrumb.value[breadcrumb.value.length - 1].id;
+}
+
+function startCreate() {
+    creating.value = true;
+    newFileName.value = '';
+    nextTick(() => newFileInput.value?.focus());
+}
+
+function cancelCreate() {
+    creating.value = false;
+    newFileName.value = '';
+}
+
+async function confirmCreate() {
+    const raw = newFileName.value.trim();
+    if (!raw) { cancelCreate(); return; }
+
+    const dot = raw.lastIndexOf('.');
+    const name      = dot > 0 ? raw.slice(0, dot) : raw;
+    const extension = dot > 0 ? raw.slice(dot + 1) : 'txt';
+
+    await createFile(currentFolderId.value, name, extension);
+    cancelCreate();
+}
+
+async function handleDelete(item) {
+    await deleteFile(item.id);
 }
 </script>
 
@@ -176,6 +237,10 @@ function jumpTo(i) {
     padding: 20px;
 }
 
+.exp-item-wrap {
+    position: relative;
+}
+
 .exp-item {
     display: flex;
     flex-direction: column;
@@ -190,6 +255,50 @@ function jumpTo(i) {
     transition: background 0.12s;
 }
 .exp-item:hover { background: rgba(0, 255, 255, 0.06); }
+
+/* Delete "✕" — hidden until the item is hovered, sits in the corner */
+.exp-item-delete {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    line-height: 14px;
+    padding: 0;
+    background: rgba(10, 10, 18, 0.9);
+    border: 1px solid rgba(255, 51, 51, 0.3);
+    color: rgba(255, 51, 51, 0.6);
+    font-size: 9px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.exp-item-wrap:hover .exp-item-delete { opacity: 1; }
+.exp-item-delete:hover { background: rgba(255, 51, 51, 0.15); color: #FF3333; }
+
+/* Add-file tile */
+.exp-item--add .exp-item-icon,
+.exp-item--add .exp-item-label { color: rgba(0, 255, 255, 0.35); }
+.exp-item--add:hover .exp-item-icon,
+.exp-item--add:hover .exp-item-label { color: #00FFFF; }
+
+.exp-item--creating {
+    cursor: default;
+}
+
+.exp-new-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+    outline: none;
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    text-align: center;
+    color: rgba(0, 255, 255, 0.9);
+    padding: 2px 0;
+}
 
 .exp-item-icon {
     font-size: 26px;

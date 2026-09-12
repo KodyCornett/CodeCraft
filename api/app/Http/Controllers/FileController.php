@@ -49,4 +49,52 @@ class FileController extends Controller
 
         return response()->json($file);
     }
+
+    /**
+     * POST /api/files
+     *
+     * Creates a new file inside one of the player's own folders.
+     * Body: { "parent_id": "uuid", "name": "string", "extension": "string?" }
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $data = $request->validate([
+            'parent_id' => 'required|uuid',
+            'name'      => 'required|string|max:100',
+            'extension' => 'nullable|string|max:20',
+        ]);
+
+        $file = $this->fileService->createFile($player, $data['parent_id'], $data['name'], $data['extension'] ?? null);
+        if ($file === null) {
+            return response()->json(['message' => 'Folder not found.'], 404);
+        }
+
+        return response()->json($file, 201);
+    }
+
+    /**
+     * DELETE /api/files/{fileId}
+     *
+     * Deletes a file the player owns. Refuses (403) protected files and
+     * folders — the seeded structure can't be removed this way.
+     */
+    public function destroy(Request $request, string $fileId): JsonResponse
+    {
+        $player = Player::where('user_id', $request->user()->id)->first();
+        if ($player === null) {
+            return response()->json(['message' => 'Player not found.'], 404);
+        }
+
+        $deleted = $this->fileService->deleteFile($player, $fileId);
+        if (!$deleted) {
+            return response()->json(['message' => 'File not found or cannot be deleted.'], 403);
+        }
+
+        return response()->json(['ok' => true]);
+    }
 }

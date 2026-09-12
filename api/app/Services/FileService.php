@@ -6,14 +6,16 @@ use App\Models\Player;
 use App\Models\PlayerFile;
 
 /**
- * Backs the File Explorer OS program (Phase 1 — read-only, see
- * CONTRACTS_AND_OS_REWORK_PLAN.md).
+ * Backs the File Explorer OS program (see CONTRACTS_AND_OS_REWORK_PLAN.md).
  *
- * Seeds a starter "Documents" folder the first time a player has no files
- * yet, so every player boots into a File Explorer that already has
- * something real in it. Everything below is read-only from the client's
- * perspective — writes only ever happen here (seeding) or, later, from
- * mission logic that inserts a file into a specific player's tree.
+ * Seeds a "Documents" folder (starter reference docs) and an empty
+ * "Downloads" folder the first time a player has no files yet, so every
+ * player boots into a File Explorer that already has something real in it.
+ * The seeded structure — both folders and the starter docs — is marked
+ * `protected`: the player can add files into any folder and delete files
+ * they've added, but can't move or delete the protected structure itself.
+ * There's no move/reorganize feature at all yet, so "can't be moved" is
+ * enforced simply by not building that capability.
  */
 class FileService
 {
@@ -29,13 +31,7 @@ class FileService
         return PlayerFile::where('player_id', $player->id)
             ->orderBy('sort_order')
             ->get()
-            ->map(fn (PlayerFile $f) => [
-                'id'        => $f->id,
-                'parentId'  => $f->parent_id,
-                'name'      => $f->name,
-                'type'      => $f->type,
-                'extension' => $f->extension,
-            ])
+            ->map(fn (PlayerFile $f) => $this->summarize($f))
             ->toArray();
     }
 
@@ -45,23 +41,129 @@ class FileService
      */
     public function getFileContent(Player $player, string $fileId): ?array
     {
-        $file = PlayerFile::where('player_id', $player->id)
-            ->where('id', $fileId)
-            ->first();
-
+        $file = $this->ownedFile($player, $fileId);
         if ($file === null || $file->isFolder()) {
             return null;
         }
 
         return [
-            'id'        => $file->id,
-            'name'      => $file->name,
-            'extension' => $file->extension,
-            'content'   => $file->content,
+            ...$this->summarize($file),
+            'content' => $file->content,
         ];
     }
 
+    /**
+     * Creates a new, unprotected file inside one of the player's own
+     * folders. Returns null if parentId doesn't exist, isn't owned by this
+     * player, or isn't a folder — creation is allowed inside ANY folder the
+     * player owns, protected ones included (Documents/Downloads can always
+     * receive new files; only the seeded structure itself can't be touched).
+     */
+    public function createFile(Player $player, string $parentId, string $name, ?string $extension): ?array
+    {
+        $parent = $this->ownedFile($player, $parentId);
+        if ($parent === null || !$parent->isFolder()) {
+            return null;
+        }
+
+        $file = PlayerFile::create([
+            'player_id'  => $player->id,
+            'parent_id'  => $parent->id,
+            'name'       => $name,
+            'type'       => 'file',
+            'extension'  => $extension ?: 'txt',
+            'content'    => '',
+            'sort_order' => $this->nextSortOrder($parent->id),
+            'protected'  => false,
+        ]);
+
+        return $this->summarize($file);
+    }
+
+    /**
+     * Deletes a file the player owns. Refuses (returns false) if it doesn't
+     * exist, isn't owned by this player, is a folder (no folder-delete
+     * feature exists), or is protected — the seeded structure can never be
+     * removed this way.
+     */
+    public function deleteFile(Player $player, string $fileId): bool
+    {
+        $file = $this->ownedFile($player, $fileId);
+        if ($file === null || $file->isFolder() || $file->protected) {
+            return false;
+        }
+
+        $file->delete();
+        return true;
+    }
+
+    /**
+     * Drops a file into the player's Downloads folder. Not wired to any API
+     * route yet — this is the hook future mission/game-system code calls
+     * directly to hand the player a file (an extracted document, mission
+     * loot, etc.) without going through the client at all. Finds the
+     * player's Downloads folder (seeding it defensively if somehow absent);
+     * the deposited file itself is unprotected, same as anything the player
+     * adds themselves, so they can clean it up once they're done with it.
+     */
+    public function depositDownload(Player $player, string $name, ?string $extension, string $content): PlayerFile
+    {
+        $this->ensureSeeded($player);
+
+        $downloads = PlayerFile::where('player_id', $player->id)
+            ->whereNull('parent_id')
+            ->where('type', 'folder')
+            ->where('name', 'Downloads')
+            ->first();
+
+        if ($downloads === null) {
+            $downloads = PlayerFile::create([
+                'player_id'  => $player->id,
+                'parent_id'  => null,
+                'name'       => 'Downloads',
+                'type'       => 'folder',
+                'sort_order' => 1,
+                'protected'  => true,
+            ]);
+        }
+
+        return PlayerFile::create([
+            'player_id'  => $player->id,
+            'parent_id'  => $downloads->id,
+            'name'       => $name,
+            'type'       => 'file',
+            'extension'  => $extension ?: 'txt',
+            'content'    => $content,
+            'sort_order' => $this->nextSortOrder($downloads->id),
+            'protected'  => false,
+        ]);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
+
+    private function ownedFile(Player $player, string $fileId): ?PlayerFile
+    {
+        return PlayerFile::where('player_id', $player->id)
+            ->where('id', $fileId)
+            ->first();
+    }
+
+    private function nextSortOrder(string $parentId): int
+    {
+        return (PlayerFile::where('parent_id', $parentId)->max('sort_order') ?? -1) + 1;
+    }
+
+    private function summarize(PlayerFile $f): array
+    {
+        return [
+            'id'        => $f->id,
+            'parentId'  => $f->parent_id,
+            'name'      => $f->name,
+            'type'      => $f->type,
+            'extension' => $f->extension,
+            'protected' => $f->protected,
+        ];
+    }
 
     private function ensureSeeded(Player $player): void
     {
@@ -75,6 +177,16 @@ class FileService
             'name'       => 'Documents',
             'type'       => 'folder',
             'sort_order' => 0,
+            'protected'  => true,
+        ]);
+
+        PlayerFile::create([
+            'player_id'  => $player->id,
+            'parent_id'  => null,
+            'name'       => 'Downloads',
+            'type'       => 'folder',
+            'sort_order' => 1,
+            'protected'  => true,
         ]);
 
         $starters = [
@@ -104,6 +216,7 @@ class FileService
                 'extension'  => $doc['extension'],
                 'content'    => $doc['content'],
                 'sort_order' => $i,
+                'protected'  => true,
             ]);
         }
     }

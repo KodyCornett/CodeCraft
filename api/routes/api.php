@@ -257,10 +257,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // ---------------------------------------------------------------------------
 // Files — per-player virtual file system backing the File Explorer OS
-// program. Phase 1 is read-only (see CONTRACTS_AND_OS_REWORK_PLAN.md).
+// program (see CONTRACTS_AND_OS_REWORK_PLAN.md). The seeded structure
+// (Documents/Downloads + starter docs) is protected — create/delete only
+// ever touch unprotected, player- or system-added files.
 // ---------------------------------------------------------------------------
 
     Route::get('/files',            [FileController::class, 'index']);
     Route::get('/files/{fileId}',   [FileController::class, 'show']);
+    // create/delete: 30/min — generous for normal use, still blocks scripted spam
+    Route::post('/files',           [FileController::class, 'store'])
+        ->middleware('throttle:30,1');
+    Route::delete('/files/{fileId}', [FileController::class, 'destroy'])
+        ->middleware('throttle:30,1');
 
 });
