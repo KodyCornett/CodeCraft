@@ -2,29 +2,17 @@
     <div class="desktop">
         <div class="desktop-icons">
 
-            <!-- Network Map — not a SPLICE browser page, so it's a distinct
-                 event the parent wires to windowManager.open('map', ...)
-                 rather than onLaunch(url). -->
-            <button class="desktop-icon" @click="emit('open-map')">
-                <span class="di-glyph">⬢</span>
-                <span class="di-label">NETWORK MAP</span>
-            </button>
-
-            <!-- SPLICE home -->
-            <button class="desktop-icon" @click="emit('launch', SPLICE.HOME)">
-                <span class="di-glyph">◈</span>
-                <span class="di-label">SPLICE</span>
-            </button>
-
-            <!-- Same pinned-app list the taskbar uses — see constants/spliceApps.js -->
+            <!-- Same launchable-programs list the Start Menu uses — see
+                 constants/spliceApps.js. 'window' kind (Network Map) emits
+                 open-map; 'launch' kind (everything else) emits launch(url). -->
             <button
-                v-for="app in SPLICE_APPS"
-                :key="app.url"
+                v-for="program in PROGRAMS"
+                :key="program.id"
                 class="desktop-icon"
-                @click="emit('launch', app.url)"
+                @click="program.kind === 'window' ? emit('open-map') : emit('launch', program.url)"
             >
-                <span class="di-glyph">{{ app.icon }}</span>
-                <span class="di-label">{{ app.label }}</span>
+                <span class="di-glyph">{{ program.icon }}</span>
+                <span class="di-label">{{ program.label }}</span>
             </button>
 
         </div>
@@ -37,8 +25,7 @@
 // 'open-map' (the one program that isn't a SPLICE page); Game.vue wires both
 // to the exact same handlers NavBar/windowManager already use elsewhere, so
 // no launch logic is duplicated here.
-import { SPLICE } from '@/components/browser/SpliceRouter.js';
-import { SPLICE_APPS } from '@/constants/spliceApps.js';
+import { PROGRAMS } from '@/constants/spliceApps.js';
 
 const emit = defineEmits(['launch', 'open-map']);
 </script>

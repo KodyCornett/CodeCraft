@@ -1,6 +1,11 @@
 <template>
     <div class="taskbar">
 
+        <!-- Start Menu — far left, mirrors a real Windows taskbar layout -->
+        <StartMenu @launch="url => emit('launch', url)" @open-map="emit('open-map')" />
+
+        <div class="tb-sep" />
+
         <!-- SPLICE home button -->
         <button
             id="nav-splice"
@@ -87,6 +92,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { SPLICE }   from '@/components/browser/SpliceRouter.js';
 import GameMenu from '@/components/layout/GameMenu.vue';
+import StartMenu from '@/components/shared/StartMenu.vue';
 import { SPLICE_APPS as APPS } from '@/constants/spliceApps.js';
 import { useWindowManager } from '@/composables/useWindowManager.js';
 
@@ -98,7 +104,7 @@ const props = defineProps({
     frequencyColor:     { type: String,  default: '#00FFC8' },
 });
 
-const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency']);
+const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency', 'open-map']);
 
 // ── Open program windows (Map, Browser) — singleton, same live state
 // Game.vue/InGameBrowser read/write. Aliased on destructure since `toggle`

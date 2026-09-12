@@ -362,6 +362,7 @@
             @tutorial="onTutorial"
             @logout="onLogout"
             @toggle-frequency="toggleFrequency"
+            @open-map="openMapWindow"
         />
 
         <!-- DOC hub live chat — opened via the FREQUENCY hotkey in NavBar -->
