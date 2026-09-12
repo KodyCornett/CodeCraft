@@ -19,10 +19,16 @@ import { ref, computed } from 'vue';
 // title     — shown in the window header bar
 // placement — 'auto' | 'top' | 'right' | 'bottom' | 'left'
 //
+// 'splice', 'pocket-wallet', and 'terminal' all target '#start-menu-btn' —
+// there's no longer a persistent per-program taskbar button to point at
+// individually (NavBar's taskbar only shows programs that are actually
+// open now); the Start Menu is the one stable, always-visible launcher for
+// all of them, so that's what these three stops point to instead.
+//
 const STEPS = [
     {
         id:        'splice',
-        target:    '#nav-splice',
+        target:    '#start-menu-btn',
         title:     'SPLICE BROWSER',
         placement: 'top',
     },
@@ -40,7 +46,7 @@ const STEPS = [
     },
     {
         id:        'pocket-wallet',
-        target:    '#nav-status',
+        target:    '#start-menu-btn',
         title:     'POCKET vs WALLET',
         placement: 'top',
     },
@@ -64,7 +70,7 @@ const STEPS = [
     },
     {
         id:        'terminal',
-        target:    '#nav-terminal',
+        target:    '#start-menu-btn',
         title:     'MISSION TERMINAL',
         placement: 'top',
     },
@@ -93,11 +99,17 @@ export function useUiTour() {
      * Start the tour from a given step index.
      * No-op if the player has already seen the tour (localStorage flag set).
      * Use forceStart() to replay regardless.
+     *
+     * Returns whether the tour actually activated — several stops point at
+     * Map-only elements (HUD, side panel) that don't exist until the Map
+     * program is open, so Game.vue uses this to open Map for the tour's
+     * duration without auto-opening it on every ordinary boot.
      */
     function start(fromStep = 0) {
-        if (localStorage.getItem(LS_KEY)) return;
+        if (localStorage.getItem(LS_KEY)) return false;
         _stepIndex.value = fromStep;
         _active.value    = true;
+        return true;
     }
 
     /**
@@ -107,6 +119,7 @@ export function useUiTour() {
     function forceStart(fromStep = 0) {
         _stepIndex.value = fromStep;
         _active.value    = true;
+        return true;
     }
 
     /** Advance to the next step, or complete the tour if on the last step. */

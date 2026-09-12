@@ -3,10 +3,15 @@
          Browser only supplies its own tab bar / nav bar / page content below. -->
     <OsWindow
         title="SPLICE BROWSER"
+        maximizable
         :z-index="windowManager.zIndexOf('browser')"
+        :geometry="windowManager.geometryOf('browser')"
+        :maximized="windowManager.isMaximized('browser')"
         @close="handleClose"
         @minimize="windowManager.minimize('browser')"
         @focus="windowManager.focus('browser')"
+        @maximize="windowManager.toggleMaximize('browser')"
+        @update:geometry="g => windowManager.setGeometry('browser', g)"
     >
       <!-- OsWindow's content slot is a plain block box — Browser supplies its
            own flex-column stacking (tabbar/navbar/content) here, same layout

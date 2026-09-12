@@ -3,26 +3,15 @@
         <!-- Persona selection — first-login gate, shown before boot sequence -->
         <PersonaSelect v-if="needsPersonaSelect" @done="onPersonaDone" />
 
-        <!-- Watcher signal interrupt — renders above everything when active -->
-        <WatcherSignal :signal="activeSignal" :player="player" @complete="onSignalComplete" />
-
-        <!-- Chapter title card — reveal cinematic, fires after WatcherSignal's reboot on a chapter close -->
-        <ChapterTitleCard
-            :chapter-number="chapterCard.chapterNumber"
-            :title="chapterCard.title"
-            :active="chapterCard.active"
-            @complete="chapterCard.active = false"
-        />
-
-        <!-- Doc notifications — HUD alerts for arc unlocks and referrals -->
-        <DocNotification :queue="docNotifQueue" @dismiss="dismissDocNotif" />
-
-        <!-- World tone — opening cinematic, first login only (after persona selection) -->
-        <WorldTone v-if="showWorldTone" @done="onWorldToneDone" />
+        <!-- Watcher signal cutscene, chapter title card, DOC arc-notifications and
+             the World Tone intro are all part of the story/quest system, which
+             is disconnected pending a new narrative design (see
+             CONTRACTS_AND_OS_REWORK_PLAN.md). Components stay on disk; just
+             unmounted here. -->
 
         <!-- Boot sequence — shown before map loads -->
         <Transition name="boot-fade">
-            <BootSequence v-if="!booted && !needsPersonaSelect && !showWorldTone" @done="booted = true" />
+            <BootSequence v-if="!booted && !needsPersonaSelect" @done="booted = true" />
         </Transition>
 
         <!-- Map row: map canvas + persistent side panel side by side -->
@@ -35,13 +24,12 @@
                 <Desktop @launch="onLaunch" @open-map="openMapWindow" />
 
                 <!-- Map program window — opens/closes/minimizes like any other
-                     SPLICE program (see useWindowManager). v-if only tracks
-                     open/closed (unmount on real close); v-show handles
-                     minimize so HexMapCanvas stays mounted (state, ref)
-                     across a minimize/restore instead of losing it. Open by
-                     default for now (see the windowManager.open('map', ...)
-                     call below); revisit once Map should truly start closed
-                     behind the desktop rather than auto-opening on boot. -->
+                     SPLICE program (see useWindowManager). Starts closed —
+                     nothing renders until openMapWindow() runs (desktop icon,
+                     Start Menu, or taskbar). v-if only tracks open/closed
+                     (unmount on real close); v-show handles minimize so
+                     HexMapCanvas stays mounted (state, ref) across a
+                     minimize/restore instead of losing it. -->
                 <OsWindow
                     v-if="windowManager.isOpen('map')"
                     v-show="!windowManager.isMinimized('map')"
@@ -50,10 +38,15 @@
                     accent="#00FF88"
                     max-width="none"
                     app-class="map-window"
+                    maximizable
                     :z-index="windowManager.zIndexOf('map')"
+                    :geometry="windowManager.geometryOf('map')"
+                    :maximized="windowManager.isMaximized('map')"
                     @close="windowManager.close('map')"
                     @minimize="windowManager.minimize('map')"
                     @focus="windowManager.focus('map')"
+                    @maximize="windowManager.toggleMaximize('map')"
+                    @update:geometry="g => windowManager.setGeometry('map', g)"
                 >
                     <!-- Hex node map -->
                     <HexMapCanvas
@@ -76,8 +69,8 @@
                     <!-- HUD overlay -->
                     <HUD :player="player" :rig="rig" :current-node="currentNode" :bounty-ticker="bountyTicker" :flash="hudFlash" />
 
-                    <!-- Active objective tracker — top-left, collapses to header bar -->
-                    <ObjectiveTracker v-if="tutorial.allComplete.value" :objective="activeObjective" />
+                    <!-- Active objective tracker — tutorial-quest driven; disconnected
+                         along with the rest of the quest system (see plan). -->
                 </OsWindow>
 
                 <!-- Boot notification — shown after Watcher reboot sequence -->
@@ -379,14 +372,9 @@
             @send="sendFrequencyMessage"
         />
 
-        <!-- DOC field comms — voice-call check-ins during field missions -->
-        <FieldCommsWindow
-            :call="fieldCommsActiveCall"
-            @complete="handleFieldCommsComplete"
-        />
-
-        <!-- First-login welcome modal -->
-        <WelcomeModal :visible="showWelcomeModal" @start="onWelcomeStart" @skip="onWelcomeSkip" />
+        <!-- DOC field comms (scripted quest check-ins) and the first-login
+             welcome modal (tutorial-quest entry point) are both part of the
+             disconnected story/quest system — see plan. -->
 
         <!-- Inactivity auto-logout warning -->
         <IdleWarning
@@ -421,25 +409,21 @@ import { useWindowManager } from '@/composables/useWindowManager.js';
 // ── Overlays ──────────────────────────────────────────────────────────────────
 import BootSequence           from '@/components/shared/BootSequence.vue';
 import PersonaSelect          from '@/components/shared/PersonaSelect.vue';
-import WorldTone              from '@/components/shared/WorldTone.vue';
-import WatcherSignal          from '@/components/shared/WatcherSignal.vue';
-import DocNotification        from '@/components/shared/DocNotification.vue';
 import OpenSeasonNotification from '@/components/shared/OpenSeasonNotification.vue';
 import CodexFindPopup         from '@/components/shared/CodexFindPopup.vue';
 import CommandHitNotification from '@/components/shared/CommandHitNotification.vue';
 import IdleWarning            from '@/components/shared/IdleWarning.vue';
-import ObjectiveTracker       from '@/components/shared/ObjectiveTracker.vue';
 import TrapFiredNotification  from '@/components/shared/TrapFiredNotification.vue';
 import UiTour                 from '@/components/shared/UiTour.vue';
 import DocChatWindow          from '@/components/shared/DocChatWindow.vue';
-import FieldCommsWindow       from '@/components/shared/FieldCommsWindow.vue';
-import ChapterTitleCard       from '@/components/shared/ChapterTitleCard.vue';
+// WorldTone, WatcherSignal, DocNotification, ObjectiveTracker, FieldCommsWindow,
+// ChapterTitleCard, WelcomeModal — story/quest-system UI, disconnected (see
+// CONTRACTS_AND_OS_REWORK_PLAN.md). Components remain on disk, unused here.
 // ── Extracted overlay components ──────────────────────────────────────────────
 import CriticalFailureOverlay from '@/components/shared/CriticalFailureOverlay.vue';
 import PvpChallengeOverlay    from '@/components/shared/PvpChallengeOverlay.vue';
 import PvpAwaitOverlay        from '@/components/shared/PvpAwaitOverlay.vue';
 import PvpResultToast         from '@/components/shared/PvpResultToast.vue';
-import WelcomeModal           from '@/components/shared/WelcomeModal.vue';
 
 import InGameBrowser    from '@/components/browser/InGameBrowser.vue';
 import HackMinigame     from '@/components/minigame/generator/HackMinigame.vue';
@@ -475,20 +459,17 @@ import { useRigDamage }        from '@/composables/useRigDamage.js';
 import { useCyberDoc }         from '@/composables/useCyberDoc.js';
 import { useTrapSystem }       from '@/composables/useTrapSystem.js';
 import { usePingSystem }       from '@/composables/usePingSystem.js';
-import { useWatcher }          from '@/composables/useWatcher.js';
 import { useQuestLog }         from '@/composables/useQuestLog.js';
 import { useQuestMinigame }    from '@/composables/useQuestMinigame.js';
 import { useDevBankHeist }     from '@/composables/useDevBankHeist.js';
 import { useDevComposer }      from '@/composables/useDevComposer.js';
 import { useDevSIT }           from '@/composables/useDevSIT.js';
 import { useDevSignalLock }    from '@/composables/useDevSignalLock.js';
-import { useDocNotifications } from '@/composables/useDocNotifications.js';
-import { useQuestArchive }     from '@/composables/useQuestArchive.js';
 import { useInactivityTimer }  from '@/composables/useInactivityTimer.js';
 import { useActiveObjective }  from '@/composables/useActiveObjective.js';
-import { useDialogue }         from '@/composables/useDialogue.js';
 import { useDocChat }          from '@/composables/useDocChat.js';
-import { useFieldComms }       from '@/composables/useFieldComms.js';
+// useDocNotifications, useQuestArchive, useDialogue, useFieldComms — story/quest
+// system, disconnected (see CONTRACTS_AND_OS_REWORK_PLAN.md).
 // ── New composables ───────────────────────────────────────────────────────────
 import { useBountyEscalation }  from '@/composables/useBountyEscalation.js';
 import { useCommandEffects }    from '@/composables/useCommandEffects.js';
@@ -502,8 +483,8 @@ import { useNodeTracking }      from '@/composables/useNodeTracking.js';
 import { getBankTargetNetworkName } from '@/composables/businessNodes.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 import { docColorByName, docColor } from '@/constants/docColors.js';
-import { WATCHER_TRANSITIONS } from '@/constants/watcherTransitions.js';
 import { SPLICE }              from '@/components/browser/SpliceRouter.js';
+// WATCHER_TRANSITIONS — Watcher cutscene system, disconnected (see plan).
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const { playerId, player: authPlayer, rig: authRig, login, logout } = useAuth();
@@ -533,8 +514,9 @@ const { startHeartbeat, stopHeartbeat } = useHeartbeat();
 // ── Audio — shuffled background music, starts on first user interaction ───────
 const { startAudio, stopAudio, cutAudio, resumeAudio } = useAudio();
 
-// ── Dialogue — NPC conversation state + localStorage persistence ──────────────
-const { initDialogue } = useDialogue();
+// ── Dialogue — NPC conversation state + localStorage persistence. CyberDoc
+// dialogue is part of the disconnected story/quest system (see plan); no
+// longer initialised here.
 
 // ── Combat — challenge handshake + result submission ─────────────────────────
 const {
@@ -561,11 +543,13 @@ const ph = usePacketHijack(playerId);
 // Quest minigame — launched from QuestLog via useQuestMinigame composable
 const { activeMinigame, setCurrentNode, clear: clearMinigame } = useQuestMinigame();
 
-// Quest log (declared early — tutorial watchers reference fetchQuestLog)
-const { docs: questDocs, fetchQuestLog, completeStage: completeQuestStage, markWatcherSignalSent } = useQuestLog();
+// Quest log — story/quest system, disconnected (see
+// CONTRACTS_AND_OS_REWORK_PLAN.md). fetchQuestLog is no longer called, so
+// questDocs stays empty and everything derived from it below (questMarkers,
+// activeObjective, missionToast, etc.) naturally goes dormant. Kept wired
+// rather than deleted since the structure is still planned for reuse.
+const { docs: questDocs, fetchQuestLog, completeStage: completeQuestStage } = useQuestLog();
 const { objective: activeObjective } = useActiveObjective(questDocs);
-const { events: archiveEvents, fetchArchive } = useQuestArchive();
-const { queue: docNotifQueue, processEvents: processDocEvents, dismiss: dismissDocNotif } = useDocNotifications();
 
 // Equipped hack/map commands — passed to the PH terminal as the rig loadout strip
 const hackCommands = computed(() =>
@@ -601,20 +585,34 @@ const {
 // ── OS shell — window manager for the map + future program windows ───────────
 const windowManager = useWindowManager();
 
-// Single place defining what "opening Map" means, so the desktop icon and
-// the initial auto-open below (see note) stay in sync automatically.
+// Single place defining what "opening Map" means, so the desktop icon,
+// Start Menu, and taskbar all stay in sync automatically.
 function openMapWindow() {
     windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' });
 }
 
-// Temporary: open the Map program immediately (not gated on `booted`) since
-// Map still auto-opens on boot rather than starting closed behind the
-// desktop. This also matches the pre-refactor behavior the mounted hook
-// below depends on — HexMapCanvas (and mapCanvasRef) must exist synchronously
-// by the time onMounted runs to seed starting position; the `.map-hidden`
-// CSS class (unchanged) is what actually keeps it visually hidden during
-// boot. Revisit alongside making Map start closed by default.
-openMapWindow();
+// Map starts closed — player sees the empty desktop first and opens it
+// themselves (desktop icon / Start Menu / taskbar). Since HexMapCanvas no
+// longer exists synchronously at boot, its starting position can't be seeded
+// from Game.vue's onMounted the way it used to be — instead, seed it
+// whenever the canvas actually mounts (first open, or any later reopen,
+// since closing the window fully unmounts HexMapCanvas). Whichever resolves
+// second — the canvas mounting, or the real position loading from the DB —
+// is what triggers the seed.
+let mapSeededThisMount = false;
+watch(mapCanvasRef, (inst) => {
+    mapSeededThisMount = false;
+    if (inst && currentNodeId.value) {
+        inst.setPlayerNode(currentNodeId.value);
+        mapSeededThisMount = true;
+    }
+});
+watch(currentNodeId, (id) => {
+    if (!mapSeededThisMount && id && mapCanvasRef.value) {
+        mapCanvasRef.value.setPlayerNode(id);
+        mapSeededThisMount = true;
+    }
+});
 
 // ── Ping system ───────────────────────────────────────────────────────────────
 const {
@@ -886,8 +884,10 @@ async function onQuestMinigameComplete() {
     if (!stageId) return;
     try {
         await completeQuestStage(stageId);
-        await Promise.all([fetchQuestLog(), fetchArchive()]);
-        processDocEvents(archiveEvents.value);
+        // Quest-arc refresh + doc-notification processing disconnected along
+        // with the rest of the story/quest system (see plan) — fetchQuestLog
+        // is no longer called anywhere, so this path is currently unreachable
+        // (no UI can hand back a real stageId), kept only for structure.
     } catch (e) {
         console.warn('[QUEST MINIGAME] stage completion failed:', e?.message);
     }
@@ -993,7 +993,16 @@ async function onLogout() {
 
 function onTutorial() { onLaunch(SPLICE.TERMINAL); }
 
-// ── Persona / World Tone / Welcome ────────────────────────────────────────────
+// ── Persona select ────────────────────────────────────────────────────────────
+// First-login account setup (persona/handle) — kept, this is account setup,
+// not story content. World Tone (opening cinematic) and the Welcome Modal
+// (tutorial-quest entry point) are part of the disconnected story/quest
+// system (see CONTRACTS_AND_OS_REWORK_PLAN.md) and no longer trigger:
+// dropping World Tone's await here would leave tutorial.tutorialSeen/
+// tutorialSkipped permanently false (tutorial.hydrate() is no longer called),
+// which would make a showWelcomeModal-style computed permanently true and
+// reopen a welcome modal every boot forever — so that computed and its
+// handlers are removed outright rather than left as a dangling trigger.
 const needsPersonaSelect = ref(false);
 
 function onPersonaDone(persona) {
@@ -1002,19 +1011,6 @@ function onPersonaDone(persona) {
     needsPersonaSelect.value  = false;
 }
 
-const showWorldTone = ref(false);
-function onWorldToneDone() { showWorldTone.value = false; }
-
-const showWelcomeModal = computed(() =>
-    booted.value && !tutorial.tutorialSeen.value && !tutorial.tutorialSkipped.value
-);
-
-function onWelcomeStart() {
-    tutorial.markSeen();
-    onLaunch(SPLICE.TUTORIAL);
-}
-function onWelcomeSkip() { tutorial.skip(); }
-
 // ── Inactivity auto-logout ────────────────────────────────────────────────────
 const idle = useInactivityTimer();
 idle.setBeforeLogout(() => tutorial.flush());
@@ -1022,52 +1018,47 @@ idle.setBeforeLogout(() => tutorial.flush());
 // ── Tutorial provides and watchers ────────────────────────────────────────────
 provide('tutorial', tutorial);
 
-// Clear badge + fire URL-based tutorial step triggers when SPLICE navigates
+// Clear the Start Menu / TERMINAL badge when SPLICE navigates there. The
+// per-step markStepDone() triggers that used to fire alongside this (quest
+// progression) are removed — the tutorial-quest system is disconnected (see
+// CONTRACTS_AND_OS_REWORK_PLAN.md); tutorial.hydrate() is no longer called,
+// so tutorial.markStepDone() would silently no-op anyway, but the call sites
+// are cut for clarity rather than left as dead wiring.
 watch(activeBrowserUrl, (url) => {
     if (!url) return;
 
     if (url.startsWith(SPLICE.TERMINAL) || url.startsWith(SPLICE.TUTORIAL)) {
         tutorial.clearBadge();
     }
-    if (url.startsWith(SPLICE.RIG)) {
-        tutorial.markStepDone('open_rig');
-    }
-    if (url.startsWith(SPLICE.STAT_GUIDE)) {
-        tutorial.markStepDone('read_stat_guide');
-    }
-    if (url.startsWith('splice://cyberdoc')) {
-        tutorial.markStepDone('open_cyberdoc_store');
-    }
 });
 
-// Launch CORTEX_PATCH install sequence once tutorial is complete and cortex hasn't been seen
-watch([booted, tutorial.needsCortexInstall], ([isBooted, needsInstall]) => {
-    if (isBooted && needsInstall) {
-        fetchQuestLog();
-        onLaunch(SPLICE.CORTEX_PATCH);
-    }
-});
+// CORTEX_PATCH install cutscene — narrative cutscene, disconnected (see
+// plan). tutorial.needsCortexInstall requires tutorialComplete, which can
+// never become true without tutorial.hydrate(), so this is permanently
+// false anyway; commented out rather than left as a silent accident.
+// watch([booted, tutorial.needsCortexInstall], ([isBooted, needsInstall]) => {
+//     if (isBooted && needsInstall) {
+//         fetchQuestLog();
+//         onLaunch(SPLICE.CORTEX_PATCH);
+//     }
+// });
 
-// UI tour — fires after cortex sequence completes, or on boot if already done
-watch(tutorial.needsCortexInstall, (needs, wasNeeded) => {
-    if (wasNeeded && !needs && booted.value) {
-        setTimeout(() => tour.start(), 1800);
-    }
-});
+// UI tour — the orientation tour itself stays wired up (explicitly excluded
+// from the story/quest disconnect). It used to also fire right after the
+// CORTEX_PATCH cutscene finished; since that cutscene never launches now,
+// tutorial.needsCortexInstall never transitions true → false, so that second
+// trigger is dead and removed. The plain post-boot trigger below covers
+// every player now (needsCortexInstall.value is permanently false).
 watch(booted, (isBooted) => {
-    if (isBooted && !tutorial.needsCortexInstall.value) tour.start();
+    if (isBooted && !tutorial.needsCortexInstall.value) {
+        if (tour.start()) openMapWindow();
+    }
 });
 
-// Quest triggers
-watch(() => selectedNode.value, (node) => {
-    if (node) tutorial.markStepDone('inspect');
-});
+// Node-tracking side effect only — the quest-step triggers that used to live
+// here (inspect/move/visit_cyberdoc) are removed along with the tutorial-quest
+// system (see plan above).
 watch(currentNodeId, (newVal, oldVal) => {
-    if (newVal && oldVal) {
-        tutorial.markStepDone('move');
-        const node = getByCanvasId(newVal);
-        if (node?.type === 'cyberdoc') tutorial.markStepDone('visit_cyberdoc');
-    }
     setCurrentNode(newVal ?? null);
 });
 
@@ -1083,9 +1074,8 @@ watch(() => ph.isPractice && activePacketHijack.value, (active) => {
 watch(() => ph.phase, (phase) => {
     if (phase === 2 && ph.isPractice) phTour.startPhase2();
 });
-watch(() => ph.isComplete, (complete) => {
-    if (complete && ph.isPractice) tutorial.markStepDone('ph_practice');
-});
+// (ph_practice tutorial-step trigger removed along with the tutorial-quest
+// system — see plan above.)
 
 // ── Quest log derived state ───────────────────────────────────────────────────
 const missionToast = ref(null);
@@ -1122,143 +1112,14 @@ const questMarkers = computed(() => {
     return markers;
 });
 
-// ── Field comms — DOC voice-call check-ins during field missions ─────────────
-// Distinct from the hub chat (FREQUENCY/DocChatWindow, player-initiated) and
-// the CyberDoc terminal dialogue (useDialogue) — this fires on its own when
-// the player arrives at an active stage's field node, scripted per-stage via
-// the field_comms column on quest_stages.
-const {
-    activeCall:     fieldCommsActiveCall,
-    triggerCall:    triggerFieldComms,
-    onCallComplete: onFieldCommsComplete,
-} = useFieldComms();
-
-// The active stage across all docs, but only when it's a field-work stage
-// (has a minigame + a scripted call) — mirrors useActiveObjective's traversal,
-// kept separate since it needs different fields (node_canvas_id, minigame_type,
-// field_comms) that useActiveObjective's reduced shape doesn't expose.
-const activeFieldStage = computed(() => {
-    for (const doc of questDocs.value ?? []) {
-        for (const arc of doc.arcs ?? []) {
-            if (arc.status !== 'active') continue;
-            const stage = (arc.stages ?? []).find(s => s.status === 'active');
-            if (!stage) continue;
-            if (!stage.minigame_type || !stage.node_canvas_id) return null;
-            if (!stage.field_comms || stage.field_comms.length === 0) return null;
-
-            return {
-                stageId:      stage.id,
-                nodeCanvasId: stage.node_canvas_id,
-                docHandle:    doc.name?.match(/^([A-Za-z]+)/)?.[1]?.toUpperCase() ?? 'UNKNOWN',
-                accentColor:  docColorByName(doc.name),
-                lines:        stage.field_comms,
-            };
-        }
-    }
-    return null;
-});
-
-// Fire the call on arrival at the field node. Requires both newVal and oldVal
-// (skips the initial spawn/restore assignment) — same guard the tutorial
-// step watcher below uses for the same reason: currentNodeId gets reassigned
-// several times during boot before the player has actually "arrived" anywhere.
-watch(currentNodeId, (newNode, oldNode) => {
-    if (!newNode || !oldNode) return;
-    const stage = activeFieldStage.value;
-    if (!stage || newNode !== stage.nodeCanvasId) return;
-
-    triggerFieldComms({
-        stageId:     stage.stageId,
-        docHandle:   stage.docHandle,
-        accentColor: stage.accentColor,
-        lines:       stage.lines,
-    });
-});
-
-// ── Unprompted field comms — DOC-initiated calls with no node requirement ────
-// Distinct from activeFieldStage above (which only fires on arrival at a
-// specific field node): these are stages that carry field_comms but no
-// node_canvas_id — the call fires wherever the player currently is, the
-// moment the stage goes active, and the stage completes itself when the call
-// ends, since there's no separate minigame/objective to finish first. Used
-// for Chapter 1's two DOC-initiated callback beats — Knuckle's "Still Live"
-// and Veil's chapter-close call — see CHAPTER_1_SCRIPT.md C1_S4_P3 / C1_S3_P2.
-const activeUnpromptedStage = computed(() => {
-    for (const doc of questDocs.value ?? []) {
-        for (const arc of doc.arcs ?? []) {
-            if (arc.status !== 'active') continue;
-            const stage = (arc.stages ?? []).find(s => s.status === 'active');
-            if (!stage) continue;
-            if (stage.node_canvas_id) continue; // node-arrival stages are activeFieldStage's job
-            if (!stage.field_comms || stage.field_comms.length === 0) continue;
-
-            // Veil's chapter close is written to land right after Knuckle's own
-            // Chapter 1 arc wraps ("both loose ends land within one scene of
-            // each other" — CHAPTER_1_SCRIPT.md). The two arcs aren't linked
-            // server-side (linear per-arc stage gating can't express a cross-doc
-            // dependency like this), so it's enforced here instead. Matched by
-            // `district`, not `name` — doc.name is the shop name ("Veil's
-            // Parlour", "Knuckle's Med-Wagon"), same convention WATCHER_TRANSITIONS
-            // already uses for exactly this reason.
-            if (doc.district === 'Downtown') {
-                const knuckle = questDocs.value.find(d => d.district === "Browne's Addition");
-                const c1Arc   = knuckle?.arcs?.find(a => a.sequence_order === 2);
-                if (c1Arc?.status !== 'complete') continue;
-            }
-
-            return {
-                stageId:        stage.id,
-                docHandle:      doc.name?.match(/^([A-Za-z]+)/)?.[1]?.toUpperCase() ?? 'UNKNOWN',
-                accentColor:    docColorByName(doc.name),
-                lines:          stage.field_comms,
-                isChapterClose: doc.district === 'Downtown',
-            };
-        }
-    }
-    return null;
-});
-
-// Fires as soon as an unprompted stage goes active — gated on `booted` so it
-// can't interrupt the boot sequence. triggerFieldComms/useFieldComms already
-// dedupes per stageId (see useFieldComms.js's _playedStageIds), same as the
-// node-arrival watcher above, so no extra bookkeeping is needed here.
-watch(activeUnpromptedStage, (stage) => {
-    if (!stage || !booted.value) return;
-
-    triggerFieldComms({
-        stageId:        stage.stageId,
-        docHandle:      stage.docHandle,
-        accentColor:    stage.accentColor,
-        lines:          stage.lines,
-        unprompted:     true,
-        isChapterClose: stage.isChapterClose,
-    });
-});
-
-// Dialogue SPLICE URL for the selected CyberDoc node
-const NPC_DIALOGUE_URL = {
-    KNUCKLE: SPLICE.DIALOGUE_KNUCKLE,
-    PATCH:   SPLICE.DIALOGUE_PATCH,
-    VEIL:    SPLICE.DIALOGUE_VEIL,
-    AXIOM:   SPLICE.DIALOGUE_AXIOM,
-    FLOAT:   SPLICE.DIALOGUE_FLOAT,
-};
-
-const currentNodeDialogueUrl = computed(() => {
-    const node = selectedNode.value;
-    if (!node || node.type !== 'cyberdoc' || !node.npcHandle) return null;
-    const url = NPC_DIALOGUE_URL[node.npcHandle.toUpperCase()];
-    if (!url) return null;
-
-    const doc = questDocs.value.find(d => d.district === node.district);
-    if (!doc) {
-        return null;
-    }
-    const hasDialogue = doc.arcs?.some(arc =>
-        arc.stages?.some(s => s.status === 'active' && s.dialogue?.length > 0)
-    );
-    return hasDialogue ? url : null;
-});
+// ── Field comms + CyberDoc dialogue — disconnected ───────────────────────────
+// Both were scripted purely off quest-arc state (field_comms/dialogue columns
+// on quest_stages), which is disconnected along with the rest of the
+// story/quest system (see CONTRACTS_AND_OS_REWORK_PLAN.md). FieldCommsWindow
+// is unmounted above (see template); currentNodeDialogueUrl always returning
+// null keeps SidePanel's dialogue button/binding dark without editing that
+// component.
+const currentNodeDialogueUrl = computed(() => null);
 
 // ── FREQUENCY — DOC hub live chat hotkey ──────────────────────────────────────
 // Available at any CyberDoc hub — one isolated room per doc, same as the
@@ -1299,139 +1160,36 @@ watch(frequencyHub, (hub) => {
     if (!hub) frequencyOpen.value = false;
 });
 
-// ── Watcher signal system ─────────────────────────────────────────────────────
-const {
-    activeSignal,
-    triggerSignal,
-    onSignalComplete: _onSignalComplete,
-} = useWatcher();
-
-const _postSignalNav = ref(null);
-
-function onSignalComplete() {
-    _onSignalComplete();
-    if (_postSignalNav.value) {
-        const nav = _postSignalNav.value;
-        _postSignalNav.value = null;
-        nav();
-    }
-}
-
-// Chapter title card — reveal cinematic. Fires once WatcherSignal's reboot
-// sequence finishes for the Chapter 1 close signal, via the same
-// _postSignalNav hook every other post-signal action already uses.
-const chapterCard = ref({ chapterNumber: 2, title: 'Persistence', active: false });
-
-// Wraps useFieldComms' onCallComplete: unprompted calls (see
-// activeUnpromptedStage above) have no separate objective for the player to
-// finish, so the call ending is what completes the stage — node-arrival field
-// jobs (activeFieldStage) still complete through their minigame, not here,
-// and are untouched since they were never tagged `unprompted`. Veil's
-// chapter-close call additionally hands off to the WatcherSignal cinematic
-// the instant it completes — Veil naming the Persistence Theory is what the
-// Watcher reacts to.
-function handleFieldCommsComplete() {
-    const finishedCall = fieldCommsActiveCall.value;
-    onFieldCommsComplete();
-    if (!finishedCall?.unprompted) return;
-
-    completeQuestStage(finishedCall.stageId).then(() => {
-        if (finishedCall.isChapterClose) {
-            _postSignalNav.value = () => {
-                chapterCard.value = { ...chapterCard.value, active: true };
-            };
-            triggerSignal({ id: 'watcher-chapter-1-close', signal_text: 'PERSISTENCE THEORY' });
-        }
-    });
-}
+// ── Watcher signal system — narrative cutscene, disconnected ─────────────────
+// WatcherSignal/ChapterTitleCard are unmounted (see template) and nothing
+// below arms a transition anymore, so useWatcher() itself, the chapter title
+// card state, and the FieldComms→Watcher handoff (handleFieldCommsComplete)
+// are cut too rather than left calling into removed UI. See
+// CONTRACTS_AND_OS_REWORK_PLAN.md.
 
 provide('questLog', { docs: questDocs, completeStage: completeQuestStage, fetchQuestLog });
 
-// Pool of nodes near BA-hub — random pick so players can't camp a fixed respawn point
-const _WATCHER_RESPAWN_POOL = ['B6', 'E7', 'C10', 'G11', 'H8', 'E5'];
-
+// Watcher-transition arming (doc arc → cutscene interrupt) — disconnected
+// along with the Watcher signal system above; questDocs never populates now
+// (fetchQuestLog is no longer called), so this was already permanently inert,
+// but it's commented out rather than left as a silent accident since it also
+// referenced triggerSignal/markWatcherSignalSent from the removed systems.
+//
+// const _WATCHER_RESPAWN_POOL = ['B6', 'E7', 'C10', 'G11', 'H8', 'E5'];
+//
 // Holds the pending transition config — armed once a doc's entry arc is
 // complete but the player hasn't yet left that doc's hub node, cleared when
 // the interrupt fires. Armed/re-armed from server quest state (see the
 // questDocs/currentNodeId watcher below) rather than from a one-shot client
 // callback, so a reload between arc completion and leaving the hub can't
 // drop the interrupt.
-const _pendingWatcherTransition = ref(null);
-
-// Arc IDs whose interrupt has already fired this session — guards against
-// re-arming while the markWatcherSignalSent() persist call is in flight and
-// questDocs hasn't caught up yet.
-const _watcherTransitionsFiredThisSession = new Set();
-
-function _fireWatcherTransition(t) {
-    _watcherTransitionsFiredThisSession.add(t.arcId);
-    _pendingWatcherTransition.value = null;
-    cutAudio();
-
-    _postSignalNav.value = () => {
-        resumeAudio();
-        if (_bootNotifTimer) clearTimeout(_bootNotifTimer);
-        bootNotification.value = true;
-        _bootNotifTimer = setTimeout(() => { bootNotification.value = false; }, 6000);
-        onLaunch(SPLICE.TERMINAL);
-    };
-
-    triggerSignal({ id: t.signalId, signal_text: t.signalText });
-    markWatcherSignalSent(t.arcId);
-}
-
-// Called by SystemUpdate.vue when the install sequence finishes
-provide('onInstallComplete', () => {
-    cutAudio();
-
-    _postSignalNav.value = () => {
-        const pool      = _WATCHER_RESPAWN_POOL;
-        const respawnId = pool[Math.floor(Math.random() * pool.length)];
-        currentNodeId.value = respawnId;
-        resumeAudio();
-        tutorial.markCortexInstall();
-        if (_bootNotifTimer) clearTimeout(_bootNotifTimer);
-        bootNotification.value = true;
-        _bootNotifTimer = setTimeout(() => { bootNotification.value = false; }, 6000);
-        onLaunch(SPLICE.TERMINAL);
-    };
-
-    triggerSignal({
-        id:          'watcher-post-cortex-install',
-        signal_text: '[UNKNOWN_PROCESS: INJECTING]\n▓░▓▓░░▓░░▓▓░▓░░▓\n...Knuckles...\n*HIGH_FREQ_INTERFERENCE*\n[SYS_INTEGRITY: FAILING]\n[CONTAINMENT: ░░░░░░░░░░] BREACHED\n...not...stable...\n*SIGNAL DECAY — SOURCE UNKNOWN*\n...speak...with...him...\n[KERNEL_PANIC]\n[MEMORY: CORRUPTING]\n...KNUCKLES...\n*EAR-SPLITTING RING*',
-    });
-});
-
-// Arm or immediately fire a Watcher transition once its doc's entry arc
-// completes server-side. Re-evaluated whenever quest state or the player's
-// node changes — reload-safe by construction: a returning player who already
-// left the hub fires immediately below; one still standing at the hub gets
-// armed for the leave-watch that follows.
-watch([questDocs, currentNodeId], ([docs, nodeId]) => {
-    if (!nodeId) return; // currentNodeId reassigns a few times during boot
-
-    for (const transition of Object.values(WATCHER_TRANSITIONS)) {
-        const doc = (docs ?? []).find(d => d.district === transition.district);
-        const arc = doc?.arcs?.find(a => a.sequence_order === 1 && a.status === 'complete' && !a.watcher_signal_sent);
-        if (!arc) continue;
-        if (_watcherTransitionsFiredThisSession.has(arc.id)) continue;
-        if (_pendingWatcherTransition.value?.arcId === arc.id) continue;
-
-        const t = { ...transition, arcId: arc.id };
-        if (nodeId !== transition.leaveNode) {
-            _fireWatcherTransition(t);
-        } else {
-            _pendingWatcherTransition.value = t;
-        }
-    }
-});
-
-// Fire the Watcher intrusion when player leaves a hub node with a pending transition
-watch(currentNodeId, (newNode, oldNode) => {
-    const t = _pendingWatcherTransition.value;
-    if (!t || oldNode !== t.leaveNode || newNode === t.leaveNode) return;
-    _fireWatcherTransition(t);
-});
+// _pendingWatcherTransition / _watcherTransitionsFiredThisSession /
+// _fireWatcherTransition, the onInstallComplete provide (CORTEX_PATCH install
+// reboot cutscene), and the arm/fire watchers below are all removed together
+// — they only ever called into the Watcher signal system disconnected above.
+// tutorial.markCortexInstall() (previously called from onInstallComplete) is
+// likewise no longer reachable; harmless since needsCortexInstall is
+// permanently false anyway.
 
 // ── WebSocket — live server events ────────────────────────────────────────────
 const ws = useWebSocket();
@@ -1482,7 +1240,10 @@ onMounted(async () => {
     idle.start();
     replenish.start();
 
-    // Initialise canvas position from geometry while auth + DB load
+    // Initialise canvas position from geometry while auth + DB load — only
+    // does anything if the Map happens to already be open at this point
+    // (it starts closed, so normally this is a no-op; the watchers above
+    // handle seeding the real position whenever Map does get opened).
     const geometryStartId = mapCanvasRef.value?.startNodeId;
     if (geometryStartId) currentNodeId.value = geometryStartId;
 
@@ -1493,15 +1254,13 @@ onMounted(async () => {
     } else {
         hydrateFromAuth(authPlayer.value, authRig.value);
 
-        // First-login gate — show persona selection then world tone before boot
+        // First-login gate — persona selection (account setup). World Tone's
+        // await used to chain here too; it's part of the disconnected story
+        // system (see plan) so it's dropped rather than gating boot on it.
         if (!player.value.persona) {
             needsPersonaSelect.value = true;
             await new Promise(resolve => {
                 const stop = watch(needsPersonaSelect, val => { if (!val) { stop(); resolve(); } });
-            });
-            showWorldTone.value = true;
-            await new Promise(resolve => {
-                const stop = watch(showWorldTone, val => { if (!val) { stop(); resolve(); } });
             });
         }
 
@@ -1521,19 +1280,18 @@ onMounted(async () => {
         // Convert raw hack count to 0–5 star level for HUD display
         player.value.bountyLevel = starLevelFromCount(hackCount.value);
 
+        // Story/quest system disconnected (see CONTRACTS_AND_OS_REWORK_PLAN.md):
+        // fetchQuestLog/fetchArchive/tutorial.hydrate() no longer run at boot,
+        // so questDocs/archiveEvents stay empty and the tutorial-quest system
+        // never activates. fetchCodexState() is unrelated (separate Codex
+        // Archive feature) and stays.
         await Promise.all([
             fetchCommands(), fetchInventory(), fetchMyTraps(),
-            fetchQuestLog(), fetchArchive(),
             fetchCodexState(),
-            tutorial.hydrate(),
         ]);
-        // Re-fetch quest log after tutorial.hydrate() — ensures Knuckle's arc is present
-        await fetchQuestLog();
-        processDocEvents(archiveEvents.value);
 
         startHeartbeat();
         startAudio();
-        initDialogue(NPC_DIALOGUE_URL);
     }
 
     // Step 2 — start polling

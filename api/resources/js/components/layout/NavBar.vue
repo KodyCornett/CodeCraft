@@ -2,7 +2,11 @@
     <div class="taskbar">
 
         <!-- Start Menu — far left, mirrors a real Windows taskbar layout -->
-        <StartMenu @launch="url => emit('launch', url)" @open-map="emit('open-map')" />
+        <StartMenu
+            :has-tutorial-badge="hasTutorialBadge"
+            @launch="url => emit('launch', url)"
+            @open-map="emit('open-map')"
+        />
 
         <div class="tb-sep" />
 

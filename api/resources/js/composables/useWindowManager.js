@@ -15,7 +15,11 @@ import { ref, computed } from 'vue';
  */
 
 // ── Singleton state ───────────────────────────────────────────────────────────
-const _windows   = ref([]);   // [{ id, title, icon, accent, appClass, minimized, z }]
+// geometry is null until the player first drags/resizes a window — until then
+// OsWindow just uses its own default CSS-centered layout. Reset to null (and
+// maximized to false) on every fresh open(), same as the rest of a window's
+// state — closing a program and reopening it starts clean.
+const _windows   = ref([]);   // [{ id, title, icon, accent, appClass, minimized, maximized, geometry, z }]
 const _focusedId = ref(null);
 let _zCounter = 0;
 
@@ -50,6 +54,27 @@ export function useWindowManager() {
         return _windows.value.find(w => w.id === id)?.z ?? 0;
     }
 
+    /** Custom position/size, or null to use OsWindow's default centered layout. */
+    function geometryOf(id) {
+        return _windows.value.find(w => w.id === id)?.geometry ?? null;
+    }
+
+    /** Called by OsWindow (via its 'update:geometry' emit) after a drag or resize. */
+    function setGeometry(id, geometry) {
+        const w = _windows.value.find(w => w.id === id);
+        if (w) w.geometry = { ...geometry };
+    }
+
+    function isMaximized(id) {
+        return _windows.value.find(w => w.id === id)?.maximized ?? false;
+    }
+
+    /** Traffic-light zoom button / titlebar double-click — same toggle either way. */
+    function toggleMaximize(id) {
+        const w = _windows.value.find(w => w.id === id);
+        if (w) w.maximized = !w.maximized;
+    }
+
     /**
      * Open a program window. If it's already open, this just restores +
      * focuses it instead of creating a second instance — there is exactly
@@ -65,7 +90,7 @@ export function useWindowManager() {
             focus(id);
             return;
         }
-        _windows.value.push({ id, minimized: false, z: ++_zCounter, ...meta });
+        _windows.value.push({ id, minimized: false, maximized: false, geometry: null, z: ++_zCounter, ...meta });
         _focusedId.value = id;
     }
 
@@ -110,6 +135,10 @@ export function useWindowManager() {
         isOpen,
         isMinimized,
         zIndexOf,
+        geometryOf,
+        setGeometry,
+        isMaximized,
+        toggleMaximize,
         open,
         close,
         minimize,

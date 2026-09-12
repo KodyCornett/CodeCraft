@@ -1,6 +1,10 @@
 <template>
-    <!-- Trigger button — lives at the far left of the taskbar -->
+    <!-- Trigger button — lives at the far left of the taskbar. Also the
+         orientation tour's anchor for SPLICE/STATUS/TERMINAL (see
+         useUiTour.js) now that those don't have their own persistent
+         taskbar buttons anymore — this is the one stable launcher for them. -->
     <button
+        id="start-menu-btn"
         class="start-btn"
         :class="{ 'start-btn--open': open }"
         title="Start"
@@ -8,6 +12,7 @@
     >
         <span class="start-btn-icon">◆</span>
         <span class="start-btn-label">START</span>
+        <span v-if="hasTutorialBadge" class="start-badge" title="New activity" />
     </button>
 
     <!-- Overlay panel — anchored above the taskbar, same slide-up pattern as
@@ -30,6 +35,7 @@
                     >
                         <span class="si-icon">{{ program.icon }}</span>
                         <span class="si-label">{{ program.label }}</span>
+                        <span v-if="program.badged && hasTutorialBadge" class="si-badge" title="New activity" />
                         <span v-if="isRunning(program)" class="si-running" title="Running" />
                     </button>
                 </div>
@@ -51,6 +57,14 @@
 import { ref } from 'vue';
 import { PROGRAMS } from '@/constants/spliceApps.js';
 import { useWindowManager } from '@/composables/useWindowManager.js';
+
+defineProps({
+    // Mirrors NavBar's own hasTutorialBadge — TERMINAL's completed-quest-step
+    // indicator used to live on NavBar's own TERMINAL button; now that
+    // TERMINAL only lives in here (and on the desktop), the badge moves here
+    // too instead of just disappearing.
+    hasTutorialBadge: { type: Boolean, default: false },
+});
 
 const emit = defineEmits(['launch', 'open-map']);
 
@@ -79,6 +93,7 @@ function onSelect(program) {
 <style scoped>
 /* ── Trigger button ───────────────────────────────────────────────────────── */
 .start-btn {
+    position: relative; /* anchor for .start-badge */
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -108,6 +123,21 @@ function onSelect(program) {
 .start-btn:hover .start-btn-label  { color: #00FFFF; }
 .start-btn--open .start-btn-icon,
 .start-btn--open .start-btn-label  { color: #00FFFF; }
+
+/* Same dot/pulse the taskbar badge used before it moved here */
+.start-badge {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00FF88;
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.8);
+    animation: start-badge-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes start-badge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 /* ── Panel ────────────────────────────────────────────────────────────────── */
 .start-panel {
@@ -198,6 +228,16 @@ function onSelect(program) {
     border-radius: 50%;
     background: #00FF88;
     box-shadow: 0 0 5px rgba(0, 255, 136, 0.8);
+    flex-shrink: 0;
+}
+
+.si-badge {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #00FF88;
+    box-shadow: 0 0 5px rgba(0, 255, 136, 0.8);
+    animation: start-badge-pulse 2s ease-in-out infinite;
     flex-shrink: 0;
 }
 

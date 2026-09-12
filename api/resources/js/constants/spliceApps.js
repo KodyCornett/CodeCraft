@@ -10,12 +10,12 @@ import { SPLICE } from '@/components/browser/SpliceRouter.js';
  * Was previously defined inline inside NavBar.vue only.
  */
 export const SPLICE_APPS = [
-    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS',   tourId: 'nav-status'   },
-    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'                              },
-    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'                             },
-    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'                              },
-    { url: SPLICE.MAPS,      icon: '⛯', label: 'MAPS'                              },
-    { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true, tourId: 'nav-terminal' },
+    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS'                   },
+    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'                      },
+    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'                     },
+    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'                      },
+    { url: SPLICE.MAPS,      icon: '⛯', label: 'MAPS'                      },
+    { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true   },
 ];
 
 /**
@@ -36,5 +36,6 @@ export const PROGRAMS = [
     { id: 'browser', kind: 'launch', icon: '◈', label: 'SPLICE', url: SPLICE.HOME },
     ...SPLICE_APPS.map(app => ({
         id: app.url, kind: 'launch', icon: app.icon, label: app.label, url: app.url,
+        badged: app.badged ?? false,
     })),
 ];
