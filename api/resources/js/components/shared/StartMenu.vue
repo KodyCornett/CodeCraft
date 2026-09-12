@@ -26,6 +26,43 @@
                     <button class="start-close" @click="open = false">✕</button>
                 </div>
 
+                <!-- Info tiles — operator profile + live system clock, shown
+                     whenever the panel is open. This is what makes the Start
+                     Menu read like a real OS's account/system tile rather
+                     than just a program launcher — see the "simulated feel
+                     of a personal desktop" goal in the OS rework plan. -->
+                <div class="start-profile">
+                    <div class="sp-id">
+                        <span class="sp-icon">◈</span>
+                        <div class="sp-id-text">
+                            <span class="sp-handle">{{ player.handle || 'UNKNOWN' }}</span>
+                            <span class="sp-persona">{{ player.persona || player.district || '—' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="sp-stats">
+                        <div class="sp-stat sp-stat--ss">
+                            <span class="sp-stat-label">SS</span>
+                            <SSBar :current="player.currentSS ?? 0" :max="player.maxSS ?? 0" :is-limping="player.isLimping" />
+                        </div>
+                        <div class="sp-stat">
+                            <span class="sp-stat-label">UPLINK</span>
+                            <span class="sp-stat-val">{{ player.uplink ?? 0 }}/{{ player.maxUplink ?? 0 }}</span>
+                        </div>
+                        <div class="sp-stat">
+                            <span class="sp-stat-label">CREDS</span>
+                            <span class="sp-stat-val">{{ (player.creds ?? 0).toLocaleString() }}</span>
+                        </div>
+                    </div>
+
+                    <div class="sp-divider" />
+
+                    <div class="sp-session">
+                        <span class="sp-clock">{{ clockTime }}</span>
+                        <span class="sp-meta">{{ clockDate }} · UP {{ uptimeLabel }}</span>
+                    </div>
+                </div>
+
                 <div class="start-search">
                     <span class="ss-icon">⌕</span>
                     <input
@@ -68,16 +105,27 @@
 // Purely presentational + its own open/closed state (same shape as
 // GameMenu.vue) — it emits 'launch'/'open-window', identical contract to
 // Desktop.vue, so NavBar just forwards both without re-implementing them.
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { PROGRAMS } from '@/constants/spliceApps.js';
 import { useWindowManager } from '@/composables/useWindowManager.js';
+import SSBar from '@/components/shared/SSBar.vue';
 
-defineProps({
+const props = defineProps({
     // Mirrors NavBar's own hasTutorialBadge — TERMINAL's completed-quest-step
     // indicator used to live on NavBar's own TERMINAL button; now that
     // TERMINAL only lives in here (and on the desktop), the badge moves here
     // too instead of just disappearing.
     hasTutorialBadge: { type: Boolean, default: false },
+    // Live player snapshot for the info tiles up top — same shape as
+    // useGameState's player ref, forwarded down from Game.vue via NavBar.
+    player: {
+        type: Object,
+        default: () => ({
+            handle: null, persona: null, district: null,
+            creds: 0, uplink: 0, maxUplink: 0,
+            currentSS: 0, maxSS: 0, isLimping: false,
+        }),
+    },
 });
 
 const emit = defineEmits(['launch', 'open-window']);
@@ -112,6 +160,37 @@ function onSearchEscape() {
     if (query.value) query.value = '';
     else open.value = false;
 }
+
+// ── Info tiles — live clock + session uptime ─────────────────────────────
+// Runs continuously from when the taskbar mounts (not just while the panel
+// is open) so uptime is accurate the first time the player opens Start.
+const clockTime   = ref('');
+const clockDate   = ref('');
+const uptimeLabel = ref('00:00:00');
+const sessionStart = Date.now();
+let clockTimer;
+
+function pad(n) {
+    return String(n).padStart(2, '0');
+}
+
+function tickClock() {
+    const now = new Date();
+    clockTime.value = now.toLocaleTimeString('en-US', { hour12: false });
+    clockDate.value = now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+
+    const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    uptimeLabel.value = `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+onMounted(() => {
+    tickClock();
+    clockTimer = setInterval(tickClock, 1000);
+});
+onUnmounted(() => clearInterval(clockTimer));
 
 // Small "already running" indicator — Map is a real window (windowManager
 // knows it); Browser pages don't have per-page window identity yet, so only
@@ -227,6 +306,107 @@ function onSelect(program) {
     transition: color 0.12s;
 }
 .start-close:hover { color: #FF3333; }
+
+/* ── Info tiles ──────────────────────────────────────────────────────────── */
+.start-profile {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sp-id {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sp-icon {
+    font-size: 18px;
+    color: #00FFFF;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.sp-id-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.sp-handle {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #00FFFF;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-persona {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: rgba(0, 255, 255, 0.4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.sp-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* Shrinks SSBar's rendered width via inherited font-size — the bar's own
+   characters scale with font-size, no separate size prop needed. */
+.sp-stat--ss {
+    font-size: 9px;
+}
+
+.sp-stat-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: rgba(0, 255, 255, 0.4);
+    flex-shrink: 0;
+}
+
+.sp-stat-val {
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    color: rgba(0, 255, 255, 0.85);
+}
+
+.sp-divider {
+    height: 1px;
+    background: rgba(0, 255, 255, 0.08);
+}
+
+.sp-session {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sp-clock {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    color: rgba(0, 255, 255, 0.9);
+}
+
+.sp-meta {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: rgba(0, 255, 255, 0.3);
+}
 
 /* ── Search ──────────────────────────────────────────────────────────────── */
 .start-search {

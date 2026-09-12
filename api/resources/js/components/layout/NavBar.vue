@@ -4,6 +4,7 @@
         <!-- Start Menu — far left, mirrors a real Windows taskbar layout -->
         <StartMenu
             :has-tutorial-badge="hasTutorialBadge"
+            :player="player"
             @launch="url => emit('launch', url)"
             @open-window="id => emit('open-window', id)"
         />
@@ -74,6 +75,9 @@ const props = defineProps({
     frequencyAvailable: { type: Boolean, default: false },
     frequencyOpen:      { type: Boolean, default: false },
     frequencyColor:     { type: String,  default: '#00FFC8' },
+    // Forwarded straight through to StartMenu's info tiles — same shape as
+    // useGameState's player ref.
+    player:             { type: Object,  default: () => ({}) },
 });
 
 const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency', 'open-window']);

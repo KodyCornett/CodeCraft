@@ -373,6 +373,7 @@
             :frequency-available="frequencyAvailable"
             :frequency-open="frequencyOpen"
             :frequency-color="frequencyAccent"
+            :player="player"
             @launch="onLaunch"
             @tutorial="onTutorial"
             @logout="onLogout"
