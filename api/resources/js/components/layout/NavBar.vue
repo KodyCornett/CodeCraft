@@ -6,43 +6,13 @@
 
         <div class="tb-sep" />
 
-        <!-- SPLICE home button -->
-        <button
-            id="nav-splice"
-            class="tb-btn tb-home"
-            :class="{ 'tb-btn--active': isActive(SPLICE.HOME) }"
-            title="SPLICE Home"
-            @click="toggle(SPLICE.HOME)"
-        >
-            <span class="tb-icon">◈</span>
-            <span class="tb-label">SPLICE</span>
-        </button>
-
-        <div class="tb-sep" />
-
-        <!-- App launchers -->
-        <button
-            v-for="app in APPS"
-            :key="app.url"
-            :id="app.tourId ?? undefined"
-            class="tb-btn tb-app"
-            :class="{ 'tb-btn--active': isActive(app.url) }"
-            :title="app.url"
-            @click="toggle(app.url)"
-        >
-            <span class="tb-icon">{{ app.icon }}</span>
-            <span class="tb-label">{{ app.label }}</span>
-            <span v-if="app.badged && hasTutorialBadge" class="tb-badge" />
-        </button>
-
-        <div class="tb-sep" />
-
-        <!-- Open program windows — Windows-taskbar style. Only Map and Browser
-             are true separate programs right now (see useWindowManager.js);
-             everything in the APPS row above opens as a page inside the one
-             Browser window. Click focuses/restores; click again while
-             already focused minimizes. Section only appears once something
-             is actually open, same as a real taskbar. -->
+        <!-- Open program windows — the whole point of the taskbar now: empty
+             until something is launched (from the Start Menu or a desktop
+             icon), then shows up here same as real Windows. Only Map and
+             Browser are true separate programs right now (see
+             useWindowManager.js); everything else still opens as a page
+             inside the one Browser window. Click focuses/restores; click
+             again while already focused minimizes. -->
         <template v-if="taskbarItems.length">
             <button
                 v-for="win in taskbarItems"
@@ -90,10 +60,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { SPLICE }   from '@/components/browser/SpliceRouter.js';
 import GameMenu from '@/components/layout/GameMenu.vue';
 import StartMenu from '@/components/shared/StartMenu.vue';
-import { SPLICE_APPS as APPS } from '@/constants/spliceApps.js';
 import { useWindowManager } from '@/composables/useWindowManager.js';
 
 const props = defineProps({
@@ -112,16 +80,6 @@ const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency', 'o
 // a different concept (launching a SPLICE page vs focusing/minimizing a
 // program window).
 const { taskbarItems, toggle: toggleWindow } = useWindowManager();
-
-// Active when the browser is open on this app's URL
-function isActive(url) {
-    return props.activeBrowserUrl?.startsWith(url) ?? false;
-}
-
-// Toggle: open if not active, close if already open
-function toggle(url) {
-    emit('launch', isActive(url) ? null : url);
-}
 
 // Live clock
 const time = ref('');
@@ -178,32 +136,8 @@ onUnmounted(() => clearInterval(timer));
     border-bottom-color: #00FFFF;
 }
 
-/* ── SPLICE home ──────────────────────────────────────────────────────────── */
-.tb-home .tb-icon  { font-size: 15px; color: rgba(0, 255, 255, 0.6); line-height: 1; }
-.tb-home .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(0, 255, 255, 0.5); letter-spacing: 0.12em; }
-.tb-home:hover .tb-icon,
-.tb-home:hover .tb-label  { color: #00FFFF; }
-.tb-home.tb-btn--active .tb-icon,
-.tb-home.tb-btn--active .tb-label { color: #00FFFF; }
-
-/* ── App buttons ──────────────────────────────────────────────────────────── */
-.tb-app .tb-icon  { font-size: 15px; color: rgba(0, 255, 255, 0.45); line-height: 1; }
-.tb-app .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(0, 255, 255, 0.4); letter-spacing: 0.1em; }
-
-@media (max-width: 1440px) {
-    .tb-btn { padding: 0 14px; }
-    .tb-home .tb-icon, .tb-app .tb-icon { font-size: 14px; }
-    .tb-home .tb-label, .tb-app .tb-label { font-size: 11px; }
-}
-@media (max-width: 1280px) {
-    .tb-btn { padding: 0 12px; gap: 5px; }
-    .tb-home .tb-icon, .tb-app .tb-icon { font-size: 13px; }
-    .tb-home .tb-label, .tb-app .tb-label { font-size: 10px; }
-}
-.tb-app:hover .tb-icon,
-.tb-app:hover .tb-label   { color: #00FFFF; }
-.tb-app.tb-btn--active .tb-icon  { color: #00FFFF; text-shadow: 0 0 8px rgba(0,255,255,0.6); }
-.tb-app.tb-btn--active .tb-label { color: rgba(0, 255, 255, 0.85); letter-spacing: 0.1em; }
+@media (max-width: 1440px) { .tb-btn { padding: 0 14px; } }
+@media (max-width: 1280px) { .tb-btn { padding: 0 12px; gap: 5px; } }
 
 /* ── Open program windows — same look as pinned app buttons, plus a dimmed
    state for minimized ones so the taskbar reads at a glance which windows
