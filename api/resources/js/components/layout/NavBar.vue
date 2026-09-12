@@ -66,6 +66,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { SPLICE }   from '@/components/browser/SpliceRouter.js';
 import GameMenu from '@/components/layout/GameMenu.vue';
+import { SPLICE_APPS as APPS } from '@/constants/spliceApps.js';
 
 const props = defineProps({
     activeBrowserUrl:   { type: String,  default: null  },
@@ -76,15 +77,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency']);
-
-const APPS = [
-    { url: SPLICE.STATS,     icon: '◈', label: 'STATUS',   tourId: 'nav-status'   },
-    { url: SPLICE.RIG,       icon: '⬡', label: 'RIG'                              },
-    { url: SPLICE.COMMANDS,  icon: '▶', label: 'CMDS'                             },
-    { url: SPLICE.INVENTORY, icon: '▣', label: 'INV'                              },
-    { url: SPLICE.MAPS,      icon: '⛯', label: 'MAPS'                              },
-    { url: SPLICE.TERMINAL,  icon: '⌨', label: 'TERMINAL', badged: true, tourId: 'nav-terminal' },
-];
 
 // Active when the browser is open on this app's URL
 function isActive(url) {

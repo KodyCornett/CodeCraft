@@ -29,11 +29,16 @@
         <div class="map-row" :class="{ 'map-hidden': !booted }">
 
             <div class="map-stage">
+                <!-- OS shell desktop — background layer, sits behind every
+                     program window. Icons reuse the same launch mechanism
+                     NavBar's taskbar buttons already use. -->
+                <Desktop @launch="onLaunch" @open-map="openMapWindow" />
+
                 <!-- Map program window — opens/closes/minimizes like any other
                      SPLICE program (see useWindowManager). Open by default for
-                     now (see the windowManager.open('map', ...) call above);
-                     becomes purely icon/taskbar-launched once desktop icons
-                     (Phase 1 step 8) exist. -->
+                     now (see the windowManager.open('map', ...) call below);
+                     revisit once Map should truly start closed behind the
+                     desktop rather than auto-opening on boot. -->
                 <OsWindow
                     v-if="windowManager.isOpen('map') && !windowManager.isMinimized('map')"
                     title="NETWORK MAP"
@@ -346,15 +351,6 @@
             @toggle-frequency="toggleFrequency"
         />
 
-        <!-- TEMP — stands in for a desktop "Network Map" icon until Phase 1
-             step 8 (real desktop icons) lands. Reopens the Map program if
-             it's been closed or minimized. Remove once icons exist. -->
-        <button
-            v-if="!windowManager.isOpen('map') || windowManager.isMinimized('map')"
-            class="temp-map-launcher"
-            @click="windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' })"
-        >⬢ MAP</button>
-
         <!-- DOC hub live chat — opened via the FREQUENCY hotkey in NavBar -->
         <DocChatWindow
             :visible="frequencyOpen"
@@ -405,6 +401,7 @@ import HexMapCanvas from '@/components/map/HexMapCanvas.vue';
 
 // ── OS shell ──────────────────────────────────────────────────────────────────
 import OsWindow from '@/components/shared/OsWindow.vue';
+import Desktop from '@/components/shared/Desktop.vue';
 import { useWindowManager } from '@/composables/useWindowManager.js';
 
 // ── Overlays ──────────────────────────────────────────────────────────────────
@@ -590,15 +587,20 @@ const {
 // ── OS shell — window manager for the map + future program windows ───────────
 const windowManager = useWindowManager();
 
+// Single place defining what "opening Map" means, so the desktop icon and
+// the initial auto-open below (see note) stay in sync automatically.
+function openMapWindow() {
+    windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' });
+}
+
 // Temporary: open the Map program immediately (not gated on `booted`) since
-// desktop icons (Phase 1 step 8) don't exist yet as the real way to launch
-// it. This also matches the pre-refactor behavior the mounted hook below
-// depends on — HexMapCanvas (and mapCanvasRef) must exist synchronously by
-// the time onMounted runs to seed starting position; the `.map-hidden` CSS
-// class (unchanged) is what actually keeps it visually hidden during boot.
-// Remove this open() call once there's a real desktop to click "Network Map"
-// from — at that point the window should start closed.
-windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' });
+// Map still auto-opens on boot rather than starting closed behind the
+// desktop. This also matches the pre-refactor behavior the mounted hook
+// below depends on — HexMapCanvas (and mapCanvasRef) must exist synchronously
+// by the time onMounted runs to seed starting position; the `.map-hidden`
+// CSS class (unchanged) is what actually keeps it visually hidden during
+// boot. Revisit alongside making Map start closed by default.
+openMapWindow();
 
 // ── Ping system ───────────────────────────────────────────────────────────────
 const {
@@ -1595,27 +1597,6 @@ onUnmounted(() => {
 .map-hidden {
     opacity: 0;
     pointer-events: none;
-}
-
-/* TEMP — remove once real desktop icons (Phase 1 step 8) exist. */
-.temp-map-launcher {
-    position: absolute;
-    right: 16px;
-    bottom: 56px;
-    z-index: 40;
-    background: #080810;
-    border: 1px solid rgba(0, 255, 136, 0.4);
-    color: #00FF88;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    padding: 8px 14px;
-    cursor: pointer;
-    transition: background 0.12s, border-color 0.12s;
-}
-.temp-map-launcher:hover {
-    background: rgba(0, 255, 136, 0.1);
-    border-color: rgba(0, 255, 136, 0.8);
 }
 
 .map-loading {
