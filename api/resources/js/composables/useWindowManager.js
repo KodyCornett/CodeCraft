@@ -44,6 +44,12 @@ export function useWindowManager() {
         return _windows.value.find(w => w.id === id)?.minimized ?? false;
     }
 
+    /** Stacking order for a window — bind this to an OsWindow's z-index so
+     *  whichever program was focused most recently renders above the rest. */
+    function zIndexOf(id) {
+        return _windows.value.find(w => w.id === id)?.z ?? 0;
+    }
+
     /**
      * Open a program window. If it's already open, this just restores +
      * focuses it instead of creating a second instance — there is exactly
@@ -103,6 +109,7 @@ export function useWindowManager() {
         taskbarItems,
         isOpen,
         isMinimized,
+        zIndexOf,
         open,
         close,
         minimize,

@@ -35,22 +35,17 @@
                 <Desktop @launch="onLaunch" @open-map="openMapWindow" />
 
                 <!-- Map program window — opens/closes/minimizes like any other
-                     SPLICE program (see useWindowManager). v-if only tracks
-                     open/closed (unmount on real close); v-show handles
-                     minimize so HexMapCanvas stays mounted (state, ref)
-                     across a minimize/restore instead of losing it. Open by
-                     default for now (see the windowManager.open('map', ...)
-                     call below); revisit once Map should truly start closed
-                     behind the desktop rather than auto-opening on boot. -->
+                     SPLICE program (see useWindowManager). Open by default for
+                     now (see the windowManager.open('map', ...) call below);
+                     revisit once Map should truly start closed behind the
+                     desktop rather than auto-opening on boot. -->
                 <OsWindow
-                    v-if="windowManager.isOpen('map')"
-                    v-show="!windowManager.isMinimized('map')"
+                    v-if="windowManager.isOpen('map') && !windowManager.isMinimized('map')"
                     title="NETWORK MAP"
                     icon="⬢"
                     accent="#00FF88"
                     max-width="none"
                     app-class="map-window"
-                    :z-index="windowManager.zIndexOf('map')"
                     @close="windowManager.close('map')"
                     @minimize="windowManager.minimize('map')"
                     @focus="windowManager.focus('map')"
@@ -145,14 +140,10 @@
                     @done="trapFiredNotification = null"
                 />
 
-                <!-- In-game SPLICE browser — v-if tracks actually open/closed
-                     (Browser manages its own windowManager registration
-                     internally); v-show handles minimize so tabs/scroll
-                     state survive a minimize/restore instead of resetting. -->
+                <!-- In-game SPLICE browser -->
                 <Transition name="browser-fade">
                     <InGameBrowser
                         v-if="activeBrowserUrl"
-                        v-show="!windowManager.isMinimized('browser')"
                         :initial-url="activeBrowserUrl"
                         @close="onCloseBrowser"
                         @url-change="onBrowserUrlChange"
@@ -320,11 +311,9 @@
             </div>
 
             <!-- Right panel — belongs to the Map program, not the desktop, so
-                 it only shows while the Map window is open, matching the same
-                 v-if/v-show split as the Map OsWindow above. -->
+                 it's only present while the Map window is actually open. -->
             <SidePanel
-                v-if="windowManager.isOpen('map')"
-                v-show="!windowManager.isMinimized('map')"
+                v-if="windowManager.isOpen('map') && !windowManager.isMinimized('map')"
                 :node="selectedNode"
                 :is-on-node="selectedNode?.canvasId === currentNodeId"
                 :resources="nodeResources"

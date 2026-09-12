@@ -1,7 +1,13 @@
 <template>
     <!-- Chrome (backdrop, titlebar, traffic lights) is the shared OsWindow shell —
          Browser only supplies its own tab bar / nav bar / page content below. -->
-    <OsWindow title="SPLICE BROWSER" :minimizable="false" @close="handleClose">
+    <OsWindow
+        title="SPLICE BROWSER"
+        :z-index="windowManager.zIndexOf('browser')"
+        @close="handleClose"
+        @minimize="windowManager.minimize('browser')"
+        @focus="windowManager.focus('browser')"
+    >
       <!-- OsWindow's content slot is a plain block box — Browser supplies its
            own flex-column stacking (tabbar/navbar/content) here, same layout
            `.splice-window` used to provide before this chrome moved out. -->
@@ -67,18 +73,31 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, provide, toRef } from 'vue';
+import { ref, computed, watch, provide, toRef, onMounted, onUnmounted } from 'vue';
 import { useBrowser }                   from '@/composables/useBrowser.js';
 import { resolveRoute, getPageTitle, SPLICE } from './SpliceRouter.js';
 import { findCompanyByQuery } from '@/composables/codexPageRoutes.js';
 import { findBankByQuery } from '@/composables/bankPageRoutes.js';
 import OsWindow from '@/components/shared/OsWindow.vue';
+import { useWindowManager } from '@/composables/useWindowManager.js';
 
 const props = defineProps({
     initialUrl: { type: String, default: 'splice://home' },
 });
 
 const emit = defineEmits(['close', 'url-change']);
+
+// ── OS shell — Browser owns its own window-manager registration end to end.
+// Game.vue only needs to mount/unmount this component (via activeBrowserUrl,
+// unchanged); open/focus/minimize/z-order live entirely in here so no window-
+// chrome wiring has to be threaded through Game.vue for this program.
+const windowManager = useWindowManager();
+onMounted(() => {
+    windowManager.open('browser', { title: 'SPLICE BROWSER', icon: '', accent: '#00FFFF' });
+});
+onUnmounted(() => {
+    windowManager.close('browser');
+});
 
 // ── Browser state (all navigation logic lives in the composable) ──────────────
 const {

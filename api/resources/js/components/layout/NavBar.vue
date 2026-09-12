@@ -32,6 +32,27 @@
 
         <div class="tb-sep" />
 
+        <!-- Open program windows — Windows-taskbar style. Only Map and Browser
+             are true separate programs right now (see useWindowManager.js);
+             everything in the APPS row above opens as a page inside the one
+             Browser window. Click focuses/restores; click again while
+             already focused minimizes. Section only appears once something
+             is actually open, same as a real taskbar. -->
+        <template v-if="taskbarItems.length">
+            <button
+                v-for="win in taskbarItems"
+                :key="win.id"
+                class="tb-btn tb-window"
+                :class="{ 'tb-btn--active': win.focused, 'tb-window--minimized': win.minimized }"
+                :title="win.title"
+                @click="toggleWindow(win.id)"
+            >
+                <span class="tb-icon">{{ win.icon || '▢' }}</span>
+                <span class="tb-label">{{ win.title }}</span>
+            </button>
+            <div class="tb-sep" />
+        </template>
+
         <!-- Frequency — live DOC comms hotkey. Not a SPLICE page launch, so it's
              kept separate from the APPS loop above. Enabled/pulsing only while
              standing at any CyberDoc hub — one isolated room per doc. -->
@@ -67,6 +88,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { SPLICE }   from '@/components/browser/SpliceRouter.js';
 import GameMenu from '@/components/layout/GameMenu.vue';
 import { SPLICE_APPS as APPS } from '@/constants/spliceApps.js';
+import { useWindowManager } from '@/composables/useWindowManager.js';
 
 const props = defineProps({
     activeBrowserUrl:   { type: String,  default: null  },
@@ -77,6 +99,13 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency']);
+
+// ── Open program windows (Map, Browser) — singleton, same live state
+// Game.vue/InGameBrowser read/write. Aliased on destructure since `toggle`
+// would otherwise collide with this file's own toggle(url) below, which is
+// a different concept (launching a SPLICE page vs focusing/minimizing a
+// program window).
+const { taskbarItems, toggle: toggleWindow } = useWindowManager();
 
 // Active when the browser is open on this app's URL
 function isActive(url) {
@@ -169,6 +198,18 @@ onUnmounted(() => clearInterval(timer));
 .tb-app:hover .tb-label   { color: #00FFFF; }
 .tb-app.tb-btn--active .tb-icon  { color: #00FFFF; text-shadow: 0 0 8px rgba(0,255,255,0.6); }
 .tb-app.tb-btn--active .tb-label { color: rgba(0, 255, 255, 0.85); letter-spacing: 0.1em; }
+
+/* ── Open program windows — same look as pinned app buttons, plus a dimmed
+   state for minimized ones so the taskbar reads at a glance which windows
+   are actually on screen right now vs just running in the background. ── */
+.tb-window .tb-icon  { font-size: 15px; color: rgba(0, 255, 136, 0.5); line-height: 1; }
+.tb-window .tb-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(0, 255, 136, 0.45); letter-spacing: 0.1em; }
+.tb-window:hover .tb-icon,
+.tb-window:hover .tb-label { color: #00FF88; }
+.tb-window.tb-btn--active .tb-icon  { color: #00FF88; text-shadow: 0 0 8px rgba(0,255,136,0.6); }
+.tb-window.tb-btn--active .tb-label { color: rgba(0, 255, 136, 0.85); letter-spacing: 0.1em; }
+.tb-window--minimized .tb-icon,
+.tb-window--minimized .tb-label { opacity: 0.5; }
 
 /* ── Frequency hotkey — live DOC comms ───────────────────────────────────── */
 .tb-freq .tb-icon  { font-size: 15px; color: rgba(255,255,255,0.18); line-height: 1; }

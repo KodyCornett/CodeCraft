@@ -1,6 +1,9 @@
 <template>
-    <!-- Dim backdrop — click outside window to close (when closable) -->
-    <div class="os-overlay" @click.self="onBackdropClick">
+    <!-- Positioning/centering layer only — no backdrop dimming and no
+         click-outside-to-close, since multiple of these can be on screen at
+         once (see the "pointer-events: none" note in the style block below
+         for how clicks reach whatever's behind the window's own gutter). -->
+    <div class="os-overlay">
 
         <div
             class="os-window"
@@ -48,6 +51,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+
 // OsWindow — shared "OS shell" window chrome.
 //
 // Every SPLICE program (Browser, Map, Rig, Bank, etc.) mounts inside one of
@@ -66,42 +71,46 @@ const props = defineProps({
     accent:       { type: String,  default: '#00FFFF' },   // titlebar/border accent — per-program skin
     appClass:     { type: String,  default: '' },          // extra class on .os-window for deeper per-program styling
     maxWidth:     { type: String,  default: '960px' },     // cap on window width — e.g. 'none' for a map-sized program
+    zIndex:       { type: Number,  default: 10 },          // stacking order — bind this to useWindowManager's zIndexOf(id)
     closable:     { type: Boolean, default: true },
     minimizable:  { type: Boolean, default: true },
     maximizable:  { type: Boolean, default: false },
-    closeOnBackdrop: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['close', 'minimize', 'maximize', 'focus']);
 
-function onBackdropClick() {
-    if (props.closeOnBackdrop) emit('close');
-}
-
-// Exposes the accent color + width cap as CSS custom properties so the
-// stylesheet below (and any per-program appClass override) can reuse them
-// without prop-drilling individual values through every rule.
-const accentStyle = {
+// Exposes accent/width/z-index as CSS custom properties so the stylesheet
+// below (and any per-program appClass override) can reuse them without
+// prop-drilling individual values through every rule. Must stay reactive —
+// zIndex in particular changes every time focus switches between windows.
+const accentStyle = computed(() => ({
     '--os-accent':    props.accent,
     '--os-max-width': props.maxWidth,
-};
+    '--os-z':         props.zIndex,
+}));
 </script>
 
 <style scoped>
-/* ── Overlay ──────────────────────────────────────────────────────────────── */
+/* ── Overlay (centering layer, not a backdrop) ───────────────────────────────
+   No background — multiple of these can be stacked at once, so dimming one
+   would wash out whatever's on the layers below it. pointer-events:none here
+   means clicks in the padding/gutter around a non-full-width window (e.g.
+   Browser's centered 960px box) fall through to whatever's beneath instead
+   of being swallowed by empty space; .os-window below re-enables them. */
 .os-overlay {
     position: absolute;
     inset: 0;
-    z-index: 50;
-    background: rgba(0, 0, 0, 0.65);
+    z-index: var(--os-z);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 24px;
+    pointer-events: none;
 }
 
 /* ── Window ───────────────────────────────────────────────────────────────── */
 .os-window {
+    pointer-events: auto;
     width: 100%;
     height: 100%;
     max-width: var(--os-max-width);
