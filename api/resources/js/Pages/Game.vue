@@ -21,7 +21,7 @@
                 <!-- OS shell desktop — background layer, sits behind every
                      program window. Icons reuse the same launch mechanism
                      NavBar's taskbar buttons already use. -->
-                <Desktop @launch="onLaunch" @open-map="openMapWindow" />
+                <Desktop @launch="onLaunch" @open-window="openWindow" />
 
                 <!-- Map program window — opens/closes/minimizes like any other
                      SPLICE program (see useWindowManager). Starts closed —
@@ -71,6 +71,28 @@
 
                     <!-- Active objective tracker — tutorial-quest driven; disconnected
                          along with the rest of the quest system (see plan). -->
+                </OsWindow>
+
+                <!-- File Explorer program window — same open/close/minimize/
+                     maximize/geometry pattern as Map above. Starts closed. -->
+                <OsWindow
+                    v-if="windowManager.isOpen('explorer')"
+                    v-show="!windowManager.isMinimized('explorer')"
+                    title="FILE EXPLORER"
+                    icon="▦"
+                    accent="#FFC24D"
+                    app-class="explorer-window"
+                    maximizable
+                    :z-index="windowManager.zIndexOf('explorer')"
+                    :geometry="windowManager.geometryOf('explorer')"
+                    :maximized="windowManager.isMaximized('explorer')"
+                    @close="windowManager.close('explorer')"
+                    @minimize="windowManager.minimize('explorer')"
+                    @focus="windowManager.focus('explorer')"
+                    @maximize="windowManager.toggleMaximize('explorer')"
+                    @update:geometry="g => windowManager.setGeometry('explorer', g)"
+                >
+                    <FileExplorer />
                 </OsWindow>
 
                 <!-- Boot notification — shown after Watcher reboot sequence -->
@@ -355,7 +377,7 @@
             @tutorial="onTutorial"
             @logout="onLogout"
             @toggle-frequency="toggleFrequency"
-            @open-map="openMapWindow"
+            @open-window="openWindow"
         />
 
         <!-- DOC hub live chat — opened via the FREQUENCY hotkey in NavBar -->
@@ -404,6 +426,7 @@ import HexMapCanvas from '@/components/map/HexMapCanvas.vue';
 // ── OS shell ──────────────────────────────────────────────────────────────────
 import OsWindow from '@/components/shared/OsWindow.vue';
 import Desktop from '@/components/shared/Desktop.vue';
+import FileExplorer from '@/components/shared/FileExplorer.vue';
 import { useWindowManager } from '@/composables/useWindowManager.js';
 
 // ── Overlays ──────────────────────────────────────────────────────────────────
@@ -582,13 +605,27 @@ const {
     onPlayerMoved, onNodeClicked,
 } = useMapInteraction(player, getByCanvasId);
 
-// ── OS shell — window manager for the map + future program windows ───────────
+// ── OS shell — window manager for Map, File Explorer, and future programs ────
 const windowManager = useWindowManager();
 
-// Single place defining what "opening Map" means, so the desktop icon,
+// Metadata for every 'window'-kind PROGRAMS entry (see spliceApps.js) —
+// single place defining what "opening" each one means, so the desktop icon,
 // Start Menu, and taskbar all stay in sync automatically.
+const WINDOW_PROGRAMS = {
+    map:      { title: 'NETWORK MAP',   icon: '⬢', accent: '#00FF88' },
+    explorer: { title: 'FILE EXPLORER', icon: '▦', accent: '#FFC24D' },
+};
+
+function openWindow(id) {
+    const meta = WINDOW_PROGRAMS[id];
+    if (!meta) return;
+    windowManager.open(id, meta);
+}
+
+// Kept as a named alias — used directly (not via the open-window event) by
+// the tutorial-tour and boot-flow watchers below.
 function openMapWindow() {
-    windowManager.open('map', { title: 'NETWORK MAP', icon: '⬢', accent: '#00FF88' });
+    openWindow('map');
 }
 
 // Map starts closed — player sees the empty desktop first and opens it

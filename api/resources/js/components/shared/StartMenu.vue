@@ -26,9 +26,22 @@
                     <button class="start-close" @click="open = false">✕</button>
                 </div>
 
+                <div class="start-search">
+                    <span class="ss-icon">⌕</span>
+                    <input
+                        ref="searchInput"
+                        v-model="query"
+                        class="ss-input"
+                        type="text"
+                        placeholder="Search programs..."
+                        @keydown.enter="onSearchEnter"
+                        @keydown.esc="onSearchEscape"
+                    />
+                </div>
+
                 <div class="start-items">
                     <button
-                        v-for="program in PROGRAMS"
+                        v-for="program in filteredPrograms"
                         :key="program.id"
                         class="start-item"
                         @click="onSelect(program)"
@@ -38,6 +51,7 @@
                         <span v-if="program.badged && hasTutorialBadge" class="si-badge" title="New activity" />
                         <span v-if="isRunning(program)" class="si-running" title="Running" />
                     </button>
+                    <div v-if="filteredPrograms.length === 0" class="start-empty">NO MATCHES</div>
                 </div>
 
             </div>
@@ -52,9 +66,9 @@
 // for "what's launchable" rather than a third hand-written copy of it.
 //
 // Purely presentational + its own open/closed state (same shape as
-// GameMenu.vue) — it emits 'launch'/'open-map', identical contract to
+// GameMenu.vue) — it emits 'launch'/'open-window', identical contract to
 // Desktop.vue, so NavBar just forwards both without re-implementing them.
-import { ref } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { PROGRAMS } from '@/constants/spliceApps.js';
 import { useWindowManager } from '@/composables/useWindowManager.js';
 
@@ -66,10 +80,38 @@ defineProps({
     hasTutorialBadge: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['launch', 'open-map']);
+const emit = defineEmits(['launch', 'open-window']);
 
 const open = ref(false);
 const windowManager = useWindowManager();
+
+// ── Search ────────────────────────────────────────────────────────────────
+const query = ref('');
+const searchInput = ref(null);
+
+const filteredPrograms = computed(() => {
+    const q = query.value.trim().toLowerCase();
+    if (!q) return PROGRAMS;
+    return PROGRAMS.filter(p => p.label.toLowerCase().includes(q));
+});
+
+// Autofocus the search field on open, reset it on close so every open starts fresh.
+watch(open, (isOpen) => {
+    if (isOpen) {
+        query.value = '';
+        nextTick(() => searchInput.value?.focus());
+    }
+});
+
+function onSearchEnter() {
+    if (filteredPrograms.value.length > 0) onSelect(filteredPrograms.value[0]);
+}
+
+// Clear the query first; only close the menu on a second Escape (query already empty).
+function onSearchEscape() {
+    if (query.value) query.value = '';
+    else open.value = false;
+}
 
 // Small "already running" indicator — Map is a real window (windowManager
 // knows it); Browser pages don't have per-page window identity yet, so only
@@ -83,7 +125,7 @@ function isRunning(program) {
 function onSelect(program) {
     open.value = false;
     if (program.kind === 'window') {
-        emit('open-map');
+        emit('open-window', program.id);
     } else {
         emit('launch', program.url);
     }
@@ -186,6 +228,34 @@ function onSelect(program) {
 }
 .start-close:hover { color: #FF3333; }
 
+/* ── Search ──────────────────────────────────────────────────────────────── */
+.start-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.08);
+}
+
+.ss-icon {
+    font-size: 12px;
+    color: rgba(0, 255, 255, 0.35);
+    flex-shrink: 0;
+}
+
+.ss-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: rgba(0, 255, 255, 0.85);
+}
+.ss-input::placeholder { color: rgba(0, 255, 255, 0.25); }
+
 /* ── Items ───────────────────────────────────────────────────────────────── */
 .start-items {
     display: flex;
@@ -239,6 +309,14 @@ function onSelect(program) {
     box-shadow: 0 0 5px rgba(0, 255, 136, 0.8);
     animation: start-badge-pulse 2s ease-in-out infinite;
     flex-shrink: 0;
+}
+
+.start-empty {
+    padding: 14px 16px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: rgba(0, 255, 255, 0.25);
+    text-align: center;
 }
 
 /* ── Transition ───────────────────────────────────────────────────────────── */

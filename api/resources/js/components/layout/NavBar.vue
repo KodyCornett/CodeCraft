@@ -5,15 +5,15 @@
         <StartMenu
             :has-tutorial-badge="hasTutorialBadge"
             @launch="url => emit('launch', url)"
-            @open-map="emit('open-map')"
+            @open-window="id => emit('open-window', id)"
         />
 
         <div class="tb-sep" />
 
         <!-- Open program windows — the whole point of the taskbar now: empty
              until something is launched (from the Start Menu or a desktop
-             icon), then shows up here same as real Windows. Only Map and
-             Browser are true separate programs right now (see
+             icon), then shows up here same as real Windows. Map, File
+             Explorer, and Browser are true separate programs right now (see
              useWindowManager.js); everything else still opens as a page
              inside the one Browser window. Click focuses/restores; click
              again while already focused minimizes. -->
@@ -76,7 +76,7 @@ const props = defineProps({
     frequencyColor:     { type: String,  default: '#00FFC8' },
 });
 
-const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency', 'open-map']);
+const emit = defineEmits(['launch', 'tutorial', 'logout', 'toggle-frequency', 'open-window']);
 
 // ── Open program windows (Map, Browser) — singleton, same live state
 // Game.vue/InGameBrowser read/write. Aliased on destructure since `toggle`

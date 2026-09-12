@@ -3,13 +3,14 @@
         <div class="desktop-icons">
 
             <!-- Same launchable-programs list the Start Menu uses — see
-                 constants/spliceApps.js. 'window' kind (Network Map) emits
-                 open-map; 'launch' kind (everything else) emits launch(url). -->
+                 constants/spliceApps.js. 'window' kind (Network Map, File
+                 Explorer) emits open-window(id); 'launch' kind (everything
+                 else) emits launch(url). -->
             <button
                 v-for="program in PROGRAMS"
                 :key="program.id"
                 class="desktop-icon"
-                @click="program.kind === 'window' ? emit('open-map') : emit('launch', program.url)"
+                @click="program.kind === 'window' ? emit('open-window', program.id) : emit('launch', program.url)"
             >
                 <span class="di-glyph">{{ program.icon }}</span>
                 <span class="di-label">{{ program.label }}</span>
@@ -22,12 +23,12 @@
 <script setup>
 // Desktop — the OS shell's background layer. Purely presentational: it emits
 // 'launch' (SPLICE url, same contract NavBar's app buttons already use) and
-// 'open-map' (the one program that isn't a SPLICE page); Game.vue wires both
-// to the exact same handlers NavBar/windowManager already use elsewhere, so
-// no launch logic is duplicated here.
+// 'open-window' (id of a non-SPLICE-page program — Network Map, File
+// Explorer); Game.vue wires both to the exact same handlers NavBar/
+// windowManager already use elsewhere, so no launch logic is duplicated here.
 import { PROGRAMS } from '@/constants/spliceApps.js';
 
-const emit = defineEmits(['launch', 'open-map']);
+const emit = defineEmits(['launch', 'open-window']);
 </script>
 
 <style scoped>

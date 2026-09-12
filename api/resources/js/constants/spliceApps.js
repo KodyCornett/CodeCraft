@@ -22,17 +22,18 @@ export const SPLICE_APPS = [
  * PROGRAMS
  *
  * Everything a player can launch from the desktop or the Start Menu — the
- * one true program (Network Map — opens as its own window, not a SPLICE
- * page) plus SPLICE home plus the same SPLICE_APPS list above. Desktop.vue
- * and StartMenu.vue both render from this single list instead of each
- * hand-assembling "map + home + apps" separately.
+ * true OS-level programs (Network Map, File Explorer — each opens as its
+ * own window, not a SPLICE page) plus SPLICE home plus the same SPLICE_APPS
+ * list above. Desktop.vue and StartMenu.vue both render from this single
+ * list instead of each hand-assembling "programs + home + apps" separately.
  *
- * kind: 'window' → not a SPLICE page; caller emits 'open-map' (only entry
- *       of this kind today, but kept generic rather than special-cased).
+ * kind: 'window' → not a SPLICE page; caller emits 'open-window' with the
+ *       program's id (Game.vue's openWindow() dispatches on it).
  * kind: 'launch' → a SPLICE page; caller emits 'launch' with `url`.
  */
 export const PROGRAMS = [
     { id: 'map', kind: 'window', icon: '⬢', label: 'NETWORK MAP' },
+    { id: 'explorer', kind: 'window', icon: '▦', label: 'FILE EXPLORER' },
     { id: 'browser', kind: 'launch', icon: '◈', label: 'SPLICE', url: SPLICE.HOME },
     ...SPLICE_APPS.map(app => ({
         id: app.url, kind: 'launch', icon: app.icon, label: app.label, url: app.url,

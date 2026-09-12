@@ -16,6 +16,7 @@ use App\Http\Controllers\StoreController;
 use App\Http\Controllers\CyberDocController;
 use App\Http\Controllers\CodexController;
 use App\Http\Controllers\DocChatController;
+use App\Http\Controllers\FileController;
 use Illuminate\Support\Facades\Route;
 
 // ---------------------------------------------------------------------------
@@ -253,5 +254,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // solve: 20/min — retries are free and expected, still throttled against scripted brute-force
     Route::post('/codex/page/{splicePageId}/solve', [CodexController::class, 'solvePage'])
         ->middleware('throttle:20,1');
+
+// ---------------------------------------------------------------------------
+// Files — per-player virtual file system backing the File Explorer OS
+// program. Phase 1 is read-only (see CONTRACTS_AND_OS_REWORK_PLAN.md).
+// ---------------------------------------------------------------------------
+
+    Route::get('/files',            [FileController::class, 'index']);
+    Route::get('/files/{fileId}',   [FileController::class, 'show']);
 
 });
